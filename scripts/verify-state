@@ -1,0 +1,109 @@
+#!/usr/bin/env python3
+"""Read-only verification for the local Hermes harness."""
+import argparse
+import hashlib
+import json
+import re
+import subprocess
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+def load(path):
+    return json.loads(Path(path).read_text())  # JSON is valid YAML; avoids a YAML dependency.
+
+
+def run(*args):
+    return subprocess.run(args, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+
+def fail(errors, message):
+    errors.append(message)
+    print(f"FAIL: {message}")
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--fixture", help="sanitized observed-state fixture; never reads live state")
+    args = parser.parse_args()
+    errors = []
+    warnings = []
+    try:
+        roster = load(ROOT / "roster.yaml")
+        snapshot = load(ROOT / "snapshots/sanitized-current-state.yaml")
+    except (OSError, json.JSONDecodeError) as exc:
+        print(f"FAIL: malformed desired state: {exc}")
+        return 2
+    if roster.get("ladder_version") != "glm-review-v1":
+        fail(errors, "ladder_version expected glm-review-v1")
+    expected = {p["name"]: p for p in roster.get("profiles", [])}
+    if args.fixture:
+        try:
+            observed = load(args.fixture)
+        except (OSError, json.JSONDecodeError) as exc:
+            print(f"FAIL: malformed fixture: {exc}")
+            return 2
+        for name, model in observed.get("profile_models", {}).items():
+            if name in expected and model != expected[name]["model"]:
+                fail(errors, f"model drift {name}: expected {expected[name]['model']}, actual {model}")
+        for name in observed.get("active_extras", []):
+            fail(errors, f"behavior-changing unexpected profile: {name}")
+        for name in observed.get("dormant_extras", []):
+            warnings.append(f"dormant unexpected profile: {name}")
+    else:
+        listed = run("hermes", "profile", "list")
+        if listed.returncode:
+            fail(errors, "unable to read Hermes profile list")
+        else:
+            text = listed.stdout
+            observed_names = set(re.findall(r"^\s*◆?([A-Za-z][A-Za-z0-9-]+)\s+\S+\s+(?:running|stopped)", text, re.M))
+            for name in sorted(observed_names - set(expected)):
+                fail(errors, f"behavior-changing unexpected profile: {name}")
+            for name, profile in expected.items():
+                if name not in observed_names:
+                    fail(errors, f"missing profile: {name}")
+                elif profile["installed"]:
+                    model = profile["model"]
+                    if model not in next((line for line in text.splitlines() if name in line), ""):
+                        fail(errors, f"model drift {name}: expected {model}")
+            for name, profile in expected.items():
+                provider = run("hermes", "-p", name, "config", "get", "model.provider")
+                if provider.returncode or provider.stdout.strip() != profile["provider"]:
+                    fail(errors, f"provider drift {name}: expected {profile['provider']}")
+        for key, want in snapshot["kanban"].items():
+            actual = run("hermes", "config", "get", f"kanban.{key}")
+            value = actual.stdout.strip()
+            expected_value = "null" if want is None else json.dumps(want)
+            if actual.returncode or value != expected_value:
+                fail(errors, f"concurrency/dispatch drift kanban.{key}: expected {expected_value}, actual {value or 'unavailable'}")
+        plugins = run("hermes", "plugins", "list", "--plain", "--no-bundled")
+        if plugins.returncode or "enabled" not in plugins.stdout or "ponytail" not in plugins.stdout:
+            fail(errors, "missing or disabled required plugin: ponytail")
+        skill = Path(snapshot["skill"]["path"])
+        if not skill.is_file():
+            fail(errors, "missing shared skill")
+        else:
+            actual_hash = hashlib.sha256(skill.read_bytes()).hexdigest()
+            if actual_hash != snapshot["skill"]["sha256"]:
+                fail(errors, "shared skill content hash mismatch")
+            if "version: " + snapshot["skill"]["version"] not in skill.read_text():
+                fail(errors, "shared skill version mismatch")
+        source = Path(snapshot["hermes_source"]["path"])
+        commit = run("git", "-C", str(source), "rev-parse", "HEAD")
+        dirty = run("git", "-C", str(source), "status", "--short")
+        if commit.returncode or commit.stdout.strip() != snapshot["hermes_source"]["commit"]:
+            fail(errors, "Hermes source commit drift")
+        if dirty.returncode or dirty.stdout.strip():
+            fail(errors, "Hermes source has unexpected modifications")
+    for message in warnings:
+        print(f"WARN: {message}")
+    if errors:
+        return 1
+    print("OK: desired state matches observed state")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

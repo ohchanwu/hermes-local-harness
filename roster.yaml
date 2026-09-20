@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "ladder_version": "glm-review-v1",
+  "escalation_rungs": ["flash", "luna", "terra", "glm-full", "sol", "astra", "human"],
+  "permitted_direct_entry_rungs": ["flash", "terra", "glm-full"],
+  "maximum_concurrent_implementation_runs": 5,
+  "native_settings": {"kanban.max_in_progress": null, "kanban.max_in_progress_per_profile": 1},
+  "dispatch_pool": {"implementation_allowlist": ["worker-flash-1", "worker-flash-2", "worker-flash-3", "worker-luna-1", "worker-luna-2"], "reviewer_outside_budget": "reviewer-sol"},
+  "automatic_decomposition": false,
+  "revision_limits": {"default_same_rung": 1, "absolute_same_rung": 2, "infrastructure_failures_before_escalation": 2, "final_tier": "human_block"},
+  "profiles": [
+    {"name":"default","role":"orchestrator","model":"gpt-5.6-sol","provider":"openai-codex","installed":true,"dispatch_eligible":false,"in_dispatch_pool":false,"lifecycle":"active","concurrency_limit":1,"required_plugins":[],"modes":[],"toolsets":"orchestrator","credential_required":true,"credential_present":true},
+    {"name":"advisor","role":"advisor","model":"gpt-5.6-sol","provider":"openai-codex","installed":true,"dispatch_eligible":false,"in_dispatch_pool":false,"lifecycle":"active","concurrency_limit":1,"required_plugins":[],"modes":[],"toolsets":"read-only","credential_required":true,"credential_present":true},
+    {"name":"reviewer-sol","role":"independent reviewer","model":"gpt-5.6-sol","provider":"openai-codex","installed":true,"dispatch_eligible":true,"in_dispatch_pool":true,"lifecycle":"active","concurrency_limit":1,"required_plugins":[],"modes":[],"toolsets":"review","credential_required":true,"credential_present":true},
+    {"name":"worker-flash-1","role":"implementation","model":"glm-5.3-flash","provider":"zai","installed":true,"dispatch_eligible":true,"in_dispatch_pool":true,"lifecycle":"active","concurrency_limit":1,"required_plugins":["ponytail"],"modes":["ponytail:full"],"toolsets":"implementation","credential_required":true,"credential_present":true},
+    {"name":"worker-flash-2","role":"implementation","model":"glm-5.3-flash","provider":"zai","installed":true,"dispatch_eligible":true,"in_dispatch_pool":true,"lifecycle":"active","concurrency_limit":1,"required_plugins":["ponytail"],"modes":["ponytail:full"],"toolsets":"implementation","credential_required":true,"credential_present":true},
+    {"name":"worker-flash-3","role":"implementation","model":"glm-5.3-flash","provider":"zai","installed":true,"dispatch_eligible":true,"in_dispatch_pool":true,"lifecycle":"active","concurrency_limit":1,"required_plugins":["ponytail"],"modes":["ponytail:full"],"toolsets":"implementation","credential_required":true,"credential_present":true},
+    {"name":"worker-luna-1","role":"implementation","model":"gpt-5.6-luna","provider":"openai-codex","installed":true,"dispatch_eligible":true,"in_dispatch_pool":true,"lifecycle":"active","concurrency_limit":1,"required_plugins":["ponytail"],"modes":["ponytail:full"],"toolsets":"implementation","credential_required":true,"credential_present":true},
+    {"name":"worker-luna-2","role":"implementation","model":"gpt-5.6-luna","provider":"openai-codex","installed":true,"dispatch_eligible":true,"in_dispatch_pool":true,"lifecycle":"active","concurrency_limit":1,"required_plugins":["ponytail"],"modes":["ponytail:full"],"toolsets":"implementation","credential_required":true,"credential_present":true},
+    {"name":"worker-terra-1","role":"implementation","model":"gpt-5.6-terra","provider":"openai-codex","installed":true,"dispatch_eligible":true,"in_dispatch_pool":false,"lifecycle":"active","concurrency_limit":1,"required_plugins":["ponytail"],"modes":["ponytail:full"],"toolsets":"implementation","credential_required":true,"credential_present":true},
+    {"name":"worker-glm-full","role":"implementation","model":"glm-5.3","provider":"zai","installed":true,"dispatch_eligible":true,"in_dispatch_pool":false,"lifecycle":"active","concurrency_limit":1,"required_plugins":["ponytail"],"modes":["ponytail:full"],"toolsets":"implementation","credential_required":true,"credential_present":true},
+    {"name":"worker-sol","role":"implementation","model":"gpt-5.6-sol","provider":"openai-codex","installed":true,"dispatch_eligible":true,"in_dispatch_pool":false,"lifecycle":"active","concurrency_limit":1,"required_plugins":["ponytail"],"modes":["ponytail:full"],"toolsets":"implementation","credential_required":true,"credential_present":true},
+    {"name":"worker-astra","role":"implementation","model":"gpt-6-astra","provider":"openai-codex","installed":true,"dispatch_eligible":true,"in_dispatch_pool":false,"lifecycle":"active","concurrency_limit":1,"required_plugins":["ponytail"],"modes":["ponytail:full"],"toolsets":"implementation","credential_required":true,"credential_present":true},
+    {"name":"worker-terra-2","role":"rollback spare","model":"gpt-5.6-terra","provider":"openai-codex","installed":true,"dispatch_eligible":false,"in_dispatch_pool":false,"lifecycle":"dormant-spare","concurrency_limit":1,"required_plugins":["ponytail"],"modes":["ponytail:full"],"toolsets":"implementation","credential_required":true,"credential_present":true}
+  ]
+}

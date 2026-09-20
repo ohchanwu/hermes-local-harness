@@ -1,0 +1,15 @@
+.env
+.env.*
+auth.json
+credentials*
+*.token
+*.db
+*.sqlite
+*.sqlite3
+*.jsonl
+logs/
+transcripts/
+private/
+__pycache__/
+*.py[cod]
+.DS_Store
