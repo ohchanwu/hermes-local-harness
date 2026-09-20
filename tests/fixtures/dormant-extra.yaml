@@ -1,1 +1,97 @@
-{"profile_models":{},"active_extras":[],"dormant_extras":["unused-local-profile"]}
+{
+  "profile_models": {
+    "default": "gpt-5.6-sol",
+    "advisor": "gpt-5.6-sol",
+    "reviewer-sol": "gpt-5.6-sol",
+    "worker-flash-1": "glm-5.3-flash",
+    "worker-flash-2": "glm-5.3-flash",
+    "worker-flash-3": "glm-5.3-flash",
+    "worker-luna-1": "gpt-5.6-luna",
+    "worker-luna-2": "gpt-5.6-luna",
+    "worker-terra-1": "gpt-5.6-terra",
+    "worker-terra-2": "gpt-5.6-terra",
+    "worker-glm-full": "glm-5.3",
+    "worker-sol": "gpt-5.6-sol",
+    "worker-astra": "gpt-6-astra"
+  },
+  "profile_providers": {
+    "default": "openai-codex",
+    "advisor": "openai-codex",
+    "reviewer-sol": "openai-codex",
+    "worker-flash-1": "zai",
+    "worker-flash-2": "zai",
+    "worker-flash-3": "zai",
+    "worker-luna-1": "openai-codex",
+    "worker-luna-2": "openai-codex",
+    "worker-terra-1": "openai-codex",
+    "worker-terra-2": "openai-codex",
+    "worker-glm-full": "zai",
+    "worker-sol": "openai-codex",
+    "worker-astra": "openai-codex"
+  },
+  "plugins": {
+    "default": {},
+    "advisor": {},
+    "reviewer-sol": {},
+    "worker-flash-1": {
+      "ponytail": "enabled      git pinned@16f29800 4.8.4    ponytail"
+    },
+    "worker-flash-2": {
+      "ponytail": "enabled      git pinned@16f29800 4.8.4    ponytail"
+    },
+    "worker-flash-3": {
+      "ponytail": "enabled      git pinned@16f29800 4.8.4    ponytail"
+    },
+    "worker-luna-1": {
+      "ponytail": "enabled      git pinned@16f29800 4.8.4    ponytail"
+    },
+    "worker-luna-2": {
+      "ponytail": "enabled      git pinned@16f29800 4.8.4    ponytail"
+    },
+    "worker-terra-1": {
+      "ponytail": "enabled      git pinned@16f29800 4.8.4    ponytail"
+    },
+    "worker-terra-2": {
+      "ponytail": "enabled      git pinned@16f29800 4.8.4    ponytail"
+    },
+    "worker-glm-full": {
+      "ponytail": "enabled      git pinned@16f29800 4.8.4    ponytail"
+    },
+    "worker-sol": {
+      "ponytail": "enabled      git pinned@16f29800 4.8.4    ponytail"
+    },
+    "worker-astra": {
+      "ponytail": "enabled      git pinned@16f29800 4.8.4    ponytail"
+    }
+  },
+  "dispatch_profiles": [
+    "worker-flash-1",
+    "worker-flash-2",
+    "worker-flash-3",
+    "worker-luna-1",
+    "worker-luna-2",
+    "reviewer-sol"
+  ],
+  "kanban": {
+    "max_in_progress": null,
+    "max_in_progress_per_profile": 1
+  },
+  "skill_files": {
+    "SKILL.md": "111bab7f058fb77ec2fbc6fefc0abe5e4d1e8eb290f2834297f00e19dd212c79",
+    "scripts/set-active-lanes.py": "157419c7c190b0a9f647271f7bd3839182f2e9324f8f9d74e43ec0553a5b77df"
+  },
+  "active_extras": [],
+  "dormant_extras": [
+    "unused-local-profile"
+  ],
+  "adapters": [
+    {
+      "repo": "cha-pt",
+      "content": "# Cha PT adapter\n**Status: operational; local repository adoption validated.**\n"
+    },
+    {
+      "repo": "jobcron",
+      "content": "# Jobcron adapter\n**Status: operational; local repository adoption validated.**\n"
+    }
+  ]
+}

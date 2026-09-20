@@ -28,8 +28,14 @@ check("--fixture", str(FIXTURES / "unexpected-plugin.yaml"), code=1, text="behav
 check("--fixture", str(FIXTURES / "missing-plugin.yaml"), code=1, text="plugin drift")
 # deployed skill hash divergence from tracked canonical source fails
 check("--fixture", str(FIXTURES / "deployed-skill-divergence.yaml"), code=1, text="deployed skill hash mismatch")
-# missing adapter fails when fixture says adoption is absent
+# empty adapter content fails (missing adoption)
 check("--fixture", str(FIXTURES / "adapter-missing.yaml"), code=1, text="repository adapter missing")
+# adapter present but adoption marker regressed fails
+check("--fixture", str(FIXTURES / "adoption-status-drift.yaml"), code=1, text="adoption status drift")
+# fail-closed schema: empty fixture cannot pass
+check("--fixture", str(FIXTURES / "incomplete-empty.yaml"), code=1, text="incomplete fixture: missing required section")
+# fail-closed schema: omitted roster profile cannot pass
+check("--fixture", str(FIXTURES / "incomplete-omits-profile.yaml"), code=1, text="incomplete fixture: profile_models omits worker-sol")
 
 
 # unreadable kanban config must FAIL, not collapse to None (None is a legal desired value for max_in_progress)

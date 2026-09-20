@@ -91,12 +91,30 @@ def check_skill(errors, deployed_hashes):
         fail(errors, "shared skill version mismatch")
 
 
-def check_adoption(errors, adapters_present):
+ADOPTION_REPOS = {"cha-pt": "adoption/cha-pt.md", "jobcron": "adoption/jobcron.md"}
+
+
+def check_adoption(errors, adapters):
+    """adapters: fixture list of {repo, content}; None means read live adapter files."""
     for adapter in load(ROOT / "snapshots/sanitized-current-state.yaml")["adoption"]["adapters"]:
-        if adapters_present is not None and not adapters_present:
-            fail(errors, f"repository adapter missing: {adapter['path']}")
-        elif adapters_present is None and not Path(adapter["path"]).is_file():
-            fail(errors, f"repository adapter missing: {adapter['path']}")
+        repo, want_path, marker = adapter["repo"], adapter["path"], adapter["marker"]
+        record = ROOT / ADOPTION_REPOS[repo]
+        if not record.is_file():
+            fail(errors, f"missing tracked adoption record: {record.relative_to(ROOT)}")
+        elif want_path not in record.read_text():
+            fail(errors, f"tracked adoption record does not reference adapter path: {record.relative_to(ROOT)}")
+        if adapters is None:
+            text = Path(want_path).read_text(errors="ignore") if Path(want_path).is_file() else ""
+        else:
+            entries = [a for a in adapters if a.get("repo") == repo]
+            if not entries:
+                fail(errors, f"adoption drift {repo}: fixture omits adapter status")
+                continue
+            text = str(entries[0].get("content") or "")
+        if not text:
+            fail(errors, f"repository adapter missing: {want_path}")
+        elif marker not in text:
+            fail(errors, f"adoption status drift {repo}: marker not found in adapter")
 
 
 def main():
@@ -121,9 +139,45 @@ def main():
         except (OSError, json.JSONDecodeError) as exc:
             print(f"FAIL: malformed fixture: {exc}")
             return 2
-        for name, model in observed.get("profile_models", {}).items():
-            if name in expected and model != expected[name]["model"]:
-                fail(errors, f"model drift {name}: expected {expected[name]['model']}, actual {model}")
+        # Fail-closed fixture schema: a passing fixture must represent every required
+        # observed field and every installed roster profile; omission is drift, not success.
+        for section in ("profile_models", "profile_providers", "plugins", "dispatch_profiles", "kanban", "skill_files", "adapters"):
+            if section not in observed:
+                fail(errors, f"incomplete fixture: missing required section '{section}'")
+        kanban = observed.get("kanban", {})
+        for key, want in snapshot["kanban"].items():
+            if key == "dispatch_profiles":
+                continue
+            if key not in kanban:
+                fail(errors, f"incomplete fixture: kanban omits {key}")
+            elif kanban[key] != want:
+                fail(errors, f"concurrency/dispatch drift kanban.{key}: expected {want!r}, actual {kanban[key]!r}")
+        if "dispatch_profiles" in observed and observed["dispatch_profiles"] != dispatch_profiles:
+            fail(errors, f"dispatch drift: expected {dispatch_profiles}, actual {observed['dispatch_profiles']}")
+        models, providers = observed.get("profile_models", {}), observed.get("profile_providers", {})
+        for name, profile in expected.items():
+            if not profile["installed"]:
+                continue
+            if name not in models:
+                fail(errors, f"incomplete fixture: profile_models omits {name}")
+            elif models[name] != profile["model"]:
+                fail(errors, f"model drift {name}: expected {profile['model']}, actual {models[name]}")
+            if name not in providers:
+                fail(errors, f"incomplete fixture: profile_providers omits {name}")
+            elif providers[name] != profile["provider"]:
+                fail(errors, f"provider drift {name}: expected {profile['provider']}, actual {providers[name]}")
+        for name in list(models) + list(providers):
+            if name not in expected:
+                fail(errors, f"behavior-changing unexpected profile: {name}")
+        plugins = observed.get("plugins", {})
+        for name in expected:
+            if name not in plugins:
+                fail(errors, f"incomplete fixture: plugins omits {name}")
+        for name, observed_plugins in plugins.items():
+            if name not in expected:
+                fail(errors, f"behavior-changing unexpected profile: {name}")
+            else:
+                check_plugins(errors, warnings, name, expected[name]["required_plugins"], observed_plugins)
         for name in observed.get("active_extras", []):
             fail(errors, f"behavior-changing unexpected profile: {name}")
         for name in observed.get("dormant_extras", []):
@@ -131,13 +185,8 @@ def main():
         for name, profile in observed.get("profiles", {}).items():
             if name not in expected:
                 check_extra(errors, warnings, name, profile.get("status", "stopped"), dispatch_profiles)
-        if "dispatch_profiles" in observed and observed["dispatch_profiles"] != dispatch_profiles:
-            fail(errors, f"dispatch drift: expected {dispatch_profiles}, actual {observed['dispatch_profiles']}")
-        for name, plugins in observed.get("plugins", {}).items():
-            check_plugins(errors, warnings, name, expected.get(name, {}).get("required_plugins", []), plugins)
-        check_skill(errors, observed.get("skill_files"))
-        if "adapters_present" in observed:
-            check_adoption(errors, observed["adapters_present"])
+        check_skill(errors, observed.get("skill_files", {}))
+        check_adoption(errors, observed.get("adapters", []))
     else:
         listed = run("hermes", "-p", "default", "profile", "list")
         if listed.returncode:

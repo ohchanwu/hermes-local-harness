@@ -1,6 +1,6 @@
 # Manual apply / reconstruction procedure
 
-Reconstruct the non-secret harness from this repository using supported Hermes CLI commands only. No apply script exists by design. Every command below was verified against the live CLI on 2026-09-20.
+Reconstruct the non-secret harness from this repository using supported Hermes CLI commands only. No apply script exists by design. Every command form below was verified against the live CLI on 2026-09-20 (`hermes profile create --description`, `hermes profile describe --text`, `hermes -p X config set`, `hermes -p X plugins install --ref`, `hermes config set/unset`).
 
 Global settings are scoped: always pass `-p default` explicitly so results do not depend on the caller's active profile (reviewer/worker profiles report `null` for unset-scoped queries).
 
@@ -12,45 +12,90 @@ Global settings are scoped: always pass `-p default` explicitly so results do no
 
 ## 1. Profiles
 
-Create each roster profile (13 total: default, advisor, reviewer-sol, worker-flash-1/2/3, worker-luna-1/2, worker-terra-1/2, worker-glm-full, worker-sol, worker-astra):
+Create the 12 non-default roster profiles with their exact descriptions (order irrelevant; `default` already exists and intentionally has no description):
 
-    hermes profile create worker-flash-1 --description "Flash implementation lane"
+    hermes profile create advisor --description "General advisor for terminology clarification, architecture decisions, local and web research, and read-only consultation of the default orchestrator's session transcripts."
+    hermes profile create reviewer-sol --description "Independent GPT 5.6 Sol reviewer; defines semantic failure and selects revision, escalation, restart, approval, or human block."
+    hermes profile create worker-flash-1 --description "GLM 5.3 Flash implementation lane 1; default economical coding worker."
+    hermes profile create worker-flash-2 --description "GLM 5.3 Flash implementation lane 2; default economical coding worker."
+    hermes profile create worker-flash-3 --description "GLM 5.3 Flash implementation lane 3; default economical coding worker."
+    hermes profile create worker-luna-1 --description "GPT 5.6 Luna implementation escalation lane 1 for work rejected at the Flash rung."
+    hermes profile create worker-luna-2 --description "GPT 5.6 Luna implementation escalation lane 2 for work rejected at the Flash rung."
+    hermes profile create worker-terra-1 --description "GPT 5.6 Terra implementation lane for ambiguity, diagnosis, architecture, security, migrations, and complex multi-file work."
+    hermes profile create worker-terra-2 --description "Dormant spare GPT 5.6 Terra implementation lane retained for rollback and capacity changes."
+    hermes profile create worker-glm-full --description "GLM 5.3 full implementation lane for large-context, repo-wide, long-horizon, or visual work."
+    hermes profile create worker-sol --description "GPT 5.6 Sol implementation escalation lane for work rejected below Sol."
+    hermes profile create worker-astra --description "GPT 6 Astra final implementation escalation lane before human intervention."
+
+To repair an existing profile's description instead:
+
+    hermes -p default profile describe <profile> --text "<exact text above>"
 
 Complete separate authorization per profile when a credential is required (`hermes` will prompt on first use; never copy OAuth stores between profiles).
 
-Set model/provider per profile:
+## 2. Model and provider per profile (all 13)
 
+    hermes -p default config set model.default gpt-5.6-sol
+    hermes -p default config set model.provider openai-codex
+    hermes -p advisor config set model.default gpt-5.6-sol
+    hermes -p advisor config set model.provider openai-codex
+    hermes -p reviewer-sol config set model.default gpt-5.6-sol
+    hermes -p reviewer-sol config set model.provider openai-codex
     hermes -p worker-flash-1 config set model.default glm-5.3-flash
     hermes -p worker-flash-1 config set model.provider zai
+    hermes -p worker-flash-2 config set model.default glm-5.3-flash
+    hermes -p worker-flash-2 config set model.provider zai
+    hermes -p worker-flash-3 config set model.default glm-5.3-flash
+    hermes -p worker-flash-3 config set model.provider zai
     hermes -p worker-luna-1 config set model.default gpt-5.6-luna
     hermes -p worker-luna-1 config set model.provider openai-codex
-    # terra/sol/astra lanes → gpt-5.6-terra / gpt-5.6-sol / gpt-6-astra @ openai-codex
-    # glm-full lane → glm-5.3 @ zai; default/advisor/reviewer-sol → gpt-5.6-sol @ openai-codex
+    hermes -p worker-luna-2 config set model.default gpt-5.6-luna
+    hermes -p worker-luna-2 config set model.provider openai-codex
+    hermes -p worker-terra-1 config set model.default gpt-5.6-terra
+    hermes -p worker-terra-1 config set model.provider openai-codex
+    hermes -p worker-terra-2 config set model.default gpt-5.6-terra
+    hermes -p worker-terra-2 config set model.provider openai-codex
+    hermes -p worker-glm-full config set model.default glm-5.3
+    hermes -p worker-glm-full config set model.provider zai
+    hermes -p worker-sol config set model.default gpt-5.6-sol
+    hermes -p worker-sol config set model.provider openai-codex
+    hermes -p worker-astra config set model.default gpt-6-astra
+    hermes -p worker-astra config set model.provider openai-codex
 
-## 2. Ponytail on implementation profiles (all nine + terra-2 spare; NOT default/reviewer-sol/advisor)
+## 3. Ponytail on the ten implementation profiles (worker-flash-1/2/3, worker-luna-1/2, worker-terra-1/2, worker-glm-full, worker-sol, worker-astra; NOT default/reviewer-sol/advisor)
 
 Install pinned from Git and enable:
 
     hermes -p worker-flash-1 plugins install https://github.com/DietrichGebert/ponytail.git --ref 16f29800fd2681bdf24f3eb4ccffe38be3baec6b --enable
-    # repeat per implementation profile; --ref pins exactly; catalog does not list ponytail
+    hermes -p worker-flash-2 plugins install https://github.com/DietrichGebert/ponytail.git --ref 16f29800fd2681bdf24f3eb4ccffe38be3baec6b --enable
+    hermes -p worker-flash-3 plugins install https://github.com/DietrichGebert/ponytail.git --ref 16f29800fd2681bdf24f3eb4ccffe38be3baec6b --enable
+    hermes -p worker-luna-1 plugins install https://github.com/DietrichGebert/ponytail.git --ref 16f29800fd2681bdf24f3eb4ccffe38be3baec6b --enable
+    hermes -p worker-luna-2 plugins install https://github.com/DietrichGebert/ponytail.git --ref 16f29800fd2681bdf24f3eb4ccffe38be3baec6b --enable
+    hermes -p worker-terra-1 plugins install https://github.com/DietrichGebert/ponytail.git --ref 16f29800fd2681bdf24f3eb4ccffe38be3baec6b --enable
+    hermes -p worker-terra-2 plugins install https://github.com/DietrichGebert/ponytail.git --ref 16f29800fd2681bdf24f3eb4ccffe38be3baec6b --enable
+    hermes -p worker-glm-full plugins install https://github.com/DietrichGebert/ponytail.git --ref 16f29800fd2681bdf24f3eb4ccffe38be3baec6b --enable
+    hermes -p worker-sol plugins install https://github.com/DietrichGebert/ponytail.git --ref 16f29800fd2681bdf24f3eb4ccffe38be3baec6b --enable
+    hermes -p worker-astra plugins install https://github.com/DietrichGebert/ponytail.git --ref 16f29800fd2681bdf24f3eb4ccffe38be3baec6b --enable
 
-Verify full mode (plugin default is `full`; the resolver honors `PONYTAIL_DEFAULT_MODE` and `~/.config/ponytail/config.json` — leave both unset unless a mode override is an approved change):
+(--ref pins exactly; catalog does not list ponytail.)
 
-    hermes -p worker-flash-1 plugins list --plain --no-bundled
+Verify full mode on each (plugin default is `full`; the resolver honors `PONYTAIL_DEFAULT_MODE` and `~/.config/ponytail/config.json` — leave both unset unless a mode override is an approved change):
+
+    hermes -p <profile> plugins list --plain --no-bundled
     # expect: enabled      git pinned@16f29800 4.8.4    ponytail
 
-## 3. Deploy the shared skill (manual copy; never symlink)
+## 4. Deploy the shared skill (manual copy; never symlink)
 
     mkdir -p ~/.hermes/skills/autonomous-ai-agents/multi-agent-coding-orchestrator/scripts
     cp skills/multi-agent-coding-orchestrator/SKILL.md ~/.hermes/skills/autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md
     cp skills/multi-agent-coding-orchestrator/scripts/set-active-lanes.py ~/.hermes/skills/autonomous-ai-agents/multi-agent-coding-orchestrator/scripts/
 
-## 4. Global kanban settings (default-scoped)
+## 5. Global kanban settings (default-scoped)
 
     hermes -p default config set kanban.max_in_progress_per_profile 1
     hermes -p default config unset kanban.max_in_progress   # must stay unset: it counts reviewer runs
 
-## 5. Dispatch allowlist (five implementation lanes + reviewer-sol)
+## 6. Dispatch allowlist (five implementation lanes + reviewer-sol)
 
 Use the canonical helper, which refuses to remove a running implementation profile:
 
@@ -58,7 +103,11 @@ Use the canonical helper, which refuses to remove a running implementation profi
       worker-flash-1 worker-flash-2 worker-flash-3 worker-luna-1 worker-luna-2
     # helper appends reviewer-sol automatically; --dry-run previews; --limit caps pool size
 
-## 6. Verify and commit
+## 7. Repository adapters (already adopted; verify only)
+
+The cha-pt and jobcron adapters at the paths in `snapshots/sanitized-current-state.yaml` must each contain `Status: operational; local repository adoption validated.` — `./scripts/verify-state` checks this marker plus the tracked `adoption/*.md` records. Do not modify those repositories from here.
+
+## 8. Verify and commit
 
     ./scripts/verify-state        # must exit 0
     git add -A && git commit -m "Apply <change>"   # commit desired-state change separately from applying
