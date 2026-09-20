@@ -89,7 +89,8 @@
     },
     {
       "repo": "jobcron",
-      "content": "# Jobcron adapter\n**Status: operational; local repository adoption validated.**\n"
+      "content": "# Jobcron adapter\n**Status: operational; local repository adoption validated.**\n",
+      "record": "/Users/chanbla11mit/gt/jobscraper/mayor/rig/docs/superpowers/specs/260919-hermes-orchestration-transition.md\nStatus: operational, local adoption validated."
     }
   ]
 }

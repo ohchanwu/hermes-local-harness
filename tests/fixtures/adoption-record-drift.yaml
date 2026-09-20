@@ -8,7 +8,7 @@
     "worker-flash-3": "glm-5.3-flash",
     "worker-luna-1": "gpt-5.6-luna",
     "worker-luna-2": "gpt-5.6-luna",
-    "worker-terra-1": "wrong-model",
+    "worker-terra-1": "gpt-5.6-terra",
     "worker-terra-2": "gpt-5.6-terra",
     "worker-glm-full": "glm-5.3",
     "worker-sol": "gpt-5.6-sol",
@@ -86,7 +86,7 @@
     {
       "repo": "cha-pt",
       "content": "# Cha PT adapter\n**Status: operational; local repository adoption validated.**\n",
-      "record": "/Users/chanbla11mit/gt/cha_pt/mayor/rig/docs/superpowers/specs/260919-hermes-orchestration-transition.md\nStatus: operational, local adoption validated."
+      "record": "/Users/chanbla11mit/gt/cha_pt/mayor/rig/docs/superpowers/specs/260919-hermes-orchestration-transition.md\nStatus: paused, adoption not validated."
     },
     {
       "repo": "jobcron",

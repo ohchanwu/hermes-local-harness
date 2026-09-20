@@ -21,6 +21,7 @@ write("active-extra.yaml", delta(lambda d: d["active_extras"].append("unapproved
 write("dormant-extra.yaml", delta(lambda d: d["dormant_extras"].append("unused-local-profile")))
 write("unexpected-plugin.yaml", delta(lambda d: d["plugins"]["worker-flash-1"].__setitem__("rogue-tool", "enabled      git 1.0.0    rogue-tool")))
 write("missing-plugin.yaml", delta(lambda d: d["plugins"]["worker-luna-1"].__setitem__("ponytail", "disabled     git pinned@16f29800 4.8.4    ponytail")))
+write("plugin-pin-drift.yaml", delta(lambda d: d["plugins"]["worker-flash-1"].__setitem__("ponytail", "enabled      git pinned@deadbeef 4.8.3    ponytail")))
 write("deployed-skill-divergence.yaml", delta(lambda d: d["skill_files"].__setitem__("scripts/set-active-lanes.py", "0" * 64)))
 
 
@@ -40,8 +41,16 @@ write("incomplete-omits-profile.yaml", delta(drop_worker_sol))
 
 
 def pause_jobcron(d):
-    d["adapters"] = [d["adapters"][0], {"repo": "jobcron", "content": "# adapter\nStatus: paused\n"}]
+    d["adapters"] = [d["adapters"][0], {"repo": "jobcron", "content": "# adapter\nStatus: paused\n", "record": d["adapters"][1]["record"]}]
 
 
 write("adoption-status-drift.yaml", delta(pause_jobcron))
+
+
+def pause_record(d):
+    rec = d["adapters"][0]
+    d["adapters"] = [{"repo": "cha-pt", "content": rec["content"], "record": "/Users/chanbla11mit/gt/cha_pt/mayor/rig/docs/superpowers/specs/260919-hermes-orchestration-transition.md\nStatus: paused, adoption not validated."}, d["adapters"][1]]
+
+
+write("adoption-record-drift.yaml", delta(pause_record))
 print("ok:", sorted(p.name for p in fx.glob("*.yaml")))

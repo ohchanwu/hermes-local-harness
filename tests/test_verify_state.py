@@ -26,12 +26,16 @@ check("--fixture", str(FIXTURES / "dormant-extra.yaml"), text="WARN: dormant")
 check("--fixture", str(FIXTURES / "unexpected-plugin.yaml"), code=1, text="behavior-changing unexpected plugin")
 # disabled required plugin fails
 check("--fixture", str(FIXTURES / "missing-plugin.yaml"), code=1, text="plugin drift")
+# enabled required plugin at wrong pin/version fails
+check("--fixture", str(FIXTURES / "plugin-pin-drift.yaml"), code=1, text="expected pinned 4.8.4@16f29800")
 # deployed skill hash divergence from tracked canonical source fails
 check("--fixture", str(FIXTURES / "deployed-skill-divergence.yaml"), code=1, text="deployed skill hash mismatch")
 # empty adapter content fails (missing adoption)
 check("--fixture", str(FIXTURES / "adapter-missing.yaml"), code=1, text="repository adapter missing")
 # adapter present but adoption marker regressed fails
 check("--fixture", str(FIXTURES / "adoption-status-drift.yaml"), code=1, text="adoption status drift")
+# tracked adoption record with paused/unvalidated status fails
+check("--fixture", str(FIXTURES / "adoption-record-drift.yaml"), code=1, text="tracked adoption record status drift")
 # fail-closed schema: empty fixture cannot pass
 check("--fixture", str(FIXTURES / "incomplete-empty.yaml"), code=1, text="incomplete fixture: missing required section")
 # fail-closed schema: omitted roster profile cannot pass

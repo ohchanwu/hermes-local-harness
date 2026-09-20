@@ -6,8 +6,8 @@
   "plugin": {"name":"ponytail","enabled":true,"pinned_commit":"16f29800","version":"4.8.4","default_mode":"full"},
   "skill": {"path":"/Users/chanbla11mit/.hermes/skills/autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md","version":"0.2.0","sha256":"111bab7f058fb77ec2fbc6fefc0abe5e4d1e8eb290f2834297f00e19dd212c79","helper_path":"scripts/set-active-lanes.py","helper_sha256":"157419c7c190b0a9f647271f7bd3839182f2e9324f8f9d74e43ec0553a5b77df"},
   "adoption": {"adapters": [
-    {"repo": "cha-pt", "path": "/Users/chanbla11mit/gt/cha_pt/mayor/rig/docs/superpowers/specs/260919-hermes-orchestration-transition.md", "marker": "Status: operational; local repository adoption validated."},
-    {"repo": "jobcron", "path": "/Users/chanbla11mit/gt/jobscraper/mayor/rig/docs/superpowers/specs/260919-hermes-orchestration-transition.md", "marker": "Status: operational; local repository adoption validated."}
+    {"repo": "cha-pt", "path": "/Users/chanbla11mit/gt/cha_pt/mayor/rig/docs/superpowers/specs/260919-hermes-orchestration-transition.md", "marker": "Status: operational; local repository adoption validated.", "record_marker": "Status: operational, local adoption validated."},
+    {"repo": "jobcron", "path": "/Users/chanbla11mit/gt/jobscraper/mayor/rig/docs/superpowers/specs/260919-hermes-orchestration-transition.md", "marker": "Status: operational; local repository adoption validated.", "record_marker": "Status: operational, local adoption validated."}
   ]},
   "hermes_source": {"path":"/Users/chanbla11mit/.hermes/hermes-agent","commit":"7c6f21a5e12ba9b1c674ec9b410fa6b8c45de4f8","clean":true}
 }

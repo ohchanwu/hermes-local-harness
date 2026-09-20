@@ -95,25 +95,31 @@ ADOPTION_REPOS = {"cha-pt": "adoption/cha-pt.md", "jobcron": "adoption/jobcron.m
 
 
 def check_adoption(errors, adapters):
-    """adapters: fixture list of {repo, content}; None means read live adapter files."""
+    """adapters: fixture list of {repo, content, record}; None means read live adapter files."""
     for adapter in load(ROOT / "snapshots/sanitized-current-state.yaml")["adoption"]["adapters"]:
         repo, want_path, marker = adapter["repo"], adapter["path"], adapter["marker"]
+        record_marker = adapter["record_marker"]
         record = ROOT / ADOPTION_REPOS[repo]
-        if not record.is_file():
+        record_live = record.read_text(errors="ignore") if record.is_file() else None
+        if record_live is None:
             fail(errors, f"missing tracked adoption record: {record.relative_to(ROOT)}")
-        elif want_path not in record.read_text():
-            fail(errors, f"tracked adoption record does not reference adapter path: {record.relative_to(ROOT)}")
         if adapters is None:
-            text = Path(want_path).read_text(errors="ignore") if Path(want_path).is_file() else ""
+            adapter_text = Path(want_path).read_text(errors="ignore") if Path(want_path).is_file() else ""
+            record_text = record_live or ""
         else:
             entries = [a for a in adapters if a.get("repo") == repo]
             if not entries:
                 fail(errors, f"adoption drift {repo}: fixture omits adapter status")
                 continue
-            text = str(entries[0].get("content") or "")
-        if not text:
+            adapter_text = str(entries[0].get("content") or "")
+            if "record" not in entries[0]:
+                fail(errors, f"incomplete fixture: adoption record status omitted for {repo}")
+            record_text = str(entries[0].get("record") or "")
+        if want_path not in record_text or record_marker not in record_text:
+            fail(errors, f"tracked adoption record status drift {repo}: expected {record_marker!r}")
+        if not adapter_text:
             fail(errors, f"repository adapter missing: {want_path}")
-        elif marker not in text:
+        elif marker not in adapter_text:
             fail(errors, f"adoption status drift {repo}: marker not found in adapter")
 
 
@@ -177,7 +183,7 @@ def main():
             if name not in expected:
                 fail(errors, f"behavior-changing unexpected profile: {name}")
             else:
-                check_plugins(errors, warnings, name, expected[name]["required_plugins"], observed_plugins)
+                check_plugins(errors, warnings, name, expected[name]["required_plugins"], observed_plugins, snapshot["plugin"])
         for name in observed.get("active_extras", []):
             fail(errors, f"behavior-changing unexpected profile: {name}")
         for name in observed.get("dormant_extras", []):
