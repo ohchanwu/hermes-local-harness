@@ -2,8 +2,8 @@
   "schema_version": 1,
   "collection": "explicit allowlist: Hermes CLI profile list/config get, enabled plugin name/version, canonical public skill files, and Hermes source Git metadata",
   "profiles": ["default","advisor","reviewer-sol","worker-astra","worker-flash-1","worker-flash-2","worker-flash-3","worker-glm-full","worker-luna-1","worker-luna-2","worker-sol","worker-terra-1","worker-terra-2"],
-  "kanban": {"max_in_progress": null, "max_in_progress_per_profile": 1, "dispatch_profiles": null},
-  "plugin": {"name":"ponytail","enabled":true,"version":"4.8.4"},
+  "kanban": {"max_in_progress": null, "max_in_progress_per_profile": 1, "dispatch_profiles": ["worker-flash-1", "worker-flash-2", "worker-flash-3", "worker-luna-1", "worker-luna-2", "reviewer-sol"]},
+  "plugin": {"name":"ponytail","enabled":true,"pinned_commit":"16f29800","version":"4.8.4","default_mode":"full"},
   "skill": {"path":"/Users/chanbla11mit/.hermes/skills/autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md","version":"0.2.0","sha256":"111bab7f058fb77ec2fbc6fefc0abe5e4d1e8eb290f2834297f00e19dd212c79"},
   "hermes_source": {"path":"/Users/chanbla11mit/.hermes/hermes-agent","commit":"7c6f21a5e12ba9b1c674ec9b410fa6b8c45de4f8","clean":true}
 }

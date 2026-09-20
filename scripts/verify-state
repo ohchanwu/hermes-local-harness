@@ -24,6 +24,30 @@ def fail(errors, message):
     print(f"FAIL: {message}")
 
 
+def json_config(profile, key):
+    result = run("hermes", "-p", profile, "config", "get", "--json", key)
+    try:
+        return json.loads(result.stdout) if not result.returncode else None
+    except json.JSONDecodeError:
+        return None
+
+
+def listed_profiles(text):
+    profiles = {}
+    for line in text.splitlines():
+        match = re.match(r"\s*◆?([A-Za-z][A-Za-z0-9-]+).*?\s{2,}(running|stopped)\s+", line)
+        if match:
+            profiles[match.group(1)] = match.group(2)
+    return profiles
+
+
+def check_extra(errors, warnings, name, status, dispatch_profiles):
+    if status == "running" or name in dispatch_profiles:
+        fail(errors, f"behavior-changing unexpected profile: {name}")
+    else:
+        warnings.append(f"dormant unexpected profile: {name}")
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--fixture", help="sanitized observed-state fixture; never reads live state")
@@ -39,6 +63,7 @@ def main():
     if roster.get("ladder_version") != "glm-review-v1":
         fail(errors, "ladder_version expected glm-review-v1")
     expected = {p["name"]: p for p in roster.get("profiles", [])}
+    dispatch_profiles = snapshot["kanban"]["dispatch_profiles"]
     if args.fixture:
         try:
             observed = load(args.fixture)
@@ -52,35 +77,42 @@ def main():
             fail(errors, f"behavior-changing unexpected profile: {name}")
         for name in observed.get("dormant_extras", []):
             warnings.append(f"dormant unexpected profile: {name}")
+        for name, profile in observed.get("profiles", {}).items():
+            if name not in expected:
+                check_extra(errors, warnings, name, profile.get("status", "stopped"), dispatch_profiles)
+        if "dispatch_profiles" in observed and observed["dispatch_profiles"] != dispatch_profiles:
+            fail(errors, f"dispatch drift: expected {dispatch_profiles}, actual {observed['dispatch_profiles']}")
     else:
-        listed = run("hermes", "profile", "list")
+        listed = run("hermes", "-p", "default", "profile", "list")
         if listed.returncode:
             fail(errors, "unable to read Hermes profile list")
         else:
-            text = listed.stdout
-            observed_names = set(re.findall(r"^\s*◆?([A-Za-z][A-Za-z0-9-]+)\s+\S+\s+(?:running|stopped)", text, re.M))
-            for name in sorted(observed_names - set(expected)):
-                fail(errors, f"behavior-changing unexpected profile: {name}")
+            observed = listed_profiles(listed.stdout)
+            for name, status in sorted(observed.items()):
+                if name not in expected:
+                    check_extra(errors, warnings, name, status, dispatch_profiles)
             for name, profile in expected.items():
-                if name not in observed_names:
+                if name not in observed:
                     fail(errors, f"missing profile: {name}")
-                elif profile["installed"]:
-                    model = profile["model"]
-                    if model not in next((line for line in text.splitlines() if name in line), ""):
-                        fail(errors, f"model drift {name}: expected {model}")
-            for name, profile in expected.items():
-                provider = run("hermes", "-p", name, "config", "get", "model.provider")
-                if provider.returncode or provider.stdout.strip() != profile["provider"]:
+                elif profile["installed"] and json_config(name, "model.default") != profile["model"]:
+                    fail(errors, f"model drift {name}: expected {profile['model']}")
+                if json_config(name, "model.provider") != profile["provider"]:
                     fail(errors, f"provider drift {name}: expected {profile['provider']}")
         for key, want in snapshot["kanban"].items():
-            actual = run("hermes", "config", "get", f"kanban.{key}")
-            value = actual.stdout.strip()
-            expected_value = "null" if want is None else json.dumps(want)
-            if actual.returncode or value != expected_value:
-                fail(errors, f"concurrency/dispatch drift kanban.{key}: expected {expected_value}, actual {value or 'unavailable'}")
-        plugins = run("hermes", "plugins", "list", "--plain", "--no-bundled")
-        if plugins.returncode or "enabled" not in plugins.stdout or "ponytail" not in plugins.stdout:
-            fail(errors, "missing or disabled required plugin: ponytail")
+            actual = json_config("default", f"kanban.{key}")
+            if actual != want:
+                fail(errors, f"concurrency/dispatch drift kanban.{key}: expected {want!r}, actual {actual!r}")
+        for profile in expected.values():
+            if profile["role"] != "implementation":
+                continue
+            plugins = run("hermes", "-p", profile["name"], "plugins", "list", "--plain", "--no-bundled")
+            required = f"enabled      git pinned@{snapshot['plugin']['pinned_commit']} {snapshot['plugin']['version']}    ponytail"
+            if plugins.returncode or required not in plugins.stdout:
+                fail(errors, f"Ponytail plugin drift {profile['name']}: expected enabled pinned {snapshot['plugin']['version']}")
+                continue
+            metadata = Path.home() / ".hermes" / "profiles" / profile["name"] / "plugins" / "ponytail" / "hooks" / "ponytail-config.js"
+            if not metadata.is_file() or f"const DEFAULT_MODE = '{snapshot['plugin']['default_mode']}'" not in metadata.read_text(errors="ignore"):
+                fail(errors, f"Ponytail mode drift {profile['name']}: expected default {snapshot['plugin']['default_mode']}")
         skill = Path(snapshot["skill"]["path"])
         if not skill.is_file():
             fail(errors, "missing shared skill")

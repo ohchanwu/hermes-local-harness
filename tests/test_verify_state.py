@@ -15,4 +15,5 @@ def check(*args, code=0, text=None):
 
 check("--fixture", str(ROOT / "tests/fixtures/behavior-changing-model-drift.yaml"), code=1, text="model drift")
 check("--fixture", str(ROOT / "tests/fixtures/dormant-extra.yaml"), text="WARN: dormant")
+check("--fixture", str(ROOT / "tests/fixtures/active-extra.yaml"), code=1, text="behavior-changing unexpected profile")
 print("ok")

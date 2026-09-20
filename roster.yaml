@@ -5,7 +5,7 @@
   "permitted_direct_entry_rungs": ["flash", "terra", "glm-full"],
   "maximum_concurrent_implementation_runs": 5,
   "native_settings": {"kanban.max_in_progress": null, "kanban.max_in_progress_per_profile": 1},
-  "dispatch_pool": {"implementation_allowlist": ["worker-flash-1", "worker-flash-2", "worker-flash-3", "worker-luna-1", "worker-luna-2"], "reviewer_outside_budget": "reviewer-sol"},
+  "dispatch_pool": {"implementation_allowlist": ["worker-flash-1", "worker-flash-2", "worker-flash-3", "worker-luna-1", "worker-luna-2"], "dispatch_allowlist": ["worker-flash-1", "worker-flash-2", "worker-flash-3", "worker-luna-1", "worker-luna-2", "reviewer-sol"], "reviewer_outside_budget": "reviewer-sol"},
   "automatic_decomposition": false,
   "revision_limits": {"default_same_rung": 1, "absolute_same_rung": 2, "infrastructure_failures_before_escalation": 2, "final_tier": "human_block"},
   "profiles": [
