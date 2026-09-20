@@ -9,6 +9,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+UNREADABLE = object()  # sentinel: command failed or output was not JSON — never equal to a desired value
 
 
 def load(path):
@@ -26,10 +27,12 @@ def fail(errors, message):
 
 def json_config(profile, key):
     result = run("hermes", "-p", profile, "config", "get", "--json", key)
+    if result.returncode:
+        return UNREADABLE
     try:
-        return json.loads(result.stdout) if not result.returncode else None
+        return json.loads(result.stdout)
     except json.JSONDecodeError:
-        return None
+        return UNREADABLE
 
 
 def listed_profiles(text):
@@ -41,11 +44,59 @@ def listed_profiles(text):
     return profiles
 
 
-def check_extra(errors, warnings, name, status, dispatch_profiles):
-    if status == "running" or name in dispatch_profiles:
-        fail(errors, f"behavior-changing unexpected profile: {name}")
+def plugin_state(text):
+    """Parse `plugins list --plain --no-bundled` lines into {name: full line}."""
+    state = {}
+    for line in text.splitlines():
+        parts = line.split()
+        if len(parts) >= 2 and parts[0] in ("enabled", "disabled"):
+            state[parts[-1]] = line.strip()
+    return state
+
+
+def check_plugins(errors, warnings, profile, expected, observed_plugins, pinned=None):
+    """expected: required plugin names; observed_plugins: {name: status-or-line} or list of enabled names."""
+    if isinstance(observed_plugins, list):
+        state = {n: "enabled" for n in observed_plugins}
     else:
-        warnings.append(f"dormant unexpected profile: {name}")
+        state = observed_plugins
+    for required in expected:
+        actual = state.get(required)
+        if actual is None or not str(actual).startswith("enabled"):
+            fail(errors, f"plugin drift {profile}: required {required} not enabled (actual {actual!r})")
+        elif pinned and f"pinned@{pinned['pinned_commit']} {pinned['version']}" not in actual:
+            fail(errors, f"plugin drift {profile}: {required} expected pinned {pinned['version']}@{pinned['pinned_commit']}")
+    for name, status in sorted(state.items()):
+        enabled = str(status).startswith("enabled")
+        if name not in expected:
+            if enabled:
+                fail(errors, f"behavior-changing unexpected plugin {profile}: {name}")
+            else:
+                warnings.append(f"dormant unexpected plugin {profile}: {name}")
+
+
+def check_skill(errors, deployed_hashes):
+    skill = load(ROOT / "snapshots/sanitized-current-state.yaml")["skill"]
+    files = {"SKILL.md": skill["sha256"], skill["helper_path"]: skill["helper_sha256"]}
+    for rel, want in sorted(files.items()):
+        tracked = ROOT / "skills" / "multi-agent-coding-orchestrator" / rel
+        if not tracked.is_file():
+            fail(errors, f"missing tracked skill file: {rel}")
+            continue
+        if hashlib.sha256(tracked.read_bytes()).hexdigest() != want:
+            fail(errors, f"tracked skill hash mismatch: {rel}")
+        if deployed_hashes is not None and deployed_hashes.get(rel) != want:
+            fail(errors, f"deployed skill hash mismatch: {rel}")
+    if deployed_hashes is not None and "version: " + skill["version"] not in (ROOT / "skills" / "multi-agent-coding-orchestrator" / "SKILL.md").read_text():
+        fail(errors, "shared skill version mismatch")
+
+
+def check_adoption(errors, adapters_present):
+    for adapter in load(ROOT / "snapshots/sanitized-current-state.yaml")["adoption"]["adapters"]:
+        if adapters_present is not None and not adapters_present:
+            fail(errors, f"repository adapter missing: {adapter['path']}")
+        elif adapters_present is None and not Path(adapter["path"]).is_file():
+            fail(errors, f"repository adapter missing: {adapter['path']}")
 
 
 def main():
@@ -82,6 +133,11 @@ def main():
                 check_extra(errors, warnings, name, profile.get("status", "stopped"), dispatch_profiles)
         if "dispatch_profiles" in observed and observed["dispatch_profiles"] != dispatch_profiles:
             fail(errors, f"dispatch drift: expected {dispatch_profiles}, actual {observed['dispatch_profiles']}")
+        for name, plugins in observed.get("plugins", {}).items():
+            check_plugins(errors, warnings, name, expected.get(name, {}).get("required_plugins", []), plugins)
+        check_skill(errors, observed.get("skill_files"))
+        if "adapters_present" in observed:
+            check_adoption(errors, observed["adapters_present"])
     else:
         listed = run("hermes", "-p", "default", "profile", "list")
         if listed.returncode:
@@ -98,30 +154,26 @@ def main():
                     fail(errors, f"model drift {name}: expected {profile['model']}")
                 if json_config(name, "model.provider") != profile["provider"]:
                     fail(errors, f"provider drift {name}: expected {profile['provider']}")
+                plugins = run("hermes", "-p", name, "plugins", "list", "--plain", "--no-bundled")
+                if plugins.returncode:
+                    fail(errors, f"unable to read plugin list {name}")
+                else:
+                    check_plugins(errors, warnings, name, profile["required_plugins"], plugin_state(plugins.stdout), snapshot["plugin"])
+                if profile["role"] == "implementation" and "ponytail" in profile["required_plugins"]:
+                    metadata = Path.home() / ".hermes" / "profiles" / name / "plugins" / "ponytail" / "hooks" / "ponytail-config.js"
+                    if not metadata.is_file() or f"const DEFAULT_MODE = '{snapshot['plugin']['default_mode']}'" not in metadata.read_text(errors="ignore"):
+                        fail(errors, f"Ponytail mode drift {name}: expected default {snapshot['plugin']['default_mode']}")
         for key, want in snapshot["kanban"].items():
             actual = json_config("default", f"kanban.{key}")
-            if actual != want:
-                fail(errors, f"concurrency/dispatch drift kanban.{key}: expected {want!r}, actual {actual!r}")
-        for profile in expected.values():
-            if profile["role"] != "implementation":
-                continue
-            plugins = run("hermes", "-p", profile["name"], "plugins", "list", "--plain", "--no-bundled")
-            required = f"enabled      git pinned@{snapshot['plugin']['pinned_commit']} {snapshot['plugin']['version']}    ponytail"
-            if plugins.returncode or required not in plugins.stdout:
-                fail(errors, f"Ponytail plugin drift {profile['name']}: expected enabled pinned {snapshot['plugin']['version']}")
-                continue
-            metadata = Path.home() / ".hermes" / "profiles" / profile["name"] / "plugins" / "ponytail" / "hooks" / "ponytail-config.js"
-            if not metadata.is_file() or f"const DEFAULT_MODE = '{snapshot['plugin']['default_mode']}'" not in metadata.read_text(errors="ignore"):
-                fail(errors, f"Ponytail mode drift {profile['name']}: expected default {snapshot['plugin']['default_mode']}")
-        skill = Path(snapshot["skill"]["path"])
-        if not skill.is_file():
-            fail(errors, "missing shared skill")
-        else:
-            actual_hash = hashlib.sha256(skill.read_bytes()).hexdigest()
-            if actual_hash != snapshot["skill"]["sha256"]:
-                fail(errors, "shared skill content hash mismatch")
-            if "version: " + snapshot["skill"]["version"] not in skill.read_text():
-                fail(errors, "shared skill version mismatch")
+            if actual is UNREADABLE or actual != want:
+                fail(errors, f"concurrency/dispatch drift kanban.{key}: expected {want!r}, actual {'<unreadable>' if actual is UNREADABLE else actual!r}")
+        skill_dir = Path(snapshot["skill"]["path"]).parent
+        deployed_hashes = {}
+        for rel in ("SKILL.md", snapshot["skill"]["helper_path"]):
+            deployed = skill_dir / rel
+            deployed_hashes[rel] = hashlib.sha256(deployed.read_bytes()).hexdigest() if deployed.is_file() else None
+        check_skill(errors, deployed_hashes)
+        check_adoption(errors, None)
         source = Path(snapshot["hermes_source"]["path"])
         commit = run("git", "-C", str(source), "rev-parse", "HEAD")
         dirty = run("git", "-C", str(source), "status", "--short")
@@ -135,6 +187,13 @@ def main():
         return 1
     print("OK: desired state matches observed state")
     return 0
+
+
+def check_extra(errors, warnings, name, status, dispatch_profiles):
+    if status == "running" or name in dispatch_profiles:
+        fail(errors, f"behavior-changing unexpected profile: {name}")
+    else:
+        warnings.append(f"dormant unexpected profile: {name}")
 
 
 if __name__ == "__main__":

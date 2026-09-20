@@ -1,0 +1,8 @@
+{
+  "profile_models": {"worker-flash-1": "glm-5.3-flash"},
+  "active_extras": [],
+  "dormant_extras": [],
+  "plugins": {"worker-flash-1": {"ponytail": "enabled      git pinned@16f29800 4.8.4    ponytail"}},
+  "skill_files": {"SKILL.md": "111bab7f058fb77ec2fbc6fefc0abe5e4d1e8eb290f2834297f00e19dd212c79", "scripts/set-active-lanes.py": "157419c7c190b0a9f647271f7bd3839182f2e9324f8f9d74e43ec0553a5b77df"},
+  "adapters_present": true
+}
