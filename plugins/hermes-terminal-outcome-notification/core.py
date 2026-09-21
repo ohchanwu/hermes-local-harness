@@ -96,7 +96,8 @@ class Store:
         with self._connect() as db:
             db.execute("BEGIN IMMEDIATE")
             db.execute("""INSERT INTO campaigns(campaign_id,session_id,title,lane,armed_at,last_activity_at) VALUES(?,?,?,?,?,?)
-                          ON CONFLICT(session_id) DO UPDATE SET title=excluded.title,lane=excluded.lane,armed_at=excluded.armed_at,
+                          ON CONFLICT(session_id) DO UPDATE SET campaign_id=excluded.campaign_id,
+                          generation=campaigns.generation+1,title=excluded.title,lane=excluded.lane,armed_at=excluded.armed_at,
                           last_activity_at=excluded.last_activity_at,proposal_status=NULL,proposal_summary=NULL,
                           candidate_response=NULL,stopped_reason=NULL,disarmed_at=NULL""",
                        (campaign_id, session_id, _summary(title, self.config.summary_max_chars), lane, _now(), _now()))
@@ -277,6 +278,8 @@ class Store:
             state = state_reader(row["task_id"])
             if state is None:  # board read failure is retryable, never a cancellation.
                 return "retain"
+            if state.get("status") == "missing":
+                return cancel("watched task no longer exists on the board")
             evidence_run = row["evidence_run_id"]
             if evidence_run is not None:
                 max_run, current_run = state.get("max_run_id"), state.get("current_run_id")

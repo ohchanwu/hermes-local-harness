@@ -133,8 +133,8 @@ def send_macos(title: str, body: str) -> None:
 
 def kanban_state(task_id: str) -> dict | None:
     """Durable board state for the finality recheck. Returns None only when the board is
-    unreadable (retry); a missing task row means the task is gone — treat as still-blocked
-    (conservative: an alert cannot be retracted once accepted)."""
+    unreadable (retry). A missing task row is reported as {"status": "missing"} — the task is
+    gone, so no durable human-block evidence exists and delivery must fail closed."""
     db_path = os.environ.get("HERMES_KANBAN_DB")
     if not db_path:
         return None
@@ -144,7 +144,7 @@ def kanban_state(task_id: str) -> dict | None:
                                            (SELECT MAX(id) FROM task_runs r WHERE r.task_id = t.id)
                                     FROM tasks t WHERE t.id=?""", (task_id,)).fetchone()
             if row is None:
-                return {"status": "blocked", "block_kind": "needs_input"}  # missing row: conservative
+                return {"status": "missing"}
             status, kind, recurrences, current_run, last_error, max_run = row
             return {"status": status, "block_kind": kind, "block_recurrences": recurrences,
                     "current_run_id": current_run, "max_run_id": max_run, "reason": last_error}

@@ -1,6 +1,9 @@
 """Hermes plugin entry point for terminal outcome notifications."""
 from __future__ import annotations
 
+import os
+import sqlite3
+from pathlib import Path
 from typing import Any
 
 from .core import Store, shared_outbox_path
@@ -15,6 +18,29 @@ def _session_id(kwargs: dict[str, Any]) -> str:
     return str(kwargs.get("session_id") or getattr(parent, "session_id", "") or "")
 
 
+def _session_ids_for_key(session_key: str) -> list[str]:
+    """Durable session_key → session_id resolution. Hermes's state.db is the single routing
+    source of truth (rows carry session_key and compression forks inherit it), so mapping an
+    `agent_loop_stopped` session_key to live session ids is evidence, not a guess. Read-only;
+    any failure returns [] (fail closed -> recovery classifies `unknown`)."""
+    if not session_key:
+        return []
+    db_path = os.environ.get("HERMES_TERMINAL_STATE_DB", "")
+    if not db_path:
+        try:
+            from hermes_constants import get_hermes_home  # type: ignore[attr-defined]
+            db_path = str(Path(get_hermes_home()) / "state.db")
+        except Exception:
+            return []
+    try:
+        with sqlite3.connect(f"file:{db_path}?mode=ro", uri=True, timeout=5) as db:
+            rows = db.execute("SELECT id FROM sessions WHERE session_key=? AND end_reason IS NULL"
+                              " ORDER BY started_at DESC", (session_key,)).fetchall()
+            return [str(row[0]) for row in rows]
+    except sqlite3.Error:
+        return []
+
+
 def arm_campaign(params: dict[str, Any], **kwargs: Any) -> str:
     """Deterministic arming interface. The HOST supplies the real opaque session_id at tool
     dispatch (tools/registry.dispatch → handler(args, session_id=..., task_id=...)), so the watch
@@ -24,7 +50,9 @@ def arm_campaign(params: dict[str, Any], **kwargs: Any) -> str:
         # ponytail: fail closed — without host session identity arming is impossible; never guess.
         return '{"success":false,"error":"session identity unavailable from host tool dispatch"}'
     title = str(params.get("title") or "Direct Hermes campaign")
-    campaign_id = _store().arm_direct(session_id, title, str(kwargs.get("platform") or "") or None)
+    # lane is reserved for session-key-level identity; tool dispatch has no platform/session_key,
+    # and a platform value here would make lane matches cross-session.
+    campaign_id = _store().arm_direct(session_id, title)
     return f'{{"success":true,"campaign_id":"{campaign_id}"}}'
 
 
@@ -64,8 +92,10 @@ def watch_command(raw_args: str) -> str:
 def _pre_llm_call(**kwargs: Any) -> None:
     session_id = _session_id(kwargs)
     if session_id:
-        _store().touch(session_id, str(kwargs.get("session_key") or "") or None,
-                       str(kwargs.get("parent_session_id") or "") or None)
+        # pre_llm_call supplies platform, never session_key: the surface lane is NOT captured
+        # here (a platform value would match every session on that surface). session-key-level
+        # identity is resolved durably from state.db at agent_loop_stopped/reset time instead.
+        _store().touch(session_id, None, str(kwargs.get("parent_session_id") or "") or None)
 
 
 def _post_llm_call(**kwargs: Any) -> None:
@@ -90,10 +120,15 @@ def _on_session_reset(**kwargs: Any) -> None:
 
 
 def _agent_loop_stopped(**kwargs: Any) -> None:
-    # Gateway/TUI surface supplies session_key, not session_id: persist lane evidence for reset reconciliation.
+    # Gateway/TUI supply session_key only. Resolve it to live session ids through Hermes's own
+    # durable routing table (state.db sessions.session_key) — evidence, not guessing — and
+    # stamp stop evidence so recovery classifies the turn `interrupted`, not `unknown`.
     session_key = str(kwargs.get("session_key") or "")
-    if session_key:
-        _store().stopped(session_key, str(kwargs.get("reason") or "interrupted"), by_lane=True)
+    reason = str(kwargs.get("reason") or "interrupted")
+    store = _store()
+    store.stopped(session_key, reason, by_lane=True)
+    for session_id in _session_ids_for_key(session_key):
+        store.stopped(session_id, reason)
 
 
 def _kanban_completed(**kwargs: Any) -> None:

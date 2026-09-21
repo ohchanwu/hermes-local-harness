@@ -476,6 +476,91 @@ def test_watch_tool_and_hooks_via_real_plugin_module():
         tmp.cleanup()
 
 
+def test_re_arm_same_session_creates_distinct_campaign_per_turn():
+    # two consecutive one-shot armed turns in ONE session must each produce their own event
+    tmp, store = fresh()
+    first = store.arm_direct("s1", "Turn one")
+    second = store.arm_direct("s1", "Turn two")  # re-arm before turn one drained
+    assert second != first
+    store.proposal("s1", "completed", "turn one done")
+    store.session_end("s1", completed=True)  # disarms; generation 1 event created
+    store.arm_direct("s1", "Turn three")  # re-arm AFTER a terminal outcome
+    store.proposal("s1", "completed", "turn three done")
+    store.session_end("s1", completed=True)
+    rows = {(r["campaign_id"], r["generation"]) for r in store.status()}
+    assert len(rows) == 2  # two distinct campaign/generation pairs
+    sent = []
+    w = Worker(store, telegram=lambda b: sent.append(b), macos=lambda t, b: sent.append(t))
+    assert w.drain_once() + w.drain_once() == 4  # both turns, both destinations (one claim per drain)
+    tmp.cleanup()
+
+
+def test_agent_loop_stopped_real_payloads_recover_interrupted():
+    # entry points with the EXACT hook payload shapes Hermes fires
+    spec = importlib.util.spec_from_file_location("notification_plugin_r2", PLUGIN / "__init__.py",
+                                                  submodule_search_locations=[str(PLUGIN)])
+    module = importlib.util.module_from_spec(spec)
+    sys.modules["notification_plugin_r2"] = module
+    tmp = tempfile.TemporaryDirectory()
+    outbox = str(Path(tmp.name) / "shared.sqlite3")
+    state_db = Path(tmp.name) / "state.db"
+    with sqlite3.connect(state_db) as db:  # Hermes's durable routing table
+        db.execute("CREATE TABLE sessions (id TEXT PRIMARY KEY, session_key TEXT, started_at REAL, ended_at REAL, end_reason TEXT)")
+        db.execute("INSERT INTO sessions VALUES('opaque-gw-7','ns:telegram:dm:111',1,NULL,NULL)")
+        db.execute("INSERT INTO sessions VALUES('opaque-gw-8','ns:telegram:dm:222',2,NULL,NULL)")  # unrelated
+        db.execute("INSERT INTO sessions VALUES('ended-old','ns:telegram:dm:111',0,1,'compression')")
+    old_outbox = os.environ.get("HERMES_TERMINAL_OUTBOX")
+    old_state = os.environ.get("HERMES_TERMINAL_STATE_DB")
+    os.environ["HERMES_TERMINAL_OUTBOX"] = outbox
+    os.environ["HERMES_TERMINAL_STATE_DB"] = str(state_db)
+    try:
+        spec.loader.exec_module(module)
+        # arm through the real tool entry point (host supplies session_id at dispatch)
+        ok = json.loads(module.arm_campaign({"title": "Gateway turn"}, session_id="opaque-gw-7"))
+        assert ok["success"] is True
+        ok8 = json.loads(module.arm_campaign({"title": "Unrelated"}, session_id="opaque-gw-8"))
+        assert ok8["success"] is True
+        # real pre_llm_call payload: platform, never session_key
+        module._pre_llm_call(session_id="opaque-gw-7", platform="telegram", parent_session_id="")
+        module._pre_llm_call(session_id="opaque-gw-8", platform="telegram", parent_session_id="")
+        # real agent_loop_stopped payload: session_key only
+        module._agent_loop_stopped(session_key="ns:telegram:dm:111", platform="telegram",
+                                   reason="user_stop", invalidation_reason="session_interrupt")
+        with module._store()._connect() as db:
+            db.execute("UPDATE campaigns SET last_activity_at=1")  # strand both arms
+        sent = []
+        w = Worker(module._store(), telegram=lambda b: sent.append(b), macos=lambda t, b: sent.append(t))
+        w.drain_once()
+        statuses = {r["terminal_status"] for r in module._store().status()}
+        assert "interrupted" in statuses  # resolved through durable state.db evidence
+        unrelated = [r for r in module._store().status() if r["title"] == "Unrelated"]
+        assert unrelated and all(r["terminal_status"] == "unknown" for r in unrelated)  # no stop evidence -> fail closed
+        assert not any(r["terminal_status"] == "completed" for r in module._store().status())
+        assert all("user_stop" in r["short_summary"] for r in module._store().status() if r["terminal_status"] == "interrupted")
+    finally:
+        sys.modules.pop("notification_plugin_r2", None)
+        for var, old in (("HERMES_TERMINAL_OUTBOX", old_outbox), ("HERMES_TERMINAL_STATE_DB", old_state)):
+            if old is None:
+                os.environ.pop(var, None)
+            else:
+                os.environ[var] = old
+        tmp.cleanup()
+
+
+def test_missing_task_never_delivers_block_on_any_destination():
+    # readable board, absent task row: no durable human-block evidence -> cancel, never send
+    tmp, store = fresh()
+    store.watch_task("t-gone", "Root")
+    store.kanban_blocked("t-gone", "needs human", run_id=5)
+    sent = []
+    w = Worker(store, telegram=lambda b: sent.append(b), macos=lambda t, b: sent.append(b),
+               state_reader=lambda _: {"status": "missing"})
+    assert w.drain_once() == 0 and sent == []
+    assert all(r["cancelled_at"] for r in store.status())
+    assert all("no longer exists" in r["cancellation_reason"] for r in store.status())
+    tmp.cleanup()
+
+
 def test_public_safety_no_private_state_in_repo_tree():
     text = (PLUGIN / "README.md").read_text() + (ROOT / "deployment/hermes-terminal-outcome-notification.example.yaml").read_text()
     for needle in ("bot_token", "-100", "chat_id=", "thread_id="):
