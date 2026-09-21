@@ -386,7 +386,7 @@ Do not add broad configuration until a real requirement appears.
 
 ## 15. Canonical control repository and deployment
 
-`/Users/chanbla11mit/hermes-local-harness` is the canonical public-safe source for this feature. Before implementation begins, add the approved specification there as `specs/hermes-terminal-outcome-notification.md`; after that copy is reviewed and committed, the Desktop draft is no longer canonical. The repository must own:
+`/Users/chanbla11mit/hermes-local-harness` is the canonical public-safe source for this feature. The approved specification is stored at `docs/superpowers/specs/260921-hermes-terminal-outcome-notification.md`; the former Desktop draft is no longer canonical. The repository must own:
 
 - standalone plugin source and tests;
 - the delivery-worker source and tests;
