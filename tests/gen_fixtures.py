@@ -25,6 +25,15 @@ write("plugin-pin-drift.yaml", delta(lambda d: d["plugins"]["worker-flash-1"].__
 write("deployed-skill-divergence.yaml", delta(lambda d: d["skill_files"].__setitem__("scripts/set-active-lanes.py", "0" * 64)))
 
 
+def remove_terminal_notification(d):
+    for plugins in d["plugins"].values():
+        plugins.pop("hermes-terminal-outcome-notification", None)
+
+
+write("terminal-deployment-pending.yaml", delta(remove_terminal_notification))
+write("terminal-notification-rollback.yaml", delta(remove_terminal_notification))
+
+
 def drop_cha_pt(d):
     d["adapters"] = [{"repo": "cha-pt", "content": ""}, d["adapters"][1]]
 

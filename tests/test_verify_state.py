@@ -26,6 +26,10 @@ check("--fixture", str(FIXTURES / "dormant-extra.yaml"), text="WARN: dormant")
 check("--fixture", str(FIXTURES / "unexpected-plugin.yaml"), code=1, text="behavior-changing unexpected plugin")
 # disabled required plugin fails
 check("--fixture", str(FIXTURES / "missing-plugin.yaml"), code=1, text="plugin drift")
+# desired deployment stays red until every terminal-notification producer is observed enabled
+check("--fixture", str(FIXTURES / "terminal-deployment-pending.yaml"), code=1, text="terminal notification deployment pending")
+# rollback observation is also red against the authorized deployment declaration
+check("--fixture", str(FIXTURES / "terminal-notification-rollback.yaml"), code=1, text="terminal notification deployment pending")
 # enabled required plugin at wrong pin/version fails
 check("--fixture", str(FIXTURES / "plugin-pin-drift.yaml"), code=1, text="expected pinned 4.8.4@16f29800")
 # deployed skill hash divergence from tracked canonical source fails

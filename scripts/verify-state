@@ -54,17 +54,18 @@ def plugin_state(text):
     return state
 
 
-def check_plugins(errors, warnings, profile, expected, observed_plugins, pinned=None):
+def check_plugins(errors, warnings, profile, expected, observed_plugins, pinned_plugins=None):
     """expected: required plugin names; observed_plugins: {name: status-or-line} or list of enabled names."""
     if isinstance(observed_plugins, list):
         state = {n: "enabled" for n in observed_plugins}
     else:
         state = observed_plugins
     for required in expected:
+        pinned = (pinned_plugins or {}).get(required)
         actual = state.get(required)
         if actual is None or not str(actual).startswith("enabled"):
             fail(errors, f"plugin drift {profile}: required {required} not enabled (actual {actual!r})")
-        elif pinned and f"pinned@{pinned['pinned_commit']} {pinned['version']}" not in actual:
+        elif pinned and f"pinned@{pinned.get('pinned_display_commit', pinned['pinned_commit'])} {pinned['version']}" not in actual:
             fail(errors, f"plugin drift {profile}: {required} expected pinned {pinned['version']}@{pinned['pinned_commit']}")
     for name, status in sorted(state.items()):
         enabled = str(status).startswith("enabled")
@@ -123,21 +124,40 @@ def check_adoption(errors, adapters):
             fail(errors, f"adoption status drift {repo}: marker not found in adapter")
 
 
-def check_terminal_notification_plan(errors, roster):
-    """Validate the reviewed deployment matrix without declaring it deployed in live state."""
+def check_terminal_notification_deployment(errors, roster, snapshot):
+    """Validate authorized desired state; observed state is checked separately and stays red until rollout."""
     try:
         matrix = load(ROOT / "deployment/hermes-terminal-outcome-notification.example.yaml")
     except (OSError, json.JSONDecodeError) as exc:
         fail(errors, f"malformed terminal notification deployment matrix: {exc}")
         return
-    expected = {p["name"] for p in roster.get("profiles", [])
-                if p["lifecycle"] == "active" and p["role"] != "advisor"}
-    if matrix.get("plugin") != "hermes-terminal-outcome-notification" or matrix.get("status") != "planned":
-        fail(errors, "terminal notification deployment matrix must remain planned")
-    elif set(matrix.get("producer_profiles", [])) != expected:
+    expected = [p["name"] for p in roster.get("profiles", [])
+                if p["lifecycle"] == "active" and p["role"] != "advisor"]
+    terminal = snapshot.get("terminal_notification", {})
+    plugin = snapshot.get("plugins", {}).get("hermes-terminal-outcome-notification", {})
+    if matrix.get("plugin") != "hermes-terminal-outcome-notification" or matrix.get("status") != "authorized":
+        fail(errors, "terminal notification deployment matrix must be authorized")
+    elif matrix.get("producer_profiles") != expected:
         fail(errors, "terminal notification deployment matrix producer roster drift")
-    elif any("hermes-terminal-outcome-notification" in p["required_plugins"] for p in roster.get("profiles", [])):
-        fail(errors, "terminal notification plugin is declared live before deployment authorization")
+    elif any(("hermes-terminal-outcome-notification" in p["required_plugins"]) != (p["name"] in expected)
+             for p in roster.get("profiles", [])):
+        fail(errors, "terminal notification roster declaration drift")
+    if (terminal.get("status") != matrix.get("status")
+            or terminal.get("source") != matrix.get("source")
+            or terminal.get("pinned_commit") != matrix.get("pinned_commit")
+            or terminal.get("producer_profiles") != matrix.get("producer_profiles")
+            or terminal.get("shared_outbox") != matrix.get("shared_outbox")
+            or terminal.get("kanban_db") != matrix.get("worker", {}).get("kanban_db")
+            or plugin.get("version") != matrix.get("version")
+            or plugin.get("pinned_commit") != matrix.get("pinned_commit")):
+        fail(errors, "terminal notification sanitized snapshot drift")
+
+
+def check_terminal_notification_observed(errors, plugins, producer_profiles):
+    for profile in producer_profiles:
+        actual = plugins.get(profile, {}).get("hermes-terminal-outcome-notification")
+        if actual is None or not str(actual).startswith("enabled"):
+            fail(errors, f"terminal notification deployment pending {profile}: plugin not enabled")
 
 
 def main():
@@ -154,7 +174,7 @@ def main():
         return 2
     if roster.get("ladder_version") != "glm-review-v1":
         fail(errors, "ladder_version expected glm-review-v1")
-    check_terminal_notification_plan(errors, roster)
+    check_terminal_notification_deployment(errors, roster, snapshot)
     expected = {p["name"]: p for p in roster.get("profiles", [])}
     dispatch_profiles = snapshot["kanban"]["dispatch_profiles"]
     if args.fixture:
@@ -194,6 +214,7 @@ def main():
             if name not in expected:
                 fail(errors, f"behavior-changing unexpected profile: {name}")
         plugins = observed.get("plugins", {})
+        check_terminal_notification_observed(errors, plugins, snapshot["terminal_notification"]["producer_profiles"])
         for name in expected:
             if name not in plugins:
                 fail(errors, f"incomplete fixture: plugins omits {name}")
@@ -201,7 +222,7 @@ def main():
             if name not in expected:
                 fail(errors, f"behavior-changing unexpected profile: {name}")
             else:
-                check_plugins(errors, warnings, name, expected[name]["required_plugins"], observed_plugins, snapshot["plugin"])
+                check_plugins(errors, warnings, name, expected[name]["required_plugins"], observed_plugins, snapshot["plugins"])
         for name in observed.get("active_extras", []):
             fail(errors, f"behavior-changing unexpected profile: {name}")
         for name in observed.get("dormant_extras", []):
@@ -231,11 +252,14 @@ def main():
                 if plugins.returncode:
                     fail(errors, f"unable to read plugin list {name}")
                 else:
-                    check_plugins(errors, warnings, name, profile["required_plugins"], plugin_state(plugins.stdout), snapshot["plugin"])
+                    state = plugin_state(plugins.stdout)
+                    if name in snapshot["terminal_notification"]["producer_profiles"]:
+                        check_terminal_notification_observed(errors, {name: state}, [name])
+                    check_plugins(errors, warnings, name, profile["required_plugins"], state, snapshot["plugins"])
                 if profile["role"] == "implementation" and "ponytail" in profile["required_plugins"]:
                     metadata = Path.home() / ".hermes" / "profiles" / name / "plugins" / "ponytail" / "hooks" / "ponytail-config.js"
-                    if not metadata.is_file() or f"const DEFAULT_MODE = '{snapshot['plugin']['default_mode']}'" not in metadata.read_text(errors="ignore"):
-                        fail(errors, f"Ponytail mode drift {name}: expected default {snapshot['plugin']['default_mode']}")
+                    if not metadata.is_file() or f"const DEFAULT_MODE = '{snapshot['plugins']['ponytail']['default_mode']}'" not in metadata.read_text(errors="ignore"):
+                        fail(errors, f"Ponytail mode drift {name}: expected default {snapshot['plugins']['ponytail']['default_mode']}")
         for key, want in snapshot["kanban"].items():
             actual = json_config("default", f"kanban.{key}")
             if actual is UNREADABLE or actual != want:

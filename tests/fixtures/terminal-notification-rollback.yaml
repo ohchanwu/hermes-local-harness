@@ -30,51 +30,38 @@
     "worker-astra": "openai-codex"
   },
   "plugins": {
-    "default": {
-      "hermes-terminal-outcome-notification": "enabled      git pinned@7d38611e 0.1.0    hermes-terminal-outcome-notification"
-    },
+    "default": {},
     "advisor": {},
-    "reviewer-sol": {
-      "hermes-terminal-outcome-notification": "enabled      git pinned@7d38611e 0.1.0    hermes-terminal-outcome-notification"
-    },
+    "reviewer-sol": {},
     "worker-flash-1": {
-      "ponytail": "enabled      git pinned@16f29800 4.8.4    ponytail",
-      "hermes-terminal-outcome-notification": "enabled      git pinned@7d38611e 0.1.0    hermes-terminal-outcome-notification"
+      "ponytail": "enabled      git pinned@16f29800 4.8.4    ponytail"
     },
     "worker-flash-2": {
-      "ponytail": "enabled      git pinned@16f29800 4.8.4    ponytail",
-      "hermes-terminal-outcome-notification": "enabled      git pinned@7d38611e 0.1.0    hermes-terminal-outcome-notification"
+      "ponytail": "enabled      git pinned@16f29800 4.8.4    ponytail"
     },
     "worker-flash-3": {
-      "ponytail": "enabled      git pinned@16f29800 4.8.4    ponytail",
-      "hermes-terminal-outcome-notification": "enabled      git pinned@7d38611e 0.1.0    hermes-terminal-outcome-notification"
+      "ponytail": "enabled      git pinned@16f29800 4.8.4    ponytail"
     },
     "worker-luna-1": {
-      "ponytail": "enabled      git pinned@16f29800 4.8.4    ponytail",
-      "hermes-terminal-outcome-notification": "enabled      git pinned@7d38611e 0.1.0    hermes-terminal-outcome-notification"
+      "ponytail": "enabled      git pinned@16f29800 4.8.4    ponytail"
     },
     "worker-luna-2": {
-      "ponytail": "enabled      git pinned@16f29800 4.8.4    ponytail",
-      "hermes-terminal-outcome-notification": "enabled      git pinned@7d38611e 0.1.0    hermes-terminal-outcome-notification"
+      "ponytail": "enabled      git pinned@16f29800 4.8.4    ponytail"
     },
     "worker-terra-1": {
-      "ponytail": "enabled      git pinned@16f29800 4.8.4    ponytail",
-      "hermes-terminal-outcome-notification": "enabled      git pinned@7d38611e 0.1.0    hermes-terminal-outcome-notification"
+      "ponytail": "enabled      git pinned@16f29800 4.8.4    ponytail"
     },
     "worker-terra-2": {
       "ponytail": "enabled      git pinned@16f29800 4.8.4    ponytail"
     },
     "worker-glm-full": {
-      "ponytail": "enabled      git pinned@16f29800 4.8.4    ponytail",
-      "hermes-terminal-outcome-notification": "enabled      git pinned@7d38611e 0.1.0    hermes-terminal-outcome-notification"
+      "ponytail": "enabled      git pinned@16f29800 4.8.4    ponytail"
     },
     "worker-sol": {
-      "ponytail": "enabled      git pinned@16f29800 4.8.4    ponytail",
-      "hermes-terminal-outcome-notification": "enabled      git pinned@7d38611e 0.1.0    hermes-terminal-outcome-notification"
+      "ponytail": "enabled      git pinned@16f29800 4.8.4    ponytail"
     },
     "worker-astra": {
-      "ponytail": "enabled      git pinned@16f29800 4.8.4    ponytail",
-      "hermes-terminal-outcome-notification": "enabled      git pinned@7d38611e 0.1.0    hermes-terminal-outcome-notification"
+      "ponytail": "enabled      git pinned@16f29800 4.8.4    ponytail"
     }
   },
   "dispatch_profiles": [
@@ -99,7 +86,7 @@
     {
       "repo": "cha-pt",
       "content": "# Cha PT adapter\n**Status: operational; local repository adoption validated.**\n",
-      "record": "/Users/chanbla11mit/gt/cha_pt/mayor/rig/docs/superpowers/specs/260919-hermes-orchestration-transition.md\nStatus: paused, adoption not validated."
+      "record": "/Users/chanbla11mit/gt/cha_pt/mayor/rig/docs/superpowers/specs/260919-hermes-orchestration-transition.md\nStatus: operational, local adoption validated."
     },
     {
       "repo": "jobcron",
