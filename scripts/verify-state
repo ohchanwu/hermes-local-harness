@@ -123,6 +123,23 @@ def check_adoption(errors, adapters):
             fail(errors, f"adoption status drift {repo}: marker not found in adapter")
 
 
+def check_terminal_notification_plan(errors, roster):
+    """Validate the reviewed deployment matrix without declaring it deployed in live state."""
+    try:
+        matrix = load(ROOT / "deployment/hermes-terminal-outcome-notification.example.yaml")
+    except (OSError, json.JSONDecodeError) as exc:
+        fail(errors, f"malformed terminal notification deployment matrix: {exc}")
+        return
+    expected = {p["name"] for p in roster.get("profiles", [])
+                if p["lifecycle"] == "active" and p["role"] != "advisor"}
+    if matrix.get("plugin") != "hermes-terminal-outcome-notification" or matrix.get("status") != "planned":
+        fail(errors, "terminal notification deployment matrix must remain planned")
+    elif set(matrix.get("producer_profiles", [])) != expected:
+        fail(errors, "terminal notification deployment matrix producer roster drift")
+    elif any("hermes-terminal-outcome-notification" in p["required_plugins"] for p in roster.get("profiles", [])):
+        fail(errors, "terminal notification plugin is declared live before deployment authorization")
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--fixture", help="sanitized observed-state fixture; never reads live state")
@@ -137,6 +154,7 @@ def main():
         return 2
     if roster.get("ladder_version") != "glm-review-v1":
         fail(errors, "ladder_version expected glm-review-v1")
+    check_terminal_notification_plan(errors, roster)
     expected = {p["name"]: p for p in roster.get("profiles", [])}
     dispatch_profiles = snapshot["kanban"]["dispatch_profiles"]
     if args.fixture:
