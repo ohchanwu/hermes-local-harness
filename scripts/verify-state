@@ -3,6 +3,7 @@
 import argparse
 import hashlib
 import json
+import os
 import re
 import subprocess
 import sys
@@ -160,6 +161,60 @@ def check_terminal_notification_observed(errors, plugins, producer_profiles):
             fail(errors, f"terminal notification deployment pending {profile}: plugin not enabled")
 
 
+def usable_absolute_path(value):
+    return isinstance(value, str) and Path(value).is_absolute() and not value.startswith("__")
+
+
+def check_terminal_notification_runtime(errors, runtime, producer_profiles):
+    """All producers and the loaded worker must agree on real private paths."""
+    environments = runtime.get("producer_environment", {}) if isinstance(runtime, dict) else {}
+    shared_environment = runtime.get("shared_environment", {}) if isinstance(runtime, dict) else {}
+    paths = []
+    for profile in producer_profiles:
+        env = environments.get(profile, shared_environment)
+        outbox, kanban_db = env.get("outbox"), env.get("kanban_db")
+        if not usable_absolute_path(outbox) or not usable_absolute_path(kanban_db):
+            fail(errors, f"terminal notification runtime pending {profile}: shared absolute environment missing")
+        else:
+            paths.append((outbox, kanban_db))
+    worker = runtime.get("worker", {}) if isinstance(runtime, dict) else {}
+    if not worker.get("plist_rendered") or not worker.get("loaded"):
+        fail(errors, "terminal notification runtime pending worker: LaunchAgent not rendered and loaded")
+        return
+    outbox, kanban_db = worker.get("outbox"), worker.get("kanban_db")
+    if not usable_absolute_path(outbox) or not usable_absolute_path(kanban_db):
+        fail(errors, "terminal notification runtime pending worker: shared absolute environment missing")
+        return
+    paths.append((outbox, kanban_db))
+    if len(set(paths)) != 1:
+        fail(errors, "terminal notification runtime drift: producers and worker must share one outbox and canonical Kanban DB")
+
+
+def launchctl_value(key):
+    result = run("launchctl", "getenv", key)
+    return result.stdout.strip() if not result.returncode else None
+
+
+def check_live_terminal_notification_runtime(errors, producer_profiles):
+    outbox, kanban_db = launchctl_value("HERMES_TERMINAL_OUTBOX"), launchctl_value("HERMES_KANBAN_DB")
+    runtime = {"producer_environment": {profile: {"outbox": outbox, "kanban_db": kanban_db}
+                                        for profile in producer_profiles}, "worker": {"outbox": outbox, "kanban_db": kanban_db}}
+    matrix = load(ROOT / "deployment/hermes-terminal-outcome-notification.example.yaml")
+    label = matrix["worker"]["launchagent"]
+    plist = Path.home() / "Library" / "LaunchAgents" / f"{label}.plist"
+    runtime["worker"]["plist_rendered"] = plist.is_file()
+    loaded = run("launchctl", "print", f"gui/{os.getuid()}/{label}")
+    runtime["worker"]["loaded"] = not loaded.returncode
+    if plist.is_file():
+        for key, want in (("EnvironmentVariables.HERMES_TERMINAL_OUTBOX", outbox),
+                          ("EnvironmentVariables.HERMES_KANBAN_DB", kanban_db),
+                          ("ProgramArguments.3", outbox), ("ProgramArguments.5", kanban_db)):
+            actual = run("plutil", "-extract", key, "raw", str(plist))
+            if actual.returncode or actual.stdout.strip() != want:
+                runtime["worker"]["plist_rendered"] = False
+    check_terminal_notification_runtime(errors, runtime, producer_profiles)
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--fixture", help="sanitized observed-state fixture; never reads live state")
@@ -185,7 +240,7 @@ def main():
             return 2
         # Fail-closed fixture schema: a passing fixture must represent every required
         # observed field and every installed roster profile; omission is drift, not success.
-        for section in ("profile_models", "profile_providers", "plugins", "dispatch_profiles", "kanban", "skill_files", "adapters"):
+        for section in ("profile_models", "profile_providers", "plugins", "dispatch_profiles", "kanban", "skill_files", "adapters", "terminal_notification_runtime"):
             if section not in observed:
                 fail(errors, f"incomplete fixture: missing required section '{section}'")
         kanban = observed.get("kanban", {})
@@ -215,6 +270,8 @@ def main():
                 fail(errors, f"behavior-changing unexpected profile: {name}")
         plugins = observed.get("plugins", {})
         check_terminal_notification_observed(errors, plugins, snapshot["terminal_notification"]["producer_profiles"])
+        check_terminal_notification_runtime(errors, observed.get("terminal_notification_runtime", {}),
+                                            snapshot["terminal_notification"]["producer_profiles"])
         for name in expected:
             if name not in plugins:
                 fail(errors, f"incomplete fixture: plugins omits {name}")
@@ -260,6 +317,7 @@ def main():
                     metadata = Path.home() / ".hermes" / "profiles" / name / "plugins" / "ponytail" / "hooks" / "ponytail-config.js"
                     if not metadata.is_file() or f"const DEFAULT_MODE = '{snapshot['plugins']['ponytail']['default_mode']}'" not in metadata.read_text(errors="ignore"):
                         fail(errors, f"Ponytail mode drift {name}: expected default {snapshot['plugins']['ponytail']['default_mode']}")
+        check_live_terminal_notification_runtime(errors, snapshot["terminal_notification"]["producer_profiles"])
         for key, want in snapshot["kanban"].items():
             actual = json_config("default", f"kanban.{key}")
             if actual is UNREADABLE or actual != want:

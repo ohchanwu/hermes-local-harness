@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
+import importlib.util
+import io
+from importlib.machinery import SourceFileLoader
 import subprocess
+from contextlib import redirect_stdout
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -14,8 +18,25 @@ def check(*args, code=0, text=None):
         assert text in result.stdout, result.stdout
 
 
-# baseline: the all-good fixture passes
+# baseline: plugins plus shared runtime paths and the loaded worker pass.
 check("--fixture", str(FIXTURES / "clean.yaml"))
+# plugin enablement alone is insufficient: every producer must expose the shared
+# absolute runtime paths and the rendered, loaded worker must match them.
+spec = importlib.util.spec_from_loader("verify_state", SourceFileLoader("verify_state", str(VERIFY)))
+assert spec and spec.loader
+verify_state = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(verify_state)
+errors = []
+with redirect_stdout(io.StringIO()):
+    verify_state.check_terminal_notification_runtime(errors, {}, ["default"])
+assert "terminal notification runtime pending default" in errors[0]
+errors = []
+with redirect_stdout(io.StringIO()):
+    verify_state.check_terminal_notification_runtime(errors, {
+        "shared_environment": {"outbox": "/private/outbox.sqlite3", "kanban_db": "/private/kanban.db"},
+        "worker": {"outbox": "/private/outbox.sqlite3", "kanban_db": "/private/other.db", "plist_rendered": True, "loaded": True},
+    }, ["default"])
+assert errors == ["terminal notification runtime drift: producers and worker must share one outbox and canonical Kanban DB"]
 # model drift on a known profile fails
 check("--fixture", str(FIXTURES / "behavior-changing-model-drift.yaml"), code=1, text="model drift")
 # running unexpected profile fails

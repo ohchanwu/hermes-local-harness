@@ -93,5 +93,9 @@
       "content": "# Jobcron adapter\n**Status: operational; local repository adoption validated.**\n",
       "record": "/Users/chanbla11mit/gt/jobscraper/mayor/rig/docs/superpowers/specs/260919-hermes-orchestration-transition.md\nStatus: operational, local adoption validated."
     }
-  ]
+  ],
+  "terminal_notification_runtime": {
+    "shared_environment": {"outbox": "/private/hermes/terminal/outbox.sqlite3", "kanban_db": "/private/hermes/kanban/kanban.db"},
+    "worker": {"outbox": "/private/hermes/terminal/outbox.sqlite3", "kanban_db": "/private/hermes/kanban/kanban.db", "plist_rendered": true, "loaded": true}
+  }
 }
