@@ -2,19 +2,22 @@
 from __future__ import annotations
 
 import os
-from pathlib import Path
 from typing import Any
 
-from .core import Store
+from .core import Store, shared_outbox_path
 
 
 def _store() -> Store:
-    home = Path(os.environ.get("HERMES_HOME", Path.home() / ".hermes"))
-    return Store(home / "terminal-outcome-notifications" / "outbox.sqlite3")
+    return Store(shared_outbox_path())
+
+
+def _producer() -> str:
+    return os.environ.get("HERMES_HOME", "")
 
 
 def _session_id(kwargs: dict[str, Any]) -> str:
-    return str(kwargs.get("session_id") or kwargs.get("session_key") or "")
+    parent = kwargs.get("parent_agent")
+    return str(kwargs.get("session_id") or getattr(parent, "session_id", "") or "")
 
 
 def campaign_terminal(params: dict[str, Any], **kwargs: Any) -> str:
@@ -26,13 +29,24 @@ def campaign_terminal(params: dict[str, Any], **kwargs: Any) -> str:
     return '{"success":true,"armed":true}'
 
 
-def arm_command(args: list[str], **kwargs: Any) -> str:
+def arm_command(raw_args: str) -> str:
+    """Plugin slash commands receive only raw text; bind at pre_llm_call, never guess a session."""
+    _store().arm_next_direct(raw_args.strip() or "Direct Hermes campaign", _producer())
+    return "Terminal notification will arm for the next direct turn. Record completed or blocked with campaign_terminal."
+
+
+def watch_command(raw_args: str) -> str:
+    task_id, _, title = raw_args.strip().partition(" ")
+    if not task_id:
+        return "Usage: /watch-terminal-task TASK_ID [title]"
+    _store().watch_task(task_id, title or f"Kanban campaign {task_id}")
+    return f"Terminal notification armed for watched Kanban task {task_id}."
+
+
+def _pre_llm_call(**kwargs: Any) -> None:
     session_id = _session_id(kwargs)
-    if not session_id:
-        return "Cannot arm notification: session identity unavailable."
-    title = " ".join(args).strip() or "Direct Hermes campaign"
-    _store().arm_direct(session_id, title, lane=str(kwargs.get("session_key") or "") or None)
-    return "Terminal notification armed for this turn. Record completed or blocked with campaign_terminal before finishing."
+    if session_id:
+        _store().claim_pending_direct(session_id, str(kwargs.get("session_key") or kwargs.get("platform") or "") or None, _producer())
 
 
 def _post_llm_call(**kwargs: Any) -> None:
@@ -45,7 +59,7 @@ def _on_session_end(**kwargs: Any) -> None:
     session_id = _session_id(kwargs)
     if session_id:
         _store().session_end(session_id, completed=bool(kwargs.get("completed")), failed=bool(kwargs.get("failed")),
-                             interrupted=bool(kwargs.get("interrupted")), turn_exit_reason=str(kwargs.get("turn_exit_reason") or ""))
+                             interrupted=bool(kwargs.get("interrupted")), turn_exit_reason=str(kwargs.get("turn_exit_reason") or kwargs.get("reason") or ""))
 
 
 def _on_session_reset(**kwargs: Any) -> None:
@@ -56,9 +70,10 @@ def _on_session_reset(**kwargs: Any) -> None:
 
 
 def _agent_loop_stopped(**kwargs: Any) -> None:
-    session_id = _session_id(kwargs)
-    if session_id:
-        _store().stopped(session_id, str(kwargs.get("reason") or "interrupted"))
+    # Gateway/TUI surface supplies session_key, not session_id: persist lane evidence for reset reconciliation.
+    session_key = str(kwargs.get("session_key") or "")
+    if session_key:
+        _store().stopped(session_key, str(kwargs.get("reason") or "interrupted"), by_lane=True)
 
 
 def _kanban_completed(**kwargs: Any) -> None:
@@ -74,8 +89,10 @@ def register(ctx: Any) -> None:
         "name": "campaign_terminal", "description": "Record the explicit terminal outcome for an armed direct campaign. Does not send a notification.",
         "parameters": {"type": "object", "properties": {"status": {"type": "string", "enum": ["completed", "blocked"]},
         "summary": {"type": "string", "maxLength": 240}}, "required": ["status", "summary"]}}, handler=campaign_terminal)
-    ctx.register_command("notify-on-terminal", arm_command, "Arm one terminal notification for the current direct turn.")
-    for name, callback in (("post_llm_call", _post_llm_call), ("on_session_end", _on_session_end),
-                           ("on_session_reset", _on_session_reset), ("agent_loop_stopped", _agent_loop_stopped),
-                           ("kanban_task_completed", _kanban_completed), ("kanban_task_blocked", _kanban_blocked)):
+    ctx.register_command("notify-on-terminal", arm_command, "Arm one terminal notification for the next direct turn.")
+    ctx.register_command("watch-terminal-task", watch_command, "Watch one root or finalizer Kanban task.", args_hint="TASK_ID [title]")
+    for name, callback in (("pre_llm_call", _pre_llm_call), ("post_llm_call", _post_llm_call),
+                           ("on_session_end", _on_session_end), ("on_session_reset", _on_session_reset),
+                           ("agent_loop_stopped", _agent_loop_stopped), ("kanban_task_completed", _kanban_completed),
+                           ("kanban_task_blocked", _kanban_blocked)):
         ctx.register_hook(name, callback)

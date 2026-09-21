@@ -2,7 +2,8 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
   <key>Label</key><string>com.nous.hermes-terminal-outcome-notification</string>
-  <key>ProgramArguments</key><array><string>__PYTHON__</string><string>__WORKER__</string><string>--db</string><string>__OUTBOX__</string></array>
+  <key>ProgramArguments</key><array><string>__PYTHON__</string><string>__WORKER__</string><string>--db</string><string>__ABSOLUTE_SHARED_OUTBOX__</string><string>--kanban-db</string><string>__ABSOLUTE_HERMES_KANBAN_DB__</string></array>
+  <key>EnvironmentVariables</key><dict><key>HERMES_TERMINAL_OUTBOX</key><string>__ABSOLUTE_SHARED_OUTBOX__</string><key>HERMES_KANBAN_DB</key><string>__ABSOLUTE_HERMES_KANBAN_DB__</string></dict>
   <key>StartInterval</key><integer>30</integer>
   <key>ProcessType</key><string>Background</string>
 </dict></plist>

@@ -27,17 +27,23 @@ def _now() -> int:
 
 def _summary(value: object, limit: int) -> str:
     text = " ".join(str(value or "").split())
-    # Summaries cross notification boundaries; redact common key/value secrets defensively.
-    text = re.sub(r"(?i)\b(api[_-]?key|token|password|secret)\s*[:=]\s*\S+", r"\1=[REDACTED]", text)
-    return text[:limit]
+    return re.sub(r"(?i)\b(api[_-]?key|token|password|secret)\s*[:=]\s*\S+", r"\1=[REDACTED]", text)[:limit]
+
+
+def shared_outbox_path() -> Path:
+    """One explicit absolute path shared by every producer and the LaunchAgent."""
+    configured = os.environ.get("HERMES_TERMINAL_OUTBOX", "")
+    path = Path(configured)
+    if not configured or not path.is_absolute():
+        raise RuntimeError("HERMES_TERMINAL_OUTBOX must be an absolute shared outbox path")
+    return path
 
 
 class Store:
-    """SQLite state; callbacks only make bounded local transactions."""
-
     def __init__(self, path: str | Path, config: Config = Config()) -> None:
         self.path, self.config = Path(path), config
         self.path.parent.mkdir(parents=True, exist_ok=True)
+        os.chmod(self.path.parent, 0o700)
         self._init()
 
     def _connect(self) -> sqlite3.Connection:
@@ -47,6 +53,10 @@ class Store:
         conn.execute("PRAGMA busy_timeout=5000")
         return conn
 
+    def _add_column(self, db: sqlite3.Connection, table: str, name: str, definition: str) -> None:
+        if name not in {row[1] for row in db.execute(f"PRAGMA table_info({table})")}:
+            db.execute(f"ALTER TABLE {table} ADD COLUMN {name} {definition}")
+
     def _init(self) -> None:
         with self._connect() as db:
             db.executescript("""
@@ -55,6 +65,9 @@ class Store:
                   generation INTEGER NOT NULL DEFAULT 1, title TEXT NOT NULL, lane TEXT,
                   armed_at INTEGER NOT NULL, proposal_status TEXT, proposal_summary TEXT,
                   candidate_response TEXT, stopped_reason TEXT, disarmed_at INTEGER
+                );
+                CREATE TABLE IF NOT EXISTS arm_requests (
+                  request_id TEXT PRIMARY KEY, title TEXT NOT NULL, created_at INTEGER NOT NULL, claimed_at INTEGER, producer TEXT NOT NULL DEFAULT ''
                 );
                 CREATE TABLE IF NOT EXISTS events (
                   event_id TEXT PRIMARY KEY, campaign_id TEXT NOT NULL, generation INTEGER NOT NULL,
@@ -70,6 +83,8 @@ class Store:
                   PRIMARY KEY(event_id, destination), FOREIGN KEY(event_id) REFERENCES events(event_id)
                 );
             """)
+            self._add_column(db, "deliveries", "available_at", "INTEGER NOT NULL DEFAULT 0")
+            self._add_column(db, "arm_requests", "producer", "TEXT NOT NULL DEFAULT ''")
         os.chmod(self.path, 0o600)
 
     def arm_direct(self, session_id: str, title: str, lane: str | None = None) -> str:
@@ -78,14 +93,35 @@ class Store:
         campaign_id = f"direct:{session_id}"
         with self._connect() as db:
             db.execute("BEGIN IMMEDIATE")
-            db.execute("""INSERT INTO campaigns(campaign_id,session_id,title,lane,armed_at)
-                          VALUES(?,?,?,?,?)
-                          ON CONFLICT(session_id) DO UPDATE SET title=excluded.title,lane=excluded.lane,
-                          armed_at=excluded.armed_at,proposal_status=NULL,proposal_summary=NULL,
-                          candidate_response=NULL,stopped_reason=NULL,disarmed_at=NULL""",
+            db.execute("""INSERT INTO campaigns(campaign_id,session_id,title,lane,armed_at) VALUES(?,?,?,?,?)
+                          ON CONFLICT(session_id) DO UPDATE SET title=excluded.title,lane=excluded.lane,armed_at=excluded.armed_at,
+                          proposal_status=NULL,proposal_summary=NULL,candidate_response=NULL,stopped_reason=NULL,disarmed_at=NULL""",
                        (campaign_id, session_id, _summary(title, self.config.summary_max_chars), lane, _now()))
             db.execute("COMMIT")
         return campaign_id
+
+    def arm_next_direct(self, title: str, producer: str = "") -> str:
+        """Slash handlers lack session context; pre_llm_call claims this once with the real ID."""
+        request_id = uuid.uuid4().hex
+        with self._connect() as db:
+            db.execute("INSERT INTO arm_requests(request_id,title,created_at,claimed_at,producer) VALUES(?,?,?,NULL,?)",
+                       (request_id, _summary(title, self.config.summary_max_chars), _now(), producer))
+        return request_id
+
+    def claim_pending_direct(self, session_id: str, lane: str | None = None, producer: str = "") -> bool:
+        with self._connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            row = db.execute("SELECT * FROM arm_requests WHERE claimed_at IS NULL AND producer=? ORDER BY created_at LIMIT 1", (producer,)).fetchone()
+            if not row:
+                db.execute("COMMIT")
+                return False
+            db.execute("UPDATE arm_requests SET claimed_at=? WHERE request_id=?", (_now(), row["request_id"]))
+            db.execute("""INSERT INTO campaigns(campaign_id,session_id,title,lane,armed_at) VALUES(?,?,?,?,?)
+                          ON CONFLICT(session_id) DO UPDATE SET title=excluded.title,lane=excluded.lane,armed_at=excluded.armed_at,
+                          proposal_status=NULL,proposal_summary=NULL,candidate_response=NULL,stopped_reason=NULL,disarmed_at=NULL""",
+                       (f"direct:{session_id}", session_id, row["title"], lane, _now()))
+            db.execute("COMMIT")
+        return True
 
     def watch_task(self, task_id: str, title: str) -> str:
         if not task_id:
@@ -101,14 +137,12 @@ class Store:
         if status not in {"completed", "blocked"}:
             raise ValueError("status must be completed or blocked")
         with self._connect() as db:
-            cur = db.execute("""UPDATE campaigns SET proposal_status=?, proposal_summary=?
-                                WHERE session_id=? AND disarmed_at IS NULL""",
-                             (status, _summary(summary, self.config.summary_max_chars), session_id))
-            return cur.rowcount == 1
+            return db.execute("UPDATE campaigns SET proposal_status=?,proposal_summary=? WHERE session_id=? AND disarmed_at IS NULL",
+                              (status, _summary(summary, self.config.summary_max_chars), session_id)).rowcount == 1
 
     def candidate(self, session_id: str, response: str) -> None:
         with self._connect() as db:
-            db.execute("""UPDATE campaigns SET candidate_response=? WHERE session_id=? AND disarmed_at IS NULL""",
+            db.execute("UPDATE campaigns SET candidate_response=? WHERE session_id=? AND disarmed_at IS NULL",
                        (_summary(response, self.config.summary_max_chars), session_id))
 
     def _event(self, db: sqlite3.Connection, campaign: sqlite3.Row, status: str, summary: str, delay: int = 0) -> str:
@@ -116,24 +150,21 @@ class Store:
                               (campaign["campaign_id"], campaign["generation"], status)).fetchone()
         if existing:
             return existing["event_id"]
-        event_id = uuid.uuid4().hex
-        now = _now()
-        db.execute("""INSERT INTO events VALUES(?,?,?,?,?,?,?,?,?,?,NULL,NULL)""",
+        event_id, now = uuid.uuid4().hex, _now()
+        db.execute("INSERT INTO events VALUES(?,?,?,?,?,?,?,?,?,?,NULL,NULL)",
                    (event_id, campaign["campaign_id"], campaign["generation"], status, campaign["title"],
-                    _summary(summary, self.config.summary_max_chars), campaign["task_id"], campaign["session_id"],
-                    now, now + delay))
-        db.executemany("INSERT INTO deliveries(event_id,destination) VALUES(?,?)",
-                       ((event_id, "telegram"), (event_id, "macos")))
+                    _summary(summary, self.config.summary_max_chars), campaign["task_id"], campaign["session_id"], now, now + delay))
+        db.executemany("INSERT INTO deliveries(event_id,destination,available_at) VALUES(?,?,?)",
+                       ((event_id, "telegram", now + delay), (event_id, "macos", now + delay)))
         return event_id
 
-    def session_end(self, session_id: str, *, completed: bool, failed: bool = False,
-                    interrupted: bool = False, turn_exit_reason: str = "") -> str | None:
+    def session_end(self, session_id: str, *, completed: bool, failed: bool = False, interrupted: bool = False,
+                    turn_exit_reason: str = "") -> str | None:
         with self._connect() as db:
             db.execute("BEGIN IMMEDIATE")
             campaign = db.execute("SELECT * FROM campaigns WHERE session_id=? AND disarmed_at IS NULL", (session_id,)).fetchone()
             if not campaign:
-                db.execute("COMMIT")
-                return None
+                db.execute("COMMIT"); return None
             if campaign["proposal_status"] and completed and not interrupted:
                 status, summary = campaign["proposal_status"], campaign["proposal_summary"]
             elif interrupted:
@@ -141,26 +172,27 @@ class Store:
             elif failed:
                 status, summary = "failed", turn_exit_reason or "Turn failed"
             else:
-                # post_llm_call is deliberately not proof of a committed final response.
                 status, summary = "unknown", "No durable terminal outcome was recorded"
             event_id = self._event(db, campaign, status, summary)
             db.execute("UPDATE campaigns SET disarmed_at=? WHERE campaign_id=?", (_now(), campaign["campaign_id"]))
             db.execute("COMMIT")
             return event_id
 
-    def stopped(self, session_id: str, reason: str) -> None:
+    def stopped(self, session_or_lane: str, reason: str, *, by_lane: bool = False) -> None:
+        column = "lane" if by_lane else "session_id"
         with self._connect() as db:
-            db.execute("UPDATE campaigns SET stopped_reason=? WHERE session_id=? AND disarmed_at IS NULL",
-                       (_summary(reason, self.config.summary_max_chars), session_id))
+            db.execute(f"UPDATE campaigns SET stopped_reason=? WHERE {column}=? AND disarmed_at IS NULL",
+                       (_summary(reason, self.config.summary_max_chars), session_or_lane))
 
     def reset(self, new_session_id: str, old_session_id: str | None = None, lane: str | None = None) -> None:
-        """Only cancel an identified predecessor; a new-only reset never guesses."""
         with self._connect() as db:
             db.execute("BEGIN IMMEDIATE")
-            if old_session_id:
-                db.execute("UPDATE campaigns SET disarmed_at=? WHERE session_id=? AND disarmed_at IS NULL",
-                           (_now(), old_session_id))
-            # New session is an explicit unarmed boundary.  Lane is stored only as evidence for callers.
+            predecessor = old_session_id
+            if not predecessor and lane:
+                row = db.execute("SELECT session_id FROM campaigns WHERE lane=? AND stopped_reason IS NOT NULL AND disarmed_at IS NULL", (lane,)).fetchone()
+                predecessor = row["session_id"] if row else None
+            if predecessor:
+                db.execute("UPDATE campaigns SET disarmed_at=? WHERE session_id=? AND disarmed_at IS NULL", (_now(), predecessor))
             db.execute("INSERT OR IGNORE INTO campaigns(campaign_id,session_id,title,lane,armed_at,disarmed_at) VALUES(?,?,?,?,?,?)",
                        (f"boundary:{new_session_id}", new_session_id, "", lane, _now(), _now()))
             db.execute("COMMIT")
@@ -181,24 +213,44 @@ class Store:
             campaign = db.execute("SELECT * FROM campaigns WHERE task_id=? AND disarmed_at IS NULL", (task_id,)).fetchone()
             return self._event(db, campaign, "blocked", reason, self.config.block_debounce_seconds) if campaign else None
 
+    @staticmethod
+    def human_block(state: dict[str, Any]) -> bool:
+        kind, status = state.get("block_kind"), state.get("status")
+        reason = str(state.get("reason") or "").lower()
+        if kind in HUMAN_BLOCKS:
+            return status == "blocked"
+        if status == "triage" and (int(state.get("block_recurrences") or 0) > 0 or "exhaust" in reason):
+            return True
+        return status == "blocked" and ("human_block" in reason or "approval" in reason or "human" in reason or "review" in reason)
+
+    def recheck_block(self, event_id: str, state_reader: Callable[[str], dict[str, Any] | None]) -> bool:
+        with self._connect() as db:
+            event = db.execute("SELECT task_id FROM events WHERE event_id=? AND cancelled_at IS NULL", (event_id,)).fetchone()
+            if not event or not event["task_id"]:
+                return True
+            state = state_reader(event["task_id"])
+            if state is None:  # board read failure is retryable, never a cancellation.
+                return False
+            if self.human_block(state):
+                return True
+            db.execute("UPDATE events SET cancelled_at=?, cancellation_reason=? WHERE event_id=?", (_now(), "block no longer requires human action", event_id))
+            return False
+
     def cancel_nonhuman_blocks(self, state_reader: Callable[[str], dict[str, Any] | None]) -> int:
-        """Worker recheck: only a current, human-action block remains eligible."""
         cancelled = 0
         with self._connect() as db:
-            rows = db.execute("""SELECT e.event_id,e.task_id FROM events e WHERE e.terminal_status='blocked'
-                               AND e.cancelled_at IS NULL AND EXISTS(SELECT 1 FROM deliveries d WHERE d.event_id=e.event_id AND d.status='pending')""").fetchall()
-            for row in rows:
-                state = state_reader(row["task_id"]) if row["task_id"] else None
-                if not state or state.get("status") != "blocked" or state.get("block_kind") not in HUMAN_BLOCKS:
-                    db.execute("UPDATE events SET cancelled_at=?, cancellation_reason=? WHERE event_id=?",
-                               (_now(), "block no longer requires human action", row["event_id"]))
-                    cancelled += 1
+            rows = db.execute("SELECT event_id FROM events WHERE terminal_status='blocked' AND cancelled_at IS NULL").fetchall()
+        for row in rows:
+            before = self.status()
+            self.recheck_block(row["event_id"], state_reader)
+            if any(r["event_id"] == row["event_id"] and r["cancelled_at"] for r in self.status()) and before:
+                cancelled += 1
         return cancelled
 
     def resume_task(self, task_id: str) -> None:
         with self._connect() as db:
-            db.execute("""UPDATE campaigns SET generation=generation+1, disarmed_at=NULL WHERE task_id=?""", (task_id,))
+            db.execute("UPDATE campaigns SET generation=generation+1,disarmed_at=NULL WHERE task_id=?", (task_id,))
 
     def status(self) -> list[dict[str, Any]]:
         with self._connect() as db:
-            return [dict(row) for row in db.execute("SELECT e.*, d.destination, d.status AS delivery_status, d.attempts FROM events e JOIN deliveries d USING(event_id) ORDER BY e.created_at,d.destination")]
+            return [dict(row) for row in db.execute("SELECT e.*,d.destination,d.status AS delivery_status,d.attempts,d.available_at AS delivery_available_at FROM events e JOIN deliveries d USING(event_id) ORDER BY e.created_at,d.destination")]

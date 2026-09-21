@@ -3,9 +3,11 @@
   "version": "0.1.0",
   "status": "planned",
   "producer_profiles": ["default", "reviewer-sol", "worker-flash-1", "worker-flash-2", "worker-flash-3", "worker-luna-1", "worker-luna-2", "worker-terra-1", "worker-glm-full", "worker-sol", "worker-astra"],
+  "shared_outbox": "__ABSOLUTE_SHARED_OUTBOX__",
   "worker": {
     "launchagent": "com.nous.hermes-terminal-outcome-notification",
-    "outbox": "$HERMES_HOME/terminal-outcome-notifications/outbox.sqlite3",
+    "outbox": "__ABSOLUTE_SHARED_OUTBOX__",
+    "kanban_db": "__ABSOLUTE_HERMES_KANBAN_DB__",
     "telegram_target": "configured Hermes Telegram chat/thread",
     "macos": true
   }
