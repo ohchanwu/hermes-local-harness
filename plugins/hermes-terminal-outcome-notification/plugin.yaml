@@ -2,12 +2,15 @@ name: hermes-terminal-outcome-notification
 version: "0.1.0"
 description: Durable zero-LLM notifications for explicitly watched terminal outcomes.
 provides_tools:
+  - arm_campaign
   - campaign_terminal
+  - watch_terminal_task
 provides_hooks:
   - pre_llm_call
   - post_llm_call
   - on_session_end
   - on_session_reset
   - agent_loop_stopped
+  - kanban_task_claimed
   - kanban_task_completed
   - kanban_task_blocked
