@@ -166,7 +166,7 @@ def usable_absolute_path(value):
 
 
 def check_terminal_notification_runtime(errors, runtime, producer_profiles):
-    """All producers and the loaded worker must agree on real private paths."""
+    """Producers and the worker must agree on real private paths; the loaded worker must match them."""
     environments = runtime.get("producer_environment", {}) if isinstance(runtime, dict) else {}
     shared_environment = runtime.get("shared_environment", {}) if isinstance(runtime, dict) else {}
     paths = []
@@ -181,6 +181,9 @@ def check_terminal_notification_runtime(errors, runtime, producer_profiles):
     if not worker.get("plist_rendered") or not worker.get("loaded"):
         fail(errors, "terminal notification runtime pending worker: LaunchAgent not rendered and loaded")
         return
+    if not worker.get("loaded_state_matches", False):
+        fail(errors, "terminal notification runtime pending worker: loaded LaunchAgent arguments/environment do not match the shared paths")
+        return
     outbox, kanban_db = worker.get("outbox"), worker.get("kanban_db")
     if not usable_absolute_path(outbox) or not usable_absolute_path(kanban_db):
         fail(errors, "terminal notification runtime pending worker: shared absolute environment missing")
@@ -190,29 +193,114 @@ def check_terminal_notification_runtime(errors, runtime, producer_profiles):
         fail(errors, "terminal notification runtime drift: producers and worker must share one outbox and canonical Kanban DB")
 
 
-def launchctl_value(key):
-    result = run("launchctl", "getenv", key)
-    return result.stdout.strip() if not result.returncode else None
+GATEWAY_PROCESS_PATTERN = "hermes_cli.main gateway run"
+WORKER_ENV_KEYS = ("HERMES_TERMINAL_OUTBOX", "HERMES_KANBAN_DB")
 
 
-def check_live_terminal_notification_runtime(errors, producer_profiles):
-    outbox, kanban_db = launchctl_value("HERMES_TERMINAL_OUTBOX"), launchctl_value("HERMES_KANBAN_DB")
-    runtime = {"producer_environment": {profile: {"outbox": outbox, "kanban_db": kanban_db}
-                                        for profile in producer_profiles}, "worker": {"outbox": outbox, "kanban_db": kanban_db}}
+def parse_ps_environment(text):
+    """KEY=VALUE tokens that `ps eww` appends after the command line."""
+    environment = {}
+    for token in text.split():
+        key, sep, value = token.partition("=")
+        if sep and re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", key):
+            environment[key] = value
+    return environment
+
+
+def parse_launchctl_print(text):
+    """Effective arguments and environment of the loaded job from `launchctl print` output."""
+    arguments, environment, section = [], {}, None
+    for line in text.splitlines():
+        stripped = line.strip()
+        if section == "arguments":
+            if stripped == "}":
+                section = None
+            else:
+                arguments.append(stripped)
+        elif section == "environment":
+            if stripped == "}":
+                section = None
+            elif " => " in stripped:
+                key, _, value = stripped.partition(" => ")
+                environment[key] = value
+        elif stripped in ("arguments = {", "environment = {"):
+            section = stripped.split()[0]
+    return {"arguments": arguments, "environment": environment}
+
+
+def argument_after(arguments, flag):
+    index = arguments.index(flag) + 1 if flag in arguments else 0
+    return arguments[index] if index < len(arguments) else None
+
+
+def observe_gateway_environment(errors, runner):
+    """Effective inherited environment of every running multiplex gateway process.
+
+    `launchctl getenv` only proves the user domain is configured for future children;
+    the inherited environment of the running gateway is what producers actually see,
+    so a gateway that was never restarted after `launchctl setenv` stays red."""
+    ps = runner("ps", "axeww", "-o", "pid=,command=")
+    if ps.returncode:
+        fail(errors, "terminal notification runtime pending gateway: unable to list processes")
+        return {}
+    environments = []
+    for line in ps.stdout.splitlines():
+        if GATEWAY_PROCESS_PATTERN not in line:
+            continue
+        environments.append(parse_ps_environment(line))
+    if not environments:
+        fail(errors, "terminal notification runtime pending gateway: multiplex gateway is not running")
+        return {}
+    gateway = {}
+    for key in WORKER_ENV_KEYS:
+        values = {env.get(key) for env in environments}
+        if len(values) > 1:
+            fail(errors, "terminal notification runtime drift: running gateway processes disagree on the shared environment")
+            return {}
+        gateway[key] = values.pop()
+    if any(gateway.get(key) is None for key in WORKER_ENV_KEYS):
+        fail(errors, "terminal notification runtime pending gateway: running gateway has not inherited "
+                     "HERMES_TERMINAL_OUTBOX/HERMES_KANBAN_DB (hermes gateway restart required)")
+    return gateway
+
+
+def build_live_terminal_runtime(errors, runner, producer_profiles, plist=None):
+    """Observe the live runtime: running gateway environment, rendered plist, and the
+    loaded LaunchAgent's effective arguments/environment (not merely the file on disk)."""
+    gateway = observe_gateway_environment(errors, runner)
+    outbox, kanban_db = gateway.get(WORKER_ENV_KEYS[0]), gateway.get(WORKER_ENV_KEYS[1])
     matrix = load(ROOT / "deployment/hermes-terminal-outcome-notification.example.yaml")
     label = matrix["worker"]["launchagent"]
-    plist = Path.home() / "Library" / "LaunchAgents" / f"{label}.plist"
-    runtime["worker"]["plist_rendered"] = plist.is_file()
-    loaded = run("launchctl", "print", f"gui/{os.getuid()}/{label}")
-    runtime["worker"]["loaded"] = not loaded.returncode
-    if plist.is_file():
+    worker = {"outbox": outbox, "kanban_db": kanban_db}
+    plist = plist if plist is not None else Path.home() / "Library" / "LaunchAgents" / f"{label}.plist"
+    worker["plist_rendered"] = plist.is_file()
+    if worker["plist_rendered"] and outbox and kanban_db:
         for key, want in (("EnvironmentVariables.HERMES_TERMINAL_OUTBOX", outbox),
                           ("EnvironmentVariables.HERMES_KANBAN_DB", kanban_db),
                           ("ProgramArguments.3", outbox), ("ProgramArguments.5", kanban_db)):
-            actual = run("plutil", "-extract", key, "raw", str(plist))
+            actual = runner("plutil", "-extract", key, "raw", str(plist))
             if actual.returncode or actual.stdout.strip() != want:
-                runtime["worker"]["plist_rendered"] = False
-    check_terminal_notification_runtime(errors, runtime, producer_profiles)
+                worker["plist_rendered"] = False
+    printed = runner("launchctl", "print", f"gui/{os.getuid()}/{label}")
+    worker["loaded"] = not printed.returncode
+    worker["loaded_state_matches"] = False
+    if worker["loaded"] and outbox and kanban_db:
+        state = parse_launchctl_print(printed.stdout)
+        worker["loaded_state_matches"] = (
+            argument_after(state["arguments"], "--db") == outbox
+            and argument_after(state["arguments"], "--kanban-db") == kanban_db
+            and state["environment"].get("HERMES_TERMINAL_OUTBOX") == outbox
+            and state["environment"].get("HERMES_KANBAN_DB") == kanban_db)
+    return {"producer_environment": {profile: {"outbox": outbox, "kanban_db": kanban_db}
+                                     for profile in producer_profiles},
+            "worker": worker}
+
+
+def check_live_terminal_notification_runtime(errors, producer_profiles):
+    errors_before = len(errors)
+    runtime = build_live_terminal_runtime(errors, run, producer_profiles)
+    if len(errors) == errors_before:  # observation failed: its error is the root cause
+        check_terminal_notification_runtime(errors, runtime, producer_profiles)
 
 
 def main():

@@ -34,9 +34,77 @@ errors = []
 with redirect_stdout(io.StringIO()):
     verify_state.check_terminal_notification_runtime(errors, {
         "shared_environment": {"outbox": "/private/outbox.sqlite3", "kanban_db": "/private/kanban.db"},
-        "worker": {"outbox": "/private/outbox.sqlite3", "kanban_db": "/private/other.db", "plist_rendered": True, "loaded": True},
+        "worker": {"outbox": "/private/outbox.sqlite3", "kanban_db": "/private/kanban.db", "plist_rendered": True, "loaded": True},
     }, ["default"])
-assert errors == ["terminal notification runtime drift: producers and worker must share one outbox and canonical Kanban DB"]
+assert errors == ["terminal notification runtime pending worker: loaded LaunchAgent arguments/environment do not match the shared paths"], errors
+errors = []
+with redirect_stdout(io.StringIO()):
+    verify_state.check_terminal_notification_runtime(errors, {
+        "shared_environment": {"outbox": "/private/outbox.sqlite3", "kanban_db": "/private/kanban.db"},
+        "worker": {"outbox": "/private/outbox.sqlite3", "kanban_db": "/private/other.db", "plist_rendered": True, "loaded": True, "loaded_state_matches": True},
+    }, ["default"])
+assert errors == ["terminal notification runtime drift: producers and worker must share one outbox and canonical Kanban DB"], errors
+
+# live-observation boundary, end to end against a stubbed command runner:
+# false green #1 — launchd domain set (or plugins enabled) but the running multiplex
+# gateway never inherited the shared environment because it was not restarted.
+OUTBOX, KANBAN = "/private/hermes/terminal/outbox.sqlite3", "/private/hermes/kanban/kanban.db"
+PLIST_EXTRACTS = {"EnvironmentVariables.HERMES_TERMINAL_OUTBOX": OUTBOX,
+                  "EnvironmentVariables.HERMES_KANBAN_DB": KANBAN,
+                  "ProgramArguments.3": OUTBOX, "ProgramArguments.5": KANBAN}
+
+
+def stub_runner(ps_output, launchctl_output, plist_values):
+    import tempfile
+    plist = Path(tempfile.mkdtemp(prefix="hermes-verify-")) / "worker.plist"
+    plist.write_text("stub")
+    ps_lines = ps_output if isinstance(ps_output, list) else [ps_output]
+    def runner(*args):
+        if args[:3] == ("ps", "axeww", "-o"):
+            return subprocess.CompletedProcess(args, 0, stdout="".join(f"4860{i} {line}" for i, line in enumerate(ps_lines)), stderr="")
+        if args[:2] == ("plutil", "-extract"):
+            want = plist_values.get(args[2])
+            code, out = (0, want) if want is not None else (1, "")
+            return subprocess.CompletedProcess(args, code, stdout=out, stderr="")
+        if args[:2] == ("launchctl", "print"):
+            code = 0 if launchctl_output is not None else 1
+            return subprocess.CompletedProcess(args, code, stdout=launchctl_output or "", stderr="")
+        return subprocess.CompletedProcess(args, 1, stdout="", stderr="")
+    return runner, plist
+
+
+def live_errors(ps_output, launchctl_output, plist_values):
+    runner, plist = stub_runner(ps_output, launchctl_output, plist_values)
+    errors = []
+    with redirect_stdout(io.StringIO()):
+        runtime = verify_state.build_live_terminal_runtime(errors, runner, ["default"], plist=plist)
+        verify_state.check_terminal_notification_runtime(errors, runtime, ["default"])
+    return errors, runtime
+
+
+PS_ENV_SET = (f"/venv/bin/python -m hermes_cli.main gateway run --external-supervisor "
+              f"HERMES_TERMINAL_OUTBOX={OUTBOX} HERMES_KANBAN_DB={KANBAN} PATH=/bin\n")
+PS_ENV_MISSING = "/venv/bin/python -m hermes_cli.main gateway run --external-supervisor PATH=/bin\n"
+LOADED_MATCHING = (f"gui/501/label = {{\n\tstate = running\n\n\targuments = {{\n\t\t/venv/bin/python\n\t\t/worker.py\n\t\t--db\n\t\t{OUTBOX}\n"
+                   f"\t\t--kanban-db\n\t\t{KANBAN}\n\t}}\n\n\tenvironment = {{\n"
+                   f"\t\tHERMES_TERMINAL_OUTBOX => {OUTBOX}\n\t\tHERMES_KANBAN_DB => {KANBAN}\n\t}}\n}}\n")
+LOADED_STALE = (f"gui/501/label = {{\n\tstate = running\n\n\targuments = {{\n\t\t/venv/bin/python\n\t\t/worker.py\n\t\t--db\n\t\t/old/outbox.sqlite3\n"
+                f"\t\t--kanban-db\n\t\t/old/kanban.db\n\t}}\n\n\tenvironment = {{\n"
+                f"\t\tHERMES_TERMINAL_OUTBOX => /old/outbox.sqlite3\n\t\tHERMES_KANBAN_DB => /old/kanban.db\n\t}}\n}}\n")
+
+# gateway present but env not inherited (restart skipped) stays red
+errors, _ = live_errors(PS_ENV_MISSING, LOADED_MATCHING, PLIST_EXTRACTS)
+assert any("running gateway has not inherited" in e for e in errors), errors
+# rendered plist matches but the loaded job is stale stays red
+errors, _ = live_errors(PS_ENV_SET, LOADED_STALE, PLIST_EXTRACTS)
+assert any("loaded LaunchAgent arguments/environment do not match" in e for e in errors), errors
+# fully rolled out (env inherited, plist rendered, loaded job effective state matches) passes
+errors, runtime = live_errors(PS_ENV_SET, LOADED_MATCHING, PLIST_EXTRACTS)
+assert errors == [], errors
+# gateway processes disagreeing on the shared environment is drift
+PS_DISAGREE = [PS_ENV_SET.replace(OUTBOX, "/a.sqlite3"), PS_ENV_SET]
+errors, _ = live_errors(PS_DISAGREE, LOADED_MATCHING, PLIST_EXTRACTS)
+assert any("gateway processes disagree" in e for e in errors), errors
 # model drift on a known profile fails
 check("--fixture", str(FIXTURES / "behavior-changing-model-drift.yaml"), code=1, text="model drift")
 # running unexpected profile fails

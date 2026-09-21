@@ -58,6 +58,6 @@
   ],
   "terminal_notification_runtime": {
     "shared_environment": {"outbox": "/private/hermes/terminal/outbox.sqlite3", "kanban_db": "/private/hermes/kanban/kanban.db"},
-    "worker": {"outbox": "/private/hermes/terminal/outbox.sqlite3", "kanban_db": "/private/hermes/kanban/kanban.db", "plist_rendered": true, "loaded": true}
+    "worker": {"outbox": "/private/hermes/terminal/outbox.sqlite3", "kanban_db": "/private/hermes/kanban/kanban.db", "plist_rendered": true, "loaded": true, "loaded_state_matches": true}
   }
 }
