@@ -55,8 +55,10 @@ def plugin_state(text):
     return state
 
 
-def check_plugins(errors, warnings, profile, expected, observed_plugins, pinned_plugins=None):
-    """expected: required plugin names; observed_plugins: {name: status-or-line} or list of enabled names."""
+def check_plugins(errors, warnings, profile, expected, observed_plugins, pinned_plugins=None,
+                  required_disabled=None):
+    """expected: required plugin names; observed_plugins: {name: status-or-line} or list of enabled names.
+    required_disabled: plugins that must be installed but disabled (None means no disabled expectation)."""
     if isinstance(observed_plugins, list):
         state = {n: "enabled" for n in observed_plugins}
     else:
@@ -68,9 +70,18 @@ def check_plugins(errors, warnings, profile, expected, observed_plugins, pinned_
             fail(errors, f"plugin drift {profile}: required {required} not enabled (actual {actual!r})")
         elif pinned and f"pinned@{pinned.get('pinned_display_commit', pinned['pinned_commit'])} {pinned['version']}" not in actual:
             fail(errors, f"plugin drift {profile}: {required} expected pinned {pinned['version']}@{pinned['pinned_commit']}")
+    for required in required_disabled or []:
+        pinned = (pinned_plugins or {}).get(required)
+        actual = state.get(required)
+        if actual is None:
+            fail(errors, f"plugin drift {profile}: required-disabled {required} absent (expected installed and disabled)")
+        elif str(actual).startswith("enabled"):
+            fail(errors, f"ponytail enabled drift {profile}: {required} must be disabled")
+        elif pinned and f"pinned@{pinned.get('pinned_display_commit', pinned['pinned_commit'])} {pinned['version']}" not in str(actual):
+            fail(errors, f"plugin drift {profile}: {required} expected pinned {pinned['version']}@{pinned['pinned_commit']}")
     for name, status in sorted(state.items()):
         enabled = str(status).startswith("enabled")
-        if name not in expected:
+        if name not in expected and name not in (required_disabled or []):
             if enabled:
                 fail(errors, f"behavior-changing unexpected plugin {profile}: {name}")
             else:
@@ -78,19 +89,28 @@ def check_plugins(errors, warnings, profile, expected, observed_plugins, pinned_
 
 
 def check_skill(errors, deployed_hashes):
+    """deployed_hashes: {skill_name: {rel: sha-or-None}} of deployed shared skills, or None to check tracked only."""
     skill = load(ROOT / "snapshots/sanitized-current-state.yaml")["skill"]
-    files = {"SKILL.md": skill["sha256"], skill["helper_path"]: skill["helper_sha256"]}
-    for rel, want in sorted(files.items()):
-        tracked = ROOT / "skills" / "multi-agent-coding-orchestrator" / rel
-        if not tracked.is_file():
-            fail(errors, f"missing tracked skill file: {rel}")
-            continue
-        if hashlib.sha256(tracked.read_bytes()).hexdigest() != want:
-            fail(errors, f"tracked skill hash mismatch: {rel}")
-        if deployed_hashes is not None and deployed_hashes.get(rel) != want:
-            fail(errors, f"deployed skill hash mismatch: {rel}")
-    if deployed_hashes is not None and "version: " + skill["version"] not in (ROOT / "skills" / "multi-agent-coding-orchestrator" / "SKILL.md").read_text():
-        fail(errors, "shared skill version mismatch")
+    tracked_dir = {
+        "multi-agent-coding-orchestrator": ROOT / "skills/multi-agent-coding-orchestrator",
+        "minimal-implementation": ROOT / "skills/minimal-implementation",
+        "simplification-review": ROOT / "skills/simplification-review",
+    }
+    for entry in skill["shared_skills"]:
+        name, base = entry["name"], tracked_dir[entry["name"]]
+        deployed = (deployed_hashes or {}).get(name, {}) if deployed_hashes is not None else {}
+        for rel, want in sorted(entry["files"].items()):
+            tracked = base / rel
+            if not tracked.is_file():
+                fail(errors, f"missing tracked skill file: {name}/{rel}")
+                continue
+            if hashlib.sha256(tracked.read_bytes()).hexdigest() != want:
+                fail(errors, f"tracked skill hash mismatch: {name}/{rel}")
+            if deployed_hashes is not None and deployed.get(rel) != want:
+                fail(errors, f"deployed skill hash mismatch: {name}/{rel}")
+        version_file = base / "SKILL.md"
+        if version_file.is_file() and "version: " + entry["version"] not in version_file.read_text():
+            fail(errors, f"shared skill version mismatch: {name}")
 
 
 ADOPTION_REPOS = {"cha-pt": "adoption/cha-pt.md", "jobcron": "adoption/jobcron.md"}
@@ -367,7 +387,8 @@ def main():
             if name not in expected:
                 fail(errors, f"behavior-changing unexpected profile: {name}")
             else:
-                check_plugins(errors, warnings, name, expected[name]["required_plugins"], observed_plugins, snapshot["plugins"])
+                check_plugins(errors, warnings, name, expected[name]["required_plugins"], observed_plugins,
+                              snapshot["plugins"], expected[name].get("installed_disabled_plugins"))
         for name in observed.get("active_extras", []):
             fail(errors, f"behavior-changing unexpected profile: {name}")
         for name in observed.get("dormant_extras", []):
@@ -400,21 +421,19 @@ def main():
                     state = plugin_state(plugins.stdout)
                     if name in snapshot["terminal_notification"]["producer_profiles"]:
                         check_terminal_notification_observed(errors, {name: state}, [name])
-                    check_plugins(errors, warnings, name, profile["required_plugins"], state, snapshot["plugins"])
-                if profile["role"] == "implementation" and "ponytail" in profile["required_plugins"]:
-                    metadata = Path.home() / ".hermes" / "profiles" / name / "plugins" / "ponytail" / "hooks" / "ponytail-config.js"
-                    if not metadata.is_file() or f"const DEFAULT_MODE = '{snapshot['plugins']['ponytail']['default_mode']}'" not in metadata.read_text(errors="ignore"):
-                        fail(errors, f"Ponytail mode drift {name}: expected default {snapshot['plugins']['ponytail']['default_mode']}")
+                    check_plugins(errors, warnings, name, profile["required_plugins"], state, snapshot["plugins"],
+                                  profile.get("installed_disabled_plugins"))
         check_live_terminal_notification_runtime(errors, snapshot["terminal_notification"]["producer_profiles"])
         for key, want in snapshot["kanban"].items():
             actual = json_config("default", f"kanban.{key}")
             if actual is UNREADABLE or actual != want:
                 fail(errors, f"concurrency/dispatch drift kanban.{key}: expected {want!r}, actual {'<unreadable>' if actual is UNREADABLE else actual!r}")
-        skill_dir = Path(snapshot["skill"]["path"]).parent
         deployed_hashes = {}
-        for rel in ("SKILL.md", snapshot["skill"]["helper_path"]):
-            deployed = skill_dir / rel
-            deployed_hashes[rel] = hashlib.sha256(deployed.read_bytes()).hexdigest() if deployed.is_file() else None
+        for entry in snapshot["skill"]["shared_skills"]:
+            deployed_hashes[entry["name"]] = {}
+            for rel in entry["files"]:
+                deployed = Path(entry["path"]) / rel
+                deployed_hashes[entry["name"]][rel] = hashlib.sha256(deployed.read_bytes()).hexdigest() if deployed.is_file() else None
         check_skill(errors, deployed_hashes)
         check_adoption(errors, None)
         source = Path(snapshot["hermes_source"]["path"])

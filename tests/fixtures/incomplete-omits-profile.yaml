@@ -37,42 +37,42 @@
       "hermes-terminal-outcome-notification": "enabled      git pinned@7d38611e 0.1.0    hermes-terminal-outcome-notification"
     },
     "worker-flash-1": {
-      "ponytail": "enabled      git pinned@16f29800 4.8.4    ponytail",
+      "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail",
       "hermes-terminal-outcome-notification": "enabled      git pinned@7d38611e 0.1.0    hermes-terminal-outcome-notification"
     },
     "worker-flash-2": {
-      "ponytail": "enabled      git pinned@16f29800 4.8.4    ponytail",
+      "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail",
       "hermes-terminal-outcome-notification": "enabled      git pinned@7d38611e 0.1.0    hermes-terminal-outcome-notification"
     },
     "worker-flash-3": {
-      "ponytail": "enabled      git pinned@16f29800 4.8.4    ponytail",
+      "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail",
       "hermes-terminal-outcome-notification": "enabled      git pinned@7d38611e 0.1.0    hermes-terminal-outcome-notification"
     },
     "worker-luna-1": {
-      "ponytail": "enabled      git pinned@16f29800 4.8.4    ponytail",
+      "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail",
       "hermes-terminal-outcome-notification": "enabled      git pinned@7d38611e 0.1.0    hermes-terminal-outcome-notification"
     },
     "worker-luna-2": {
-      "ponytail": "enabled      git pinned@16f29800 4.8.4    ponytail",
+      "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail",
       "hermes-terminal-outcome-notification": "enabled      git pinned@7d38611e 0.1.0    hermes-terminal-outcome-notification"
     },
     "worker-terra-1": {
-      "ponytail": "enabled      git pinned@16f29800 4.8.4    ponytail",
+      "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail",
       "hermes-terminal-outcome-notification": "enabled      git pinned@7d38611e 0.1.0    hermes-terminal-outcome-notification"
     },
     "worker-terra-2": {
-      "ponytail": "enabled      git pinned@16f29800 4.8.4    ponytail"
+      "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail"
     },
     "worker-glm-full": {
-      "ponytail": "enabled      git pinned@16f29800 4.8.4    ponytail",
+      "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail",
       "hermes-terminal-outcome-notification": "enabled      git pinned@7d38611e 0.1.0    hermes-terminal-outcome-notification"
     },
     "worker-sol": {
-      "ponytail": "enabled      git pinned@16f29800 4.8.4    ponytail",
+      "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail",
       "hermes-terminal-outcome-notification": "enabled      git pinned@7d38611e 0.1.0    hermes-terminal-outcome-notification"
     },
     "worker-astra": {
-      "ponytail": "enabled      git pinned@16f29800 4.8.4    ponytail",
+      "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail",
       "hermes-terminal-outcome-notification": "enabled      git pinned@7d38611e 0.1.0    hermes-terminal-outcome-notification"
     }
   },
@@ -89,8 +89,16 @@
     "max_in_progress_per_profile": 1
   },
   "skill_files": {
-    "SKILL.md": "a3a1385853587cbb8c446c044f316eac5b8b65add74cc4b1f8bb50a996a9cfa2",
-    "scripts/set-active-lanes.py": "157419c7c190b0a9f647271f7bd3839182f2e9324f8f9d74e43ec0553a5b77df"
+    "multi-agent-coding-orchestrator": {
+      "SKILL.md": "146b1fa23d36704f9067bfdd9e6cf1522e79771d64be238f076d06b2df8e75bf",
+      "scripts/set-active-lanes.py": "157419c7c190b0a9f647271f7bd3839182f2e9324f8f9d74e43ec0553a5b77df"
+    },
+    "minimal-implementation": {
+      "SKILL.md": "49542affe2fe219297e29af98a012df54911c1243f1fa9150221221772a40c65"
+    },
+    "simplification-review": {
+      "SKILL.md": "d058cd37b2cf161097dfc51eafd373414603f5feb22ff22e8fe1e198679edb47"
+    }
   },
   "active_extras": [],
   "dormant_extras": [],
@@ -105,5 +113,18 @@
       "content": "# Jobcron adapter\n**Status: operational; local repository adoption validated.**\n",
       "record": "/Users/chanbla11mit/gt/jobscraper/mayor/rig/docs/superpowers/specs/260919-hermes-orchestration-transition.md\nStatus: operational, local adoption validated."
     }
-  ]
+  ],
+  "terminal_notification_runtime": {
+    "shared_environment": {
+      "outbox": "/private/hermes/terminal/outbox.sqlite3",
+      "kanban_db": "/private/hermes/kanban/kanban.db"
+    },
+    "worker": {
+      "outbox": "/private/hermes/terminal/outbox.sqlite3",
+      "kanban_db": "/private/hermes/kanban/kanban.db",
+      "plist_rendered": true,
+      "loaded": true,
+      "loaded_state_matches": true
+    }
+  }
 }

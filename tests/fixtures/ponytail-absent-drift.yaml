@@ -38,7 +38,7 @@
       "hermes-terminal-outcome-notification": "enabled      git pinned@7d38611e 0.1.0    hermes-terminal-outcome-notification"
     },
     "worker-flash-1": {
-      "ponytail": "disabled     git pinned@deadbeef 4.8.3    ponytail",
+      "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail",
       "hermes-terminal-outcome-notification": "enabled      git pinned@7d38611e 0.1.0    hermes-terminal-outcome-notification"
     },
     "worker-flash-2": {
@@ -61,9 +61,7 @@
       "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail",
       "hermes-terminal-outcome-notification": "enabled      git pinned@7d38611e 0.1.0    hermes-terminal-outcome-notification"
     },
-    "worker-terra-2": {
-      "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail"
-    },
+    "worker-terra-2": {},
     "worker-glm-full": {
       "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail",
       "hermes-terminal-outcome-notification": "enabled      git pinned@7d38611e 0.1.0    hermes-terminal-outcome-notification"

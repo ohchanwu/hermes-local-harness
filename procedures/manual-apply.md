@@ -64,31 +64,60 @@ Complete separate authorization per profile when a credential is required (`herm
 
 ## 3. Ponytail on the ten implementation profiles (worker-flash-1/2/3, worker-luna-1/2, worker-terra-1/2, worker-glm-full, worker-sol, worker-astra; NOT default/reviewer-sol/advisor)
 
-Install pinned from Git and enable:
+Desired state: the pinned Ponytail package is installed but `disabled` on every implementation profile. Hermes never runs the Ponytail plugin; minimalism comes from the per-card `minimal-implementation` skill instead (see section 4).
 
-    hermes -p worker-flash-1 plugins install https://github.com/DietrichGebert/ponytail.git --ref 16f29800fd2681bdf24f3eb4ccffe38be3baec6b --enable
-    hermes -p worker-flash-2 plugins install https://github.com/DietrichGebert/ponytail.git --ref 16f29800fd2681bdf24f3eb4ccffe38be3baec6b --enable
-    hermes -p worker-flash-3 plugins install https://github.com/DietrichGebert/ponytail.git --ref 16f29800fd2681bdf24f3eb4ccffe38be3baec6b --enable
-    hermes -p worker-luna-1 plugins install https://github.com/DietrichGebert/ponytail.git --ref 16f29800fd2681bdf24f3eb4ccffe38be3baec6b --enable
-    hermes -p worker-luna-2 plugins install https://github.com/DietrichGebert/ponytail.git --ref 16f29800fd2681bdf24f3eb4ccffe38be3baec6b --enable
-    hermes -p worker-terra-1 plugins install https://github.com/DietrichGebert/ponytail.git --ref 16f29800fd2681bdf24f3eb4ccffe38be3baec6b --enable
-    hermes -p worker-terra-2 plugins install https://github.com/DietrichGebert/ponytail.git --ref 16f29800fd2681bdf24f3eb4ccffe38be3baec6b --enable
-    hermes -p worker-glm-full plugins install https://github.com/DietrichGebert/ponytail.git --ref 16f29800fd2681bdf24f3eb4ccffe38be3baec6b --enable
-    hermes -p worker-sol plugins install https://github.com/DietrichGebert/ponytail.git --ref 16f29800fd2681bdf24f3eb4ccffe38be3baec6b --enable
-    hermes -p worker-astra plugins install https://github.com/DietrichGebert/ponytail.git --ref 16f29800fd2681bdf24f3eb4ccffe38be3baec6b --enable
+Install pinned from Git without enabling:
 
-(--ref pins exactly; catalog does not list ponytail.)
+    hermes -p worker-flash-1 plugins install https://github.com/DietrichGebert/ponytail.git --ref 16f29800fd2681bdf24f3eb4ccffe38be3baec6b --no-enable
+    hermes -p worker-flash-2 plugins install https://github.com/DietrichGebert/ponytail.git --ref 16f29800fd2681bdf24f3eb4ccffe38be3baec6b --no-enable
+    hermes -p worker-flash-3 plugins install https://github.com/DietrichGebert/ponytail.git --ref 16f29800fd2681bdf24f3eb4ccffe38be3baec6b --no-enable
+    hermes -p worker-luna-1 plugins install https://github.com/DietrichGebert/ponytail.git --ref 16f29800fd2681bdf24f3eb4ccffe38be3baec6b --no-enable
+    hermes -p worker-luna-2 plugins install https://github.com/DietrichGebert/ponytail.git --ref 16f29800fd2681bdf24f3eb4ccffe38be3baec6b --no-enable
+    hermes -p worker-terra-1 plugins install https://github.com/DietrichGebert/ponytail.git --ref 16f29800fd2681bdf24f3eb4ccffe38be3baec6b --no-enable
+    hermes -p worker-terra-2 plugins install https://github.com/DietrichGebert/ponytail.git --ref 16f29800fd2681bdf24f3eb4ccffe38be3baec6b --no-enable
+    hermes -p worker-glm-full plugins install https://github.com/DietrichGebert/ponytail.git --ref 16f29800fd2681bdf24f3eb4ccffe38be3baec6b --no-enable
+    hermes -p worker-sol plugins install https://github.com/DietrichGebert/ponytail.git --ref 16f29800fd2681bdf24f3eb4ccffe38be3baec6b --no-enable
+    hermes -p worker-astra plugins install https://github.com/DietrichGebert/ponytail.git --ref 16f29800fd2681bdf24f3eb4ccffe38be3baec6b --no-enable
 
-Verify full mode on each (plugin default is `full`; the resolver honors `PONYTAIL_DEFAULT_MODE` and `~/.config/ponytail/config.json` — leave both unset unless a mode override is an approved change):
+(--ref pins exactly; catalog does not list ponytail. `--no-enable` installs disabled, skipping the enable prompt.)
+
+If a profile already has Ponytail enabled, disable it instead of reinstalling:
+
+    hermes -p <profile> plugins disable ponytail
+
+Verify disabled-but-pinned on each:
 
     hermes -p <profile> plugins list --plain --no-bundled
-    # expect: enabled      git pinned@16f29800 4.8.4    ponytail
+    # expect: disabled     git pinned@16f29800 4.8.4    ponytail
+    # drift: absent line (not installed) or `enabled` prefix (plugin active) — both are failures
+    # the resolver honors PONYTAIL_DEFAULT_MODE and ~/.config/ponytail/config.json; with the plugin disabled they are irrelevant — leave both unset unless a mode override is an approved change
 
-## 4. Deploy the shared skill (manual copy; never symlink)
+## 4. Deploy the shared skills (manual copy; never symlink)
 
     mkdir -p ~/.hermes/skills/autonomous-ai-agents/multi-agent-coding-orchestrator/scripts
+    mkdir -p ~/.hermes/skills/software-development/minimal-implementation
+    mkdir -p ~/.hermes/skills/software-development/simplification-review
     cp skills/multi-agent-coding-orchestrator/SKILL.md ~/.hermes/skills/autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md
     cp skills/multi-agent-coding-orchestrator/scripts/set-active-lanes.py ~/.hermes/skills/autonomous-ai-agents/multi-agent-coding-orchestrator/scripts/
+    cp skills/minimal-implementation/SKILL.md ~/.hermes/skills/software-development/minimal-implementation/SKILL.md
+    cp skills/simplification-review/SKILL.md ~/.hermes/skills/software-development/simplification-review/SKILL.md
+
+Deployed copies must match the tracked hashes in `snapshots/sanitized-current-state.yaml` (`./scripts/verify-state` checks this). Reviewer and advisor profiles never load `minimal-implementation`; the orchestrator attaches it per card per the routing policy in `skills/multi-agent-coding-orchestrator/SKILL.md`.
+
+## 4b. Interactive Claude/Codex sessions (manual live-state step)
+
+Desired policy for interactive Claude Code and Codex CLI sessions on this machine: upstream Ponytail remains installed and enabled, but the shared default mode is `off`, so sessions are manually activatable (`/ponytail`) rather than ambient. This is live `~/.claude` / `~/.codex` state — apply it manually; never commit it to this repository.
+
+    # resolver order: PONYTAIL_DEFAULT_MODE env var, then ~/.config/ponytail/config.json defaultMode, then plugin default
+    unset PONYTAIL_DEFAULT_MODE                          # in the shell that launches claude/codex
+    mkdir -p ~/.config/ponytail
+    printf '{"defaultMode": "off"}\n' > ~/.config/ponytail/config.json
+
+Verify (manual):
+
+    cat ~/.config/ponytail/config.json                  # expect {"defaultMode": "off"}
+    env | grep PONYTAIL_DEFAULT_MODE                    # expect no output
+    # start one claude/codex session: no Ponytail system prompt appears; `/ponytail full` activates it for that session
 
 ## 5. Global kanban settings (default-scoped)
 

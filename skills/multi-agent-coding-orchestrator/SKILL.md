@@ -1,7 +1,7 @@
 ---
 name: multi-agent-coding-orchestrator
 description: "Use when orchestrating multi-agent coding with Hermes."
-version: 0.2.1
+version: 0.3.0
 author: chanbla11mit, Hermes Agent
 license: MIT
 platforms: [macos]
@@ -42,7 +42,18 @@ Implementation profiles, in escalation order:
 
 Keep `worker-terra-2` installed but dormant as a rollback/spare lane. It is outside the active nine-lane roster unless the human changes the policy.
 
-All implementation profiles run Ponytail in `full` mode. The orchestrator, reviewer, and advisor do not use Ponytail.
+Ponytail never runs as a plugin on Hermes profiles. Implementation profiles keep the pinned package installed but `disabled`; the minimalism behavior lives in the per-card `minimal-implementation` skill instead (see Skills). The orchestrator, reviewer, and advisor neither load it nor the simplification skill.
+
+## Skills
+
+`minimal-implementation` is the task-triggered minimalism skill. The orchestrator attaches it per card (via `skills: ["minimal-implementation"]` on the card) using this policy:
+
+- Attach for: native/platform-alternative questions, dependency or library choice, open-ended UI/component work, suspected overengineering, refactoring or simplification, and shared-function or root-cause repair.
+- Leave off for: acceptance-heavy, security or trust-boundary, migration or data-loss, concurrency or distributed-systems, infrastructure or production, and compliance-sensitive tasks.
+- Override: even for an attach-category task, the orchestrator may leave the skill off whenever verification or safety requirements outrank simplification. That is the direction of the override — verification and safety outrank minimalism, never the reverse.
+- `simplification-review` is a separate, optional post-implementation review skill; it recommends reductions only and never edits or weakens tests. It is never a substitute for required verification.
+
+Record the decision in card metadata: `skill_policy_version`, `minimal_implementation: enabled|disabled`, the reason, and that verification precedence applies (`verification_precedence: requirements-and-risk-outrank-simplification`). Reviewer and advisor lanes never load the implementation skill.
 
 ## Routing Rubric
 
@@ -181,6 +192,7 @@ Each implementation card must include:
 - Required worktree/branch isolation.
 - Acceptance criteria and test commands.
 - Ladder metadata and routing rationale.
+- Skill policy metadata (`minimal_implementation` enabled/disabled and reason; see Skills).
 - Required local commit and structured handoff.
 - `reviewer-sol` as same-card reviewer for code changes.
 - Explicit prohibitions on push, PR creation, deployment, and production mutation.
