@@ -47,7 +47,7 @@
   "dispatch_profiles": ["worker-flash-1", "worker-flash-2", "worker-flash-3", "worker-luna-1", "worker-luna-2", "reviewer-sol"],
   "kanban": {"max_in_progress": null, "max_in_progress_per_profile": 1},
   "skill_files": {
-    "SKILL.md": "111bab7f058fb77ec2fbc6fefc0abe5e4d1e8eb290f2834297f00e19dd212c79",
+    "SKILL.md": "a3a1385853587cbb8c446c044f316eac5b8b65add74cc4b1f8bb50a996a9cfa2",
     "scripts/set-active-lanes.py": "157419c7c190b0a9f647271f7bd3839182f2e9324f8f9d74e43ec0553a5b77df"
   },
   "active_extras": [],

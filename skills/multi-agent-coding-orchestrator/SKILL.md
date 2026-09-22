@@ -1,7 +1,7 @@
 ---
 name: multi-agent-coding-orchestrator
 description: "Use when orchestrating multi-agent coding with Hermes."
-version: 0.2.0
+version: 0.2.1
 author: chanbla11mit, Hermes Agent
 license: MIT
 platforms: [macos]
@@ -161,6 +161,8 @@ Authorization covers local branches, worktrees, commits, tests, and recoverable 
 
 ## Cross-Session Startup
 
+When the user refers to another session, "the spec," or prior work from another surface, recover the exact session record or literal source path first and verify that target exists. Telegram, CLI, TUI, and tmux conversations may share a profile without sharing conversational context; do not infer the intended artifact from a similar name.
+
 1. Confirm repository root and current branch/status with `terminal`.
 2. Read repository `AGENTS.md` and `docs/superpowers/README.md`.
 3. Read only the active specification, plan, decision, and status material relevant to the work.
@@ -223,6 +225,9 @@ Send only milestone completions, genuine blockers, and approval requests. Do not
 
 ## Pitfalls
 
+- When the user says stop, terminate every owned background worker, reviewer, preview server, and watcher before replying, then verify they stopped. Do not resume because a delayed completion notification arrives.
+- Run every Git command with an explicit repository `workdir` or `git -C`; printing a repository path inside a loop does not change the command's working repository.
+- For Hermes plugin or service specifications, validate every required hook and payload against the installed source or current official documentation on each emitting surface. CLI, TUI, gateway, and automatic lifecycle paths can expose different identifiers and ordering.
 - Standard `kanban_request_changes` immediately routes back to the original implementer; use a structured block for tier escalation to prevent a reassignment race. A normal unblock preserves review provenance and returns to review, so escalation must reassign and then explicitly promote the card to `ready`.
 - Hermes's global `kanban.max_in_progress` counts review tasks. Do not use it for the implementation-only cap; enforce the active profile pool instead.
 - Profile isolation does not isolate files. Every code-changing card needs its own worktree.
