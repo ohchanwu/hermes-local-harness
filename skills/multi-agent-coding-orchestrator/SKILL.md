@@ -175,7 +175,7 @@ Authorization covers local branches, worktrees, commits, tests, and recoverable 
 When the user refers to another session, "the spec," or prior work from another surface, recover the exact session record or literal source path first and verify that target exists. Telegram, CLI, TUI, and tmux conversations may share a profile without sharing conversational context; do not infer the intended artifact from a similar name.
 
 1. Confirm repository root and current branch/status with `terminal`.
-2. Read repository `AGENTS.md` and `docs/superpowers/README.md`.
+2. Read repository `AGENTS.md` and `docs/README.md`.
 3. Read only the active specification, plan, decision, and status material relevant to the work.
 4. Inspect the matching Kanban tenant and active task histories.
 5. Reconcile repository state, Git branches/worktrees, active lane allowlist, and Kanban before changing status or dispatching work.

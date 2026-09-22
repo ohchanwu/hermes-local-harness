@@ -90,7 +90,7 @@
   "skill_files": {
     "multi-agent-coding-orchestrator": {
       "default": {
-        "SKILL.md": "146b1fa23d36704f9067bfdd9e6cf1522e79771d64be238f076d06b2df8e75bf",
+        "SKILL.md": "8ebad5c1649b67464d934cb38e935de326a82536621d9babdee649088498938e",
         "scripts/set-active-lanes.py": "157419c7c190b0a9f647271f7bd3839182f2e9324f8f9d74e43ec0553a5b77df"
       }
     },
@@ -165,12 +165,12 @@
     {
       "repo": "cha-pt",
       "content": "# Cha PT adapter\n**Status: operational; local repository adoption validated.**\n",
-      "record": "/Users/chanbla11mit/gt/cha_pt/mayor/rig/docs/superpowers/specs/260919-hermes-orchestration-transition.md\nStatus: operational, local adoption validated."
+      "record": "/Users/chanbla11mit/gt/cha_pt/mayor/rig/docs/specs/260919-hermes-orchestration-transition.md\nStatus: operational, local adoption validated."
     },
     {
       "repo": "jobcron",
       "content": "# Jobcron adapter\n**Status: operational; local repository adoption validated.**\n",
-      "record": "/Users/chanbla11mit/gt/jobscraper/mayor/rig/docs/superpowers/specs/260919-hermes-orchestration-transition.md\nStatus: operational, local adoption validated."
+      "record": "/Users/chanbla11mit/gt/jobscraper/mayor/rig/docs/specs/260919-hermes-orchestration-transition.md\nStatus: operational, local adoption validated."
     }
   ],
   "terminal_notification_runtime": {

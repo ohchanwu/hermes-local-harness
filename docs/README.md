@@ -1,6 +1,6 @@
-# Superpowers
+# Documentation
 
-This directory tracks durable implementation knowledge that should stay in Git and remain easy to find.
+This index is the entry point for durable harness documentation tracked in Git. Load this index instead of recursively reading the docs tree.
 
 ## Layout
 
