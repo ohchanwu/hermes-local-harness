@@ -34,4 +34,3 @@ Minimality never limits acceptance-critical, regression, security, migration, da
 ## Boundaries
 
 - Never de-scope acceptance criteria; record conflict on the card and stop.
-- Mark any deliberate simplification with a known ceiling using a `ponytail:` comment naming the ceiling and the upgrade path.

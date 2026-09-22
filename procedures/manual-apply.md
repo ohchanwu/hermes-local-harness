@@ -94,15 +94,21 @@ Verify disabled-but-pinned on each:
 
 ## 4. Deploy the shared skills (manual copy; never symlink)
 
+Hermes skills load per profile: worker profiles read only `~/.hermes/profiles/<profile>/skills`, and the default profile reads `~/.hermes/skills`. A skill installed only under `~/.hermes/skills` is invisible to implementation lanes, so the two scoped skills are copied into every implementation profile home — including dormant `worker-terra-2` — and never into reviewer/advisor homes. The orchestrator skill stays in the default (control-plane) home.
+
     mkdir -p ~/.hermes/skills/autonomous-ai-agents/multi-agent-coding-orchestrator/scripts
-    mkdir -p ~/.hermes/skills/software-development/minimal-implementation
-    mkdir -p ~/.hermes/skills/software-development/simplification-review
     cp skills/multi-agent-coding-orchestrator/SKILL.md ~/.hermes/skills/autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md
     cp skills/multi-agent-coding-orchestrator/scripts/set-active-lanes.py ~/.hermes/skills/autonomous-ai-agents/multi-agent-coding-orchestrator/scripts/
-    cp skills/minimal-implementation/SKILL.md ~/.hermes/skills/software-development/minimal-implementation/SKILL.md
-    cp skills/simplification-review/SKILL.md ~/.hermes/skills/software-development/simplification-review/SKILL.md
 
-Deployed copies must match the tracked hashes in `snapshots/sanitized-current-state.yaml` (`./scripts/verify-state` checks this). Reviewer and advisor profiles never load `minimal-implementation`; the orchestrator attaches it per card per the routing policy in `skills/multi-agent-coding-orchestrator/SKILL.md`.
+    for profile in worker-flash-1 worker-flash-2 worker-flash-3 worker-luna-1 worker-luna-2 \
+                   worker-terra-1 worker-terra-2 worker-glm-full worker-sol worker-astra; do
+      mkdir -p ~/.hermes/profiles/$profile/skills/software-development/minimal-implementation \
+               ~/.hermes/profiles/$profile/skills/software-development/simplification-review
+      cp skills/minimal-implementation/SKILL.md ~/.hermes/profiles/$profile/skills/software-development/minimal-implementation/SKILL.md
+      cp skills/simplification-review/SKILL.md ~/.hermes/profiles/$profile/skills/software-development/simplification-review/SKILL.md
+    done
+
+Every deployed copy must match the tracked hashes in `snapshots/sanitized-current-state.yaml`; its `deploy_profiles` lists exactly which profile homes host each skill, and `./scripts/verify-state` hashes each copy and fails on a missing or divergent one. Reviewer and advisor profiles never receive `minimal-implementation`; the orchestrator attaches it per card per the routing policy in `skills/multi-agent-coding-orchestrator/SKILL.md`.
 
 ## 4b. Interactive Claude/Codex sessions (manual live-state step)
 

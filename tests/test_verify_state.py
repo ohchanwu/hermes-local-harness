@@ -123,6 +123,15 @@ check("--fixture", str(FIXTURES / "terminal-notification-rollback.yaml"), code=1
 check("--fixture", str(FIXTURES / "plugin-pin-drift.yaml"), code=1, text="expected pinned 4.8.4@16f29800")
 # deployed skill hash divergence from tracked canonical source fails
 check("--fixture", str(FIXTURES / "deployed-skill-divergence.yaml"), code=1, text="deployed skill hash mismatch")
+# enabled Ponytail on an implementation profile fails with its own diagnostic
+check("--fixture", str(FIXTURES / "ponytail-enabled-drift.yaml"), code=1, text="must be disabled")
+# absent required-disabled Ponytail fails with its own diagnostic
+check("--fixture", str(FIXTURES / "ponytail-absent-drift.yaml"), code=1, text="required-disabled ponytail absent")
+# a missing per-profile deployed copy fails (dormant profile included)
+check("--fixture", str(FIXTURES / "skill-deployment-missing.yaml"), code=1, text="deployed skill copy missing")
+# the implementation skill must not impose Ponytail's mandatory source-comment convention
+assert "ponytail:" not in (ROOT / "skills" / "minimal-implementation" / "SKILL.md").read_text(), \
+    "minimal-implementation must not mandate ponytail: source comments"
 # empty adapter content fails (missing adoption)
 check("--fixture", str(FIXTURES / "adapter-missing.yaml"), code=1, text="repository adapter missing")
 # adapter present but adoption marker regressed fails

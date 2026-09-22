@@ -7,7 +7,7 @@ clean = json.loads((fx / "clean.yaml").read_text())
 
 ORCH_SKILL_SHA = "146b1fa23d36704f9067bfdd9e6cf1522e79771d64be238f076d06b2df8e75bf"
 ORCH_HELPER_SHA = "157419c7c190b0a9f647271f7bd3839182f2e9324f8f9d74e43ec0553a5b77df"
-MINIMPL_SKILL_SHA = "49542affe2fe219297e29af98a012df54911c1243f1fa9150221221772a40c65"
+MINIMPL_SKILL_SHA = "a017ca2b203644ce6d5bd688c0b06875bbbe3908fe9dc6212ff39098ab53d794"
 SIMPREV_SKILL_SHA = "d058cd37b2cf161097dfc51eafd373414603f5feb22ff22e8fe1e198679edb47"
 
 IMPL = ["worker-flash-1", "worker-flash-2", "worker-flash-3", "worker-luna-1", "worker-luna-2",
@@ -43,15 +43,26 @@ def base_plugins():
     return plugins
 
 
-def set_skill_files(d):
-    d["skill_files"] = {
+def skill_files_map():
+    """skill -> profile -> {rel: sha}, per the desired deploy_profiles matrix."""
+    return {
         "multi-agent-coding-orchestrator": {
-            "SKILL.md": ORCH_SKILL_SHA,
-            "scripts/set-active-lanes.py": ORCH_HELPER_SHA,
+            profile: {
+                "SKILL.md": ORCH_SKILL_SHA,
+                "scripts/set-active-lanes.py": ORCH_HELPER_SHA,
+            } for profile in ["default"]
         },
-        "minimal-implementation": {"SKILL.md": MINIMPL_SKILL_SHA},
-        "simplification-review": {"SKILL.md": SIMPREV_SKILL_SHA},
+        "minimal-implementation": {
+            profile: {"SKILL.md": MINIMPL_SKILL_SHA} for profile in IMPL
+        },
+        "simplification-review": {
+            profile: {"SKILL.md": SIMPREV_SKILL_SHA} for profile in IMPL
+        },
     }
+
+
+def set_skill_files(d):
+    d["skill_files"] = skill_files_map()
 
 
 write("behavior-changing-model-drift.yaml", delta(lambda d: d["profile_models"].__setitem__("worker-terra-1", "wrong-model")))
@@ -96,10 +107,18 @@ write("ponytail-absent-drift.yaml", delta(ponytail_absent))
 
 def skill_divergence(d):
     set_skill_files(d)
-    d["skill_files"]["minimal-implementation"]["SKILL.md"] = "0" * 64
+    d["skill_files"]["minimal-implementation"]["worker-flash-1"]["SKILL.md"] = "0" * 64
 
 
 write("deployed-skill-divergence.yaml", delta(skill_divergence))
+
+
+def skill_missing(d):
+    set_skill_files(d)
+    del d["skill_files"]["minimal-implementation"]["worker-terra-2"]
+
+
+write("skill-deployment-missing.yaml", delta(skill_missing))
 
 
 def remove_terminal_notification(d):

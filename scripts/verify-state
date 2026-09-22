@@ -89,7 +89,7 @@ def check_plugins(errors, warnings, profile, expected, observed_plugins, pinned_
 
 
 def check_skill(errors, deployed_hashes):
-    """deployed_hashes: {skill_name: {rel: sha-or-None}} of deployed shared skills, or None to check tracked only."""
+    """deployed_hashes: {skill: {profile: {rel: sha-or-None}}} of deployed copies, or None to check tracked only."""
     skill = load(ROOT / "snapshots/sanitized-current-state.yaml")["skill"]
     tracked_dir = {
         "multi-agent-coding-orchestrator": ROOT / "skills/multi-agent-coding-orchestrator",
@@ -97,20 +97,31 @@ def check_skill(errors, deployed_hashes):
         "simplification-review": ROOT / "skills/simplification-review",
     }
     for entry in skill["shared_skills"]:
-        name, base = entry["name"], tracked_dir[entry["name"]]
-        deployed = (deployed_hashes or {}).get(name, {}) if deployed_hashes is not None else {}
+        name = entry["name"]
         for rel, want in sorted(entry["files"].items()):
-            tracked = base / rel
+            tracked = tracked_dir[name] / rel
             if not tracked.is_file():
                 fail(errors, f"missing tracked skill file: {name}/{rel}")
-                continue
-            if hashlib.sha256(tracked.read_bytes()).hexdigest() != want:
+            elif hashlib.sha256(tracked.read_bytes()).hexdigest() != want:
                 fail(errors, f"tracked skill hash mismatch: {name}/{rel}")
-            if deployed_hashes is not None and deployed.get(rel) != want:
-                fail(errors, f"deployed skill hash mismatch: {name}/{rel}")
-        version_file = base / "SKILL.md"
+        version_file = tracked_dir[name] / "SKILL.md"
         if version_file.is_file() and "version: " + entry["version"] not in version_file.read_text():
             fail(errors, f"shared skill version mismatch: {name}")
+        if deployed_hashes is None:
+            continue
+        observed_profiles = deployed_hashes.get(name, {})
+        for profile in entry["deploy_profiles"]:
+            if profile not in observed_profiles:
+                fail(errors, f"deployed skill copy missing: {name} {profile}")
+        for profile, observed in sorted(observed_profiles.items()):
+            for rel, want in sorted(entry["files"].items()):
+                actual = (observed or {}).get(rel)
+                if actual == want:
+                    continue
+                if actual is None:
+                    fail(errors, f"deployed skill copy missing: {name} {profile}/{rel}")
+                else:
+                    fail(errors, f"deployed skill hash mismatch: {name} {profile}/{rel}")
 
 
 ADOPTION_REPOS = {"cha-pt": "adoption/cha-pt.md", "jobcron": "adoption/jobcron.md"}
@@ -431,9 +442,12 @@ def main():
         deployed_hashes = {}
         for entry in snapshot["skill"]["shared_skills"]:
             deployed_hashes[entry["name"]] = {}
-            for rel in entry["files"]:
-                deployed = Path(entry["path"]) / rel
-                deployed_hashes[entry["name"]][rel] = hashlib.sha256(deployed.read_bytes()).hexdigest() if deployed.is_file() else None
+            for profile in entry["deploy_profiles"]:
+                deployed_hashes[entry["name"]][profile] = {}
+                for rel in entry["files"]:
+                    deployed = Path(entry["path"].replace("<profile>", profile)) / rel
+                    deployed_hashes[entry["name"]][profile][rel] = (
+                        hashlib.sha256(deployed.read_bytes()).hexdigest() if deployed.is_file() else None)
         check_skill(errors, deployed_hashes)
         check_adoption(errors, None)
         source = Path(snapshot["hermes_source"]["path"])
