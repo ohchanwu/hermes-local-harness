@@ -33,7 +33,7 @@ def rows_by(store, terminal):
     return {r["destination"]: r for r in store.status() if r["terminal_status"] == terminal}
 
 
-def test_deployment_runbook_renders_exact_worker_arguments():
+def test_deployment_runbook_renders_exact_worker_launch_configuration():
     procedure = (ROOT / "procedures" / "hermes-terminal-outcome-notifications.md").read_text()
     commands = [
         line.strip()
@@ -42,6 +42,18 @@ def test_deployment_runbook_renders_exact_worker_arguments():
         and "ProgramArguments" in line
     ]
     assert len(commands) == 4
+    path_commands = [
+        line.strip()
+        for line in procedure.splitlines()
+        if line.strip().startswith("plutil -insert EnvironmentVariables.PATH")
+    ]
+    assert len(path_commands) == 1
+    path_setup = [
+        line.strip()
+        for line in procedure.splitlines()
+        if line.strip().startswith(("HERMES_EXE=", "[ \"${HERMES_EXE#/}\"", "HERMES_WORKER_PATH="))
+    ]
+    assert len(path_setup) == 3
 
     with tempfile.TemporaryDirectory(prefix="terminal outcome plist ") as tmpdir:
         tmp = Path(tmpdir)
@@ -59,7 +71,9 @@ def test_deployment_runbook_renders_exact_worker_arguments():
                 f"PLIST={shlex.quote(str(plist))}",
                 f"HERMES_TERMINAL_OUTBOX={shlex.quote(str(outbox))}",
                 f"HERMES_KANBAN_DB={shlex.quote(str(kanban))}",
+                *path_setup,
                 *commands,
+                *path_commands,
             ]
         )
         subprocess.run(["/bin/zsh", "-c", script], check=True, capture_output=True, text=True)
@@ -75,6 +89,27 @@ def test_deployment_runbook_renders_exact_worker_arguments():
         ]
         assert len(rendered["ProgramArguments"]) == 6
         assert rendered["ProgramArguments"] == expected
+        hermes_executable = Path(subprocess.check_output(["/bin/zsh", "-c", "command -v hermes"], text=True).strip())
+        assert hermes_executable.is_absolute()
+        hermes_bin = hermes_executable.parent
+        assert rendered["EnvironmentVariables"]["PATH"] == f"{hermes_bin}:/usr/bin:/bin:/usr/sbin:/sbin"
+
+    with tempfile.TemporaryDirectory(prefix="relative hermes path ") as tmpdir:
+        tmp = Path(tmpdir)
+        relative_bin = tmp / ".local" / "bin"
+        relative_bin.mkdir(parents=True)
+        hermes = relative_bin / "hermes"
+        hermes.write_text("#!/bin/sh\nexit 0\n")
+        hermes.chmod(0o755)
+        result = subprocess.run(
+            ["/bin/zsh", "-c", "\n".join(["set -eu", *path_setup])],
+            cwd=tmp,
+            env={**os.environ, "PATH": ".local/bin:/usr/bin:/bin"},
+            text=True,
+            capture_output=True,
+        )
+        assert result.returncode != 0
+        assert "absolute Hermes executable path is required" in result.stderr
 
 
 # ---------- finding 1: deterministic arming via host tool dispatch ----------

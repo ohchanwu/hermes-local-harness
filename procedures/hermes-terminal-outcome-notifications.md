@@ -26,6 +26,9 @@ Run this exact sequence from `/Users/chanbla11mit/hermes-local-harness` after ap
     hermes plugins validate "$ROOT/plugins/hermes-terminal-outcome-notification" --json
     hermes gateway restart
     PLIST="$HOME/Library/LaunchAgents/com.nous.hermes-terminal-outcome-notification.plist"
+    HERMES_EXE="$(command -v hermes)"
+    [ "${HERMES_EXE#/}" != "$HERMES_EXE" ] || { printf '%s\n' 'absolute Hermes executable path is required' >&2; exit 1; }
+    HERMES_WORKER_PATH="$(dirname "$HERMES_EXE"):/usr/bin:/bin:/usr/sbin:/sbin"
     cp "$ROOT/deployment/com.nous.hermes-terminal-outcome-notification.plist.template" "$PLIST"
     /usr/libexec/PlistBuddy -c "Set :ProgramArguments:0 $(command -v python3)" "$PLIST"
     /usr/libexec/PlistBuddy -c "Set :ProgramArguments:1 $ROOT/plugins/hermes-terminal-outcome-notification/worker.py" "$PLIST"
@@ -33,6 +36,7 @@ Run this exact sequence from `/Users/chanbla11mit/hermes-local-harness` after ap
     /usr/libexec/PlistBuddy -c "Set :ProgramArguments:5 $HERMES_KANBAN_DB" "$PLIST"
     plutil -replace EnvironmentVariables.HERMES_TERMINAL_OUTBOX -string "$HERMES_TERMINAL_OUTBOX" "$PLIST"
     plutil -replace EnvironmentVariables.HERMES_KANBAN_DB -string "$HERMES_KANBAN_DB" "$PLIST"
+    plutil -insert EnvironmentVariables.PATH -string "$HERMES_WORKER_PATH" "$PLIST"
     plutil -lint "$PLIST"
     if launchctl print "gui/$(id -u)/com.nous.hermes-terminal-outcome-notification" >/dev/null 2>&1; then launchctl bootout "gui/$(id -u)" "$PLIST"; fi
     launchctl bootstrap "gui/$(id -u)" "$PLIST"

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import importlib.util
 import io
+import shutil
 from importlib.machinery import SourceFileLoader
 import subprocess
 from contextlib import redirect_stdout
@@ -49,8 +50,12 @@ assert errors == ["terminal notification runtime drift: producers and worker mus
 # false green #1 — launchd domain set (or plugins enabled) but the running multiplex
 # gateway never inherited the shared environment because it was not restarted.
 OUTBOX, KANBAN = "/private/hermes/terminal/outbox.sqlite3", "/private/hermes/kanban/kanban.db"
+HERMES_EXE = shutil.which("hermes")
+assert HERMES_EXE and Path(HERMES_EXE).is_absolute()
+WORKER_PATH = f"{Path(HERMES_EXE).parent}:/usr/bin:/bin:/usr/sbin:/sbin"
 PLIST_EXTRACTS = {"EnvironmentVariables.HERMES_TERMINAL_OUTBOX": OUTBOX,
                   "EnvironmentVariables.HERMES_KANBAN_DB": KANBAN,
+                  "EnvironmentVariables.PATH": WORKER_PATH,
                   "ProgramArguments.3": OUTBOX, "ProgramArguments.5": KANBAN}
 
 
@@ -88,6 +93,8 @@ PS_ENV_MISSING = "/venv/bin/python -m hermes_cli.main gateway run --external-sup
 LOADED_MATCHING = (f"gui/501/label = {{\n\tstate = running\n\n\targuments = {{\n\t\t/venv/bin/python\n\t\t/worker.py\n\t\t--db\n\t\t{OUTBOX}\n"
                    f"\t\t--kanban-db\n\t\t{KANBAN}\n\t}}\n\n\tenvironment = {{\n"
                    f"\t\tHERMES_TERMINAL_OUTBOX => {OUTBOX}\n\t\tHERMES_KANBAN_DB => {KANBAN}\n\t}}\n}}\n")
+LOADED_MATCHING = LOADED_MATCHING.replace(
+    f"\t\tHERMES_KANBAN_DB => {KANBAN}\n", f"\t\tHERMES_KANBAN_DB => {KANBAN}\n\t\tPATH => {WORKER_PATH}\n")
 LOADED_STALE = (f"gui/501/label = {{\n\tstate = running\n\n\targuments = {{\n\t\t/venv/bin/python\n\t\t/worker.py\n\t\t--db\n\t\t/old/outbox.sqlite3\n"
                 f"\t\t--kanban-db\n\t\t/old/kanban.db\n\t}}\n\n\tenvironment = {{\n"
                 f"\t\tHERMES_TERMINAL_OUTBOX => /old/outbox.sqlite3\n\t\tHERMES_KANBAN_DB => /old/kanban.db\n\t}}\n}}\n")
@@ -101,6 +108,17 @@ assert any("loaded LaunchAgent arguments/environment do not match" in e for e in
 # fully rolled out (env inherited, plist rendered, loaded job effective state matches) passes
 errors, runtime = live_errors(PS_ENV_SET, LOADED_MATCHING, PLIST_EXTRACTS)
 assert errors == [], errors
+# a missing or stale worker PATH in either rendered or loaded state stays red
+plist_without_path = {key: value for key, value in PLIST_EXTRACTS.items()
+                      if key != "EnvironmentVariables.PATH"}
+errors, _ = live_errors(PS_ENV_SET, LOADED_MATCHING, plist_without_path)
+assert any("LaunchAgent not rendered and loaded" in e for e in errors), errors
+loaded_without_path = LOADED_MATCHING.replace(f"\t\tPATH => {WORKER_PATH}\n", "")
+errors, _ = live_errors(PS_ENV_SET, loaded_without_path, PLIST_EXTRACTS)
+assert any("loaded LaunchAgent arguments/environment do not match" in e for e in errors), errors
+loaded_stale_path = LOADED_MATCHING.replace(f"PATH => {WORKER_PATH}", "PATH => /usr/bin:/bin")
+errors, _ = live_errors(PS_ENV_SET, loaded_stale_path, PLIST_EXTRACTS)
+assert any("loaded LaunchAgent arguments/environment do not match" in e for e in errors), errors
 # gateway processes disagreeing on the shared environment is drift
 PS_DISAGREE = [PS_ENV_SET.replace(OUTBOX, "/a.sqlite3"), PS_ENV_SET]
 errors, _ = live_errors(PS_DISAGREE, LOADED_MATCHING, PLIST_EXTRACTS)
