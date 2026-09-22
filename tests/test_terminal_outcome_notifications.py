@@ -4,6 +4,8 @@ generation-safe block recheck, adapters, privacy. No real sends."""
 import importlib.util
 import json
 import os
+import plistlib
+import shlex
 import sqlite3
 import stat
 import subprocess
@@ -29,6 +31,50 @@ def deliveries(store):
 
 def rows_by(store, terminal):
     return {r["destination"]: r for r in store.status() if r["terminal_status"] == terminal}
+
+
+def test_deployment_runbook_renders_exact_worker_arguments():
+    procedure = (ROOT / "procedures" / "hermes-terminal-outcome-notifications.md").read_text()
+    commands = [
+        line.strip()
+        for line in procedure.splitlines()
+        if line.strip().startswith("/usr/libexec/PlistBuddy -c")
+        and "ProgramArguments" in line
+    ]
+    assert len(commands) == 4
+
+    with tempfile.TemporaryDirectory(prefix="terminal outcome plist ") as tmpdir:
+        tmp = Path(tmpdir)
+        plist = tmp / "worker launch agent.plist"
+        plist.write_bytes(
+            (ROOT / "deployment" / "com.nous.hermes-terminal-outcome-notification.plist.template").read_bytes()
+        )
+        harness_root = tmp / "Harness Root"
+        outbox = tmp / "Runtime State" / "outbox.sqlite3"
+        kanban = tmp / "Kanban State" / "kanban.db"
+        script = "\n".join(
+            [
+                "set -eu",
+                f"ROOT={shlex.quote(str(harness_root))}",
+                f"PLIST={shlex.quote(str(plist))}",
+                f"HERMES_TERMINAL_OUTBOX={shlex.quote(str(outbox))}",
+                f"HERMES_KANBAN_DB={shlex.quote(str(kanban))}",
+                *commands,
+            ]
+        )
+        subprocess.run(["/bin/zsh", "-c", script], check=True, capture_output=True, text=True)
+        rendered = plistlib.loads(plist.read_bytes())
+        python = subprocess.check_output(["/bin/zsh", "-c", "command -v python3"], text=True).strip()
+        expected = [
+            python,
+            str(harness_root / "plugins" / "hermes-terminal-outcome-notification" / "worker.py"),
+            "--db",
+            str(outbox),
+            "--kanban-db",
+            str(kanban),
+        ]
+        assert len(rendered["ProgramArguments"]) == 6
+        assert rendered["ProgramArguments"] == expected
 
 
 # ---------- finding 1: deterministic arming via host tool dispatch ----------
