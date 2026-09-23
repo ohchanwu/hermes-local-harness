@@ -167,12 +167,12 @@
     {
       "repo": "cha-pt",
       "content": "# Cha PT adapter\n**Status: operational; local repository adoption validated.**\n",
-      "record": "/Users/chanbla11mit/gt/cha_pt/mayor/rig/docs/specs/260919-hermes-orchestration-transition.md\nStatus: operational, local adoption validated."
+      "record": "/Users/chanbla11mit/projects/cha-pt/docs/specs/260919-hermes-orchestration-transition.md\nStatus: operational, local adoption validated."
     },
     {
       "repo": "jobcron",
       "content": "# Jobcron adapter\n**Status: operational; local repository adoption validated.**\n",
-      "record": "/Users/chanbla11mit/gt/jobscraper/mayor/rig/docs/specs/260919-hermes-orchestration-transition.md\nStatus: operational, local adoption validated."
+      "record": "/Users/chanbla11mit/projects/jobcron/docs/specs/260919-hermes-orchestration-transition.md\nStatus: operational, local adoption validated."
     }
   ],
   "terminal_notification_runtime": {

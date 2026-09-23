@@ -154,7 +154,7 @@ write("adoption-status-drift.yaml", delta(pause_jobcron))
 
 def pause_record(d):
     rec = d["adapters"][0]
-    d["adapters"] = [{"repo": "cha-pt", "content": rec["content"], "record": "/Users/chanbla11mit/gt/cha_pt/mayor/rig/docs/specs/260919-hermes-orchestration-transition.md\nStatus: paused, adoption not validated."}, d["adapters"][1]]
+    d["adapters"] = [{"repo": "cha-pt", "content": rec["content"], "record": "/Users/chanbla11mit/projects/cha-pt/docs/specs/260919-hermes-orchestration-transition.md\nStatus: paused, adoption not validated."}, d["adapters"][1]]
 
 
 write("adoption-record-drift.yaml", delta(pause_record))
