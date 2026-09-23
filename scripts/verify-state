@@ -5,7 +5,6 @@ import hashlib
 import json
 import os
 import re
-import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -296,6 +295,32 @@ def observe_gateway_environment(errors, runner):
     return gateway
 
 
+def valid_worker_path(errors, candidate):
+    """Structurally validate the rendered plist worker PATH; return it, or None.
+
+    The verifier caller's own shutil.which("hermes") directory is deliberately not
+    consulted: deployment validly resolved Hermes at render time, which may differ
+    from the caller's environment. Fail closed on placeholders, relative entries,
+    a missing standard system suffix, or a missing/non-executable Hermes helper."""
+    if not isinstance(candidate, str) or not candidate or candidate.startswith("__"):
+        fail(errors, "terminal notification runtime pending worker: rendered LaunchAgent PATH missing")
+        return None
+    entries = candidate.split(":")
+    if any(not entry or not Path(entry).is_absolute() for entry in entries):
+        fail(errors, "terminal notification runtime pending worker: rendered LaunchAgent PATH must contain absolute entries only")
+        return None
+    if entries[1:] != ["/usr/bin", "/bin", "/usr/sbin", "/sbin"]:
+        fail(errors, "terminal notification runtime pending worker: rendered LaunchAgent PATH must end "
+                     f"with /usr/bin:/bin:/usr/sbin:/sbin (actual {candidate})")
+        return None
+    helper = Path(entries[0]) / "hermes"
+    if not (helper.is_file() and os.access(helper, os.X_OK)):
+        fail(errors, f"terminal notification runtime pending worker: rendered LaunchAgent PATH has "
+                     f"no usable Hermes executable in {entries[0]}")
+        return None
+    return candidate
+
+
 def build_live_terminal_runtime(errors, runner, producer_profiles, plist=None):
     """Observe the live runtime: running gateway environment, rendered plist, and the
     loaded LaunchAgent's effective arguments/environment (not merely the file on disk)."""
@@ -304,22 +329,20 @@ def build_live_terminal_runtime(errors, runner, producer_profiles, plist=None):
     matrix = load(ROOT / "deployment/hermes-terminal-outcome-notification.example.yaml")
     label = matrix["worker"]["launchagent"]
     worker = {"outbox": outbox, "kanban_db": kanban_db}
-    hermes_executable = shutil.which("hermes")
     worker_path = None
-    if not hermes_executable or not Path(hermes_executable).is_absolute():
-        fail(errors, "terminal notification runtime pending worker: absolute Hermes executable path is unavailable")
-    else:
-        worker_path = f"{Path(hermes_executable).parent}:/usr/bin:/bin:/usr/sbin:/sbin"
     plist = plist if plist is not None else Path.home() / "Library" / "LaunchAgents" / f"{label}.plist"
     worker["plist_rendered"] = plist.is_file()
-    if worker["plist_rendered"] and outbox and kanban_db and worker_path:
+    if worker["plist_rendered"] and outbox and kanban_db:
         for key, want in (("EnvironmentVariables.HERMES_TERMINAL_OUTBOX", outbox),
                           ("EnvironmentVariables.HERMES_KANBAN_DB", kanban_db),
-                          ("EnvironmentVariables.PATH", worker_path),
                           ("ProgramArguments.3", outbox), ("ProgramArguments.5", kanban_db)):
             actual = runner("plutil", "-extract", key, "raw", str(plist))
             if actual.returncode or actual.stdout.strip() != want:
                 worker["plist_rendered"] = False
+        extracted_path = runner("plutil", "-extract", "EnvironmentVariables.PATH", "raw", str(plist))
+        worker_path = valid_worker_path(errors, extracted_path.stdout.strip() if not extracted_path.returncode else None)
+        if extracted_path.returncode or worker_path is None:
+            worker["plist_rendered"] = False
     printed = runner("launchctl", "print", f"gui/{os.getuid()}/{label}")
     worker["loaded"] = not printed.returncode
     worker["loaded_state_matches"] = False

@@ -108,11 +108,47 @@ assert any("loaded LaunchAgent arguments/environment do not match" in e for e in
 # fully rolled out (env inherited, plist rendered, loaded job effective state matches) passes
 errors, runtime = live_errors(PS_ENV_SET, LOADED_MATCHING, PLIST_EXTRACTS)
 assert errors == [], errors
-# a missing or stale worker PATH in either rendered or loaded state stays red
+# the worker PATH is validated structurally from the rendered plist itself; the
+# verifier caller's own shutil.which("hermes") directory is irrelevant because
+# deployment validly resolved a different Hermes at render time.
+import tempfile
+deployed_bin = Path(tempfile.mkdtemp(prefix="hermes-deployed-bin-"))
+hermes_helper = deployed_bin / "hermes"
+hermes_helper.write_text("#!/bin/sh\nexit 0\n")
+hermes_helper.chmod(0o755)
+DEPLOYED_PATH = f"{deployed_bin}:/usr/bin:/bin:/usr/sbin:/sbin"
+assert deployed_bin != Path(HERMES_EXE).parent  # caller and deployment genuinely differ
+plist_other_helper = {**PLIST_EXTRACTS, "EnvironmentVariables.PATH": DEPLOYED_PATH}
+loaded_other_helper = LOADED_MATCHING.replace(WORKER_PATH, DEPLOYED_PATH)
+errors, _ = live_errors(PS_ENV_SET, loaded_other_helper, plist_other_helper)
+assert errors == [], errors  # differing caller PATH vs valid deployed PATH passes
+# structurally invalid rendered PATH stays red with a specific diagnostic
+plist_relative = {**PLIST_EXTRACTS, "EnvironmentVariables.PATH": ".local/bin:/usr/bin:/bin:/usr/sbin:/sbin"}
+errors, _ = live_errors(PS_ENV_SET, LOADED_MATCHING.replace(WORKER_PATH, ".local/bin:/usr/bin:/bin:/usr/sbin:/sbin"),
+                        plist_relative)
+assert any("rendered LaunchAgent PATH" in e for e in errors), errors
+plist_short_suffix = {**PLIST_EXTRACTS, "EnvironmentVariables.PATH": f"{deployed_bin}:/usr/bin:/bin"}
+errors, _ = live_errors(PS_ENV_SET, LOADED_MATCHING, plist_short_suffix)
+assert any("rendered LaunchAgent PATH" in e for e in errors), errors
+# helper dir without a usable Hermes executable stays red
+empty_bin = Path(tempfile.mkdtemp(prefix="hermes-empty-bin-"))
+missing_helper_path = f"{empty_bin}:/usr/bin:/bin:/usr/sbin:/sbin"
+plist_no_helper = {**PLIST_EXTRACTS, "EnvironmentVariables.PATH": missing_helper_path}
+errors, _ = live_errors(PS_ENV_SET, LOADED_MATCHING.replace(WORKER_PATH, missing_helper_path), plist_no_helper)
+assert any("no usable Hermes executable" in e for e in errors), errors
+noexec_bin = Path(tempfile.mkdtemp(prefix="hermes-noexec-bin-"))
+noexec_helper = noexec_bin / "hermes"
+noexec_helper.write_text("#!/bin/sh\nexit 0\n")  # present but not executable
+noexec_helper_path = f"{noexec_bin}:/usr/bin:/bin:/usr/sbin:/sbin"
+plist_noexec_helper = {**PLIST_EXTRACTS, "EnvironmentVariables.PATH": noexec_helper_path}
+errors, _ = live_errors(PS_ENV_SET, LOADED_MATCHING.replace(WORKER_PATH, noexec_helper_path), plist_noexec_helper)
+assert any("no usable Hermes executable" in e for e in errors), errors
+# a missing rendered PATH stays red with its own diagnostic
 plist_without_path = {key: value for key, value in PLIST_EXTRACTS.items()
                       if key != "EnvironmentVariables.PATH"}
 errors, _ = live_errors(PS_ENV_SET, LOADED_MATCHING, plist_without_path)
-assert any("LaunchAgent not rendered and loaded" in e for e in errors), errors
+assert any("rendered LaunchAgent PATH missing" in e for e in errors), errors
+# a stale PATH in the loaded job stays red against the validated rendered PATH
 loaded_without_path = LOADED_MATCHING.replace(f"\t\tPATH => {WORKER_PATH}\n", "")
 errors, _ = live_errors(PS_ENV_SET, loaded_without_path, PLIST_EXTRACTS)
 assert any("loaded LaunchAgent arguments/environment do not match" in e for e in errors), errors
