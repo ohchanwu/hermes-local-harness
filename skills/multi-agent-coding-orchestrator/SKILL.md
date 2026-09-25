@@ -1,7 +1,7 @@
 ---
 name: multi-agent-coding-orchestrator
 description: "Use when orchestrating multi-agent coding with Hermes."
-version: 0.3.0
+version: 0.3.1
 author: chanbla11mit, Hermes Agent
 license: MIT
 platforms: [macos]
@@ -102,7 +102,7 @@ At Astra, any outcome that would advance beyond Astra, including exhausted revis
 
 ### Infrastructure failure
 
-Retry one infrastructure failure at the same rung. A second consecutive provider, quota, crash, timeout, unavailable-model, or context-exhaustion failure advances one rung with attribution `infrastructure`, not `worker_capability`. At Astra, block for human intervention. Never use provider fallback to silently traverse the semantic ladder inside one worker run.
+Retry one infrastructure failure at the same rung. Before retrying a timed-out run, increase its per-run runtime cap; never blindly requeue it under the cap that already proved insufficient. A second consecutive provider, quota, crash, timeout, unavailable-model, or context-exhaustion failure advances one rung with attribution `infrastructure`, not `worker_capability`. At Astra, block for human intervention. Never use provider fallback to silently traverse the semantic ladder inside one worker run.
 
 ## Escalation Mechanics
 
@@ -191,6 +191,7 @@ Each implementation card must include:
 - Base branch or commit and recovery procedure.
 - Required worktree/branch isolation.
 - Acceptance criteria and test commands.
+- An explicit per-run runtime cap and its rationale.
 - Ladder metadata and routing rationale.
 - Skill policy metadata (`minimal_implementation` enabled/disabled and reason; see Skills).
 - Required local commit and structured handoff.
@@ -198,6 +199,16 @@ Each implementation card must include:
 - Explicit prohibitions on push, PR creation, deployment, and production mutation.
 
 Use parent-child links for real dependencies. Keep independent slices parallel. Do not decompose merely to keep every lane busy.
+
+### Runtime budgeting
+
+Estimate the whole worker attempt, not just editing time: repository discovery, implementation, focused tests, cross-platform or container matrices, broad regression gates, commits, and the review handoff all consume the same per-run budget.
+
+- Keep the one-hour default only when the complete attempt is reasonably expected to finish within it.
+- If the orchestrator suspects the attempt may exceed one hour, set `max_runtime_seconds` explicitly when creating the card. Use at least two to three hours for substantial implementation, security, infrastructure, migration, large-context, or broad-verification work, and use a longer evidence-based cap when the test matrix or prior measurements justify it.
+- If any prior attempt timed out, increase the cap before the next attempt. Choose a value comfortably above the observed elapsed time and remaining work; do not merely add a few minutes.
+- Prefer a larger bounded cap over splitting work solely to evade the timer. Split into dependent cards only when the stages have real independent acceptance criteria or handoffs.
+- Preserve committed progress and timeout evidence. If the installed Hermes version cannot update an existing card's cap through a supported interface, do not edit the Kanban database directly; create an explicitly linked continuation card with the higher cap and durable handoff, then retire or block the superseded card without losing its audit trail.
 
 ## Worker Contract
 
@@ -218,14 +229,14 @@ Approve only when acceptance criteria pass and no material correctness, security
 
 ## Integration
 
-Reviewer approval authorizes local merge or cherry-pick without asking. Before integration:
+Reviewer approval authorizes and requires automatic local integration without asking. Integrate in the same turn that approval is observed; do not leave a successful branch isolated for the human to notice. Prefer a fast-forward when the reviewed branch descends from the target. Otherwise merge or cherry-pick while preserving the reviewed tree and history. Before integration:
 
 1. Verify the reviewed commit matches the reviewed diff.
-2. Verify the target checkout has no unrelated changes that integration would disturb.
-3. Integrate locally and run specification integration gates.
-4. Update repository status and Kanban from observed results.
+2. Verify the target checkout has no unrelated changes that integration would disturb. Preserve and restore concurrent work instead of overwriting it.
+3. Integrate locally, preferring fast-forward, and run specification integration gates.
+4. Verify the target branch contains the reviewed result, then update repository status and Kanban from observed results.
 
-Pushing, opening a PR, or deploying still requires explicit approval.
+If integration is blocked, report the exact blocker immediately. Pushing, opening a PR, or deploying still requires explicit approval.
 
 ## Orchestrator Escape Hatch
 

@@ -5,7 +5,7 @@ from pathlib import Path
 fx = Path(__file__).resolve().parent / "fixtures"
 clean = json.loads((fx / "clean.yaml").read_text())
 
-ORCH_SKILL_SHA = "8ebad5c1649b67464d934cb38e935de326a82536621d9babdee649088498938e"
+ORCH_SKILL_SHA = "d8ae3833d3035f701d473bb406757ba01f97e4ca88672db43c1f22b45f1abd0c"
 ORCH_HELPER_SHA = "157419c7c190b0a9f647271f7bd3839182f2e9324f8f9d74e43ec0553a5b77df"
 MINIMPL_SKILL_SHA = "a017ca2b203644ce6d5bd688c0b06875bbbe3908fe9dc6212ff39098ab53d794"
 SIMPREV_SKILL_SHA = "d058cd37b2cf161097dfc51eafd373414603f5feb22ff22e8fe1e198679edb47"
