@@ -198,6 +198,17 @@ check("--fixture", str(FIXTURES / "deployment-skill-supporting-file-drift.yaml")
       text="deployed skill hash mismatch")
 # Astra's three intentional local built-in overrides are declared rather than normalized into fleet drift.
 check("--fixture", str(FIXTURES / "astra-local-override.yaml"))
+local_overrides = json.loads((ROOT / "snapshots/sanitized-current-state.yaml").read_text())["skill"]["profile_local_skill_overrides"]
+errors = []
+with redirect_stdout(io.StringIO()):
+    verify_state.check_profile_local_skill_overrides(errors, local_overrides, local_overrides)
+assert errors == [], errors
+drifted_overrides = json.loads(json.dumps(local_overrides))
+drifted_overrides["worker-astra"]["software-development/spike/SKILL.md"] = "0" * 64
+errors = []
+with redirect_stdout(io.StringIO()):
+    verify_state.check_profile_local_skill_overrides(errors, local_overrides, drifted_overrides)
+assert errors == ["profile-local skill override declaration drift"], errors
 # the implementation skill must not impose Ponytail's mandatory source-comment convention
 assert "ponytail:" not in (ROOT / "skills" / "minimal-implementation" / "SKILL.md").read_text(), \
     "minimal-implementation must not mandate ponytail: source comments"

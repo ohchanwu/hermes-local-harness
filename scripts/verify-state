@@ -129,17 +129,18 @@ def check_skill(errors, deployed_hashes):
 
 
 def check_profile_local_skill_overrides(errors, expected, observed=None):
-    """Local overrides are explicit and never treated as shared-skill deployment drift."""
+    """Local overrides are explicit, hash-pinned, and never shared-skill deployment drift."""
     if not isinstance(expected, dict):
         fail(errors, "malformed profile-local skill overrides")
         return
-    for profile, paths in expected.items():
-        if not isinstance(profile, str) or not isinstance(paths, list) or not paths:
+    for profile, files in expected.items():
+        if not isinstance(profile, str) or not isinstance(files, dict) or not files:
             fail(errors, f"malformed profile-local skill override: {profile!r}")
             continue
-        for path in paths:
+        for path, want in files.items():
             if (not isinstance(path, str) or path.startswith("/") or ".." in Path(path).parts
-                    or not path.endswith("/SKILL.md")):
+                    or not path.endswith("/SKILL.md") or not isinstance(want, str)
+                    or not re.fullmatch(r"[0-9a-f]{64}", want)):
                 fail(errors, f"malformed profile-local skill override path: {profile}/{path!r}")
     if observed is not None and observed != expected:
         fail(errors, "profile-local skill override declaration drift")
@@ -511,6 +512,15 @@ def main():
                     for rel in entry["files"]:
                         deployed_hashes[entry["name"]][profile][rel] = None
         check_skill(errors, deployed_hashes)
+        observed_local_overrides = {}
+        for profile, files in expected_local_overrides.items():
+            observed_local_overrides[profile] = {}
+            root = Path.home() / ".hermes" / "profiles" / profile / "skills"
+            for rel in files:
+                candidate = root / rel
+                observed_local_overrides[profile][rel] = (
+                    hashlib.sha256(candidate.read_bytes()).hexdigest() if candidate.is_file() else None)
+        check_profile_local_skill_overrides(errors, expected_local_overrides, observed_local_overrides)
         check_adoption(errors, None)
         source = Path(snapshot["hermes_source"]["path"])
         commit = run("git", "-C", str(source), "rev-parse", "HEAD")
