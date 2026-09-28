@@ -137,8 +137,9 @@ def _kanban_completed(**kwargs: Any) -> None:
 
 def _kanban_blocked(**kwargs: Any) -> None:
     run_id = kwargs.get("run_id")
+    # exact positive int only: a boolean payload (True == 1) is not run evidence
     _store().kanban_blocked(str(kwargs.get("task_id") or ""), str(kwargs.get("reason") or "Campaign blocked"),
-                            int(run_id) if isinstance(run_id, int) else None)
+                            int(run_id) if isinstance(run_id, int) and not isinstance(run_id, bool) else None)
 
 
 def _kanban_claimed(**kwargs: Any) -> None:

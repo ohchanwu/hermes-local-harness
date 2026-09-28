@@ -131,6 +131,9 @@ Astra campaign is explicitly non-human: it cancels any pending block candidate. 
 must require the complete structured marker, including the root task, campaign generation,
 repository, protected baseline, worktree/branch, rejected candidate SHA, review run, attribution,
 concrete findings, `strategy`, `rung: astra`, and `terminal_retry_policy: astra-until-approve-v1`.
+The numeric fence fields (`campaign_generation`, `review_run_id`, and the host-supplied run
+evidence) accept exact positive integers only: JSON booleans (`true`/`false`), zero, negative,
+floating, and string forms fail closed, because Python `bool` subclasses `int` and `True == 1`.
 `needs_input` and `capability` remain human-relevant even if the reason contains such a marker; a
 malformed, stale, v1, or side-by-side marker must fail closed to the ordinary block policy.
 The `campaign_generation` carried by the verdict is a durable campaign identity, not the

@@ -33,7 +33,10 @@ the worker recognizes only an exact JSON `RETRY_TERMINAL` verdict fenced to the 
 campaign generation, rejected candidate SHA, and review run, with `strategy`, `rung: astra`,
 `ladder_version: glm-review-v2`, `authorization_mode: autonomous`,
 `terminal_retry_policy: astra-until-approve-v1`, repository, protected baseline, worktree/branch,
-attribution, and concrete findings. `needs_input` and `capability` always remain human blocks.
+attribution, and concrete findings. The numeric fences (`campaign_generation`, `review_run_id`,
+and the host-supplied run evidence) accept exact positive integers only — a JSON boolean
+(`true`/`false`), zero, negative, floating, or string form fails closed, because Python `bool`
+subclasses `int` and `True == 1`. `needs_input` and `capability` always remain human blocks.
 Malformed, stale, v1, side-by-side, or prose markers fail closed to ordinary human-block
 classification. The durable campaign generation is an authoritative identity, not a delivery
 counter: it is established and advanced (never regressed) when `kanban_task_blocked` records a

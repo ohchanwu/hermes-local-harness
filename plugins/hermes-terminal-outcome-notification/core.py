@@ -45,7 +45,7 @@ def _fenced_terminal_retry(verdict: dict[str, Any], task_id: str, run_id: int | 
     exactly this fully fenced verdict.
     """
     return (
-        run_id is not None
+        _valid_positive_int(run_id)
         and verdict.get("verdict") == "RETRY_TERMINAL"
         and verdict.get("strategy") in {"continue", "restart"}
         and verdict.get("rung") == "astra"
@@ -305,6 +305,11 @@ class Store:
             return event_id
 
     def kanban_blocked(self, task_id: str, reason: str, run_id: int | None = None) -> str | None:
+        # Host run evidence is itself a numeric fence: an exact positive integer only.
+        # A boolean payload (bool subclasses int, True == 1) must never fence a verdict,
+        # advance the durable identity, or be recorded as run evidence.
+        if not _valid_positive_int(run_id):
+            run_id = None
         with self._connect() as db:
             db.execute("BEGIN IMMEDIATE")
             campaign = db.execute("SELECT * FROM campaigns WHERE task_id=? AND disarmed_at IS NULL", (task_id,)).fetchone()
