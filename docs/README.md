@@ -4,11 +4,13 @@ This index is the entry point for durable harness documentation tracked in Git. 
 
 ## Layout
 
+- `plans/` contains active implementation plans.
 - `specs/` contains active or awaiting-approval requirements and designs.
 - `archive/` contains completed plans and retired designs.
 
 ## Current entries
 
+- [Autonomous Astra terminal-retry harness plan](plans/260929-autonomous-astra-terminal-retry.md)
 - [Hermes terminal outcome notification specification](specs/260921-hermes-terminal-outcome-notification.md)
 - [Completed local Hermes harness tracking plan](archive/260920-hermes-local-harness-tracking-plan.md)
 
