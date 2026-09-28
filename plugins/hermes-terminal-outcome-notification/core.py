@@ -29,6 +29,12 @@ _RETRY_REQUIRED_TEXT = ("root_task_id", "repository", "worktree", "branch", "att
 _RETRY_REQUIRED_SHA = ("protected_baseline", "rejected_candidate_sha")
 
 
+def _valid_positive_int(value: object) -> bool:
+    """Exact positive integer: JSON booleans are int subclasses and must fail closed,
+    as must zero/negative/floating/string numeric fences outside the valid domain."""
+    return isinstance(value, int) and not isinstance(value, bool) and value > 0
+
+
 def _fenced_terminal_retry(verdict: dict[str, Any], task_id: str, run_id: int | None) -> bool:
     """Structural fence + identity binding to the watched task and the firing review run.
 
@@ -46,10 +52,10 @@ def _fenced_terminal_retry(verdict: dict[str, Any], task_id: str, run_id: int | 
         and verdict.get("ladder_version") == "glm-review-v2"
         and verdict.get("authorization_mode") == "autonomous"
         and verdict.get("terminal_retry_policy") == TERMINAL_RETRY_POLICY
-        and isinstance(verdict.get("review_run_id"), int)
+        and _valid_positive_int(verdict.get("review_run_id"))
         and verdict["review_run_id"] == run_id
         and all(isinstance(verdict.get(field), str) and verdict[field] for field in _RETRY_REQUIRED_TEXT)
-        and isinstance(verdict.get("campaign_generation"), int)
+        and _valid_positive_int(verdict.get("campaign_generation"))
         and verdict["root_task_id"] == task_id
         and all(isinstance(verdict.get(field), str) and SHA40.fullmatch(verdict[field]) for field in _RETRY_REQUIRED_SHA)
         and isinstance(verdict.get("findings"), list)

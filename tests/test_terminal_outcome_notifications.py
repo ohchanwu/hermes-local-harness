@@ -404,6 +404,42 @@ def test_stale_durable_terminal_retry_generation_does_not_suppress_human_block()
     tmp.cleanup()
 
 
+def test_boolean_or_nonpositive_numeric_fences_fail_closed():
+    # Python bool is an int subclass: JSON true/false must not pass the numeric
+    # fence, and zero/negative generations are outside the valid domain.
+    for bad in (True, False, 0, -1, 2.0, "3"):
+        tmp, store = fresh()
+        store.watch_task("t1", "Root")
+        retry = _terminal_retry()
+        retry["campaign_generation"] = bad
+        store.kanban_blocked("t1", json.dumps(retry), run_id=5)
+        assert store.campaigns()[0]["terminal_retry_generation"] == 1  # never advances
+        sent = []
+        w = Worker(store, telegram=lambda b: sent.append(b), macos=lambda t, b: sent.append(b),
+                   state_reader=lambda _: {"status": "blocked", "block_kind": "transient",
+                                           "current_run_id": 5, "max_run_id": 5,
+                                           "reason": json.dumps(retry)})
+        assert w.drain_once() == 2 and len(sent) == 2, bad  # human-block delivered
+        tmp.cleanup()
+
+
+def test_boolean_review_run_fence_fails_closed():
+    # review_run_id: true would equal run 1 by int subclassing; it must not.
+    tmp, store = fresh()
+    store.watch_task("t1", "Root")
+    retry = _terminal_retry(run=1)
+    retry["review_run_id"] = True
+    store.kanban_blocked("t1", json.dumps(retry), run_id=1)
+    assert store.campaigns()[0]["terminal_retry_generation"] == 1
+    sent = []
+    w = Worker(store, telegram=lambda b: sent.append(b), macos=lambda t, b: sent.append(b),
+               state_reader=lambda _: {"status": "blocked", "block_kind": "transient",
+                                       "current_run_id": 1, "max_run_id": 1,
+                                       "reason": json.dumps(retry)})
+    assert w.drain_once() == 2 and len(sent) == 2
+    tmp.cleanup()
+
+
 def test_nonfirst_generation_verdict_suppresses_across_claims():
     # a legitimate campaign whose durable generation is 2+ must suppress after claimed()
     tmp, store = fresh()
