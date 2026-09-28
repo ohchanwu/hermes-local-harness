@@ -3,7 +3,7 @@
   "version": "0.2.0",
   "status": "authorized",
   "source": "https://github.com/ohchanwu/hermes-local-harness.git#plugins/hermes-terminal-outcome-notification",
-  "pinned_commit": "2bb72d8cbede883ee0c69fd4fd1d40d2848333bc",
+  "pinned_commit": "5914ec8519ee5209c1cfb6cde06dce5e46186fb1",
   "producer_profiles": ["default", "reviewer-sol", "worker-flash-1", "worker-flash-2", "worker-flash-3", "worker-luna-1", "worker-luna-2", "worker-terra-1", "worker-glm-full", "worker-sol", "worker-astra"],
   "shared_outbox": "__ABSOLUTE_SHARED_OUTBOX__",
   "worker": {
