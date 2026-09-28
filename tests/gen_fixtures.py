@@ -4,11 +4,7 @@ from pathlib import Path
 
 fx = Path(__file__).resolve().parent / "fixtures"
 clean = json.loads((fx / "clean.yaml").read_text())
-
-ORCH_SKILL_SHA = "8dac8f2d8e9e05d11a24f6cc795bac5da7bb373b177ba0c146430cb9bef57655"
-ORCH_HELPER_SHA = "157419c7c190b0a9f647271f7bd3839182f2e9324f8f9d74e43ec0553a5b77df"
-MINIMPL_SKILL_SHA = "a017ca2b203644ce6d5bd688c0b06875bbbe3908fe9dc6212ff39098ab53d794"
-SIMPREV_SKILL_SHA = "d058cd37b2cf161097dfc51eafd373414603f5feb22ff22e8fe1e198679edb47"
+desired = json.loads((Path(__file__).resolve().parents[1] / "snapshots" / "sanitized-current-state.yaml").read_text())
 
 IMPL = ["worker-flash-1", "worker-flash-2", "worker-flash-3", "worker-luna-1", "worker-luna-2",
         "worker-terra-1", "worker-terra-2", "worker-glm-full", "worker-sol", "worker-astra"]
@@ -45,24 +41,19 @@ def base_plugins():
 
 def skill_files_map():
     """skill -> profile -> {rel: sha}, per the desired deploy_profiles matrix."""
-    return {
-        "multi-agent-coding-orchestrator": {
-            profile: {
-                "SKILL.md": ORCH_SKILL_SHA,
-                "scripts/set-active-lanes.py": ORCH_HELPER_SHA,
-            } for profile in ["default"]
-        },
-        "minimal-implementation": {
-            profile: {"SKILL.md": MINIMPL_SKILL_SHA} for profile in IMPL
-        },
-        "simplification-review": {
-            profile: {"SKILL.md": SIMPREV_SKILL_SHA} for profile in IMPL
-        },
-    }
+    return {entry["name"]: {profile: copy.deepcopy(entry["files"])
+                            for profile in entry["deploy_profiles"]}
+            for entry in desired["skill"]["shared_skills"]}
 
 
 def set_skill_files(d):
     d["skill_files"] = skill_files_map()
+    d["profile_local_skill_overrides"] = copy.deepcopy(
+        desired["skill"]["profile_local_skill_overrides"])
+
+
+set_skill_files(clean)
+write("clean.yaml", clean)
 
 
 write("behavior-changing-model-drift.yaml", delta(lambda d: d["profile_models"].__setitem__("worker-terra-1", "wrong-model")))
@@ -119,6 +110,15 @@ def skill_missing(d):
 
 
 write("skill-deployment-missing.yaml", delta(skill_missing))
+
+
+def supporting_file_drift(d):
+    set_skill_files(d)
+    d["skill_files"]["production-deployment"]["worker-astra"]["references/release-ci-portability.md"] = "0" * 64
+
+
+write("deployment-skill-supporting-file-drift.yaml", delta(supporting_file_drift))
+write("astra-local-override.yaml", delta(set_skill_files))
 
 
 def remove_terminal_notification(d):

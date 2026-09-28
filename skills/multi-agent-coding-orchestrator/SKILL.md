@@ -126,6 +126,12 @@ Never delete rejected work merely because the next model starts clean. The same 
 
 Before creating or reassigning a card, resolve the destination from the Fixed Roster and verify the exact profile id against live `hermes profile list` output. Never invent an id from a naming pattern. Do not use `hermes kanban assignees` as proof that a profile exists: it also includes names retained on cards, including stale or invalid assignees. If the exact profile is absent, stop and correct the route before mutating the card.
 
+Before creating a card with `skills`, run the reviewed harness preflight for the exact assignee and every requested skill:
+
+    python3 scripts/check-forced-skills --profile <assignee> --skills <skill> [<skill> ...]
+
+It imports Hermes's installed resolver under that profile's `HERMES_HOME`; it does not parse `hermes skills list` table output and does not start model inference. A nonzero result, including a mixed present/missing request, rejects the card creation. Do not rely on Hermes's current partial-load behavior, which skips unknown names when another requested skill resolves.
+
 After activating a lane and assigning or promoting a card intended to run immediately:
 
 1. Read the card back and verify its exact assignee, eligible status, dependency state, and that the destination profile is active in `kanban.dispatch_profiles`.

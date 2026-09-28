@@ -103,12 +103,23 @@ Hermes skills load per profile: worker profiles read only `~/.hermes/profiles/<p
     for profile in worker-flash-1 worker-flash-2 worker-flash-3 worker-luna-1 worker-luna-2 \
                    worker-terra-1 worker-terra-2 worker-glm-full worker-sol worker-astra; do
       mkdir -p ~/.hermes/profiles/$profile/skills/software-development/minimal-implementation \
-               ~/.hermes/profiles/$profile/skills/software-development/simplification-review
+               ~/.hermes/profiles/$profile/skills/software-development/simplification-review \
+               ~/.hermes/profiles/$profile/skills/devops
       cp skills/minimal-implementation/SKILL.md ~/.hermes/profiles/$profile/skills/software-development/minimal-implementation/SKILL.md
       cp skills/simplification-review/SKILL.md ~/.hermes/profiles/$profile/skills/software-development/simplification-review/SKILL.md
+      rm -rf ~/.hermes/profiles/$profile/skills/devops/production-deployment \
+             ~/.hermes/profiles/$profile/skills/devops/production-deployment-planning
+      cp -R skills/devops/production-deployment ~/.hermes/profiles/$profile/skills/devops/
+      cp -R skills/devops/production-deployment-planning ~/.hermes/profiles/$profile/skills/devops/
     done
 
-Every deployed copy must match the tracked hashes in `snapshots/sanitized-current-state.yaml`; its `deploy_profiles` lists exactly which profile homes host each skill, and `./scripts/verify-state` hashes each copy and fails on a missing or divergent one. Copy the reviewed tracked source only; do not patch a live skill. After copying, run `./scripts/verify-state` so source and deployed copies are identical. Reviewer and advisor profiles never receive `minimal-implementation`; the orchestrator attaches it per card per the routing policy in `skills/multi-agent-coding-orchestrator/SKILL.md`.
+The tracked trees under `skills/` are canonical source; the copies under each profile home are intentional deployment artifacts. Profiles do not share on-disk skill files, inherit live changes, or use symlinks. Every deployed copy, including every supporting file in both deployment skills, must match the tracked hashes in `snapshots/sanitized-current-state.yaml`; its `deploy_profiles` lists exactly which profile homes host each skill, and `./scripts/verify-state` hashes each copy and fails on a missing or divergent one. Copy the reviewed tracked source only; do not patch a live skill. Preserve worker-astra's three declared built-in skill overrides; they are profile-local exceptions, not copies to normalize. After copying, run `./scripts/verify-state` so source and deployed copies are identical. Reviewer and advisor profiles never receive `minimal-implementation`; the orchestrator attaches it per card per the routing policy in `skills/multi-agent-coding-orchestrator/SKILL.md`.
+
+Before creating any card that force-loads skills, reject incompatible requests before the card exists:
+
+    python3 scripts/check-forced-skills --profile <assignee> --skills <skill> [<skill> ...]
+
+This command uses the installed resolver under the exact profile home and fails if any requested name is unavailable or disabled; a mixed present/missing set is a failure.
 
 ## 4b. Interactive Claude/Codex sessions (manual live-state step)
 

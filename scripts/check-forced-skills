@@ -1,0 +1,60 @@
+#!/usr/bin/env python3
+"""Fail closed when a profile cannot resolve every force-loaded skill."""
+import argparse
+import json
+import os
+import sys
+from pathlib import Path
+
+
+def use_hermes_python():
+    """The resolver imports Hermes's dependency set, not the caller's Python environment."""
+    if os.environ.get("HERMES_FORCED_SKILL_CHECK_REEXEC"):
+        return
+    interpreter = Path(os.environ.get(
+        "HERMES_SKILL_RESOLVER_PYTHON",
+        Path.home() / ".hermes" / "hermes-agent" / "venv" / "bin" / "python"))
+    if interpreter.is_file() and os.access(interpreter, os.X_OK):
+        environment = dict(os.environ, HERMES_FORCED_SKILL_CHECK_REEXEC="1")
+        os.execve(interpreter, [str(interpreter), __file__, *sys.argv[1:]], environment)
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--profile", required=True)
+    parser.add_argument("--skills", nargs="+", required=True)
+    parser.add_argument("--home-root", type=Path, default=Path.home() / ".hermes")
+    parser.add_argument("--source-root", type=Path, default=Path.home() / ".hermes" / "hermes-agent")
+    args = parser.parse_args()
+    if not args.profile or "/" in args.profile or "\\" in args.profile or args.profile in {".", ".."}:
+        parser.error("--profile must be a profile identifier")
+    requested = list(dict.fromkeys(args.skills))
+    if any(not name or "/" in name or "\\" in name for name in requested):
+        parser.error("--skills entries must be bare skill names")
+    home = args.home_root if args.profile == "default" else args.home_root / "profiles" / args.profile
+    if not home.is_dir():
+        print(json.dumps({"profile": args.profile, "requested": requested,
+                          "missing": requested, "error": "profile home does not exist"}))
+        return 2
+    if not (args.source_root / "tools" / "skills_tool.py").is_file():
+        print(json.dumps({"profile": args.profile, "requested": requested,
+                          "missing": requested, "error": "Hermes skill resolver source is unavailable"}))
+        return 2
+    os.environ["HERMES_HOME"] = str(home)
+    sys.path.insert(0, str(args.source_root))
+    try:
+        from tools.skills_tool import skills_list
+        resolved = json.loads(skills_list())
+        available = {skill["name"] for skill in resolved["skills"]}
+    except Exception as exc:
+        print(json.dumps({"profile": args.profile, "requested": requested,
+                          "missing": requested, "error": f"resolver failed: {exc}"}))
+        return 2
+    missing = [name for name in requested if name not in available]
+    print(json.dumps({"profile": args.profile, "requested": requested, "missing": missing}, sort_keys=True))
+    return 1 if missing else 0
+
+
+if __name__ == "__main__":
+    use_hermes_python()
+    raise SystemExit(main())

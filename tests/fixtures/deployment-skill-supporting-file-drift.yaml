@@ -115,6 +115,9 @@
       "worker-terra-1": {
         "SKILL.md": "a017ca2b203644ce6d5bd688c0b06875bbbe3908fe9dc6212ff39098ab53d794"
       },
+      "worker-terra-2": {
+        "SKILL.md": "a017ca2b203644ce6d5bd688c0b06875bbbe3908fe9dc6212ff39098ab53d794"
+      },
       "worker-glm-full": {
         "SKILL.md": "a017ca2b203644ce6d5bd688c0b06875bbbe3908fe9dc6212ff39098ab53d794"
       },
@@ -206,7 +209,7 @@
       "worker-astra": {
         "SKILL.md": "bde6a90e7d328d7a579976f61d3112b6504a91a1b6f79993d156ccb15d48c425",
         "references/live-state-reconciliation.md": "60b39c679849ba49f503cdda6844fc9678d837fac5279d496dbfd3e8450abed7",
-        "references/release-ci-portability.md": "9ac3ca08733ff1810289b90e9834a12ad413a0762bfcdd046026ec0ec3e3dc13"
+        "references/release-ci-portability.md": "0000000000000000000000000000000000000000000000000000000000000000"
       }
     },
     "production-deployment-planning": {

@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 import importlib.util
 import io
+import json
 import shutil
+import tempfile
 from importlib.machinery import SourceFileLoader
 import subprocess
 from contextlib import redirect_stdout
@@ -9,6 +11,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 VERIFY = ROOT / "scripts" / "verify-state"
+FORCED_SKILLS = ROOT / "scripts" / "check-forced-skills"
 FIXTURES = ROOT / "tests" / "fixtures"
 
 
@@ -190,6 +193,11 @@ check("--fixture", str(FIXTURES / "ponytail-enabled-drift.yaml"), code=1, text="
 check("--fixture", str(FIXTURES / "ponytail-absent-drift.yaml"), code=1, text="required-disabled ponytail absent")
 # a missing per-profile deployed copy fails (dormant profile included)
 check("--fixture", str(FIXTURES / "skill-deployment-missing.yaml"), code=1, text="deployed skill copy missing")
+# a supporting file in either deployment skill is part of the deployed tree contract
+check("--fixture", str(FIXTURES / "deployment-skill-supporting-file-drift.yaml"), code=1,
+      text="deployed skill hash mismatch")
+# Astra's three intentional local built-in overrides are declared rather than normalized into fleet drift.
+check("--fixture", str(FIXTURES / "astra-local-override.yaml"))
 # the implementation skill must not impose Ponytail's mandatory source-comment convention
 assert "ponytail:" not in (ROOT / "skills" / "minimal-implementation" / "SKILL.md").read_text(), \
     "minimal-implementation must not mandate ponytail: source comments"
@@ -225,5 +233,29 @@ def test_unreadable_config(tmp="/tmp/hermes-verify-stub"):
 
 
 test_unreadable_config()
+
+
+def forced_skill_check(*skills):
+    home_root = Path(tempfile.mkdtemp(prefix="hermes-forced-skill-home-"))
+    skill_root = home_root / "profiles" / "worker" / "skills" / "devops"
+    for name in ("production-deployment", "production-deployment-planning"):
+        path = skill_root / name
+        path.mkdir(parents=True, exist_ok=True)
+        (path / "SKILL.md").write_text(f"---\nname: {name}\ndescription: test\n---\n")
+    result = subprocess.run([str(FORCED_SKILLS), "--profile", "worker", "--skills", *skills,
+                             "--home-root", str(home_root), "--source-root",
+                             str(Path.home() / ".hermes" / "hermes-agent")], text=True, capture_output=True)
+    shutil.rmtree(home_root)
+    return result
+
+
+# Preflight imports the same resolver under the assignee's HERMES_HOME, and rejects
+# every incomplete requested set before card creation can exercise Hermes's partial-load behavior.
+result = forced_skill_check("production-deployment", "production-deployment-planning")
+assert result.returncode == 0 and json.loads(result.stdout)["missing"] == [], result.stdout + result.stderr
+result = forced_skill_check("missing")
+assert result.returncode == 1 and json.loads(result.stdout)["missing"] == ["missing"], result.stdout + result.stderr
+result = forced_skill_check("production-deployment", "missing")
+assert result.returncode == 1 and json.loads(result.stdout)["missing"] == ["missing"], result.stdout + result.stderr
 
 print("ok")

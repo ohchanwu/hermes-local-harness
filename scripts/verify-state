@@ -95,6 +95,8 @@ def check_skill(errors, deployed_hashes):
         "multi-agent-coding-orchestrator": ROOT / "skills/multi-agent-coding-orchestrator",
         "minimal-implementation": ROOT / "skills/minimal-implementation",
         "simplification-review": ROOT / "skills/simplification-review",
+        "production-deployment": ROOT / "skills/devops/production-deployment",
+        "production-deployment-planning": ROOT / "skills/devops/production-deployment-planning",
     }
     for entry in skill["shared_skills"]:
         name = entry["name"]
@@ -122,6 +124,25 @@ def check_skill(errors, deployed_hashes):
                     fail(errors, f"deployed skill copy missing: {name} {profile}/{rel}")
                 else:
                     fail(errors, f"deployed skill hash mismatch: {name} {profile}/{rel}")
+            for rel in sorted(set((observed or {})) - set(entry["files"])):
+                fail(errors, f"unexpected deployed skill file: {name} {profile}/{rel}")
+
+
+def check_profile_local_skill_overrides(errors, expected, observed=None):
+    """Local overrides are explicit and never treated as shared-skill deployment drift."""
+    if not isinstance(expected, dict):
+        fail(errors, "malformed profile-local skill overrides")
+        return
+    for profile, paths in expected.items():
+        if not isinstance(profile, str) or not isinstance(paths, list) or not paths:
+            fail(errors, f"malformed profile-local skill override: {profile!r}")
+            continue
+        for path in paths:
+            if (not isinstance(path, str) or path.startswith("/") or ".." in Path(path).parts
+                    or not path.endswith("/SKILL.md")):
+                fail(errors, f"malformed profile-local skill override path: {profile}/{path!r}")
+    if observed is not None and observed != expected:
+        fail(errors, "profile-local skill override declaration drift")
 
 
 ADOPTION_REPOS = {"cha-pt": "adoption/cha-pt.md", "jobcron": "adoption/jobcron.md"}
@@ -381,6 +402,8 @@ def main():
     if roster.get("ladder_version") != "glm-review-v1":
         fail(errors, "ladder_version expected glm-review-v1")
     check_terminal_notification_deployment(errors, roster, snapshot)
+    expected_local_overrides = snapshot["skill"].get("profile_local_skill_overrides", {})
+    check_profile_local_skill_overrides(errors, expected_local_overrides)
     expected = {p["name"]: p for p in roster.get("profiles", [])}
     dispatch_profiles = snapshot["kanban"]["dispatch_profiles"]
     if args.fixture:
@@ -391,7 +414,7 @@ def main():
             return 2
         # Fail-closed fixture schema: a passing fixture must represent every required
         # observed field and every installed roster profile; omission is drift, not success.
-        for section in ("profile_models", "profile_providers", "plugins", "dispatch_profiles", "kanban", "skill_files", "adapters", "terminal_notification_runtime"):
+        for section in ("profile_models", "profile_providers", "plugins", "dispatch_profiles", "kanban", "skill_files", "profile_local_skill_overrides", "adapters", "terminal_notification_runtime"):
             if section not in observed:
                 fail(errors, f"incomplete fixture: missing required section '{section}'")
         kanban = observed.get("kanban", {})
@@ -439,6 +462,8 @@ def main():
         for name, profile in observed.get("profiles", {}).items():
             if name not in expected:
                 check_extra(errors, warnings, name, profile.get("status", "stopped"), dispatch_profiles)
+        check_profile_local_skill_overrides(errors, expected_local_overrides,
+                                            observed.get("profile_local_skill_overrides"))
         check_skill(errors, observed.get("skill_files", {}))
         check_adoption(errors, observed.get("adapters", []))
     else:
@@ -476,10 +501,15 @@ def main():
             deployed_hashes[entry["name"]] = {}
             for profile in entry["deploy_profiles"]:
                 deployed_hashes[entry["name"]][profile] = {}
-                for rel in entry["files"]:
-                    deployed = Path(entry["path"].replace("<profile>", profile)) / rel
-                    deployed_hashes[entry["name"]][profile][rel] = (
-                        hashlib.sha256(deployed.read_bytes()).hexdigest() if deployed.is_file() else None)
+                deployed_root = Path(entry["path"].replace("<profile>", profile))
+                if deployed_root.is_dir():
+                    for deployed in deployed_root.rglob("*"):
+                        if deployed.is_file():
+                            deployed_hashes[entry["name"]][profile][str(deployed.relative_to(deployed_root))] = (
+                                hashlib.sha256(deployed.read_bytes()).hexdigest())
+                else:
+                    for rel in entry["files"]:
+                        deployed_hashes[entry["name"]][profile][rel] = None
         check_skill(errors, deployed_hashes)
         check_adoption(errors, None)
         source = Path(snapshot["hermes_source"]["path"])
