@@ -288,6 +288,27 @@ def _board(task_id="t1", status="blocked", kind="needs_input", run=5, recurrence
                       "max_run_id": run, "block_recurrences": recurrences, "reason": reason}
 
 
+def _terminal_retry(*, task_id="t1", generation=1, candidate="a" * 40, run=5):
+    return {
+        "verdict": "RETRY_TERMINAL",
+        "strategy": "restart",
+        "rung": "astra",
+        "ladder_version": "glm-review-v2",
+        "authorization_mode": "autonomous",
+        "terminal_retry_policy": "astra-until-approve-v1",
+        "root_task_id": task_id,
+        "campaign_generation": generation,
+        "repository": "/repo/hermes-local-harness",
+        "protected_baseline": "b" * 40,
+        "worktree": "/repo/.worktrees/task",
+        "branch": "harness/task",
+        "rejected_candidate_sha": candidate,
+        "review_run_id": run,
+        "attribution": "worker_error",
+        "findings": ["concrete remediable semantic defect"],
+    }
+
+
 def test_generation_safe_recheck_cancels_old_generation_block():
     tmp, store = fresh()
     store.watch_task("t1", "Root")
@@ -329,17 +350,9 @@ def test_fresh_human_block_still_sends():
 def test_opted_in_structured_terminal_retry_is_cancelled_not_notified():
     tmp, store = fresh()
     store.watch_task("t1", "Root")
-    store.kanban_blocked("t1", "review retry", run_id=5)
+    retry = _terminal_retry()
+    store.kanban_blocked("t1", json.dumps(retry), run_id=5)
     sent = []
-    retry = {
-        "verdict": "RETRY_TERMINAL",
-        "strategy": "restart",
-        "rung": "astra",
-        "ladder_version": "glm-review-v2",
-        "authorization_mode": "autonomous",
-        "terminal_retry_policy": "astra-until-approve-v1",
-        "review_run_id": 5,
-    }
     w = Worker(store, telegram=lambda b: sent.append(b), macos=lambda t, b: sent.append(b),
                state_reader=lambda _: {"status": "blocked", "block_kind": "transient",
                                        "current_run_id": 5, "max_run_id": 5,
@@ -349,17 +362,33 @@ def test_opted_in_structured_terminal_retry_is_cancelled_not_notified():
     tmp.cleanup()
 
 
-def test_malformed_or_stale_terminal_retry_marker_does_not_suppress_human_block():
+def test_terminal_retry_marker_with_missing_or_stale_fence_does_not_suppress_human_block():
     for retry in ({"verdict": "RETRY_TERMINAL", "rung": "astra"},
-                  {"verdict": "RETRY_TERMINAL", "strategy": "continue", "rung": "astra",
-                   "ladder_version": "glm-review-v2", "authorization_mode": "autonomous",
-                   "terminal_retry_policy": "astra-until-approve-v1", "review_run_id": 4}):
+                  _terminal_retry(task_id="other-task"),
+                  _terminal_retry(generation=2),
+                  _terminal_retry(candidate="c" * 40),
+                  _terminal_retry(run=4)):
         tmp, store = fresh()
         store.watch_task("t1", "Root")
-        store.kanban_blocked("t1", "review retry", run_id=5)
+        store.kanban_blocked("t1", json.dumps(_terminal_retry()), run_id=5)
         sent = []
         w = Worker(store, telegram=lambda b: sent.append(b), macos=lambda t, b: sent.append(b),
                    state_reader=lambda _: {"status": "blocked", "block_kind": "needs_input",
+                                           "current_run_id": 5, "max_run_id": 5,
+                                           "reason": json.dumps(retry)})
+        assert w.drain_once() == 2 and len(sent) == 2
+        tmp.cleanup()
+
+
+def test_valid_terminal_retry_never_suppresses_needs_input_or_capability():
+    for kind in ("needs_input", "capability"):
+        tmp, store = fresh()
+        store.watch_task("t1", "Root")
+        retry = _terminal_retry()
+        store.kanban_blocked("t1", json.dumps(retry), run_id=5)
+        sent = []
+        w = Worker(store, telegram=lambda b: sent.append(b), macos=lambda t, b: sent.append(b),
+                   state_reader=lambda _: {"status": "blocked", "block_kind": kind,
                                            "current_run_id": 5, "max_run_id": 5,
                                            "reason": json.dumps(retry)})
         assert w.drain_once() == 2 and len(sent) == 2

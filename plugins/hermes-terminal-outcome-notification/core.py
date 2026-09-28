@@ -14,6 +14,15 @@ from typing import Any, Callable
 TERMINAL = {"completed", "blocked", "failed", "interrupted", "timed_out", "unknown"}
 HUMAN_BLOCKS = {"needs_input", "capability"}
 TERMINAL_RETRY_POLICY = "astra-until-approve-v1"
+SHA40 = re.compile(r"^[0-9a-f]{40}$")
+
+
+def _terminal_retry_verdict(reason: object) -> dict[str, Any] | None:
+    try:
+        verdict = json.loads(str(reason or ""))
+    except (TypeError, json.JSONDecodeError):
+        return None
+    return verdict if isinstance(verdict, dict) else None
 
 
 def _is_current_terminal_retry(state: dict[str, Any]) -> bool:
@@ -24,12 +33,11 @@ def _is_current_terminal_retry(state: dict[str, Any]) -> bool:
     complete JSON object so malformed, stale, and v1/side-by-side callbacks
     fail closed to the normal human-gate path.
     """
-    try:
-        verdict = json.loads(str(state.get("reason") or ""))
-    except (TypeError, json.JSONDecodeError):
+    verdict = _terminal_retry_verdict(state.get("reason"))
+    if verdict is None:
         return False
-    if not isinstance(verdict, dict):
-        return False
+    required_text = ("root_task_id", "repository", "worktree", "branch", "attribution")
+    required_sha = ("protected_baseline", "rejected_candidate_sha")
     return (
         verdict.get("verdict") == "RETRY_TERMINAL"
         and verdict.get("strategy") in {"continue", "restart"}
@@ -39,6 +47,15 @@ def _is_current_terminal_retry(state: dict[str, Any]) -> bool:
         and verdict.get("terminal_retry_policy") == TERMINAL_RETRY_POLICY
         and isinstance(verdict.get("review_run_id"), int)
         and verdict["review_run_id"] == state.get("current_run_id")
+        and all(isinstance(verdict.get(field), str) and verdict[field] for field in required_text)
+        and isinstance(verdict.get("campaign_generation"), int)
+        and verdict["root_task_id"] == state.get("_notification_task_id")
+        and verdict["campaign_generation"] == state.get("_notification_generation")
+        and all(isinstance(verdict.get(field), str) and SHA40.fullmatch(verdict[field]) for field in required_sha)
+        and verdict["rejected_candidate_sha"] == state.get("_notification_candidate_sha")
+        and isinstance(verdict.get("findings"), list)
+        and bool(verdict["findings"])
+        and all(isinstance(finding, str) and finding.strip() for finding in verdict["findings"])
     )
 
 
@@ -101,6 +118,7 @@ class Store:
                   terminal_status TEXT NOT NULL, title TEXT NOT NULL, short_summary TEXT NOT NULL,
                   task_id TEXT, session_id TEXT, created_at INTEGER NOT NULL, available_at INTEGER NOT NULL,
                   cancelled_at INTEGER, cancellation_reason TEXT, evidence_run_id INTEGER,
+                  evidence_candidate_sha TEXT,
                   UNIQUE(campaign_id, generation, terminal_status)
                 );
                 CREATE TABLE IF NOT EXISTS deliveries (
@@ -113,6 +131,7 @@ class Store:
             """)
             self._add_column(db, "campaigns", "last_activity_at", "INTEGER NOT NULL DEFAULT 0")
             self._add_column(db, "events", "evidence_run_id", "INTEGER")
+            self._add_column(db, "events", "evidence_candidate_sha", "TEXT")
             self._add_column(db, "deliveries", "available_at", "INTEGER NOT NULL DEFAULT 0")
             self._add_column(db, "deliveries", "recheck_attempts", "INTEGER NOT NULL DEFAULT 0")
 
@@ -172,7 +191,7 @@ class Store:
                        (_summary(response, self.config.summary_max_chars), _now(), session_id))
 
     def _event(self, db: sqlite3.Connection, campaign: sqlite3.Row, status: str, summary: str, delay: int = 0,
-               evidence_run_id: int | None = None) -> str:
+               evidence_run_id: int | None = None, evidence_candidate_sha: str | None = None) -> str:
         existing = db.execute("SELECT event_id FROM events WHERE campaign_id=? AND generation=? AND terminal_status=?",
                               (campaign["campaign_id"], campaign["generation"], status)).fetchone()
         if existing:
@@ -180,11 +199,11 @@ class Store:
         event_id, now = uuid.uuid4().hex, _now()
         db.execute("""INSERT INTO events(event_id,campaign_id,generation,terminal_status,title,short_summary,
                                         task_id,session_id,created_at,available_at,cancelled_at,
-                                        cancellation_reason,evidence_run_id)
-                      VALUES(?,?,?,?,?,?,?,?,?,?,NULL,NULL,?)""",
+                                        cancellation_reason,evidence_run_id,evidence_candidate_sha)
+                      VALUES(?,?,?,?,?,?,?,?,?,?,NULL,NULL,?,?)""",
                    (event_id, campaign["campaign_id"], campaign["generation"], status, campaign["title"],
                     _summary(summary, self.config.summary_max_chars), campaign["task_id"], campaign["session_id"],
-                    now, now + delay, evidence_run_id))
+                    now, now + delay, evidence_run_id, evidence_candidate_sha))
         db.executemany("INSERT INTO deliveries(event_id,destination,available_at) VALUES(?,?,?)",
                        ((event_id, "telegram", now + delay), (event_id, "macos", now + delay)))
         return event_id
@@ -261,7 +280,10 @@ class Store:
     def kanban_blocked(self, task_id: str, reason: str, run_id: int | None = None) -> str | None:
         with self._connect() as db:
             campaign = db.execute("SELECT * FROM campaigns WHERE task_id=? AND disarmed_at IS NULL", (task_id,)).fetchone()
-            return self._event(db, campaign, "blocked", reason, self.config.block_debounce_seconds, run_id) if campaign else None
+            verdict = _terminal_retry_verdict(reason)
+            candidate_sha = verdict.get("rejected_candidate_sha") if verdict else None
+            return self._event(db, campaign, "blocked", reason, self.config.block_debounce_seconds, run_id,
+                               candidate_sha if isinstance(candidate_sha, str) else None) if campaign else None
 
     def claimed(self, task_id: str, run_id: int | None = None) -> None:
         """kanban_task_claimed: a new attempt begins, so block candidates from earlier generations
@@ -280,10 +302,10 @@ class Store:
     def human_block(state: dict[str, Any]) -> bool:
         kind, status = state.get("block_kind"), state.get("status")
         reason = str(state.get("reason") or "").lower()
-        if _is_current_terminal_retry(state):
-            return False
         if kind in HUMAN_BLOCKS:
             return status == "blocked"
+        if _is_current_terminal_retry(state):
+            return False
         if status == "triage" and (int(state.get("block_recurrences") or 0) > 0 or "exhaust" in reason):
             return True
         return status == "blocked" and ("human_block" in reason or "approval" in reason or "human" in reason or "review" in reason)
@@ -292,7 +314,8 @@ class Store:
         """Generation- and run-safe finality check immediately before a destination send.
         Returns 'send', 'retain' (board unavailable — retry, never cancel), or 'cancel'."""
         with self._connect() as db:
-            row = db.execute("""SELECT e.event_id, e.task_id, e.generation, e.evidence_run_id, c.generation AS campaign_generation
+            row = db.execute("""SELECT e.event_id, e.task_id, e.generation, e.evidence_run_id, e.evidence_candidate_sha,
+                                       c.generation AS campaign_generation
                                 FROM events e JOIN campaigns c ON c.campaign_id = e.campaign_id
                                 WHERE e.event_id=? AND e.cancelled_at IS NULL""", (event_id,)).fetchone()
             if not row or not row["task_id"]:
@@ -310,6 +333,9 @@ class Store:
                 return "retain"
             if state.get("status") == "missing":
                 return cancel("watched task no longer exists on the board")
+            state = {**state, "_notification_task_id": row["task_id"],
+                     "_notification_generation": row["generation"],
+                     "_notification_candidate_sha": row["evidence_candidate_sha"]}
             evidence_run = row["evidence_run_id"]
             if evidence_run is not None:
                 max_run, current_run = state.get("max_run_id"), state.get("current_run_id")
