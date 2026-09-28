@@ -2,7 +2,7 @@
 
 Deployment is separately approval-gated. This matrix is authorized desired state, not proof that runtime rollout happened: `./scripts/verify-state --fixture tests/fixtures/clean.yaml` is the deployed shape; `terminal-deployment-pending.yaml` and `terminal-notification-rollback.yaml` must stay red.
 
-After approval, replace these two placeholders only in the operator's private shell/runtime environment, never in this repository: `__ABSOLUTE_SHARED_OUTBOX__` is one absolute SQLite path outside every profile home, and `__ABSOLUTE_HERMES_KANBAN_DB__` is the one canonical absolute Kanban database path. Use the same values for all eleven producers and the worker. The approved source is `https://github.com/ohchanwu/hermes-local-harness.git#plugins/hermes-terminal-outcome-notification` at `377c178646034949917e4643f4ebb011f77b2d23` (version `0.2.0`).
+After approval, replace these two placeholders only in the operator's private shell/runtime environment, never in this repository: `__ABSOLUTE_SHARED_OUTBOX__` is one absolute SQLite path outside every profile home, and `__ABSOLUTE_HERMES_KANBAN_DB__` is the one canonical absolute Kanban database path. Use the same values for all eleven producers and the worker. The approved source is `https://github.com/ohchanwu/hermes-local-harness.git#plugins/hermes-terminal-outcome-notification` at `2bb72d8cbede883ee0c69fd4fd1d40d2848333bc` (version `0.2.0`).
 
 Run this exact sequence from `/Users/chanbla11mit/hermes-local-harness` after approval. It fails before installation for placeholders or relative paths, stores only the two private values in a mode-0600 file, gives the outbox parent mode 0700, restarts the multiplexed producer gateway after its environment is set, and renders then loads the worker.
 
@@ -20,7 +20,7 @@ Run this exact sequence from `/Users/chanbla11mit/hermes-local-harness` after ap
     launchctl setenv HERMES_TERMINAL_OUTBOX "$HERMES_TERMINAL_OUTBOX"
     launchctl setenv HERMES_KANBAN_DB "$HERMES_KANBAN_DB"
     for profile in default reviewer-sol worker-flash-1 worker-flash-2 worker-flash-3 worker-luna-1 worker-luna-2 worker-terra-1 worker-glm-full worker-sol worker-astra; do
-      hermes -p "$profile" plugins install https://github.com/ohchanwu/hermes-local-harness.git#plugins/hermes-terminal-outcome-notification --ref 377c178646034949917e4643f4ebb011f77b2d23 --enable
+      hermes -p "$profile" plugins install https://github.com/ohchanwu/hermes-local-harness.git#plugins/hermes-terminal-outcome-notification --ref 2bb72d8cbede883ee0c69fd4fd1d40d2848333bc --enable
       hermes -p "$profile" plugins list --plain --no-bundled
     done
     hermes plugins validate "$ROOT/plugins/hermes-terminal-outcome-notification" --json

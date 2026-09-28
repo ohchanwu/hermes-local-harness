@@ -53,5 +53,5 @@ process crashes before recording success.
 
 No private target, token, transcript, or runtime database belongs in this repository.
 
-The reviewed local candidate pin for this release is `377c178646034949917e4643f4ebb011f77b2d23`.
+The reviewed local candidate pin for this release is `2bb72d8cbede883ee0c69fd4fd1d40d2848333bc`.
 Publishing or installing that candidate remains separately authorization-gated.
