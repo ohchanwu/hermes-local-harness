@@ -25,37 +25,56 @@ def _terminal_retry_verdict(reason: object) -> dict[str, Any] | None:
     return verdict if isinstance(verdict, dict) else None
 
 
-def _is_current_terminal_retry(state: dict[str, Any]) -> bool:
-    """Recognize only a fully fenced v2 retry verdict before blocker heuristics.
+_RETRY_REQUIRED_TEXT = ("root_task_id", "repository", "worktree", "branch", "attribution")
+_RETRY_REQUIRED_SHA = ("protected_baseline", "rejected_candidate_sha")
 
-    A reason that merely mentions review/retry must remain eligible for ordinary
-    human-block classification. The terminal retry marker is deliberately a
-    complete JSON object so malformed, stale, and v1/side-by-side callbacks
-    fail closed to the normal human-gate path.
+
+def _fenced_terminal_retry(verdict: dict[str, Any], task_id: str, run_id: int | None) -> bool:
+    """Structural fence + identity binding to the watched task and the firing review run.
+
+    This is the authoritative acceptance test for a `RETRY_TERMINAL` verdict record: every
+    plan-required field must be present and well-formed, the root task must be the watched
+    card, and the verdict's review run must equal the host-supplied evidence run. It does
+    NOT compare `campaign_generation` — the caller establishes the durable generation from
+    exactly this fully fenced verdict.
     """
-    verdict = _terminal_retry_verdict(state.get("reason"))
-    if verdict is None:
-        return False
-    required_text = ("root_task_id", "repository", "worktree", "branch", "attribution")
-    required_sha = ("protected_baseline", "rejected_candidate_sha")
     return (
-        verdict.get("verdict") == "RETRY_TERMINAL"
+        run_id is not None
+        and verdict.get("verdict") == "RETRY_TERMINAL"
         and verdict.get("strategy") in {"continue", "restart"}
         and verdict.get("rung") == "astra"
         and verdict.get("ladder_version") == "glm-review-v2"
         and verdict.get("authorization_mode") == "autonomous"
         and verdict.get("terminal_retry_policy") == TERMINAL_RETRY_POLICY
         and isinstance(verdict.get("review_run_id"), int)
-        and verdict["review_run_id"] == state.get("current_run_id")
-        and all(isinstance(verdict.get(field), str) and verdict[field] for field in required_text)
+        and verdict["review_run_id"] == run_id
+        and all(isinstance(verdict.get(field), str) and verdict[field] for field in _RETRY_REQUIRED_TEXT)
         and isinstance(verdict.get("campaign_generation"), int)
-        and verdict["root_task_id"] == state.get("_notification_task_id")
-        and verdict["campaign_generation"] == state.get("_notification_terminal_retry_generation")
-        and all(isinstance(verdict.get(field), str) and SHA40.fullmatch(verdict[field]) for field in required_sha)
-        and verdict["rejected_candidate_sha"] == state.get("_notification_candidate_sha")
+        and verdict["root_task_id"] == task_id
+        and all(isinstance(verdict.get(field), str) and SHA40.fullmatch(verdict[field]) for field in _RETRY_REQUIRED_SHA)
         and isinstance(verdict.get("findings"), list)
         and bool(verdict["findings"])
         and all(isinstance(finding, str) and finding.strip() for finding in verdict["findings"])
+    )
+
+
+def _is_current_terminal_retry(state: dict[str, Any]) -> bool:
+    """Recognize only a fully fenced v2 retry verdict before blocker heuristics.
+
+    A reason that merely mentions review/retry must remain eligible for ordinary
+    human-block classification. The terminal retry marker is deliberately a
+    complete JSON object so malformed, stale, and v1/side-by-side callbacks
+    fail closed to the normal human-gate path. The durable campaign generation
+    is the one established from the last fully fenced verdict (never the
+    notifier's per-claim delivery generation), so a verdict whose campaign
+    generation does not match the durable identity is stale and fails closed.
+    """
+    verdict = _terminal_retry_verdict(state.get("reason"))
+    return (
+        verdict is not None
+        and _fenced_terminal_retry(verdict, str(state.get("_notification_task_id")), state.get("current_run_id"))
+        and verdict["campaign_generation"] == state.get("_notification_terminal_retry_generation")
+        and verdict["rejected_candidate_sha"] == state.get("_notification_candidate_sha")
     )
 
 
@@ -281,11 +300,25 @@ class Store:
 
     def kanban_blocked(self, task_id: str, reason: str, run_id: int | None = None) -> str | None:
         with self._connect() as db:
+            db.execute("BEGIN IMMEDIATE")
             campaign = db.execute("SELECT * FROM campaigns WHERE task_id=? AND disarmed_at IS NULL", (task_id,)).fetchone()
+            if not campaign:
+                db.execute("COMMIT"); return None
             verdict = _terminal_retry_verdict(reason)
             candidate_sha = verdict.get("rejected_candidate_sha") if verdict else None
+            # Authoritative durable campaign generation: established/advanced (never regressed)
+            # by a fully fenced RETRY_TERMINAL verdict bound to this exact task and the firing
+            # review run. This is the campaign identity the classifier later compares against —
+            # deliberately independent of `generation`, which `claimed()` advances per attempt
+            # for stale pending-event cancellation.
+            if verdict is not None and _fenced_terminal_retry(verdict, task_id, run_id):
+                durable = int(verdict["campaign_generation"])
+                if durable > campaign["terminal_retry_generation"]:
+                    db.execute("UPDATE campaigns SET terminal_retry_generation=?,last_activity_at=? WHERE campaign_id=?",
+                               (durable, _now(), campaign["campaign_id"]))
+            db.execute("COMMIT")
             return self._event(db, campaign, "blocked", reason, self.config.block_debounce_seconds, run_id,
-                               candidate_sha if isinstance(candidate_sha, str) else None) if campaign else None
+                               candidate_sha if isinstance(candidate_sha, str) else None)
 
     def claimed(self, task_id: str, run_id: int | None = None) -> None:
         """kanban_task_claimed: a new attempt begins, so block candidates from earlier generations

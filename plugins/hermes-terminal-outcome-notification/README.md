@@ -35,8 +35,12 @@ campaign generation, rejected candidate SHA, and review run, with `strategy`, `r
 `terminal_retry_policy: astra-until-approve-v1`, repository, protected baseline, worktree/branch,
 attribution, and concrete findings. `needs_input` and `capability` always remain human blocks.
 Malformed, stale, v1, side-by-side, or prose markers fail closed to ordinary human-block
-classification; a valid retry cancels the pending candidate and the next claimed run advances the
-notification generation.
+classification. The durable campaign generation is an authoritative identity, not a delivery
+counter: it is established and advanced (never regressed) when `kanban_task_blocked` records a
+fully fenced verdict bound to the watched task and the firing review run, and it survives
+`kanban_task_claimed`, which advances only the notifier's per-attempt delivery generation for
+stale pending-event cancellation. A verdict whose `campaign_generation` is older than the
+durable identity is stale and alerts as a human block.
 
 Producers and the LaunchAgent must use the same absolute `HERMES_TERMINAL_OUTBOX` path. The worker
 also needs `HERMES_KANBAN_DB` (or `--kanban-db`) to recheck human-relevant block finality. Its

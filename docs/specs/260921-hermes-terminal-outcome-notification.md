@@ -133,6 +133,13 @@ repository, protected baseline, worktree/branch, rejected candidate SHA, review 
 concrete findings, `strategy`, `rung: astra`, and `terminal_retry_policy: astra-until-approve-v1`.
 `needs_input` and `capability` remain human-relevant even if the reason contains such a marker; a
 malformed, stale, v1, or side-by-side marker must fail closed to the ordinary block policy.
+The `campaign_generation` carried by the verdict is a durable campaign identity, not the
+notifier's delivery generation: the plugin establishes and advances it (never regresses it)
+only when `kanban_task_blocked` records a fully fenced verdict bound to the watched task and
+the firing review run, and `kanban_task_claimed` advances only the delivery generation used to
+cancel stale pending events. A legitimate campaign therefore suppresses across arbitrary claim
+cycles at any durable generation, while a verdict older than the durable identity fails closed
+and alerts.
 
 ### 6.2 Suppress
 

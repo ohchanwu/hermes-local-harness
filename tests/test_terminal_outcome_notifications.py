@@ -379,17 +379,73 @@ def test_claimed_attempt_retains_durable_terminal_retry_generation():
 
 
 def test_stale_durable_terminal_retry_generation_does_not_suppress_human_block():
+    # genuinely stale: the campaign's durable identity is established at generation 3, and a
+    # later verdict claiming an older campaign generation (after a new claim) fails closed.
     tmp, store = fresh()
     store.watch_task("t1", "Root")
-    store.claimed("t1", run_id=6)
+    current = _terminal_retry(generation=3, run=5)
+    store.kanban_blocked("t1", json.dumps(current), run_id=5)
+    assert store.campaigns()[0]["terminal_retry_generation"] == 3
+    sent = []
+    drain = Worker(store, telegram=lambda b: None, macos=lambda t, b: None,
+                   state_reader=lambda _: {"status": "blocked", "block_kind": "transient",
+                                           "current_run_id": 5, "max_run_id": 5,
+                                           "reason": json.dumps(current)})
+    assert drain.drain_once() == 0  # current generation-3 retry suppressed
+    store.claimed("t1", run_id=6)  # next attempt begins; delivery generation advances
+    stale = _terminal_retry(generation=2, run=6)  # older campaign generation, current run
+    store.kanban_blocked("t1", json.dumps(stale), run_id=6)
+    assert store.campaigns()[0]["terminal_retry_generation"] == 3  # never regresses
+    stale_drain = Worker(store, telegram=lambda b: sent.append(b), macos=lambda t, b: sent.append(b),
+                         state_reader=lambda _: {"status": "blocked", "block_kind": "transient",
+                                                 "current_run_id": 6, "max_run_id": 6,
+                                                 "reason": json.dumps(stale)})
+    assert stale_drain.drain_once() == 2 and len(sent) == 2
+    tmp.cleanup()
+
+
+def test_nonfirst_generation_verdict_suppresses_across_claims():
+    # a legitimate campaign whose durable generation is 2+ must suppress after claimed()
+    tmp, store = fresh()
+    store.watch_task("t1", "Root")
+    store.claimed("t1", run_id=6)  # delivery generation advances; campaign identity must not
     retry = _terminal_retry(generation=2, run=6)
     store.kanban_blocked("t1", json.dumps(retry), run_id=6)
+    assert store.campaigns()[0]["terminal_retry_generation"] == 2  # authoritative write path
     sent = []
     w = Worker(store, telegram=lambda b: sent.append(b), macos=lambda t, b: sent.append(b),
                state_reader=lambda _: {"status": "blocked", "block_kind": "transient",
                                        "current_run_id": 6, "max_run_id": 6,
                                        "reason": json.dumps(retry)})
-    assert w.drain_once() == 2 and len(sent) == 2
+    assert w.drain_once() == 0 and sent == []
+    assert all(r["cancelled_at"] for r in store.status())
+    tmp.cleanup()
+
+
+def test_generation_identity_write_path_is_fenced():
+    # only a structurally complete verdict fenced to THIS task and the CURRENT review run
+    # may establish/advance the durable campaign generation; everything else must not.
+    tmp, store = fresh()
+    store.watch_task("t1", "Root")
+
+    def durable():
+        return store.campaigns()[0]["terminal_retry_generation"]
+
+    store.kanban_blocked("t1", json.dumps(_terminal_retry(generation=7, run=4)), run_id=6)  # stale run
+    assert durable() == 1
+    store.kanban_blocked("t1", json.dumps(_terminal_retry(task_id="t2", generation=9, run=6)), run_id=6)  # cross-task
+    assert durable() == 1
+    store.kanban_blocked("t1", json.dumps({"verdict": "RETRY_TERMINAL", "rung": "astra",
+                                           "campaign_generation": 9, "review_run_id": 6}), run_id=6)  # malformed fence
+    assert durable() == 1
+    store.kanban_blocked("t1", "RETRY_TERMINAL review retry needed generation 9", run_id=6)  # prose
+    assert durable() == 1
+    store.kanban_blocked("t1", json.dumps(_terminal_retry(generation=3, run=6)))  # no run evidence from host
+    assert durable() == 1
+    store.kanban_blocked("t1", json.dumps(_terminal_retry(generation=3, run=6)), run_id=6)  # valid: establishes
+    assert durable() == 3
+    store.kanban_blocked("t1", json.dumps(_terminal_retry(generation=2, run=6)), run_id=6)  # older: no regression
+    assert durable() == 3
     tmp.cleanup()
 
 
