@@ -505,7 +505,7 @@ def main():
                 deployed_root = Path(entry["path"].replace("<profile>", profile))
                 if deployed_root.is_dir():
                     for deployed in deployed_root.rglob("*"):
-                        if deployed.is_file():
+                        if deployed.is_file() and "__pycache__" not in deployed.relative_to(deployed_root).parts:
                             deployed_hashes[entry["name"]][profile][str(deployed.relative_to(deployed_root))] = (
                                 hashlib.sha256(deployed.read_bytes()).hexdigest())
                 else:
