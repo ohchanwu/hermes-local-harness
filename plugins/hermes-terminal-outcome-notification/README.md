@@ -36,7 +36,11 @@ campaign generation, rejected candidate SHA, and review run, with `strategy`, `r
 attribution, and concrete findings. The numeric fences (`campaign_generation`, `review_run_id`,
 and the host-supplied run evidence) accept exact positive integers only — a JSON boolean
 (`true`/`false`), zero, negative, floating, or string form fails closed, because Python `bool`
-subclasses `int` and `True == 1`. `needs_input` and `capability` always remain human blocks.
+subclasses `int` and `True == 1`. Suppression binds to the host-run evidence recorded with the
+blocked event, never to a later matching board run: when the host supplies no valid run evidence,
+`kanban_task_blocked` records neither run nor rejected-candidate evidence, so an otherwise
+valid-looking marker cannot suppress the human-block alert via the board's current run and the
+default durable generation. `needs_input` and `capability` always remain human blocks.
 Malformed, stale, v1, side-by-side, or prose markers fail closed to ordinary human-block
 classification. The durable campaign generation is an authoritative identity, not a delivery
 counter: it is established and advanced (never regressed) when `kanban_task_blocked` records a

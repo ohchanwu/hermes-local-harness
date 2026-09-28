@@ -164,6 +164,8 @@ A watched Kanban card is notification-worthy as `blocked` only when its durable 
 
 The plugin should debounce a block candidate for a short bounded interval and then reread the card, its block classification, remaining retry or revision policy, parents, and current run. The delivery worker must recheck the same durable state immediately before sending. If the card was reactivated, reassigned for automatic continuation, promoted to another review rung, completed, or otherwise ceased to require human action, cancel the pending block event without notification. An alert already accepted by a destination cannot be retracted.
 
+Terminal-retry suppression binds to authoritative recorded host-run evidence, never to a later matching board run: when `kanban_task_blocked` fires without a valid exact-positive-integer `run_id`, the event records neither run nor rejected-candidate evidence, so recheck cannot admit the marker as a current terminal retry even when its `review_run_id` happens to equal the board's current run and its `campaign_generation` equals the default durable identity. An unfenced callback therefore always fails closed to the human-block path.
+
 ## 7. Hermes lifecycle integration
 
 The implementation should use a standalone Hermes plugin and documented hooks.

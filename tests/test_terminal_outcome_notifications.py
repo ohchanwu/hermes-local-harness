@@ -527,6 +527,80 @@ def test_boolean_host_run_evidence_never_fences_or_suppresses():
     tmp.cleanup()
 
 
+def test_generation_one_invalid_host_run_evidence_cannot_suppress():
+    # The default generation-1 bypass: a marker that is otherwise fully valid
+    # (campaign_generation=1 == default durable identity, review_run_id equal to
+    # the board's current run, candidate SHA recorded) must NOT suppress the
+    # human-block alert when the host-supplied run evidence is invalid, because
+    # suppression binds to authoritative recorded host-run evidence, not to a
+    # later matching board run. Zero/negative host payloads fail the same way.
+    marker = json.dumps(_terminal_retry(generation=1, run=1))
+    for bad_host_run in (True, 0, -1):
+        tmp, store = fresh()
+        store.watch_task("t1", "Root")
+        store.kanban_blocked("t1", marker, run_id=bad_host_run)
+        assert store.campaigns()[0]["terminal_retry_generation"] == 1  # never advances
+        blocked = [r for r in store.status() if r["terminal_status"] == "blocked"]
+        assert all(r["evidence_run_id"] is None for r in blocked), bad_host_run
+        assert all(r["evidence_candidate_sha"] is None for r in blocked), bad_host_run
+        sent = []
+        w = Worker(store, telegram=lambda b: sent.append(b), macos=lambda t, b: sent.append(b),
+                   state_reader=lambda _: {"status": "blocked", "block_kind": "transient",
+                                           "current_run_id": 1, "max_run_id": 1,
+                                           "reason": marker})
+        assert w.drain_once() == 2 and len(sent) == 2, bad_host_run  # fail closed to human alert
+        tmp.cleanup()
+
+    # the same reviewer scenario through the real plugin hook entry point:
+    # a boolean host payload must not be coerced into run evidence that fences.
+    spec = importlib.util.spec_from_file_location("notification_plugin_gen1bool", PLUGIN / "__init__.py",
+                                                  submodule_search_locations=[str(PLUGIN)])
+    module = importlib.util.module_from_spec(spec)
+    sys.modules["notification_plugin_gen1bool"] = module
+    tmp2 = tempfile.TemporaryDirectory()
+    old = os.environ.get("HERMES_TERMINAL_OUTBOX")
+    os.environ["HERMES_TERMINAL_OUTBOX"] = str(Path(tmp2.name) / "outbox.sqlite3")
+    try:
+        spec.loader.exec_module(module)
+        module.watch_terminal_task({"task_id": "t1", "title": "Root"})
+        module._kanban_blocked(task_id="t1", reason=marker, run_id=True)
+        assert module._store().campaigns()[0]["terminal_retry_generation"] == 1
+        events = [r for r in module._store().status() if r["terminal_status"] == "blocked"]
+        assert all(r["evidence_run_id"] is None and r["evidence_candidate_sha"] is None for r in events)
+        # full classifier verdict through the real hook store (its default debounce
+        # only delays delivery; the classification decision is recheck_block):
+        board = {"status": "blocked", "block_kind": "transient",
+                 "current_run_id": 1, "max_run_id": 1, "reason": marker}
+        assert all(module._store().recheck_block(r["event_id"], lambda _: board) == "send" for r in events)
+    finally:
+        sys.modules.pop("notification_plugin_gen1bool", None)
+        if old is None:
+            os.environ.pop("HERMES_TERMINAL_OUTBOX", None)
+        else:
+            os.environ["HERMES_TERMINAL_OUTBOX"] = old
+        tmp2.cleanup()
+
+
+def test_generation_one_valid_host_run_evidence_still_suppresses():
+    # Contrast leg: the identical generation-1 marker with an exact positive
+    # integer host run evidence is a legitimate current terminal retry and
+    # remains suppressed (both destinations cancelled, nothing sent).
+    tmp, store = fresh()
+    store.watch_task("t1", "Root")
+    marker = _terminal_retry(generation=1, run=1)
+    store.kanban_blocked("t1", json.dumps(marker), run_id=1)
+    blocked = [r for r in store.status() if r["terminal_status"] == "blocked"]
+    assert all(r["evidence_run_id"] == 1 and r["evidence_candidate_sha"] == "a" * 40 for r in blocked)
+    sent = []
+    w = Worker(store, telegram=lambda b: sent.append(b), macos=lambda t, b: sent.append(b),
+               state_reader=lambda _: {"status": "blocked", "block_kind": "transient",
+                                       "current_run_id": 1, "max_run_id": 1,
+                                       "reason": json.dumps(marker)})
+    assert w.drain_once() == 0 and sent == []
+    assert all(r["cancelled_at"] for r in store.status())
+    tmp.cleanup()
+
+
 def test_terminal_retry_marker_with_missing_or_stale_fence_does_not_suppress_human_block():
     for retry in ({"verdict": "RETRY_TERMINAL", "rung": "astra"},
                   _terminal_retry(task_id="other-task"),

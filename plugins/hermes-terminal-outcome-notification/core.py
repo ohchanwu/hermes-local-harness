@@ -70,15 +70,21 @@ def _is_current_terminal_retry(state: dict[str, Any]) -> bool:
     A reason that merely mentions review/retry must remain eligible for ordinary
     human-block classification. The terminal retry marker is deliberately a
     complete JSON object so malformed, stale, and v1/side-by-side callbacks
-    fail closed to the normal human-gate path. The durable campaign generation
-    is the one established from the last fully fenced verdict (never the
-    notifier's per-claim delivery generation), so a verdict whose campaign
-    generation does not match the durable identity is stale and fails closed.
+    fail closed to the normal human-gate path. Suppression binds to the
+    host-run evidence recorded with the blocked event — the same exact
+    positive integer the fence below demands — never to a later matching
+    board run, so an unfenced `kanban_blocked` callback (boolean/zero/
+    negative/absent host run) leaves no admissible evidence and cannot
+    suppress a human-block alert. The durable campaign generation is the one
+    established from the last fully fenced verdict (never the notifier's
+    per-claim delivery generation), so a verdict whose campaign generation
+    does not match the durable identity is stale and fails closed.
     """
     verdict = _terminal_retry_verdict(state.get("reason"))
     return (
         verdict is not None
-        and _fenced_terminal_retry(verdict, str(state.get("_notification_task_id")), state.get("current_run_id"))
+        and _fenced_terminal_retry(verdict, str(state.get("_notification_task_id")),
+                                   state.get("_notification_evidence_run_id"))
         and verdict["campaign_generation"] == state.get("_notification_terminal_retry_generation")
         and verdict["rejected_candidate_sha"] == state.get("_notification_candidate_sha")
     )
@@ -316,7 +322,15 @@ class Store:
             if not campaign:
                 db.execute("COMMIT"); return None
             verdict = _terminal_retry_verdict(reason)
-            candidate_sha = verdict.get("rejected_candidate_sha") if verdict else None
+            # Candidate evidence binds to a fully fenced verdict: when the host
+            # supplied no valid run evidence (boolean/zero/negative/absent),
+            # nothing from the marker is admissible — recording the candidate
+            # SHA alone would let recheck later suppress a human-block alert
+            # by matching the board's current run and the default durable
+            # generation. Fail closed at the write boundary.
+            candidate_sha = (verdict.get("rejected_candidate_sha")
+                             if verdict is not None and _fenced_terminal_retry(verdict, task_id, run_id)
+                             and isinstance(verdict.get("rejected_candidate_sha"), str) else None)
             # Authoritative durable campaign generation: established/advanced (never regressed)
             # by a fully fenced RETRY_TERMINAL verdict bound to this exact task and the firing
             # review run. This is the campaign identity the classifier later compares against —
@@ -329,7 +343,7 @@ class Store:
                                (durable, _now(), campaign["campaign_id"]))
             db.execute("COMMIT")
             return self._event(db, campaign, "blocked", reason, self.config.block_debounce_seconds, run_id,
-                               candidate_sha if isinstance(candidate_sha, str) else None)
+                               candidate_sha)
 
     def claimed(self, task_id: str, run_id: int | None = None) -> None:
         """kanban_task_claimed: a new attempt begins, so block candidates from earlier generations
@@ -382,6 +396,7 @@ class Store:
                 return cancel("watched task no longer exists on the board")
             state = {**state, "_notification_task_id": row["task_id"],
                      "_notification_generation": row["generation"],
+                     "_notification_evidence_run_id": row["evidence_run_id"],
                      "_notification_terminal_retry_generation": row["terminal_retry_generation"],
                      "_notification_candidate_sha": row["evidence_candidate_sha"]}
             evidence_run = row["evidence_run_id"]
