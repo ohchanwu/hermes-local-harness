@@ -28,6 +28,13 @@ escalate to a visible `failed` row. A stranded armed direct turn (crash/hard kil
 `on_session_end`) is recovered by the worker's per-cycle scan as `interrupted` (with stop
 evidence) or fail-closed `unknown` — never `completed`.
 
+An automatic Astra terminal retry is not a human block. Before the ordinary blocker heuristics,
+the worker recognizes only an exact JSON `RETRY_TERMINAL` verdict fenced to the current run with
+`strategy`, `rung: astra`, `ladder_version: glm-review-v2`, `authorization_mode: autonomous`,
+and `terminal_retry_policy: astra-until-approve-v1`. Malformed, stale, v1, side-by-side, or prose
+markers fail closed to ordinary human-block classification; a valid retry cancels the pending
+candidate and the next claimed run advances the notification generation.
+
 Producers and the LaunchAgent must use the same absolute `HERMES_TERMINAL_OUTBOX` path. The worker
 also needs `HERMES_KANBAN_DB` (or `--kanban-db`) to recheck human-relevant block finality. Its
 SQLite file is mode 0600 and parent directory mode 0700.

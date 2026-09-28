@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import os
 import re
+import json
 import sqlite3
 import time
 import uuid
@@ -12,6 +13,33 @@ from typing import Any, Callable
 
 TERMINAL = {"completed", "blocked", "failed", "interrupted", "timed_out", "unknown"}
 HUMAN_BLOCKS = {"needs_input", "capability"}
+TERMINAL_RETRY_POLICY = "astra-until-approve-v1"
+
+
+def _is_current_terminal_retry(state: dict[str, Any]) -> bool:
+    """Recognize only a fully fenced v2 retry verdict before blocker heuristics.
+
+    A reason that merely mentions review/retry must remain eligible for ordinary
+    human-block classification. The terminal retry marker is deliberately a
+    complete JSON object so malformed, stale, and v1/side-by-side callbacks
+    fail closed to the normal human-gate path.
+    """
+    try:
+        verdict = json.loads(str(state.get("reason") or ""))
+    except (TypeError, json.JSONDecodeError):
+        return False
+    if not isinstance(verdict, dict):
+        return False
+    return (
+        verdict.get("verdict") == "RETRY_TERMINAL"
+        and verdict.get("strategy") in {"continue", "restart"}
+        and verdict.get("rung") == "astra"
+        and verdict.get("ladder_version") == "glm-review-v2"
+        and verdict.get("authorization_mode") == "autonomous"
+        and verdict.get("terminal_retry_policy") == TERMINAL_RETRY_POLICY
+        and isinstance(verdict.get("review_run_id"), int)
+        and verdict["review_run_id"] == state.get("current_run_id")
+    )
 
 
 @dataclass(frozen=True)
@@ -252,6 +280,8 @@ class Store:
     def human_block(state: dict[str, Any]) -> bool:
         kind, status = state.get("block_kind"), state.get("status")
         reason = str(state.get("reason") or "").lower()
+        if _is_current_terminal_retry(state):
+            return False
         if kind in HUMAN_BLOCKS:
             return status == "blocked"
         if status == "triage" and (int(state.get("block_recurrences") or 0) > 0 or "exhaust" in reason):

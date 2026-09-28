@@ -1,7 +1,7 @@
 ---
 name: multi-agent-coding-orchestrator
 description: "Use when orchestrating multi-agent coding with Hermes."
-version: 0.3.3
+version: 0.4.0
 author: chanbla11mit, Hermes Agent
 license: MIT
 platforms: [macos]
@@ -66,7 +66,7 @@ Luna, Sol, and Astra are escalation rungs, not normal direct-entry rungs. A task
 
 Before dispatch, record in the task body or an initial structured comment:
 
-- `ladder_version: glm-review-v1`
+- `ladder_version: glm-review-v1` for bounded compatibility, or `glm-review-v2` only for an explicitly authorized terminal-retry campaign.
 - `entry_rung`
 - `current_rung`
 - protected baseline commit/checkpoint
@@ -84,8 +84,9 @@ The reviewer must issue exactly one verdict:
 - `ESCALATE_CONTINUE`: advance one rung and preserve/continue the current artifact.
 - `ESCALATE_RESTART`: preserve the rejected artifact for evidence, then restart from the recorded baseline at the next rung.
 - `HUMAN_BLOCK`: stop automated execution and request human intervention.
+- `RETRY_TERMINAL`: only at Astra, for a fenced, remediable semantic rejection in an explicitly opted-in v2 campaign.
 
-Use `kanban_request_changes` only for `REVISE_SAME_RUNG`. For either escalation verdict, use `kanban_block` with a structured verdict so the task cannot race back to the previous implementer. The orchestrator reads the durable verdict, updates task history, safely reassigns the card, and explicitly promotes it to `ready`. Do not use `kanban_unblock` for this transition: a card blocked from review returns to the review lane when unblocked. Use `kanban_complete` only for `APPROVE`.
+Use `kanban_request_changes` only for `REVISE_SAME_RUNG` and an eligible `RETRY_TERMINAL` continue transition. For either escalation verdict, use `kanban_block` with a structured verdict so the task cannot race back to the previous implementer. The orchestrator reads the durable verdict, updates task history, safely reassigns the card, and explicitly promotes it to `ready`. Do not use `kanban_unblock` for this transition: a card blocked from review returns to the review lane when unblocked. Use `kanban_complete` only for `APPROVE`.
 
 ### Same-rung revision allowance
 
@@ -98,13 +99,34 @@ Every revision consumes the allowance, including reviewer-caused retries. No run
 
 After the second revision, issue `APPROVE`, `ESCALATE_CONTINUE`, `ESCALATE_RESTART`, or `HUMAN_BLOCK`. Repeated worker failure, failure to resolve a substantive defect, newly discovered substantive inadequacy, or mixed responsibility containing material worker error ordinarily escalates instead of receiving the conditional second revision.
 
-At Astra, any outcome that would advance beyond Astra, including exhausted revisions or repeated infrastructure failure, becomes `HUMAN_BLOCK` and notifies the human.
+At Astra, any outcome that would advance beyond Astra, including exhausted revisions or repeated infrastructure failure, becomes `HUMAN_BLOCK` and notifies the human unless the exact v2 terminal-retry contract below is satisfied. Provider, quota, crash, timeout, unavailable-model, and context-exhaustion are infrastructure outcomes and always remain on the bounded human-block path at Astra.
 
 ### Infrastructure failure
 
 Retry one infrastructure failure at the same rung. Before retrying a timed-out run, increase its per-run runtime cap; never blindly requeue it under the cap that already proved insufficient. A second consecutive provider, quota, crash, timeout, unavailable-model, or context-exhaustion failure advances one rung with attribution `infrastructure`, not `worker_capability`. At Astra, block for human intervention. Never use provider fallback to silently traverse the semantic ladder inside one worker run.
 
 ## Escalation Mechanics
+
+### Astra terminal retry (glm-review-v2 opt-in only)
+
+`RETRY_TERMINAL` is never inferred. It is valid only when the same root card durably records all of:
+
+```yaml
+ladder_version: glm-review-v2
+authorization_mode: autonomous
+terminal_retry_policy: astra-until-approve-v1
+verdict: RETRY_TERMINAL
+rung: astra
+strategy: continue | restart
+```
+
+The structured verdict must fence the root task, campaign generation, repository, protected baseline, worktree/branch, rejected candidate SHA, reviewer run ID, attribution, concrete findings, and strategy. Reject a stale or duplicate callback, a mismatched candidate/worktree/generation/root, or an identical SHA without explicit reviewer-guidance invalidation; no duplicate Astra run may be created. Event history is authoritative for cycle count, and every individual Astra run remains bounded.
+
+For `continue`, preserve branch, commit, test evidence, and findings; return through `kanban_request_changes`, retain Astra ownership, and require a new commit plus fresh independent `reviewer-sol` review. For `restart`, durably block the fenced verdict first, preserve rejected evidence, create a fresh worktree from the protected baseline, retain the same root/generation lineage and Astra rung, then reassign `worker-astra` and promote to `ready`. In either case read the card and run history within two normal dispatcher ticks and require a new claimed run receipt.
+
+Never use terminal retry for user stop/pause/revocation, missing product decisions, credentials/MFA/prohibited writes, unsafe repository state, capability boundaries, or policy/legal/security decisions. Those conditions are `HUMAN_BLOCK`. Default, malformed, side-by-side, and v1 metadata stay bounded and human-block after Astra exhaustion.
+
+GOOD: an exact v2, autonomous, card-scoped `astra-until-approve-v1` verdict finds a remediable semantic defect at Astra and returns the same fenced card for a new bounded Astra run. BAD: a side-by-side or v1 card, a provider timeout, or prose merely mentioning “retry” automatically requeues Astra.
 
 For `ESCALATE_CONTINUE`:
 

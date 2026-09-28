@@ -207,6 +207,55 @@ def check_terminal_notification_deployment(errors, roster, snapshot):
         fail(errors, "terminal notification sanitized snapshot drift")
 
 
+TERMINAL_RETRY_REQUIRED_METADATA = [
+    "ladder_version: glm-review-v2",
+    "authorization_mode: autonomous",
+    "terminal_retry_policy: astra-until-approve-v1",
+]
+TERMINAL_RETRY_HUMAN_GATES = [
+    "user_stop", "product_decision", "credentials_or_prohibited_write",
+    "unsafe_state", "capability_boundary", "policy_legal_security",
+]
+TERMINAL_RETRY_INFRASTRUCTURE = ["provider", "quota", "crash", "timeout", "context_exhaustion"]
+
+
+def check_terminal_retry_policy(errors, roster, observed=None):
+    """Fail closed on any global-default or under-specified Astra retry policy."""
+    policy = roster.get("terminal_retry")
+    if not isinstance(policy, dict):
+        fail(errors, "terminal retry policy missing")
+        return
+    if policy.get("default") != "bounded-human-block":
+        fail(errors, "terminal retry default drift: expected bounded-human-block")
+    if policy.get("supported_opt_in") != "astra-until-approve-v1":
+        fail(errors, "terminal retry supported opt-in drift")
+    if policy.get("required_card_metadata") != TERMINAL_RETRY_REQUIRED_METADATA:
+        fail(errors, "terminal retry policy missing required scope")
+    if policy.get("human_gates") != TERMINAL_RETRY_HUMAN_GATES:
+        fail(errors, "terminal retry policy missing human/infrastructure exclusion")
+    if policy.get("infrastructure_exclusions") != TERMINAL_RETRY_INFRASTRUCTURE:
+        fail(errors, "terminal retry policy missing human/infrastructure exclusion")
+    if policy.get("terminal_assignee") != "worker-astra":
+        fail(errors, "terminal retry terminal assignee drift")
+    if observed is not None:
+        if "terminal_retry_policy" not in observed:
+            fail(errors, "incomplete fixture: missing required section 'terminal_retry_policy'")
+            return
+        observed_policy = observed["terminal_retry_policy"]
+        if not isinstance(observed_policy, dict):
+            fail(errors, "terminal retry observed policy drift")
+            return
+        if observed_policy.get("default") != policy.get("default"):
+            fail(errors, "terminal retry default drift: expected bounded-human-block")
+        if observed_policy.get("required_card_metadata") != policy.get("required_card_metadata"):
+            fail(errors, "terminal retry policy missing required scope")
+        if (observed_policy.get("human_gates") != policy.get("human_gates")
+                or observed_policy.get("infrastructure_exclusions") != policy.get("infrastructure_exclusions")):
+            fail(errors, "terminal retry policy missing human/infrastructure exclusion")
+        if observed_policy != policy:
+            fail(errors, "terminal retry observed policy drift")
+
+
 def check_terminal_notification_observed(errors, plugins, producer_profiles):
     for profile in producer_profiles:
         actual = plugins.get(profile, {}).get("hermes-terminal-outcome-notification")
@@ -400,9 +449,12 @@ def main():
     except (OSError, json.JSONDecodeError) as exc:
         print(f"FAIL: malformed desired state: {exc}")
         return 2
-    if roster.get("ladder_version") != "glm-review-v1":
-        fail(errors, "ladder_version expected glm-review-v1")
+    if roster.get("schema_version") != 2:
+        fail(errors, "roster schema_version expected 2")
+    if roster.get("ladder_version") != "glm-review-v2":
+        fail(errors, "ladder_version expected glm-review-v2")
     check_terminal_notification_deployment(errors, roster, snapshot)
+    check_terminal_retry_policy(errors, roster)
     expected_local_overrides = snapshot["skill"].get("profile_local_skill_overrides", {})
     check_profile_local_skill_overrides(errors, expected_local_overrides)
     expected = {p["name"]: p for p in roster.get("profiles", [])}
@@ -415,7 +467,7 @@ def main():
             return 2
         # Fail-closed fixture schema: a passing fixture must represent every required
         # observed field and every installed roster profile; omission is drift, not success.
-        for section in ("profile_models", "profile_providers", "plugins", "dispatch_profiles", "kanban", "skill_files", "profile_local_skill_overrides", "adapters", "terminal_notification_runtime"):
+        for section in ("profile_models", "profile_providers", "plugins", "dispatch_profiles", "kanban", "skill_files", "profile_local_skill_overrides", "adapters", "terminal_notification_runtime", "terminal_retry_policy"):
             if section not in observed:
                 fail(errors, f"incomplete fixture: missing required section '{section}'")
         kanban = observed.get("kanban", {})
@@ -447,6 +499,7 @@ def main():
         check_terminal_notification_observed(errors, plugins, snapshot["terminal_notification"]["producer_profiles"])
         check_terminal_notification_runtime(errors, observed.get("terminal_notification_runtime", {}),
                                             snapshot["terminal_notification"]["producer_profiles"])
+        check_terminal_retry_policy(errors, roster, observed)
         for name in expected:
             if name not in plugins:
                 fail(errors, f"incomplete fixture: plugins omits {name}")

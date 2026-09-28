@@ -126,6 +126,12 @@ A block is notification-worthy when human attention is required, including:
 - crash or timeout with no automatic retry remaining;
 - required human review or another explicit human gate.
 
+An exact, current-run-fenced `RETRY_TERMINAL` verdict for an opted-in `glm-review-v2` autonomous
+Astra campaign is explicitly non-human: it cancels any pending block candidate. The classifier
+must require the complete structured marker, including `strategy`, `rung: astra`,
+`terminal_retry_policy: astra-until-approve-v1`, and matching review run; a malformed, stale, v1,
+or side-by-side marker must fail closed to the ordinary block policy.
+
 ### 6.2 Suppress
 
 Do not notify for:

@@ -326,6 +326,46 @@ def test_fresh_human_block_still_sends():
     tmp.cleanup()
 
 
+def test_opted_in_structured_terminal_retry_is_cancelled_not_notified():
+    tmp, store = fresh()
+    store.watch_task("t1", "Root")
+    store.kanban_blocked("t1", "review retry", run_id=5)
+    sent = []
+    retry = {
+        "verdict": "RETRY_TERMINAL",
+        "strategy": "restart",
+        "rung": "astra",
+        "ladder_version": "glm-review-v2",
+        "authorization_mode": "autonomous",
+        "terminal_retry_policy": "astra-until-approve-v1",
+        "review_run_id": 5,
+    }
+    w = Worker(store, telegram=lambda b: sent.append(b), macos=lambda t, b: sent.append(b),
+               state_reader=lambda _: {"status": "blocked", "block_kind": "transient",
+                                       "current_run_id": 5, "max_run_id": 5,
+                                       "reason": json.dumps(retry)})
+    assert w.drain_once() == 0 and sent == []
+    assert all(r["cancelled_at"] for r in store.status())
+    tmp.cleanup()
+
+
+def test_malformed_or_stale_terminal_retry_marker_does_not_suppress_human_block():
+    for retry in ({"verdict": "RETRY_TERMINAL", "rung": "astra"},
+                  {"verdict": "RETRY_TERMINAL", "strategy": "continue", "rung": "astra",
+                   "ladder_version": "glm-review-v2", "authorization_mode": "autonomous",
+                   "terminal_retry_policy": "astra-until-approve-v1", "review_run_id": 4}):
+        tmp, store = fresh()
+        store.watch_task("t1", "Root")
+        store.kanban_blocked("t1", "review retry", run_id=5)
+        sent = []
+        w = Worker(store, telegram=lambda b: sent.append(b), macos=lambda t, b: sent.append(b),
+                   state_reader=lambda _: {"status": "blocked", "block_kind": "needs_input",
+                                           "current_run_id": 5, "max_run_id": 5,
+                                           "reason": json.dumps(retry)})
+        assert w.drain_once() == 2 and len(sent) == 2
+        tmp.cleanup()
+
+
 def test_dependency_block_is_cancelled_not_sent():
     tmp, store = fresh()
     store.watch_task("t1", "Root")

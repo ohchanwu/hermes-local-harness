@@ -9,7 +9,7 @@ desired = json.loads((Path(__file__).resolve().parents[1] / "snapshots" / "sanit
 IMPL = ["worker-flash-1", "worker-flash-2", "worker-flash-3", "worker-luna-1", "worker-luna-2",
         "worker-terra-1", "worker-terra-2", "worker-glm-full", "worker-sol", "worker-astra"]
 NOTIF = "hermes-terminal-outcome-notification"
-ENABLED_NOTIF = f"enabled      git pinned@7d38611e 0.1.0    {NOTIF}"
+ENABLED_NOTIF = f"enabled      git pinned@7d38611e 0.2.0    {NOTIF}"
 DISABLED_PONY = "disabled     git pinned@16f29800 4.8.4    ponytail"
 ENABLED_PONY = "enabled      git pinned@16f29800 4.8.4    ponytail"
 
@@ -30,10 +30,10 @@ def base_plugins():
     for name in clean["profile_models"]:
         if name == "advisor":
             plugins[name] = {}
-        elif name == "default" or name == "reviewer-sol":
-            plugins[name] = {NOTIF: ENABLED_NOTIF}
         else:
-            plugins[name] = {NOTIF: ENABLED_NOTIF}
+            plugins[name] = {}
+            if name in desired["terminal_notification"]["producer_profiles"]:
+                plugins[name][NOTIF] = ENABLED_NOTIF
             if name in IMPL:
                 plugins[name]["ponytail"] = DISABLED_PONY
     return plugins
@@ -52,7 +52,10 @@ def set_skill_files(d):
         desired["skill"]["profile_local_skill_overrides"])
 
 
+clean["plugins"] = base_plugins()
 set_skill_files(clean)
+clean["terminal_retry_policy"] = copy.deepcopy(
+    json.loads((Path(__file__).resolve().parents[1] / "roster.yaml").read_text())["terminal_retry"])
 write("clean.yaml", clean)
 
 
@@ -69,7 +72,7 @@ write("unexpected-plugin.yaml", delta(rogue))
 
 
 def missing_required(d):
-    d["plugins"]["worker-luna-1"]["hermes-terminal-outcome-notification"] = f"disabled     git pinned@7d38611e 0.1.0    {NOTIF}"
+    d["plugins"]["worker-luna-1"]["hermes-terminal-outcome-notification"] = f"disabled     git pinned@7d38611e 0.2.0    {NOTIF}"
 
 
 write("missing-plugin.yaml", delta(missing_required))
@@ -128,6 +131,23 @@ def remove_terminal_notification(d):
 
 write("terminal-deployment-pending.yaml", delta(remove_terminal_notification))
 write("terminal-notification-rollback.yaml", delta(remove_terminal_notification))
+
+
+def terminal_retry_default_drift(d):
+    d["terminal_retry_policy"]["default"] = "astra-until-approve-v1"
+
+
+def terminal_retry_missing_scope(d):
+    del d["terminal_retry_policy"]["required_card_metadata"]
+
+
+def terminal_retry_missing_human_gate(d):
+    d["terminal_retry_policy"]["human_gates"] = []
+
+
+write("terminal-retry-default-drift.yaml", delta(terminal_retry_default_drift))
+write("terminal-retry-missing-scope.yaml", delta(terminal_retry_missing_scope))
+write("terminal-retry-missing-human-gate.yaml", delta(terminal_retry_missing_human_gate))
 
 
 def drop_cha_pt(d):

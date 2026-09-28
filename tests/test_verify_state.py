@@ -183,10 +183,28 @@ check("--fixture", str(FIXTURES / "deployed-skill-divergence.yaml"), code=1, tex
 # The canonical orchestration policy is versioned and its source-to-live hash
 # enforcement covers the default profile's deployed orchestrator skill.
 orchestrator = (ROOT / "skills" / "multi-agent-coding-orchestrator" / "SKILL.md").read_text()
-assert "version: 0.3.3" in orchestrator
+assert "version: 0.4.0" in orchestrator
 assert "Routing validation and dispatch receipt" in orchestrator
 assert "Authentication expiry blocks a fresh observation" in orchestrator
 assert "currently_actionable" in orchestrator
+# Terminal retry remains an explicit card-scoped v2 policy, never the default.
+assert "version: 0.4.0" in orchestrator
+assert "RETRY_TERMINAL" in orchestrator
+assert "terminal_retry_policy: astra-until-approve-v1" in orchestrator
+assert "glm-review-v2" in orchestrator
+assert "HUMAN_BLOCK" in orchestrator
+assert "Provider, quota, crash, timeout, unavailable-model, and context-exhaustion" in orchestrator
+roster = json.loads((ROOT / "roster.yaml").read_text())
+assert roster["schema_version"] == 2
+assert roster["ladder_version"] == "glm-review-v2"
+assert roster["terminal_retry"]["default"] == "bounded-human-block"
+assert roster["terminal_retry"]["supported_opt_in"] == "astra-until-approve-v1"
+check("--fixture", str(FIXTURES / "terminal-retry-default-drift.yaml"), code=1,
+      text="terminal retry default drift")
+check("--fixture", str(FIXTURES / "terminal-retry-missing-scope.yaml"), code=1,
+      text="terminal retry policy missing required scope")
+check("--fixture", str(FIXTURES / "terminal-retry-missing-human-gate.yaml"), code=1,
+      text="terminal retry policy missing human/infrastructure exclusion")
 # enabled Ponytail on an implementation profile fails with its own diagnostic
 check("--fixture", str(FIXTURES / "ponytail-enabled-drift.yaml"), code=1, text="must be disabled")
 # absent required-disabled Ponytail fails with its own diagnostic

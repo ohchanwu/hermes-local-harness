@@ -158,6 +158,16 @@ The cha-pt and jobcron adapters at the paths in `snapshots/sanitized-current-sta
     ./scripts/verify-state        # must exit 0
     git add -A && git commit -m "Apply <change>"   # commit desired-state change separately from applying
 
+## 9. Authorized Astra terminal-retry upgrade (manual only)
+
+After independent review, copy the exact tracked `skills/multi-agent-coding-orchestrator` tree to
+the default profile and install the exact reviewed `hermes-terminal-outcome-notification` pin on
+every producer profile using supported Hermes plugin commands. Render and reload the reviewed
+notification worker only with separate deployment authorization. Run `./scripts/verify-state`
+after deployment; before rollout, fixture mode is the valid proof and live pin/copy drift is
+expected. Never enable `astra-until-approve-v1` globally: record all three v2 authorization fields
+only on the explicitly authorized card/root campaign.
+
 ## Boundaries
 
 - Do not use this procedure for credentials; authorization happens per profile through the supported interface.

@@ -31,50 +31,50 @@
   },
   "plugins": {
     "default": {
-      "hermes-terminal-outcome-notification": "enabled      git pinned@7d38611e 0.1.0    hermes-terminal-outcome-notification"
+      "hermes-terminal-outcome-notification": "enabled      git pinned@7d38611e 0.2.0    hermes-terminal-outcome-notification"
     },
     "advisor": {},
     "reviewer-sol": {
-      "hermes-terminal-outcome-notification": "enabled      git pinned@7d38611e 0.1.0    hermes-terminal-outcome-notification"
+      "hermes-terminal-outcome-notification": "enabled      git pinned@7d38611e 0.2.0    hermes-terminal-outcome-notification"
     },
     "worker-flash-1": {
-      "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail",
-      "hermes-terminal-outcome-notification": "enabled      git pinned@7d38611e 0.1.0    hermes-terminal-outcome-notification"
+      "hermes-terminal-outcome-notification": "enabled      git pinned@7d38611e 0.2.0    hermes-terminal-outcome-notification",
+      "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail"
     },
     "worker-flash-2": {
-      "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail",
-      "hermes-terminal-outcome-notification": "enabled      git pinned@7d38611e 0.1.0    hermes-terminal-outcome-notification"
+      "hermes-terminal-outcome-notification": "enabled      git pinned@7d38611e 0.2.0    hermes-terminal-outcome-notification",
+      "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail"
     },
     "worker-flash-3": {
-      "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail",
-      "hermes-terminal-outcome-notification": "enabled      git pinned@7d38611e 0.1.0    hermes-terminal-outcome-notification"
+      "hermes-terminal-outcome-notification": "enabled      git pinned@7d38611e 0.2.0    hermes-terminal-outcome-notification",
+      "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail"
     },
     "worker-luna-1": {
-      "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail",
-      "hermes-terminal-outcome-notification": "enabled      git pinned@7d38611e 0.1.0    hermes-terminal-outcome-notification"
+      "hermes-terminal-outcome-notification": "enabled      git pinned@7d38611e 0.2.0    hermes-terminal-outcome-notification",
+      "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail"
     },
     "worker-luna-2": {
-      "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail",
-      "hermes-terminal-outcome-notification": "enabled      git pinned@7d38611e 0.1.0    hermes-terminal-outcome-notification"
+      "hermes-terminal-outcome-notification": "enabled      git pinned@7d38611e 0.2.0    hermes-terminal-outcome-notification",
+      "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail"
     },
     "worker-terra-1": {
-      "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail",
-      "hermes-terminal-outcome-notification": "enabled      git pinned@7d38611e 0.1.0    hermes-terminal-outcome-notification"
+      "hermes-terminal-outcome-notification": "enabled      git pinned@7d38611e 0.2.0    hermes-terminal-outcome-notification",
+      "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail"
     },
     "worker-terra-2": {
       "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail"
     },
     "worker-glm-full": {
-      "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail",
-      "hermes-terminal-outcome-notification": "enabled      git pinned@7d38611e 0.1.0    hermes-terminal-outcome-notification"
+      "hermes-terminal-outcome-notification": "enabled      git pinned@7d38611e 0.2.0    hermes-terminal-outcome-notification",
+      "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail"
     },
     "worker-sol": {
-      "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail",
-      "hermes-terminal-outcome-notification": "enabled      git pinned@7d38611e 0.1.0    hermes-terminal-outcome-notification"
+      "hermes-terminal-outcome-notification": "enabled      git pinned@7d38611e 0.2.0    hermes-terminal-outcome-notification",
+      "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail"
     },
     "worker-astra": {
-      "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail",
-      "hermes-terminal-outcome-notification": "enabled      git pinned@7d38611e 0.1.0    hermes-terminal-outcome-notification"
+      "hermes-terminal-outcome-notification": "enabled      git pinned@7d38611e 0.2.0    hermes-terminal-outcome-notification",
+      "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail"
     }
   },
   "dispatch_profiles": [
@@ -92,7 +92,7 @@
   "skill_files": {
     "multi-agent-coding-orchestrator": {
       "default": {
-        "SKILL.md": "1b71f24b06d64ceba08c17ff5525283051e63dffd4fe48691282380748b64c97",
+        "SKILL.md": "12bdbc9c036dc44f3e807b26118f311a1e6a0304a15e8717d18941b85aea01a0",
         "scripts/set-active-lanes.py": "157419c7c190b0a9f647271f7bd3839182f2e9324f8f9d74e43ec0553a5b77df"
       }
     },
@@ -300,5 +300,30 @@
       "software-development/systematic-debugging/SKILL.md": "e1cca1cb9ad4d73030272aa30d19eb7da7c905997285c9bcad7b7d0c41a996a5",
       "software-development/test-driven-development/SKILL.md": "b1915508f49f0c7c4edad6c939a26d83f3c5fd433a087d20ea10a67480d21a9d"
     }
+  },
+  "terminal_retry_policy": {
+    "default": "bounded-human-block",
+    "supported_opt_in": "astra-until-approve-v1",
+    "required_card_metadata": [
+      "ladder_version: glm-review-v2",
+      "authorization_mode: autonomous",
+      "terminal_retry_policy: astra-until-approve-v1"
+    ],
+    "human_gates": [
+      "user_stop",
+      "product_decision",
+      "credentials_or_prohibited_write",
+      "unsafe_state",
+      "capability_boundary",
+      "policy_legal_security"
+    ],
+    "infrastructure_exclusions": [
+      "provider",
+      "quota",
+      "crash",
+      "timeout",
+      "context_exhaustion"
+    ],
+    "terminal_assignee": "worker-astra"
   }
 }

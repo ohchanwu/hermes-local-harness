@@ -1,5 +1,5 @@
 name: hermes-terminal-outcome-notification
-version: "0.1.0"
+version: "0.2.0"
 description: Durable zero-LLM notifications for explicitly watched terminal outcomes.
 provides_tools:
   - arm_campaign

@@ -270,7 +270,8 @@
   "adapters": [
     {
       "repo": "cha-pt",
-      "content": ""
+      "content": "# Cha PT adapter\n**Status: operational; local repository adoption validated.**\n",
+      "record": "/Users/chanbla11mit/projects/cha-pt/docs/specs/260919-hermes-orchestration-transition.md\nStatus: operational, local adoption validated."
     },
     {
       "repo": "jobcron",
@@ -301,11 +302,6 @@
   "terminal_retry_policy": {
     "default": "bounded-human-block",
     "supported_opt_in": "astra-until-approve-v1",
-    "required_card_metadata": [
-      "ladder_version: glm-review-v2",
-      "authorization_mode: autonomous",
-      "terminal_retry_policy: astra-until-approve-v1"
-    ],
     "human_gates": [
       "user_stop",
       "product_decision",
