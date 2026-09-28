@@ -9,7 +9,7 @@ desired = json.loads((Path(__file__).resolve().parents[1] / "snapshots" / "sanit
 IMPL = ["worker-flash-1", "worker-flash-2", "worker-flash-3", "worker-luna-1", "worker-luna-2",
         "worker-terra-1", "worker-terra-2", "worker-glm-full", "worker-sol", "worker-astra"]
 NOTIF = "hermes-terminal-outcome-notification"
-ENABLED_NOTIF = f"enabled      git pinned@5914ec8 0.2.0    {NOTIF}"
+ENABLED_NOTIF = f"enabled      git pinned@a627cdd 0.2.0    {NOTIF}"
 DISABLED_PONY = "disabled     git pinned@16f29800 4.8.4    ponytail"
 ENABLED_PONY = "enabled      git pinned@16f29800 4.8.4    ponytail"
 
@@ -72,7 +72,7 @@ write("unexpected-plugin.yaml", delta(rogue))
 
 
 def missing_required(d):
-    d["plugins"]["worker-luna-1"]["hermes-terminal-outcome-notification"] = f"disabled     git pinned@5914ec8 0.2.0    {NOTIF}"
+    d["plugins"]["worker-luna-1"]["hermes-terminal-outcome-notification"] = f"disabled     git pinned@a627cdd 0.2.0    {NOTIF}"
 
 
 write("missing-plugin.yaml", delta(missing_required))
