@@ -108,7 +108,7 @@ Hermes skills load per profile: worker profiles read only `~/.hermes/profiles/<p
       cp skills/simplification-review/SKILL.md ~/.hermes/profiles/$profile/skills/software-development/simplification-review/SKILL.md
     done
 
-Every deployed copy must match the tracked hashes in `snapshots/sanitized-current-state.yaml`; its `deploy_profiles` lists exactly which profile homes host each skill, and `./scripts/verify-state` hashes each copy and fails on a missing or divergent one. Reviewer and advisor profiles never receive `minimal-implementation`; the orchestrator attaches it per card per the routing policy in `skills/multi-agent-coding-orchestrator/SKILL.md`.
+Every deployed copy must match the tracked hashes in `snapshots/sanitized-current-state.yaml`; its `deploy_profiles` lists exactly which profile homes host each skill, and `./scripts/verify-state` hashes each copy and fails on a missing or divergent one. Copy the reviewed tracked source only; do not patch a live skill. After copying, run `./scripts/verify-state` so source and deployed copies are identical. Reviewer and advisor profiles never receive `minimal-implementation`; the orchestrator attaches it per card per the routing policy in `skills/multi-agent-coding-orchestrator/SKILL.md`.
 
 ## 4b. Interactive Claude/Codex sessions (manual live-state step)
 

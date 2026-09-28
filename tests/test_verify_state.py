@@ -177,6 +177,13 @@ check("--fixture", str(FIXTURES / "terminal-notification-rollback.yaml"), code=1
 check("--fixture", str(FIXTURES / "plugin-pin-drift.yaml"), code=1, text="expected pinned 4.8.4@16f29800")
 # deployed skill hash divergence from tracked canonical source fails
 check("--fixture", str(FIXTURES / "deployed-skill-divergence.yaml"), code=1, text="deployed skill hash mismatch")
+# The canonical orchestration policy is versioned and its source-to-live hash
+# enforcement covers the default profile's deployed orchestrator skill.
+orchestrator = (ROOT / "skills" / "multi-agent-coding-orchestrator" / "SKILL.md").read_text()
+assert "version: 0.3.3" in orchestrator
+assert "Routing validation and dispatch receipt" in orchestrator
+assert "Authentication expiry blocks a fresh observation" in orchestrator
+assert "currently_actionable" in orchestrator
 # enabled Ponytail on an implementation profile fails with its own diagnostic
 check("--fixture", str(FIXTURES / "ponytail-enabled-drift.yaml"), code=1, text="must be disabled")
 # absent required-disabled Ponytail fails with its own diagnostic

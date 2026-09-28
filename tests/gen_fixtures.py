@@ -5,7 +5,7 @@ from pathlib import Path
 fx = Path(__file__).resolve().parent / "fixtures"
 clean = json.loads((fx / "clean.yaml").read_text())
 
-ORCH_SKILL_SHA = "d8ae3833d3035f701d473bb406757ba01f97e4ca88672db43c1f22b45f1abd0c"
+ORCH_SKILL_SHA = "8dac8f2d8e9e05d11a24f6cc795bac5da7bb373b177ba0c146430cb9bef57655"
 ORCH_HELPER_SHA = "157419c7c190b0a9f647271f7bd3839182f2e9324f8f9d74e43ec0553a5b77df"
 MINIMPL_SKILL_SHA = "a017ca2b203644ce6d5bd688c0b06875bbbe3908fe9dc6212ff39098ab53d794"
 SIMPREV_SKILL_SHA = "d058cd37b2cf161097dfc51eafd373414603f5feb22ff22e8fe1e198679edb47"
@@ -107,7 +107,7 @@ write("ponytail-absent-drift.yaml", delta(ponytail_absent))
 
 def skill_divergence(d):
     set_skill_files(d)
-    d["skill_files"]["minimal-implementation"]["worker-flash-1"]["SKILL.md"] = "0" * 64
+    d["skill_files"]["multi-agent-coding-orchestrator"]["default"]["SKILL.md"] = "0" * 64
 
 
 write("deployed-skill-divergence.yaml", delta(skill_divergence))

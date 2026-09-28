@@ -92,13 +92,13 @@
   "skill_files": {
     "multi-agent-coding-orchestrator": {
       "default": {
-        "SKILL.md": "d8ae3833d3035f701d473bb406757ba01f97e4ca88672db43c1f22b45f1abd0c",
+        "SKILL.md": "0000000000000000000000000000000000000000000000000000000000000000",
         "scripts/set-active-lanes.py": "157419c7c190b0a9f647271f7bd3839182f2e9324f8f9d74e43ec0553a5b77df"
       }
     },
     "minimal-implementation": {
       "worker-flash-1": {
-        "SKILL.md": "0000000000000000000000000000000000000000000000000000000000000000"
+        "SKILL.md": "a017ca2b203644ce6d5bd688c0b06875bbbe3908fe9dc6212ff39098ab53d794"
       },
       "worker-flash-2": {
         "SKILL.md": "a017ca2b203644ce6d5bd688c0b06875bbbe3908fe9dc6212ff39098ab53d794"

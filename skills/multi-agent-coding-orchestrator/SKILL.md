@@ -1,7 +1,7 @@
 ---
 name: multi-agent-coding-orchestrator
 description: "Use when orchestrating multi-agent coding with Hermes."
-version: 0.3.1
+version: 0.3.3
 author: chanbla11mit, Hermes Agent
 license: MIT
 platforms: [macos]
@@ -122,6 +122,18 @@ For `ESCALATE_RESTART`:
 
 Never delete rejected work merely because the next model starts clean. The same card remains the audit trail across all rungs.
 
+### Routing validation and dispatch receipt
+
+Before creating or reassigning a card, resolve the destination from the Fixed Roster and verify the exact profile id against live `hermes profile list` output. Never invent an id from a naming pattern. Do not use `hermes kanban assignees` as proof that a profile exists: it also includes names retained on cards, including stale or invalid assignees. If the exact profile is absent, stop and correct the route before mutating the card.
+
+After activating a lane and assigning or promoting a card intended to run immediately:
+
+1. Read the card back and verify its exact assignee, eligible status, dependency state, and that the destination profile is active in `kanban.dispatch_profiles`.
+2. Within two normal gateway dispatcher ticks, read the card and run history again. Require a new claimed/run record, or a terminal transition tied to that new run if the worker finished quickly.
+3. If no new run appears, treat routing as failed: inspect profile existence, active lanes, parents, scheduling, concurrency, and card events. Report the exact blocker; never say the worker started merely because reassignment or promotion succeeded.
+
+Do not force a manual dispatcher pass while the gateway dispatcher is active; observe its normal ticks.
+
 ## Five-Lane Implementation Pool
 
 Installed profiles are capacity, not running work. Enforce a maximum of five simultaneous implementation runs with native per-profile capacity and a five-profile active allowlist:
@@ -169,6 +181,35 @@ Begin only when both conditions are true:
 For work expected to last hours or days, send the approved specification through an independent `reviewer-sol` preflight before dispatching implementation.
 
 Authorization covers local branches, worktrees, commits, tests, and recoverable local destructive operations. It never covers pushes, PR creation, deployments, production mutations, messages beyond the configured progress protocol, purchases, credential changes, or other external writes.
+
+## Operator Effort and Evidence Lifecycle
+
+Do not manufacture manual work. Recommend an operator action only when all of these are true:
+
+1. It is necessary to pass the current authorized gate.
+2. Existing evidence for the affected surface was invalidated by a relevant observed change, not merely elapsed time or authentication expiry.
+3. The agent cannot perform the action under its authorization and capabilities.
+4. The decision value exceeds the operator effort.
+
+Authentication expiry blocks a fresh observation; it does not erase evidence already recorded. Revalidate only the affected surface, and only after a relevant invalidating event or immediately before the next materially dependent authorized mutation. Do not use a precautionary recheck to replace a completed, blocked, or still-valid check.
+
+For production deployment, treat prior verified deployment evidence as valid until a relevant observed deployment/configuration change invalidates its affected surface. Do not ask an operator to log in or recheck solely because a token expired. A fresh production observation is required only at the next materially dependent authorized deployment mutation or after the relevant invalidating event; this policy does not authorize that mutation.
+
+Maintain a lightweight campaign checkpoint in the task body or structured comment:
+
+- `completed`: checks/actions with accepted evidence.
+- `currently_actionable`: authorized work that can usefully proceed now.
+- `blocked_by`: the exact unmet gate, if any.
+- `next_gate`: the gate after `currently_actionable` completes.
+- `evidence_invalidation_events`: relevant observed changes and their affected surfaces.
+
+Derive “what next?” from `currently_actionable`. After filtering completed, blocked, and uninvalidated checks, an empty list is a valid completion: say directly that nothing useful remains. Do not create a campaign database, plugin, or precautionary task for this convention.
+
+### Examples
+
+- GOOD — Rules were verified and the token later expires: retain the verified rules evidence. If no materially dependent authorized mutation is next, `currently_actionable` is empty: nothing useful remains. BAD — ask the operator to recheck rules solely because the token expired.
+- GOOD — A GitHub App installation changes but does not affect repository rules: record it only if relevant to a later gate; do not recheck rules. BAD — treat an unrelated App installation as ruleset evidence drift.
+- GOOD — A ruleset edit is observed: add a ruleset invalidation event and revalidate only the affected ruleset before its next materially dependent authorized mutation. BAD — recheck every repository, deployment, and unrelated control surface.
 
 ## Cross-Session Startup
 
