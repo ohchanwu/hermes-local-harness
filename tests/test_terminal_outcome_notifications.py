@@ -362,6 +362,37 @@ def test_opted_in_structured_terminal_retry_is_cancelled_not_notified():
     tmp.cleanup()
 
 
+def test_claimed_attempt_retains_durable_terminal_retry_generation():
+    tmp, store = fresh()
+    store.watch_task("t1", "Root")
+    store.claimed("t1", run_id=6)  # notifier delivery generation advances to 2
+    retry = _terminal_retry(generation=1, run=6)
+    store.kanban_blocked("t1", json.dumps(retry), run_id=6)
+    sent = []
+    w = Worker(store, telegram=lambda b: sent.append(b), macos=lambda t, b: sent.append(b),
+               state_reader=lambda _: {"status": "blocked", "block_kind": "transient",
+                                       "current_run_id": 6, "max_run_id": 6,
+                                       "reason": json.dumps(retry)})
+    assert w.drain_once() == 0 and sent == []
+    assert all(r["cancelled_at"] for r in store.status())
+    tmp.cleanup()
+
+
+def test_stale_durable_terminal_retry_generation_does_not_suppress_human_block():
+    tmp, store = fresh()
+    store.watch_task("t1", "Root")
+    store.claimed("t1", run_id=6)
+    retry = _terminal_retry(generation=2, run=6)
+    store.kanban_blocked("t1", json.dumps(retry), run_id=6)
+    sent = []
+    w = Worker(store, telegram=lambda b: sent.append(b), macos=lambda t, b: sent.append(b),
+               state_reader=lambda _: {"status": "blocked", "block_kind": "transient",
+                                       "current_run_id": 6, "max_run_id": 6,
+                                       "reason": json.dumps(retry)})
+    assert w.drain_once() == 2 and len(sent) == 2
+    tmp.cleanup()
+
+
 def test_terminal_retry_marker_with_missing_or_stale_fence_does_not_suppress_human_block():
     for retry in ({"verdict": "RETRY_TERMINAL", "rung": "astra"},
                   _terminal_retry(task_id="other-task"),

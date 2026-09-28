@@ -50,7 +50,7 @@ def _is_current_terminal_retry(state: dict[str, Any]) -> bool:
         and all(isinstance(verdict.get(field), str) and verdict[field] for field in required_text)
         and isinstance(verdict.get("campaign_generation"), int)
         and verdict["root_task_id"] == state.get("_notification_task_id")
-        and verdict["campaign_generation"] == state.get("_notification_generation")
+        and verdict["campaign_generation"] == state.get("_notification_terminal_retry_generation")
         and all(isinstance(verdict.get(field), str) and SHA40.fullmatch(verdict[field]) for field in required_sha)
         and verdict["rejected_candidate_sha"] == state.get("_notification_candidate_sha")
         and isinstance(verdict.get("findings"), list)
@@ -108,7 +108,8 @@ class Store:
             db.executescript("""
                 CREATE TABLE IF NOT EXISTS campaigns (
                   campaign_id TEXT PRIMARY KEY, session_id TEXT UNIQUE, task_id TEXT UNIQUE,
-                  generation INTEGER NOT NULL DEFAULT 1, title TEXT NOT NULL, lane TEXT,
+                  generation INTEGER NOT NULL DEFAULT 1, terminal_retry_generation INTEGER NOT NULL DEFAULT 1,
+                  title TEXT NOT NULL, lane TEXT,
                   armed_at INTEGER NOT NULL, proposal_status TEXT, proposal_summary TEXT,
                   candidate_response TEXT, stopped_reason TEXT, disarmed_at INTEGER,
                   last_activity_at INTEGER NOT NULL DEFAULT 0
@@ -130,6 +131,7 @@ class Store:
                 );
             """)
             self._add_column(db, "campaigns", "last_activity_at", "INTEGER NOT NULL DEFAULT 0")
+            self._add_column(db, "campaigns", "terminal_retry_generation", "INTEGER NOT NULL DEFAULT 1")
             self._add_column(db, "events", "evidence_run_id", "INTEGER")
             self._add_column(db, "events", "evidence_candidate_sha", "TEXT")
             self._add_column(db, "deliveries", "available_at", "INTEGER NOT NULL DEFAULT 0")
@@ -315,7 +317,8 @@ class Store:
         Returns 'send', 'retain' (board unavailable — retry, never cancel), or 'cancel'."""
         with self._connect() as db:
             row = db.execute("""SELECT e.event_id, e.task_id, e.generation, e.evidence_run_id, e.evidence_candidate_sha,
-                                       c.generation AS campaign_generation
+                                       c.generation AS campaign_generation,
+                                       c.terminal_retry_generation
                                 FROM events e JOIN campaigns c ON c.campaign_id = e.campaign_id
                                 WHERE e.event_id=? AND e.cancelled_at IS NULL""", (event_id,)).fetchone()
             if not row or not row["task_id"]:
@@ -335,6 +338,7 @@ class Store:
                 return cancel("watched task no longer exists on the board")
             state = {**state, "_notification_task_id": row["task_id"],
                      "_notification_generation": row["generation"],
+                     "_notification_terminal_retry_generation": row["terminal_retry_generation"],
                      "_notification_candidate_sha": row["evidence_candidate_sha"]}
             evidence_run = row["evidence_run_id"]
             if evidence_run is not None:
