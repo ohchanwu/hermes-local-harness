@@ -408,6 +408,8 @@ Because Kanban completion and block hooks fire in the process that drives the tr
 
 Any implementation change requires independent `reviewer-sol` review before local integration. Enabling the plugin, installing or loading the LaunchAgent, changing live profile configuration, or sending test notifications are deployment/external effects and require their own explicit authorization.
 
+The reviewed local v0.2.0 candidate pin is `b0fba955e274465f811123fc5611d2395775b5b0`; publication and profile installation remain separate authorized actions.
+
 ## 16. Implementation sequence
 
 ### Phase 0: control-repository integration

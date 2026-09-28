@@ -49,3 +49,6 @@ at-least-once contract permits one duplicate only if a destination accepts a mes
 process crashes before recording success.
 
 No private target, token, transcript, or runtime database belongs in this repository.
+
+The reviewed local candidate pin for this release is `b0fba955e274465f811123fc5611d2395775b5b0`.
+Publishing or installing that candidate remains separately authorization-gated.
