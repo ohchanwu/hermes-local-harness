@@ -128,9 +128,11 @@ A block is notification-worthy when human attention is required, including:
 
 An exact, current-run-fenced `RETRY_TERMINAL` verdict for an opted-in `glm-review-v2` autonomous
 Astra campaign is explicitly non-human: it cancels any pending block candidate. The classifier
-must require the complete structured marker, including `strategy`, `rung: astra`,
-`terminal_retry_policy: astra-until-approve-v1`, and matching review run; a malformed, stale, v1,
-or side-by-side marker must fail closed to the ordinary block policy.
+must require the complete structured marker, including the root task, campaign generation,
+repository, protected baseline, worktree/branch, rejected candidate SHA, review run, attribution,
+concrete findings, `strategy`, `rung: astra`, and `terminal_retry_policy: astra-until-approve-v1`.
+`needs_input` and `capability` remain human-relevant even if the reason contains such a marker; a
+malformed, stale, v1, or side-by-side marker must fail closed to the ordinary block policy.
 
 ### 6.2 Suppress
 
@@ -408,7 +410,7 @@ Because Kanban completion and block hooks fire in the process that drives the tr
 
 Any implementation change requires independent `reviewer-sol` review before local integration. Enabling the plugin, installing or loading the LaunchAgent, changing live profile configuration, or sending test notifications are deployment/external effects and require their own explicit authorization.
 
-The reviewed local v0.2.0 candidate pin is `b0fba955e274465f811123fc5611d2395775b5b0`; publication and profile installation remain separate authorized actions.
+The reviewed local v0.2.0 candidate pin is `377c178646034949917e4643f4ebb011f77b2d23`; publication and profile installation remain separate authorized actions.
 
 ## 16. Implementation sequence
 

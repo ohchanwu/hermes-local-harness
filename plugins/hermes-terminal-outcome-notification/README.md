@@ -29,11 +29,14 @@ escalate to a visible `failed` row. A stranded armed direct turn (crash/hard kil
 evidence) or fail-closed `unknown` — never `completed`.
 
 An automatic Astra terminal retry is not a human block. Before the ordinary blocker heuristics,
-the worker recognizes only an exact JSON `RETRY_TERMINAL` verdict fenced to the current run with
-`strategy`, `rung: astra`, `ladder_version: glm-review-v2`, `authorization_mode: autonomous`,
-and `terminal_retry_policy: astra-until-approve-v1`. Malformed, stale, v1, side-by-side, or prose
-markers fail closed to ordinary human-block classification; a valid retry cancels the pending
-candidate and the next claimed run advances the notification generation.
+the worker recognizes only an exact JSON `RETRY_TERMINAL` verdict fenced to the current task,
+campaign generation, rejected candidate SHA, and review run, with `strategy`, `rung: astra`,
+`ladder_version: glm-review-v2`, `authorization_mode: autonomous`,
+`terminal_retry_policy: astra-until-approve-v1`, repository, protected baseline, worktree/branch,
+attribution, and concrete findings. `needs_input` and `capability` always remain human blocks.
+Malformed, stale, v1, side-by-side, or prose markers fail closed to ordinary human-block
+classification; a valid retry cancels the pending candidate and the next claimed run advances the
+notification generation.
 
 Producers and the LaunchAgent must use the same absolute `HERMES_TERMINAL_OUTBOX` path. The worker
 also needs `HERMES_KANBAN_DB` (or `--kanban-db`) to recheck human-relevant block finality. Its
@@ -50,5 +53,5 @@ process crashes before recording success.
 
 No private target, token, transcript, or runtime database belongs in this repository.
 
-The reviewed local candidate pin for this release is `b0fba955e274465f811123fc5611d2395775b5b0`.
+The reviewed local candidate pin for this release is `377c178646034949917e4643f4ebb011f77b2d23`.
 Publishing or installing that candidate remains separately authorization-gated.
