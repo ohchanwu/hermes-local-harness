@@ -308,8 +308,12 @@ assert result.returncode == 1 and json.loads(result.stdout)["missing"] == ["miss
 
 # Rollback runbook contract: every restore command must name an existing backup
 # source and an existing destination parent, and the runbook must never widen
-# permissions. Guards against the placeholder `cp -R` failure mode the human
-# reviewer flagged.
+# permissions. Every install -d command must carry the mode its path requires
+# (scoped roots 0700, nested payload/skill dirs 0755), appear exactly once per
+# path, order all 0700 commands before any 0755 one, and stay non-widening
+# against the live directory it would recreate. Guards against the placeholder
+# `cp -R` failure mode the human reviewer flagged and the contradictory-mode
+# failure mode reviewer-sol flagged in run 376.
 def test_rollback_runbook():
     import re as _re
     home = Path.home()
@@ -324,14 +328,59 @@ def test_rollback_runbook():
         assert dest.parent.is_dir(), f"restore destination parent missing: {dest.parent}"
         assert ".." not in cmd and "cp -R" not in cmd, f"non-specific restore command: {cmd}"
         assert str(home) in str(source) and str(home) in str(dest), f"restore outside home: {cmd}"
-    assert "install -d -m 700" in runbook and "install -d -m 755" in runbook
     assert "cp -R" not in runbook
+
+    # install -d contract: expected mode per path, uniqueness, phase ordering,
+    # non-widening vs the live tree.
+    def expected_mode(path: Path) -> str:
+        parts = path.relative_to(home).parts
+        assert parts[0] == ".hermes", f"recreation outside ~/.hermes: {path}"
+        if parts in ((".hermes", "plugins"), (".hermes", "skills")):
+            return "700"
+        if parts[:2] == (".hermes", "profiles") and (
+                len(parts) == 3 or (len(parts) == 4 and parts[3] in ("plugins", "skills"))):
+            return "700"  # profile home or profile-scoped root
+        return "755"      # nested payload/skill directory
+
+    inst = [(m.group(1), Path(m.group(2))) for m in
+            _re.finditer(r'^\s+install -d -m (\d{3}) "([^"]+)"$', runbook, _re.M)]
+    assert len(inst) >= 30, f"expected >=30 install -d commands, got {len(inst)}"
+    seen = {}
+    for mode, path in inst:
+        key = str(path)
+        assert key not in seen, f"duplicate/conflicting install command for {key}"
+        seen[key] = mode
+        want = expected_mode(path)
+        assert mode == want, f"{path}: expected -m {want}, got {mode}"
+        if path.is_dir():
+            live = path.stat().st_mode & 0o777
+            assert (int(mode, 8) & live) == int(mode, 8), \
+                f"widening recreation for {path} (live {live:o}, recreate {mode})"
+        else:
+            assert path.parent.is_dir(), f"recreation target parent missing: {path}"
+    modes = [m for m, _ in inst]
+    assert "700" in modes and "755" in modes
+    last700 = max(i for i, m in enumerate(modes) if m == "700")
+    first755 = min(i for i, m in enumerate(modes) if m == "755")
+    assert last700 < first755, "every 0700 recreation command must precede every 0755 one"
+
     # mode contract: files 0644, orchestrator SKILL.md 0600, private trees stay 0700
     for probe in ("harness-drift-backups/20261002T064500+0900",
                   "harness-skill-backups/20261002T063137+0900"):
         tree = home / ".hermes/private" / probe
         assert tree.is_dir(), f"backup tree missing: {tree}"
         assert (tree.stat().st_mode & 0o777) == 0o700, f"backup tree widened: {tree}"
+    # the runbook's mode description must match the trees it describes: per-
+    # profile dirs 0700, nested dirs 0755, files 0644 (0600 SKILL.md.v0.3.3)
+    drift = home / ".hermes/private/harness-drift-backups/20261002T064500+0900"
+    assert all((p.stat().st_mode & 0o777) == 0o700
+               for p in drift.iterdir() if p.is_dir()), "per-profile backup dirs must be 0700"
+    nested = [p for p in drift.rglob("*") if p.is_dir() and p.parent != drift]
+    assert nested and all((p.stat().st_mode & 0o777) == 0o755 for p in nested)
+    files = [p for p in drift.rglob("*") if p.is_file()]
+    assert files and all((p.stat().st_mode & 0o777) == 0o644 for p in files)
+    v033 = home / ".hermes/private/harness-skill-backups/20261002T063137+0900/SKILL.md.v0.3.3"
+    assert v033.is_file() and (v033.stat().st_mode & 0o777) == 0o600
 
 
 test_rollback_runbook()
