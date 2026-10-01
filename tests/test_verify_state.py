@@ -305,4 +305,35 @@ assert result.returncode == 1 and json.loads(result.stdout)["missing"] == ["miss
 result = forced_skill_check("production-deployment", "missing")
 assert result.returncode == 1 and json.loads(result.stdout)["missing"] == ["missing"], result.stdout + result.stderr
 
+
+# Rollback runbook contract: every restore command must name an existing backup
+# source and an existing destination parent, and the runbook must never widen
+# permissions. Guards against the placeholder `cp -R` failure mode the human
+# reviewer flagged.
+def test_rollback_runbook():
+    import re as _re
+    home = Path.home()
+    runbook = (ROOT / "procedures" / "rollback-restore.md").read_text()
+    cp_cmds = [ln.strip() for ln in runbook.splitlines() if ln.strip().startswith("cp -p ")]
+    assert len(cp_cmds) >= 65, f"expected >=65 explicit restore commands, got {len(cp_cmds)}"
+    for cmd in cp_cmds:
+        src = _re.search(r'cp -p "([^"]+)" "([^"]+)"', cmd)
+        assert src, f"unparseable restore command: {cmd}"
+        source, dest = Path(src.group(1)), Path(src.group(2))
+        assert source.is_file(), f"restore source missing: {source}"
+        assert dest.parent.is_dir(), f"restore destination parent missing: {dest.parent}"
+        assert ".." not in cmd and "cp -R" not in cmd, f"non-specific restore command: {cmd}"
+        assert str(home) in str(source) and str(home) in str(dest), f"restore outside home: {cmd}"
+    assert "install -d -m 700" in runbook and "install -d -m 755" in runbook
+    assert "cp -R" not in runbook
+    # mode contract: files 0644, orchestrator SKILL.md 0600, private trees stay 0700
+    for probe in ("harness-drift-backups/20261002T064500+0900",
+                  "harness-skill-backups/20261002T063137+0900"):
+        tree = home / ".hermes/private" / probe
+        assert tree.is_dir(), f"backup tree missing: {tree}"
+        assert (tree.stat().st_mode & 0o777) == 0o700, f"backup tree widened: {tree}"
+
+
+test_rollback_runbook()
+
 print("ok")

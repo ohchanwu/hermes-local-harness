@@ -9,6 +9,8 @@ Global settings are scoped: always pass `-p default` explicitly so results do no
     hermes -p default config path          # note config location
     git -C ~/.hermes/hermes-agent rev-parse HEAD   # record source commit (expect 7c6f21a5e12ba9b1c674ec9b410fa6b8c45de4f8)
     # create a private snapshot outside Git per decisions/260920-harness-baseline.md; never snapshot into this repo
+    # exact per-profile/path restore commands for the timestamped trees under
+    # ~/.hermes/private live in procedures/rollback-restore.md
 
 ## 1. Profiles
 
