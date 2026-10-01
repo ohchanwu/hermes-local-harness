@@ -1,6 +1,6 @@
 # Cha PT adoption
 
-Adapter: `/Users/chanbla11mit/projects/cha-pt/docs/specs/260919-hermes-orchestration-transition.md`.
+Adapter: `/Users/chanbla11mit/projects/cha-pt/docs/archive/260919-hermes-orchestration-transition.md` (archived lifecycle location after the repository's docs taxonomy migration; the adapter content is unchanged).
 
 Status: operational, local adoption validated. It delegates fleet policy to the canonical skill and leaves profile selection/authority to Kanban cards. Use the clean canonical checkout under `/Users/chanbla11mit/projects/cha-pt`; use an assigned worktree for implementation. Task-scoped `minimal-implementation` (Ponytail plugin disabled on implementation profiles), loopback-only headless preview, public-safe records, sanitized/local data, and Go verification (`go test ./...`, `go vet ./...`, `gofmt -l .`) are repository-specific.
 

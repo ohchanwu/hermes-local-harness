@@ -31,49 +31,49 @@
   },
   "plugins": {
     "default": {
-      "hermes-terminal-outcome-notification": "enabled      git pinned@6ae2bf2 0.2.0    hermes-terminal-outcome-notification"
+      "hermes-terminal-outcome-notification": "enabled      git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification"
     },
     "advisor": {},
     "reviewer-sol": {
-      "hermes-terminal-outcome-notification": "enabled      git pinned@6ae2bf2 0.2.0    hermes-terminal-outcome-notification"
+      "hermes-terminal-outcome-notification": "enabled      git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification"
     },
     "worker-flash-1": {
-      "hermes-terminal-outcome-notification": "enabled      git pinned@6ae2bf2 0.2.0    hermes-terminal-outcome-notification",
+      "hermes-terminal-outcome-notification": "enabled      git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification",
       "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail"
     },
     "worker-flash-2": {
-      "hermes-terminal-outcome-notification": "enabled      git pinned@6ae2bf2 0.2.0    hermes-terminal-outcome-notification",
+      "hermes-terminal-outcome-notification": "enabled      git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification",
       "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail"
     },
     "worker-flash-3": {
-      "hermes-terminal-outcome-notification": "enabled      git pinned@6ae2bf2 0.2.0    hermes-terminal-outcome-notification",
+      "hermes-terminal-outcome-notification": "enabled      git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification",
       "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail"
     },
     "worker-luna-1": {
-      "hermes-terminal-outcome-notification": "enabled      git pinned@6ae2bf2 0.2.0    hermes-terminal-outcome-notification",
+      "hermes-terminal-outcome-notification": "enabled      git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification",
       "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail"
     },
     "worker-luna-2": {
-      "hermes-terminal-outcome-notification": "enabled      git pinned@6ae2bf2 0.2.0    hermes-terminal-outcome-notification",
+      "hermes-terminal-outcome-notification": "enabled      git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification",
       "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail"
     },
     "worker-terra-1": {
-      "hermes-terminal-outcome-notification": "enabled      git pinned@6ae2bf2 0.2.0    hermes-terminal-outcome-notification",
+      "hermes-terminal-outcome-notification": "enabled      git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification",
       "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail"
     },
     "worker-terra-2": {
       "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail"
     },
     "worker-glm-full": {
-      "hermes-terminal-outcome-notification": "enabled      git pinned@6ae2bf2 0.2.0    hermes-terminal-outcome-notification",
+      "hermes-terminal-outcome-notification": "enabled      git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification",
       "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail"
     },
     "worker-sol": {
-      "hermes-terminal-outcome-notification": "enabled      git pinned@6ae2bf2 0.2.0    hermes-terminal-outcome-notification",
+      "hermes-terminal-outcome-notification": "enabled      git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification",
       "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail"
     },
     "worker-astra": {
-      "hermes-terminal-outcome-notification": "enabled      git pinned@6ae2bf2 0.2.0    hermes-terminal-outcome-notification",
+      "hermes-terminal-outcome-notification": "enabled      git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification",
       "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail"
     }
   },
@@ -268,12 +268,12 @@
     {
       "repo": "cha-pt",
       "content": "# Cha PT adapter\n**Status: operational; local repository adoption validated.**\n",
-      "record": "/Users/chanbla11mit/projects/cha-pt/docs/specs/260919-hermes-orchestration-transition.md\nStatus: operational, local adoption validated."
+      "record": "/Users/chanbla11mit/projects/cha-pt/docs/archive/260919-hermes-orchestration-transition.md\nStatus: operational, local adoption validated."
     },
     {
       "repo": "jobcron",
-      "content": "# Jobcron adapter\n**Status: operational; local repository adoption validated.**\n",
-      "record": "/Users/chanbla11mit/projects/jobcron/docs/specs/260919-hermes-orchestration-transition.md\nStatus: operational, local adoption validated."
+      "content": "# Jobcron adapter\n**Status: archived; the transition it records is complete and was validated.**\n",
+      "record": "/Users/chanbla11mit/projects/jobcron/docs/archive/2026-09-24-hermes-orchestration-transition/260919-hermes-orchestration-transition.md\nStatus: operational, local adoption validated."
     }
   ],
   "terminal_notification_runtime": {
@@ -292,8 +292,8 @@
   "profile_local_skill_overrides": {
     "worker-astra": {
       "software-development/spike/SKILL.md": "64992df7588a511575cb4abb0615fed075a6f12bf0dc7df720deda6c942c9e27",
-      "software-development/systematic-debugging/SKILL.md": "e1cca1cb9ad4d73030272aa30d19eb7da7c905997285c9bcad7b7d0c41a996a5",
-      "software-development/test-driven-development/SKILL.md": "b1915508f49f0c7c4edad6c939a26d83f3c5fd433a087d20ea10a67480d21a9d"
+      "software-development/systematic-debugging/SKILL.md": "ba44896266af82366bcf316398282bfc792de1ced4d781be22d1406228d1a215",
+      "software-development/test-driven-development/SKILL.md": "9e9a4bb630506f4f3b4ff19cca80bb464e57db19b8a175959388d2112fc096ff"
     }
   },
   "terminal_retry_policy": {

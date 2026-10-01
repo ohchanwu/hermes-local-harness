@@ -55,6 +55,32 @@ def plugin_state(text):
     return state
 
 
+def full_pin_errors(profile, pinned):
+    """Full-commit pin provenance: the CLI display truncates, so read the install
+    metadata the plugin manager itself maintains and require the exact revision.
+    Returns a list of error messages (empty when the exact pin is proven)."""
+    if not pinned:
+        return []
+    want_commit, want_version = pinned["pinned_commit"], pinned["version"]
+    home = Path.home() / ".hermes"
+    if profile == "default":
+        meta_path = home / "plugins" / ".install-metadata.json"
+    else:
+        meta_path = home / "profiles" / profile / "plugins" / ".install-metadata.json"
+    try:
+        meta = json.loads(meta_path.read_text())
+    except (OSError, json.JSONDecodeError):
+        return [f"plugin drift {profile}: unable to read install metadata for full pin verification"]
+    entry = meta.get(pinned["name"]) if isinstance(meta, dict) else None
+    if not isinstance(entry, dict):
+        return [f"plugin drift {profile}: {pinned['name']} missing from install metadata"]
+    errors = []
+    if entry.get("pinned") is not True or entry.get("revision") != want_commit:
+        errors.append(f"plugin drift {profile}: {pinned['name']} install metadata not pinned at "
+                      f"{want_commit} (pinned={entry.get('pinned')!r}, revision={entry.get('revision')!r})")
+    return errors
+
+
 def check_plugins(errors, warnings, profile, expected, observed_plugins, pinned_plugins=None,
                   required_disabled=None):
     """expected: required plugin names; observed_plugins: {name: status-or-line} or list of enabled names.
@@ -150,7 +176,13 @@ ADOPTION_REPOS = {"cha-pt": "adoption/cha-pt.md", "jobcron": "adoption/jobcron.m
 
 
 def check_adoption(errors, adapters):
-    """adapters: fixture list of {repo, content, record}; None means read live adapter files."""
+    """adapters: fixture list of {repo, content, record}; None means read live adapter files.
+
+    Adapters are verified at their canonical archived lifecycle locations: the
+    marker is the adapter's own lifecycle-status line (operational for a still-
+    active adapter, archived for one whose recorded transition completed and was
+    validated), never a fabricated status. The tracked harness adoption record
+    must still carry the path and the operational adoption validation marker."""
     for adapter in load(ROOT / "snapshots/sanitized-current-state.yaml")["adoption"]["adapters"]:
         repo, want_path, marker = adapter["repo"], adapter["path"], adapter["marker"]
         record_marker = adapter["record_marker"]
@@ -543,6 +575,9 @@ def main():
                     state = plugin_state(plugins.stdout)
                     if name in snapshot["terminal_notification"]["producer_profiles"]:
                         check_terminal_notification_observed(errors, {name: state}, [name])
+                        for message in full_pin_errors(name, snapshot["plugins"].get(
+                                "hermes-terminal-outcome-notification")):
+                            fail(errors, message)
                     check_plugins(errors, warnings, name, profile["required_plugins"], state, snapshot["plugins"],
                                   profile.get("installed_disabled_plugins"))
         check_live_terminal_notification_runtime(errors, snapshot["terminal_notification"]["producer_profiles"])

@@ -236,6 +236,24 @@ check("--fixture", str(FIXTURES / "adapter-missing.yaml"), code=1, text="reposit
 check("--fixture", str(FIXTURES / "adoption-status-drift.yaml"), code=1, text="adoption status drift")
 # tracked adoption record with paused/unvalidated status fails
 check("--fixture", str(FIXTURES / "adoption-record-drift.yaml"), code=1, text="tracked adoption record status drift")
+# the full-commit pin is proven from plugin-manager install metadata, not the truncated display:
+# a wrong expected revision or a missing metadata entry must fail closed.
+errors = []
+with redirect_stdout(io.StringIO()):
+    verify_state.check_adoption(errors, [])  # sanity: fixture path still guards omission
+assert any("fixture omits adapter status" in e for e in errors), errors
+pinned = json.loads((ROOT / "snapshots/sanitized-current-state.yaml").read_text())["plugins"]["hermes-terminal-outcome-notification"]
+errors = []
+with redirect_stdout(io.StringIO()):
+    for message in verify_state.full_pin_errors("default", pinned):
+        print(f"FAIL: {message}")
+        errors.append(message)
+assert errors == [], errors
+wrong_pin = dict(pinned, pinned_commit="0" * 40)
+messages = verify_state.full_pin_errors("worker-astra", wrong_pin)
+assert len(messages) == 1 and "install metadata not pinned at" in messages[0], messages
+messages = verify_state.full_pin_errors("worker-terra-2", pinned)
+assert len(messages) == 1 and "missing from install metadata" in messages[0], messages
 # fail-closed schema: empty fixture cannot pass
 check("--fixture", str(FIXTURES / "incomplete-empty.yaml"), code=1, text="incomplete fixture: missing required section")
 # fail-closed schema: omitted roster profile cannot pass

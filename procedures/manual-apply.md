@@ -151,7 +151,14 @@ Use the canonical helper, which refuses to remove a running implementation profi
 
 ## 7. Repository adapters (already adopted; verify only)
 
-The cha-pt and jobcron adapters at the paths in `snapshots/sanitized-current-state.yaml` must each contain `Status: operational; local repository adoption validated.` — `./scripts/verify-state` checks this marker plus the tracked `adoption/*.md` records. Do not modify those repositories from here.
+The cha-pt and jobcron adapters live at their canonical archived lifecycle paths in
+`snapshots/sanitized-current-state.yaml` (each repository migrated its docs to the
+`docs/{plans,specs,decisions,archive}` taxonomy). Each adapter must contain its own
+lifecycle-status line — `Status: operational; local repository adoption validated.`
+for a still-active adapter, or the archived variant whose recorded transition is
+complete and was validated — and `./scripts/verify-state` checks that marker plus the
+tracked `adoption/*.md` records' operational adoption status. Do not modify those
+repositories from here.
 
 ## 8. Verify and commit
 
