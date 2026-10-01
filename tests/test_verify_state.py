@@ -319,11 +319,19 @@ def test_rollback_runbook():
     home = Path.home()
     runbook = (ROOT / "procedures" / "rollback-restore.md").read_text()
     cp_cmds = [ln.strip() for ln in runbook.splitlines() if ln.strip().startswith("cp -p ")]
+    required_dirs = set()
     assert len(cp_cmds) >= 65, f"expected >=65 explicit restore commands, got {len(cp_cmds)}"
     for cmd in cp_cmds:
         src = _re.search(r'cp -p "([^"]+)" "([^"]+)"', cmd)
         assert src, f"unparseable restore command: {cmd}"
         source, dest = Path(src.group(1)), Path(src.group(2))
+        required_dirs.add(dest.parent)
+        parts = dest.relative_to(home / ".hermes").parts
+        if parts[0] == "profiles":
+            profile_home = home / ".hermes" / "profiles" / parts[1]
+            required_dirs.update((profile_home, profile_home / parts[2]))
+        else:
+            required_dirs.add(home / ".hermes" / parts[0])
         assert source.is_file(), f"restore source missing: {source}"
         assert dest.parent.is_dir(), f"restore destination parent missing: {dest.parent}"
         assert ".." not in cmd and "cp -R" not in cmd, f"non-specific restore command: {cmd}"
@@ -363,6 +371,31 @@ def test_rollback_runbook():
     last700 = max(i for i, m in enumerate(modes) if m == "700")
     first755 = min(i for i, m in enumerate(modes) if m == "755")
     assert last700 < first755, "every 0700 recreation command must precede every 0755 one"
+    assert set(map(Path, seen)) == required_dirs, \
+        f"recreation path set mismatch: missing {required_dirs - set(map(Path, seen))}, extra {set(map(Path, seen)) - required_dirs}"
+    positions = {path: i for i, (_, path) in enumerate(inst)}
+    for path, i in positions.items():
+        if path.parent in positions:
+            assert positions[path.parent] < i, f"parent must be explicit before child: {path}"
+
+    # Execute only directory creation, remapped into an empty temporary tree.
+    # A permissive umask exposes implicit 0755 profile homes on macOS. Check
+    # after EACH command so a later chmod cannot hide a widened boundary.
+    with tempfile.TemporaryDirectory(prefix="rollback-missing-tree-", dir=ROOT) as tmp:
+        sandbox = Path(tmp)
+        (sandbox / ".hermes").mkdir(mode=0o700)
+        (sandbox / ".hermes/profiles").mkdir(mode=0o755)
+        for _ in range(2):  # missing tree, then existing-tree replay
+            for mode, path in inst:
+                target = sandbox / path.relative_to(home)
+                subprocess.run(["install", "-d", "-m", mode, str(target)],
+                               check=True, umask=0o022)
+                for required in required_dirs:
+                    probe = sandbox / required.relative_to(home)
+                    if probe.exists():
+                        assert probe.stat().st_mode & 0o777 == int(expected_mode(required), 8), \
+                            f"wrong recreated mode after {path}: {required}"
+            assert all((sandbox / p.relative_to(home)).is_dir() for p in required_dirs)
 
     # mode contract: files 0644, orchestrator SKILL.md 0600, private trees stay 0700
     for probe in ("harness-drift-backups/20261002T064500+0900",

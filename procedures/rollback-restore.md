@@ -91,10 +91,11 @@ non-widening: every profile-scoped root — `~/.hermes/profiles/<p>`, its
 (equal to or stricter than every live mode), and only nested payload/skill
 directories are recreated at 0755.
 
-If a destination directory is missing, recreate it with exactly one command
-from section 0. Run the 0700 block before the 0755 block: `install -d` applies
-`-m` to every directory it creates (including implicit intermediates), so a
-0755 command crossing a missing scoped root would create that root at 0755.
+If a destination directory is missing, recreate it with the commands in
+section 0, including its missing ancestors, in the listed order. On macOS,
+`install -d -m` sets the mode of the named target, not implicit intermediate
+directories: those can be created at 0755 even with `-m 700`. Every profile
+home therefore has an explicit 0700 command before its plugins/skills roots.
 `install -d` on an already-existing directory re-applies `-m` to that
 directory only, never to its parents; with one command per path there are no
 duplicate or conflicting instructions. Explicit normalization for the one
@@ -116,30 +117,42 @@ documented 0600 exception; any other mode is a restore defect):
 ### 0. Recreate missing destination directories (only the ones that are absent)
 
 Exactly one command per path — no path may appear twice, in this section or
-anywhere else in the runbook. Run phase 1 before phase 2: `install -d` applies
-`-m` to every directory it creates (including implicit intermediates), so a
-phase-2 command whose scoped root is still missing would create that root at
-0755. A profile home that is missing entirely is recreated at 0700 as an
-intermediate of its phase-1 command. Category directories that are not listed
+anywhere else in the runbook. Prerequisite: the owner-controlled `~/.hermes`
+home already exists at 0700 and `~/.hermes/profiles` exists; stop if either
+is absent or is a symlink. These commands restore payload directories, not a
+complete Hermes installation. Run phase 1 before phase 2, in the listed
+parent-before-child order. Do not rely on implicit intermediates for a
+security boundary: macOS can create them at 0755 regardless of `-m 700`.
+Category directories that are not listed
 (`skills/devops`, `skills/software-development`,
-`skills/autonomous-ai-agents`) are likewise created at 0755 as intermediates,
-matching their live modes.
+`skills/autonomous-ai-agents`) may be created as intermediates beneath the
+explicit 0700 roots; with umask 022 they are 0755, matching their live modes.
 
 Phase 1 — profile-scoped roots (0700, equal to or stricter than every live
 mode; never widen):
 
     install -d -m 700 "/Users/chanbla11mit/.hermes/plugins"
     install -d -m 700 "/Users/chanbla11mit/.hermes/skills"
+    install -d -m 700 "/Users/chanbla11mit/.hermes/profiles/reviewer-sol"
     install -d -m 700 "/Users/chanbla11mit/.hermes/profiles/reviewer-sol/plugins"
+    install -d -m 700 "/Users/chanbla11mit/.hermes/profiles/worker-astra"
     install -d -m 700 "/Users/chanbla11mit/.hermes/profiles/worker-astra/plugins"
     install -d -m 700 "/Users/chanbla11mit/.hermes/profiles/worker-astra/skills"
+    install -d -m 700 "/Users/chanbla11mit/.hermes/profiles/worker-flash-1"
     install -d -m 700 "/Users/chanbla11mit/.hermes/profiles/worker-flash-1/plugins"
+    install -d -m 700 "/Users/chanbla11mit/.hermes/profiles/worker-flash-2"
     install -d -m 700 "/Users/chanbla11mit/.hermes/profiles/worker-flash-2/plugins"
+    install -d -m 700 "/Users/chanbla11mit/.hermes/profiles/worker-flash-3"
     install -d -m 700 "/Users/chanbla11mit/.hermes/profiles/worker-flash-3/plugins"
+    install -d -m 700 "/Users/chanbla11mit/.hermes/profiles/worker-glm-full"
     install -d -m 700 "/Users/chanbla11mit/.hermes/profiles/worker-glm-full/plugins"
+    install -d -m 700 "/Users/chanbla11mit/.hermes/profiles/worker-luna-1"
     install -d -m 700 "/Users/chanbla11mit/.hermes/profiles/worker-luna-1/plugins"
+    install -d -m 700 "/Users/chanbla11mit/.hermes/profiles/worker-luna-2"
     install -d -m 700 "/Users/chanbla11mit/.hermes/profiles/worker-luna-2/plugins"
+    install -d -m 700 "/Users/chanbla11mit/.hermes/profiles/worker-sol"
     install -d -m 700 "/Users/chanbla11mit/.hermes/profiles/worker-sol/plugins"
+    install -d -m 700 "/Users/chanbla11mit/.hermes/profiles/worker-terra-1"
     install -d -m 700 "/Users/chanbla11mit/.hermes/profiles/worker-terra-1/plugins"
 
 Phase 2 — nested payload/skill directories (0755, each beneath a 0700
@@ -318,6 +331,12 @@ indicators (any other failure is an unrelated defect):
   above them), replaced the two conflicting recreation blocks with exactly one
   command per path — scoped roots (`profiles/<p>`, their `plugins/`/`skills/`,
   `~/.hermes/plugins`, `~/.hermes/skills`) at 0700, nested payload/skill
-  directories at 0755 — ordered 0700-before-0755 because `install -d` applies
-  `-m` to every directory it creates. The contract test now asserts each
-  command's expected mode and rejects duplicate/conflicting commands.
+  directories at 0755. The contract test asserts each command's expected
+  mode and rejects duplicate/conflicting commands. The implicit-intermediate
+  mode premise in that revision was incorrect; corrected below.
+- 2026-10-02: Astra continuation (reviewer finding, run 378): explicitly
+  create every affected profile home at 0700 before its scoped roots; correct
+  the macOS intermediate-mode description. The contract checks the complete
+  destination-derived path set and parent order, then executes directory
+  creation in a temporary missing tree and replays it on the existing tree,
+  checking boundary modes after every command. No live restore is executed.
