@@ -1,7 +1,7 @@
 ---
 name: production-deployment
 description: "Use when planning or executing production deployments."
-version: 0.1.5
+version: 0.2.0
 author: Hermes Agent
 license: MIT
 platforms: [macos, linux]
@@ -13,6 +13,16 @@ metadata:
 # Production Deployment
 
 Plan and execute production launches from observed runtime state. Prefer the smallest supported architecture that meets the near-term load, but never trade away data recovery, secret isolation, exact-artifact identity, or explicit public-cutover approval.
+
+## Diagnostic Convergence
+
+Choose the smallest decision-changing probe, not a reusable product. Record the decision, one falsifiable hypothesis, minimum probe, risk tier, positive/negative/INDETERMINATE outcome-to-action map, and complexity budget. Reject likely-INDETERMINATE probes that do not change the next action; state both positive and negative evidence utility and coverage limitations.
+
+Prefer trusted direct bounded read-only commands when safer/simpler than custom controllers, then a local synthetic repro, then a one-off bounded script. A sealed reusable controller requires written justification of decision value, reuse, and concrete threat; do not build generalized automation during incident diagnosis. Accepted platform/system tools define a proportional trust boundary: check identity, target, arguments, permissions, and output handling, not recursive OS/toolchain attestation absent a concrete threat.
+
+Limit each hypothesis to two design generations across cards/models. Reassess the approach after the first material review correction; after a second material failure or exhausted budget, pivot strategy or abandon rather than refine by default. Accept one-time probes with representative positive/negative/indeterminate checks, required risk-based verification, and evidence selecting the next action; synthetic success is not live proof.
+
+All external-read/write, credential, mutation, deployment, and cutover HUMAN GATEs remain unchanged. Read-only payloads can still require provider writes and owner approval. Explicit owner-approved call envelopes count each completed provider request (including errors, retries, pages, and polls); proven local pre-provider failures consume no external-call units but still consume time/design budget. Ambiguous submissions stop for authorized reconciliation with a possible unit reserved, not a free retry. Never infer permission or extend an envelope without owner approval.
 
 ## Procedure
 

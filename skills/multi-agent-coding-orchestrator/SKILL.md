@@ -1,7 +1,7 @@
 ---
 name: multi-agent-coding-orchestrator
 description: "Use when orchestrating multi-agent coding with Hermes."
-version: 0.4.0
+version: 0.5.0
 author: chanbla11mit, Hermes Agent
 license: MIT
 platforms: [macos]
@@ -49,7 +49,8 @@ Ponytail never runs as a plugin on Hermes profiles. Implementation profiles keep
 `minimal-implementation` is the task-triggered minimalism skill. The orchestrator attaches it per card (via `skills: ["minimal-implementation"]` on the card) using this policy:
 
 - Attach for: native/platform-alternative questions, dependency or library choice, open-ended UI/component work, suspected overengineering, refactoring or simplification, and shared-function or root-cause repair.
-- Leave off for: acceptance-heavy, security or trust-boundary, migration or data-loss, concurrency or distributed-systems, infrastructure or production, and compliance-sensitive tasks.
+- Attach for diagnostic design, including infrastructure diagnostics; separate any production/mutation implementation slice. Verification and safety requirements still take precedence.
+- Leave off for ordinary implementation of acceptance-heavy, security or trust-boundary, migration or data-loss, concurrency or distributed-systems, infrastructure or production, and compliance-sensitive tasks.
 - Override: even for an attach-category task, the orchestrator may leave the skill off whenever verification or safety requirements outrank simplification. That is the direction of the override — verification and safety outrank minimalism, never the reverse.
 - `simplification-review` is a separate, optional post-implementation review skill; it recommends reductions only and never edits or weakens tests. It is never a substitute for required verification.
 
@@ -252,6 +253,20 @@ When the user refers to another session, "the spec," or prior work from another 
 Completion criterion: the next action is grounded in current files, Git state, active lanes, and board state rather than transcript memory.
 
 ## Task Construction
+
+### Diagnostic convergence
+
+For `work_kind: diagnostic`, require `decision_to_unlock`, one falsifiable `hypothesis`, `minimum_probe`, `risk_tier`, `outcome_to_next_action` (positive, negative, INDETERMINATE), and `complexity_budget` (time, files/dependencies, external-call units, at most two design generations). Put the harness policy `policies/diagnostic-convergence.md` and applicable authority rules in the card context; workers need not have the harness checkout.
+
+Reject likely-INDETERMINATE probes that do not change the next action. Follow the probe ladder: trusted direct command → local synthetic repro → one-off bounded script → sealed reusable controller. Ascend only with reasons simpler rungs cannot answer the decision; a sealed reusable controller requires written justification of decision value, reuse, and concrete threat.
+
+Allow at most two design generations per hypothesis across cards and model rungs. After the first material review correction, reassess the approach before editing. After a second material failure or exhausted budget, require a strategy pivot or abandon the probe, not further default refinement. Record the failed design, spent budget, preserved evidence, and changed evidence path/decision framing; renaming a hypothesis or changing cards/models does not reset its budget. No viable authorized pivot means HUMAN_BLOCK.
+
+Unlimited terminal retries mean campaign-level problem solving, not unlimited refinement of one diagnostic design. An exhausted diagnostic design requires a recorded strategy pivot before another eligible `RETRY_TERMINAL`; all existing v2 authorization, fencing, bounded runs, independent review, and human/infrastructure exclusions remain intact. Review proportionality and decision utility before implementation minutiae; direct simplify/pivot/abandon rather than serial micro-fixes of an overbuilt or low-value approach.
+
+Accept one-time diagnostics with representative positive, negative, and indeterminate/error checks, risk-required verification, stated coverage/limitations, and an observed outcome selecting the next action; synthetic tests are not live proof. Do not require generalized automation. Accepted platform/system tools need proportional identity/target/permission/output checks, not recursive toolchain attestation absent a concrete threat.
+
+Preserve all external-read/write, credential, mutation, deployment, and cutover HUMAN GATEs. Owner-approved call envelopes must state target, operations, unit/cap, expiry, retries/pagination/polling, and output custody: a proven local pre-provider failure consumes no external-call units; each completed provider request (including errors) consumes one. Count SDK retries/pages/polls separately; ambiguous submissions reserve a possible unit and stop for authorized reconciliation, never a free retry. Local retries remain subject to time/design and explicit attempt caps; missing semantics or envelope extensions need owner approval.
 
 Each implementation card must include:
 

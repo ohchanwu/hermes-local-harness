@@ -183,12 +183,12 @@ check("--fixture", str(FIXTURES / "deployed-skill-divergence.yaml"), code=1, tex
 # The canonical orchestration policy is versioned and its source-to-live hash
 # enforcement covers the default profile's deployed orchestrator skill.
 orchestrator = (ROOT / "skills" / "multi-agent-coding-orchestrator" / "SKILL.md").read_text()
-assert "version: 0.4.0" in orchestrator
+assert "version: 0.5.0" in orchestrator
 assert "Routing validation and dispatch receipt" in orchestrator
 assert "Authentication expiry blocks a fresh observation" in orchestrator
 assert "currently_actionable" in orchestrator
 # Terminal retry remains an explicit card-scoped v2 policy, never the default.
-assert "version: 0.4.0" in orchestrator
+assert "version: 0.5.0" in orchestrator
 assert "RETRY_TERMINAL" in orchestrator
 assert "terminal_retry_policy: astra-until-approve-v1" in orchestrator
 assert "glm-review-v2" in orchestrator
