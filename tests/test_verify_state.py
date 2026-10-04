@@ -180,6 +180,9 @@ check("--fixture", str(FIXTURES / "dormant-extra.yaml"), text="WARN: dormant")
 check("--fixture", str(FIXTURES / "unexpected-plugin.yaml"), code=1, text="behavior-changing unexpected plugin")
 # disabled required plugin fails
 check("--fixture", str(FIXTURES / "missing-plugin.yaml"), code=1, text="plugin drift")
+# command approval policy drift fails
+check("--fixture", str(FIXTURES / "approval-mode-drift.yaml"), code=1,
+      text="approval mode drift jobcron-worker")
 # desired deployment stays red until every terminal-notification producer is observed enabled
 check("--fixture", str(FIXTURES / "terminal-deployment-pending.yaml"), code=1, text="terminal notification deployment pending")
 # rollback observation is also red against the authorized deployment declaration
@@ -220,6 +223,8 @@ assert roster["project_dispatch_allowlist"] == [
     "jobcron-worker", "jobcron-worker-glm-1", "jobcron-worker-glm-2", "jobcron-reviewer",
     "chapt-worker", "chapt-worker-glm-1", "chapt-worker-glm-2", "chapt-reviewer"]
 roster_profiles = {profile["name"]: profile for profile in roster["profiles"]}
+assert roster["approval_policy"]["mode"] == "off"
+assert roster["approval_policy"]["profiles"] == list(roster_profiles)
 assert not roster_profiles["jobcron-orchestrator"]["dispatch_eligible"]
 assert not roster_profiles["chapt-orchestrator"]["dispatch_eligible"]
 project_workers = (

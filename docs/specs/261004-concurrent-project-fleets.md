@@ -29,6 +29,8 @@ Hermes intentionally hides board-routing tools such as `kanban_list` and `kanban
 
 ## Isolation guarantees
 
+Hermes command approvals are disabled with `approvals.mode: off` on every installed roster profile. This affects the terminal approval gate only; project isolation and all authorization policies below remain mandatory.
+
 Named Kanban boards are the hard task boundary: each has its own SQLite database, workspaces, logs, and attachments, and dispatcher-spawned workers receive board-pinned environment variables. Each project profile has its own Hermes home, configuration, memory, sessions, logs, and state database. Each board's `default_workdir` points to one canonical repository, so coding tasks receive project-local worktrees.
 
 Hermes profiles are not filesystem sandboxes. Repository/profile pairing is therefore also enforced by fixed `terminal.cwd`, role-specific `SOUL.md`, the canonical orchestration skill, explicit reviewer names, and `scripts/verify-state`. A card with a mismatched board, profile, repository, or workspace must block before file access or mutation.

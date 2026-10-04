@@ -541,9 +541,16 @@ def main():
     check_terminal_notification_deployment(errors, roster, snapshot)
     check_terminal_retry_policy(errors, roster)
     check_project_isolation(errors, snapshot.get("project_isolation"))
+    approval_policy = roster.get("approval_policy", {})
+    approval_profiles = approval_policy.get("profiles", [])
+    if approval_policy.get("mode") != "off":
+        fail(errors, "approval policy mode must be off")
+    if approval_profiles != list(expected := {p["name"]: p for p in roster.get("profiles", [])}):
+        fail(errors, "approval policy profiles must exactly match the installed roster order")
+    if snapshot.get("approvals") != approval_policy:
+        fail(errors, "approval policy snapshot drift")
     expected_local_overrides = snapshot["skill"].get("profile_local_skill_overrides", {})
     check_profile_local_skill_overrides(errors, expected_local_overrides)
-    expected = {p["name"]: p for p in roster.get("profiles", [])}
     dispatch_profiles = snapshot["kanban"]["dispatch_profiles"]
     if args.fixture:
         try:
@@ -553,7 +560,7 @@ def main():
             return 2
         # Fail-closed fixture schema: a passing fixture must represent every required
         # observed field and every installed roster profile; omission is drift, not success.
-        for section in ("profile_models", "profile_providers", "plugins", "dispatch_profiles", "kanban", "skill_files", "profile_local_skill_overrides", "adapters", "terminal_notification_runtime", "terminal_retry_policy", "project_isolation"):
+        for section in ("profile_models", "profile_providers", "profile_approval_modes", "plugins", "dispatch_profiles", "kanban", "skill_files", "profile_local_skill_overrides", "adapters", "terminal_notification_runtime", "terminal_retry_policy", "project_isolation"):
             if section not in observed:
                 fail(errors, f"incomplete fixture: missing required section '{section}'")
         kanban = observed.get("kanban", {})
@@ -566,7 +573,9 @@ def main():
                 fail(errors, f"concurrency/dispatch drift kanban.{key}: expected {want!r}, actual {kanban[key]!r}")
         if "dispatch_profiles" in observed and observed["dispatch_profiles"] != dispatch_profiles:
             fail(errors, f"dispatch drift: expected {dispatch_profiles}, actual {observed['dispatch_profiles']}")
-        models, providers = observed.get("profile_models", {}), observed.get("profile_providers", {})
+        models = observed.get("profile_models", {})
+        providers = observed.get("profile_providers", {})
+        approval_modes = observed.get("profile_approval_modes", {})
         for name, profile in expected.items():
             if not profile["installed"]:
                 continue
@@ -578,7 +587,11 @@ def main():
                 fail(errors, f"incomplete fixture: profile_providers omits {name}")
             elif providers[name] != profile["provider"]:
                 fail(errors, f"provider drift {name}: expected {profile['provider']}, actual {providers[name]}")
-        for name in list(models) + list(providers):
+            if name not in approval_modes:
+                fail(errors, f"incomplete fixture: profile_approval_modes omits {name}")
+            elif approval_modes[name] != approval_policy["mode"]:
+                fail(errors, f"approval mode drift {name}: expected {approval_policy['mode']}, actual {approval_modes[name]}")
+        for name in list(models) + list(providers) + list(approval_modes):
             if name not in expected:
                 fail(errors, f"behavior-changing unexpected profile: {name}")
         plugins = observed.get("plugins", {})
@@ -623,6 +636,9 @@ def main():
                     fail(errors, f"model drift {name}: expected {profile['model']}")
                 if json_config(name, "model.provider") != profile["provider"]:
                     fail(errors, f"provider drift {name}: expected {profile['provider']}")
+                actual_approval_mode = json_config(name, "approvals.mode")
+                if actual_approval_mode is UNREADABLE or actual_approval_mode != approval_policy["mode"]:
+                    fail(errors, f"approval mode drift {name}: expected {approval_policy['mode']}, actual {'<unreadable>' if actual_approval_mode is UNREADABLE else actual_approval_mode!r}")
                 plugins = run("hermes", "-p", name, "plugins", "list", "--plain", "--no-bundled")
                 if plugins.returncode:
                     fail(errors, f"unable to read plugin list {name}")

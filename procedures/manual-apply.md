@@ -64,6 +64,27 @@ Complete separate authorization per profile when a credential is required (`herm
     hermes -p worker-astra config set model.default gpt-6-astra
     hermes -p worker-astra config set model.provider openai-codex
 
+## 2b. Command approval mode (all roster profiles)
+
+The desired state is `approvals.mode: off` on every installed roster profile. This removes Hermes terminal-command approval prompts; it does not relax project routing, repository/worktree scope, credential handling, deployment authorization, cloud-mutation, or production-write policies.
+
+    for profile in default advisor reviewer-sol \
+                   worker-flash-1 worker-flash-2 worker-flash-3 \
+                   worker-luna-1 worker-luna-2 worker-terra-1 worker-glm-full \
+                   worker-sol worker-astra worker-terra-2 \
+                   jobcron-orchestrator jobcron-worker jobcron-worker-glm-1 \
+                   jobcron-worker-glm-2 jobcron-reviewer \
+                   chapt-orchestrator chapt-worker chapt-worker-glm-1 \
+                   chapt-worker-glm-2 chapt-reviewer; do
+      hermes -p "$profile" config set approvals.mode off
+    done
+
+Hermes reads this setting at the command approval gate. Subsequent commands in an already-running session use the new mode, but an approval request that is already pending must still be approved, denied, or retried.
+
+Verify each profile explicitly:
+
+    hermes -p <profile> config get approvals.mode   # expect: off
+
 ## 3. Ponytail on the ten implementation profiles (worker-flash-1/2/3, worker-luna-1/2, worker-terra-1/2, worker-glm-full, worker-sol, worker-astra; NOT default/reviewer-sol/advisor)
 
 Desired state: the pinned Ponytail package is installed but `disabled` on every implementation profile. Hermes never runs the Ponytail plugin; minimalism comes from the per-card `minimal-implementation` skill instead (see section 4).

@@ -516,5 +516,30 @@
         "chapt-worker-glm-2"
       ]
     }
+  },
+  "profile_approval_modes": {
+    "default": "off",
+    "advisor": "off",
+    "reviewer-sol": "off",
+    "worker-flash-1": "off",
+    "worker-flash-2": "off",
+    "worker-flash-3": "off",
+    "worker-luna-1": "off",
+    "worker-luna-2": "off",
+    "worker-terra-1": "off",
+    "worker-glm-full": "off",
+    "worker-sol": "off",
+    "worker-astra": "off",
+    "worker-terra-2": "off",
+    "jobcron-orchestrator": "off",
+    "jobcron-worker": "off",
+    "jobcron-worker-glm-1": "off",
+    "jobcron-worker-glm-2": "off",
+    "jobcron-reviewer": "off",
+    "chapt-orchestrator": "off",
+    "chapt-worker": "off",
+    "chapt-worker-glm-1": "off",
+    "chapt-worker-glm-2": "off",
+    "chapt-reviewer": "off"
   }
 }

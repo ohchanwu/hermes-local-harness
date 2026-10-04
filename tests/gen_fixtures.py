@@ -61,6 +61,8 @@ def set_skill_files(d):
 
 clean["profile_models"] = {profile["name"]: profile["model"] for profile in roster["profiles"]}
 clean["profile_providers"] = {profile["name"]: profile["provider"] for profile in roster["profiles"]}
+clean["profile_approval_modes"] = {
+    profile: desired["approvals"]["mode"] for profile in desired["approvals"]["profiles"]}
 clean["dispatch_profiles"] = copy.deepcopy(desired["kanban"]["dispatch_profiles"])
 clean["kanban"] = {key: copy.deepcopy(value) for key, value in desired["kanban"].items()
                    if key != "dispatch_profiles"}
@@ -73,6 +75,8 @@ write("clean.yaml", clean)
 
 
 write("behavior-changing-model-drift.yaml", delta(lambda d: d["profile_models"].__setitem__("worker-terra-1", "wrong-model")))
+write("approval-mode-drift.yaml", delta(
+    lambda d: d["profile_approval_modes"].__setitem__("jobcron-worker", "smart")))
 write("active-extra.yaml", delta(lambda d: d["active_extras"].append("unapproved-running-profile")))
 write("dormant-extra.yaml", delta(lambda d: d["dormant_extras"].append("unused-local-profile")))
 
