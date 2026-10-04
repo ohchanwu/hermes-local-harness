@@ -5,11 +5,14 @@ from pathlib import Path
 fx = Path(__file__).resolve().parent / "fixtures"
 clean = json.loads((fx / "clean.yaml").read_text())
 desired = json.loads((Path(__file__).resolve().parents[1] / "snapshots" / "sanitized-current-state.yaml").read_text())
+roster = json.loads((Path(__file__).resolve().parents[1] / "roster.yaml").read_text())
 
 IMPL = ["worker-flash-1", "worker-flash-2", "worker-flash-3", "worker-luna-1", "worker-luna-2",
-        "worker-terra-1", "worker-terra-2", "worker-glm-full", "worker-sol", "worker-astra"]
+        "worker-terra-1", "worker-terra-2", "worker-glm-full", "worker-sol", "worker-astra",
+        "jobcron-worker", "chapt-worker"]
 NOTIF = "hermes-terminal-outcome-notification"
 ENABLED_NOTIF = f"enabled      git pinned@6ae2bf2d 0.2.0    {NOTIF}"
+DISABLED_NOTIF = f"disabled     git pinned@6ae2bf2d 0.2.0    {NOTIF}"
 DISABLED_PONY = "disabled     git pinned@16f29800 4.8.4    ponytail"
 ENABLED_PONY = "enabled      git pinned@16f29800 4.8.4    ponytail"
 
@@ -27,6 +30,7 @@ def delta(mutate):
 def base_plugins():
     """Fresh copy of the desired plugin matrix (clean.yaml may itself be mutated by a caller)."""
     plugins = {}
+    roster_profiles = {profile["name"]: profile for profile in roster["profiles"]}
     for name in clean["profile_models"]:
         if name == "advisor":
             plugins[name] = {}
@@ -34,6 +38,8 @@ def base_plugins():
             plugins[name] = {}
             if name in desired["terminal_notification"]["producer_profiles"]:
                 plugins[name][NOTIF] = ENABLED_NOTIF
+            elif NOTIF in roster_profiles[name].get("installed_disabled_plugins", []):
+                plugins[name][NOTIF] = DISABLED_NOTIF
             if name in IMPL:
                 plugins[name]["ponytail"] = DISABLED_PONY
     return plugins
@@ -52,6 +58,12 @@ def set_skill_files(d):
         desired["skill"]["profile_local_skill_overrides"])
 
 
+clean["profile_models"] = {profile["name"]: profile["model"] for profile in roster["profiles"]}
+clean["profile_providers"] = {profile["name"]: profile["provider"] for profile in roster["profiles"]}
+clean["dispatch_profiles"] = copy.deepcopy(desired["kanban"]["dispatch_profiles"])
+clean["kanban"] = {key: copy.deepcopy(value) for key, value in desired["kanban"].items()
+                   if key != "dispatch_profiles"}
+clean["project_isolation"] = copy.deepcopy(desired["project_isolation"])
 clean["plugins"] = base_plugins()
 set_skill_files(clean)
 clean["terminal_retry_policy"] = copy.deepcopy(

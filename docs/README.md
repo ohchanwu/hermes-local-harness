@@ -11,6 +11,7 @@ This index is the entry point for durable harness documentation tracked in Git. 
 
 ## Current entries
 
+- [Concurrent project fleets](specs/261004-concurrent-project-fleets.md) — implemented Jobcron/Cha PT profile, board, worktree, port, and review isolation.
 - [Diagnostic convergence policy](../policies/diagnostic-convergence.md) — maintained design and review contract; [authority boundaries](../policies/authority-and-review.md).
 - [Completed diagnostic-convergence implementation plan](archive/261003-diagnostic-convergence.md)
 

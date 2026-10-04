@@ -1,7 +1,7 @@
 ---
 name: multi-agent-coding-orchestrator
 description: "Use when orchestrating multi-agent coding with Hermes."
-version: 0.5.0
+version: 0.6.0
 author: chanbla11mit, Hermes Agent
 license: MIT
 platforms: [macos]
@@ -25,13 +25,24 @@ Do not use this procedure for a simple question that needs no repository change 
 
 ## Fixed Roster
 
-Control-plane profiles:
+Project-isolated fleets:
 
-- `default`: `gpt-5.6-sol` orchestrator and user-facing profile.
-- `reviewer-sol`: `gpt-5.6-sol` independent reviewer.
-- `advisor`: `gpt-5.6-sol` read/analyze advisor; not a Kanban implementation lane.
+- Jobcron board `jobcron`: `jobcron-orchestrator` (`gpt-6.1-sol`), `jobcron-worker` (`gpt-6.1-sol`), and `jobcron-reviewer` (`gpt-6-astra`). Repository root: `/Users/chanbla11mit/projects/jobcron`; preview port: `17777`.
+- Cha PT board `cha-pt`: `chapt-orchestrator` (`gpt-6.1-sol`), `chapt-worker` (`gpt-6.1-sol`), and `chapt-reviewer` (`gpt-6-astra`). Repository root: `/Users/chanbla11mit/projects/cha-pt`; preview port: `18080`.
 
-Implementation profiles, in escalation order:
+Each project profile has an independent Hermes home, memory, sessions, and fixed terminal root. Named boards provide separate databases, logs, attachments, and workspaces. A project orchestrator may assign only its matching worker and reviewer. A task or callback with a mismatched board, profile, repository, or workspace is invalid and must be blocked before file access or mutation.
+
+Project orchestrators are interactive control-plane sessions, not dispatcher-spawned task workers. Hermes intentionally hides `kanban_list` and `kanban_unblock` whenever `HERMES_KANBAN_TASK` is set, so assigning a card to an orchestrator removes the board-routing tools it needs. Launch each controller through the tracked board-pinning wrapper (`scripts/run-jobcron-orchestrator` or `scripts/run-chapt-orchestrator`). Keep only project workers and reviewers in `kanban.dispatch_profiles`.
+
+The project fleets deliberately start with one implementation worker each. Do not recreate the legacy escalation fleet per project until observed queueing or capability failures justify the additional profiles. Review revision stays on the project's worker; a genuine capability boundary becomes a human block rather than silently crossing into the legacy fleet.
+
+Legacy/default-board control profiles remain installed for rollback and existing history:
+
+- `default`: legacy `gpt-5.6-sol` orchestrator and user-facing profile.
+- `reviewer-sol`: legacy `gpt-5.6-sol` independent reviewer.
+- `advisor`: read/analyze advisor; not a Kanban implementation lane.
+
+Legacy/default-board implementation profiles, in escalation order:
 
 1. `worker-flash-1`, `worker-flash-2`, `worker-flash-3`: Z.AI `glm-5.3-flash`.
 2. `worker-luna-1`, `worker-luna-2`: OpenAI Codex `gpt-5.6-luna`.
@@ -40,7 +51,9 @@ Implementation profiles, in escalation order:
 5. `worker-sol`: OpenAI Codex `gpt-5.6-sol`.
 6. `worker-astra`: OpenAI Codex `gpt-6-astra`.
 
-Keep `worker-terra-2` installed but dormant as a rollback/spare lane. It is outside the active nine-lane roster unless the human changes the policy.
+Keep `worker-terra-2` installed but dormant as a rollback/spare lane. It is outside the active legacy roster unless the human changes the policy.
+
+The escalation ladder and terminal-retry rules below apply only to cards that explicitly use the legacy/default-board roster. Project-isolated Jobcron and Cha PT cards use their three-profile fleets and never fall through to a legacy profile.
 
 Ponytail never runs as a plugin on Hermes profiles. Implementation profiles keep the pinned package installed but `disabled`; the minimalism behavior lives in the per-card `minimal-implementation` skill instead (see Skills). The orchestrator, reviewer, and advisor neither load it nor the simplification skill.
 
@@ -123,7 +136,7 @@ strategy: continue | restart
 
 The structured verdict must fence the root task, campaign generation, repository, protected baseline, worktree/branch, rejected candidate SHA, reviewer run ID, attribution, concrete findings, and strategy. Reject a stale or duplicate callback, a mismatched candidate/worktree/generation/root, or an identical SHA without explicit reviewer-guidance invalidation; no duplicate Astra run may be created. Event history is authoritative for cycle count, and every individual Astra run remains bounded.
 
-For `continue`, preserve branch, commit, test evidence, and findings; return through `kanban_request_changes`, retain Astra ownership, and require a new commit plus fresh independent `reviewer-sol` review. For `restart`, durably block the fenced verdict first, preserve rejected evidence, create a fresh worktree from the protected baseline, retain the same root/generation lineage and Astra rung, then reassign `worker-astra` and promote to `ready`. In either case read the card and run history within two normal dispatcher ticks and require a new claimed run receipt.
+For `continue`, preserve branch, commit, test evidence, and findings; return through `kanban_request_changes`, retain Astra ownership, and require a new commit plus fresh independent `reviewer-sol` review. For `restart`, durably block the fenced verdict first, preserve rejected evidence, create a fresh worktree from the protected baseline, retain the same root/generation lineage and Astra rung, then reassign `worker-astra` and promote to `ready`. In either case read the card and run history within two normal dispatcher ticks and require a new claimed run receipt. This paragraph is legacy/default-board policy only.
 
 Never use terminal retry for user stop/pause/revocation, missing product decisions, credentials/MFA/prohibited writes, unsafe repository state, capability boundaries, or policy/legal/security decisions. Those conditions are `HUMAN_BLOCK`. Default, malformed, side-by-side, and v1 metadata stay bounded and human-block after Astra exhaustion.
 
@@ -147,7 +160,7 @@ Never delete rejected work merely because the next model starts clean. The same 
 
 ### Routing validation and dispatch receipt
 
-Before creating or reassigning a card, resolve the destination from the Fixed Roster and verify the exact profile id against live `hermes profile list` output. Never invent an id from a naming pattern. Do not use `hermes kanban assignees` as proof that a profile exists: it also includes names retained on cards, including stale or invalid assignees. If the exact profile is absent, stop and correct the route before mutating the card.
+Before creating or reassigning a card, resolve the destination from the Fixed Roster and verify the exact profile id against live `hermes profile list` output. Also verify the active board maps to that profile's project; profile existence alone does not authorize cross-project assignment. Never invent an id from a naming pattern. Do not use `hermes kanban assignees` as proof that a profile exists: it also includes names retained on cards, including stale or invalid assignees. If the exact profile is absent or belongs to another project, stop and correct the route before mutating the card.
 
 Before creating a card with `skills`, run the reviewed harness preflight for the exact assignee and every requested skill:
 
@@ -163,14 +176,15 @@ After activating a lane and assigning or promoting a card intended to run immedi
 
 Do not force a manual dispatcher pass while the gateway dispatcher is active; observe its normal ticks.
 
-## Five-Lane Implementation Pool
+## Legacy Five-Lane Implementation Pool
 
 Installed profiles are capacity, not running work. Enforce a maximum of five simultaneous implementation runs with native per-profile capacity and a five-profile active allowlist:
 
 - Leave `kanban.max_in_progress` unset because Hermes counts reviewer runs in that global number.
 - Set `kanban.max_in_progress_per_profile` to `1`.
-- Keep `reviewer-sol` in `kanban.dispatch_profiles` at all times.
+- Keep `reviewer-sol` in `kanban.dispatch_profiles` while legacy/default-board work remains enabled.
 - Keep no more than five implementation profiles in `kanban.dispatch_profiles` at once.
+- Keep both projects' workers and reviewers dispatchable independently of the legacy five-lane budget; each is already capped at one run by `kanban.max_in_progress_per_profile: 1`. Project orchestrators run as board-pinned interactive sessions outside the dispatcher.
 - Initially activate the three Flash lanes and two Luna lanes.
 - Use `scripts/set-active-lanes.py` to change the active implementation profiles. It refuses to remove a running implementation profile, preventing a swap from temporarily creating a sixth implementation run.
 
@@ -207,7 +221,7 @@ Begin only when both conditions are true:
 1. The specification and acceptance criteria are approved.
 2. The user explicitly says `run autonomously` or an unambiguous equivalent for that specification.
 
-For work expected to last hours or days, send the approved specification through an independent `reviewer-sol` preflight before dispatching implementation.
+For work expected to last hours or days, send the approved specification through the board-designated independent reviewer (`jobcron-reviewer`, `chapt-reviewer`, or legacy `reviewer-sol`) before dispatching implementation.
 
 Authorization covers local branches, worktrees, commits, tests, and recoverable local destructive operations. It never covers pushes, PR creation, deployments, production mutations, messages beyond the configured progress protocol, purchases, credential changes, or other external writes.
 
@@ -279,7 +293,7 @@ Each implementation card must include:
 - Ladder metadata and routing rationale.
 - Skill policy metadata (`minimal_implementation` enabled/disabled and reason; see Skills).
 - Required local commit and structured handoff.
-- `reviewer-sol` as same-card reviewer for code changes.
+- The exact board-designated reviewer as same-card reviewer for code changes.
 - Explicit prohibitions on push, PR creation, deployment, and production mutation.
 
 Use parent-child links for real dependencies. Keep independent slices parallel. Do not decompose merely to keep every lane busy.
@@ -301,13 +315,13 @@ Estimate the whole worker attempt, not just editing time: repository discovery, 
 3. Implement only the assigned slice in the pinned worktree.
 4. Run focused tests, then required broader gates.
 5. Commit successful work locally.
-6. Request review with `reviewer="reviewer-sol"` and concise evidence.
+6. Request review with the exact reviewer named by the project contract (`jobcron-reviewer`, `chapt-reviewer`, or legacy `reviewer-sol`) and concise evidence.
 7. Block for a genuine decision, prohibited action, credential need, unsafe state, or infrastructure outcome that the orchestrator must classify.
 8. Never push, open a PR, deploy, mutate production, or bypass review.
 
 ## Review Contract
 
-Every code change requires independent Sol review before local integration. Inspect the specification, actual diff and commit, repository context, prior rung history, and test evidence. Do not edit implementation code.
+Every code change requires independent board-designated review before local integration. Project boards use Astra reviewers; the legacy board uses `reviewer-sol`. Inspect the specification, actual diff and commit, repository context, prior rung history, and test evidence. Do not edit implementation code.
 
 Approve only when acceptance criteria pass and no material correctness, security, regression, or scope defect remains. Every non-approval must name the verdict, attribution, rung, revision count, findings, evidence, required next action, and whether continuation or a clean restart is safer.
 
@@ -349,7 +363,9 @@ Before declaring the harness or an autonomous workstream complete, verify:
 
 - The Hermes source checkout is clean and updateable.
 - Every active profile returns its configured model identity on a fresh inference probe.
-- The active allowlist contains `reviewer-sol` and no more than the configured implementation-pool size.
+- The dispatch allowlist contains each project's worker/reviewer pair plus the intended legacy lanes, excludes project orchestrators, and has no project card assigned outside its project tuple.
+- Board `jobcron` resolves only the Jobcron repository/workspaces and board `cha-pt` only the Cha PT repository/workspaces.
+- Fresh project profile sessions have separate state homes and return `gpt-6.1-sol` for orchestrator/worker and `gpt-6-astra` for reviewer.
 - No running implementation profile was removed during a lane swap.
 - Reviews can start while five implementation profiles are running.
 - Every code change reaches independent review before integration.

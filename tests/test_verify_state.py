@@ -22,10 +22,10 @@ def check(*args, code=0, text=None):
         assert text in result.stdout, result.stdout
 
 
-# baseline: plugins plus shared runtime paths and the loaded worker pass.
+# baseline: plugins plus a shared producer outbox and the loaded worker pass.
 check("--fixture", str(FIXTURES / "clean.yaml"))
 # plugin enablement alone is insufficient: every producer must expose the shared
-# absolute runtime paths and the rendered, loaded worker must match them.
+# absolute outbox and the rendered, loaded worker must match it.
 spec = importlib.util.spec_from_loader("verify_state", SourceFileLoader("verify_state", str(VERIFY)))
 assert spec and spec.loader
 verify_state = importlib.util.module_from_spec(spec)
@@ -37,17 +37,17 @@ assert "terminal notification runtime pending default" in errors[0]
 errors = []
 with redirect_stdout(io.StringIO()):
     verify_state.check_terminal_notification_runtime(errors, {
-        "shared_environment": {"outbox": "/private/outbox.sqlite3", "kanban_db": "/private/kanban.db"},
+        "shared_environment": {"outbox": "/private/outbox.sqlite3"},
         "worker": {"outbox": "/private/outbox.sqlite3", "kanban_db": "/private/kanban.db", "plist_rendered": True, "loaded": True},
     }, ["default"])
 assert errors == ["terminal notification runtime pending worker: loaded LaunchAgent arguments/environment do not match the shared paths"], errors
 errors = []
 with redirect_stdout(io.StringIO()):
     verify_state.check_terminal_notification_runtime(errors, {
-        "shared_environment": {"outbox": "/private/outbox.sqlite3", "kanban_db": "/private/kanban.db"},
-        "worker": {"outbox": "/private/outbox.sqlite3", "kanban_db": "/private/other.db", "plist_rendered": True, "loaded": True, "loaded_state_matches": True},
+        "shared_environment": {"outbox": "/private/other.sqlite3"},
+        "worker": {"outbox": "/private/outbox.sqlite3", "kanban_db": "/private/kanban.db", "plist_rendered": True, "loaded": True, "loaded_state_matches": True},
     }, ["default"])
-assert errors == ["terminal notification runtime drift: producers and worker must share one outbox and canonical Kanban DB"], errors
+assert errors == ["terminal notification runtime drift: producers and worker must share one outbox"], errors
 
 # live-observation boundary, end to end against a stubbed command runner:
 # false green #1 — launchd domain set (or plugins enabled) but the running multiplex
@@ -90,8 +90,10 @@ def live_errors(ps_output, launchctl_output, plist_values):
     return errors, runtime
 
 
-PS_ENV_SET = (f"/venv/bin/python -m hermes_cli.main gateway run --external-supervisor "
-              f"HERMES_TERMINAL_OUTBOX={OUTBOX} HERMES_KANBAN_DB={KANBAN} PATH=/bin\n")
+PS_ENV_SET = (f"/venv/bin/python -I -c launcher gateway run --external-supervisor "
+              f"HERMES_TERMINAL_OUTBOX={OUTBOX} PATH=/bin\n")
+PS_ENV_PINNED = PS_ENV_SET.replace(" PATH=/bin", f" HERMES_KANBAN_DB={KANBAN} PATH=/bin")
+PS_WRAPPER = "/venv/bin/python --run-module hermes_cli.stderr_timestamp -- /venv/bin/hermes gateway run --external-supervisor PATH=/bin\n"
 PS_ENV_MISSING = "/venv/bin/python -m hermes_cli.main gateway run --external-supervisor PATH=/bin\n"
 LOADED_MATCHING = (f"gui/501/label = {{\n\tstate = running\n\n\targuments = {{\n\t\t/venv/bin/python\n\t\t/worker.py\n\t\t--db\n\t\t{OUTBOX}\n"
                    f"\t\t--kanban-db\n\t\t{KANBAN}\n\t}}\n\n\tenvironment = {{\n"
@@ -102,14 +104,20 @@ LOADED_STALE = (f"gui/501/label = {{\n\tstate = running\n\n\targuments = {{\n\t\
                 f"\t\t--kanban-db\n\t\t/old/kanban.db\n\t}}\n\n\tenvironment = {{\n"
                 f"\t\tHERMES_TERMINAL_OUTBOX => /old/outbox.sqlite3\n\t\tHERMES_KANBAN_DB => /old/kanban.db\n\t}}\n}}\n")
 
-# gateway present but env not inherited (restart skipped) stays red
+# gateway present but outbox env not inherited stays red
 errors, _ = live_errors(PS_ENV_MISSING, LOADED_MATCHING, PLIST_EXTRACTS)
 assert any("running gateway has not inherited" in e for e in errors), errors
+# a legacy single-DB pin on the gateway is incompatible with multi-board dispatch
+errors, _ = live_errors(PS_ENV_PINNED, LOADED_MATCHING, PLIST_EXTRACTS)
+assert any("must not inherit HERMES_KANBAN_DB" in e for e in errors), errors
 # rendered plist matches but the loaded job is stale stays red
 errors, _ = live_errors(PS_ENV_SET, LOADED_STALE, PLIST_EXTRACTS)
 assert any("loaded LaunchAgent arguments/environment do not match" in e for e in errors), errors
 # fully rolled out (env inherited, plist rendered, loaded job effective state matches) passes
 errors, runtime = live_errors(PS_ENV_SET, LOADED_MATCHING, PLIST_EXTRACTS)
+assert errors == [], errors
+# a supervisor wrapper may omit producer env; only the actual gateway process is authoritative
+errors, _ = live_errors([PS_WRAPPER, PS_ENV_SET], LOADED_MATCHING, PLIST_EXTRACTS)
 assert errors == [], errors
 # the worker PATH is validated structurally from the rendered plist itself; the
 # verifier caller's own shutil.which("hermes") directory is irrelevant because
@@ -183,12 +191,15 @@ check("--fixture", str(FIXTURES / "deployed-skill-divergence.yaml"), code=1, tex
 # The canonical orchestration policy is versioned and its source-to-live hash
 # enforcement covers the default profile's deployed orchestrator skill.
 orchestrator = (ROOT / "skills" / "multi-agent-coding-orchestrator" / "SKILL.md").read_text()
-assert "version: 0.5.0" in orchestrator
+assert "version: 0.6.0" in orchestrator
 assert "Routing validation and dispatch receipt" in orchestrator
 assert "Authentication expiry blocks a fresh observation" in orchestrator
 assert "currently_actionable" in orchestrator
+assert "jobcron-orchestrator" in orchestrator
+assert "chapt-reviewer" in orchestrator
+assert "gpt-6.1-sol" in orchestrator
 # Terminal retry remains an explicit card-scoped v2 policy, never the default.
-assert "version: 0.5.0" in orchestrator
+assert "version: 0.6.0" in orchestrator
 assert "RETRY_TERMINAL" in orchestrator
 assert "terminal_retry_policy: astra-until-approve-v1" in orchestrator
 assert "glm-review-v2" in orchestrator
@@ -199,6 +210,22 @@ assert roster["schema_version"] == 2
 assert roster["ladder_version"] == "glm-review-v2"
 assert roster["terminal_retry"]["default"] == "bounded-human-block"
 assert roster["terminal_retry"]["supported_opt_in"] == "astra-until-approve-v1"
+assert roster["project_fleets"]["jobcron"]["reviewer"] == "jobcron-reviewer"
+assert roster["project_fleets"]["cha-pt"]["orchestrator"] == "chapt-orchestrator"
+assert roster["project_dispatch_allowlist"] == [
+    "jobcron-worker", "jobcron-reviewer", "chapt-worker", "chapt-reviewer"]
+roster_profiles = {profile["name"]: profile for profile in roster["profiles"]}
+assert not roster_profiles["jobcron-orchestrator"]["dispatch_eligible"]
+assert not roster_profiles["chapt-orchestrator"]["dispatch_eligible"]
+for profile in ("jobcron-worker", "jobcron-reviewer", "chapt-worker", "chapt-reviewer"):
+    assert roster_profiles[profile]["dispatch_eligible"]
+for profile in ("jobcron-orchestrator", "jobcron-worker", "jobcron-reviewer",
+                "chapt-orchestrator", "chapt-worker", "chapt-reviewer"):
+    assert "hermes-terminal-outcome-notification" in roster_profiles[profile]["installed_disabled_plugins"]
+errors = []
+with redirect_stdout(io.StringIO()):
+    verify_state.check_project_isolation(errors, roster["project_fleets"], roster["project_fleets"])
+assert errors == [], errors
 check("--fixture", str(FIXTURES / "terminal-retry-default-drift.yaml"), code=1,
       text="terminal retry default drift")
 check("--fixture", str(FIXTURES / "terminal-retry-missing-scope.yaml"), code=1,
@@ -214,7 +241,7 @@ check("--fixture", str(FIXTURES / "skill-deployment-missing.yaml"), code=1, text
 # a supporting file in either deployment skill is part of the deployed tree contract
 check("--fixture", str(FIXTURES / "deployment-skill-supporting-file-drift.yaml"), code=1,
       text="deployed skill hash mismatch")
-# Astra's three intentional local built-in overrides are declared rather than normalized into fleet drift.
+# Astra's intentional local learned-skill overrides are declared rather than normalized into fleet drift.
 check("--fixture", str(FIXTURES / "astra-local-override.yaml"))
 local_overrides = json.loads((ROOT / "snapshots/sanitized-current-state.yaml").read_text())["skill"]["profile_local_skill_overrides"]
 errors = []

@@ -117,6 +117,7 @@ def check_plugins(errors, warnings, profile, expected, observed_plugins, pinned_
 def check_skill(errors, deployed_hashes):
     """deployed_hashes: {skill: {profile: {rel: sha-or-None}}} of deployed copies, or None to check tracked only."""
     skill = load(ROOT / "snapshots/sanitized-current-state.yaml")["skill"]
+    local_overrides = skill.get("profile_local_skill_overrides", {})
     tracked_dir = {
         "multi-agent-coding-orchestrator": ROOT / "skills/multi-agent-coding-orchestrator",
         "minimal-implementation": ROOT / "skills/minimal-implementation",
@@ -146,6 +147,11 @@ def check_skill(errors, deployed_hashes):
                 actual = (observed or {}).get(rel)
                 if actual == want:
                     continue
+                override_suffix = f"/{name}/{rel}"
+                override_hashes = [sha for path, sha in local_overrides.get(profile, {}).items()
+                                   if f"/{path}".endswith(override_suffix)]
+                if actual is not None and actual in override_hashes:
+                    continue
                 if actual is None:
                     fail(errors, f"deployed skill copy missing: {name} {profile}/{rel}")
                 else:
@@ -165,7 +171,7 @@ def check_profile_local_skill_overrides(errors, expected, observed=None):
             continue
         for path, want in files.items():
             if (not isinstance(path, str) or path.startswith("/") or ".." in Path(path).parts
-                    or not path.endswith("/SKILL.md") or not isinstance(want, str)
+                    or not Path(path).name or not isinstance(want, str)
                     or not re.fullmatch(r"[0-9a-f]{64}", want)):
                 fail(errors, f"malformed profile-local skill override path: {profile}/{path!r}")
     if observed is not None and observed != expected:
@@ -173,6 +179,37 @@ def check_profile_local_skill_overrides(errors, expected, observed=None):
 
 
 ADOPTION_REPOS = {"cha-pt": "adoption/cha-pt.md", "jobcron": "adoption/jobcron.md"}
+
+
+def check_project_isolation(errors, fleets, observed=None):
+    """Validate the hard board/repository/profile mapping for concurrent projects."""
+    if not isinstance(fleets, dict) or set(fleets) != {"jobcron", "cha-pt"}:
+        fail(errors, "project isolation mapping must contain exactly jobcron and cha-pt")
+        return
+    seen_profiles, seen_boards, seen_repos, seen_ports = set(), set(), set(), set()
+    for project, fleet in fleets.items():
+        if not isinstance(fleet, dict):
+            fail(errors, f"project isolation mapping malformed: {project}")
+            continue
+        board, repo, port = fleet.get("board"), fleet.get("repository"), fleet.get("preview_port")
+        profiles = [fleet.get(role) for role in ("orchestrator", "worker", "reviewer")]
+        if board != project or not isinstance(repo, str) or not Path(repo).is_absolute():
+            fail(errors, f"project isolation mapping malformed: {project}")
+        if not isinstance(port, int) or not 1024 <= port <= 65535:
+            fail(errors, f"project isolation preview port invalid: {project}")
+        if any(not isinstance(profile, str) or not profile for profile in profiles):
+            fail(errors, f"project isolation profile mapping malformed: {project}")
+        for value, seen, label in ((board, seen_boards, "board"), (repo, seen_repos, "repository"),
+                                   (port, seen_ports, "preview port")):
+            if value in seen:
+                fail(errors, f"project isolation duplicate {label}: {value}")
+            seen.add(value)
+        for profile in profiles:
+            if profile in seen_profiles:
+                fail(errors, f"project isolation duplicate profile: {profile}")
+            seen_profiles.add(profile)
+    if observed is not None and observed != fleets:
+        fail(errors, "project isolation observed mapping drift")
 
 
 def check_adoption(errors, adapters):
@@ -300,17 +337,17 @@ def usable_absolute_path(value):
 
 
 def check_terminal_notification_runtime(errors, runtime, producer_profiles):
-    """Producers and the worker must agree on real private paths; the loaded worker must match them."""
+    """Producers share one outbox; the worker alone owns the legacy default-board DB pin."""
     environments = runtime.get("producer_environment", {}) if isinstance(runtime, dict) else {}
     shared_environment = runtime.get("shared_environment", {}) if isinstance(runtime, dict) else {}
-    paths = []
+    outboxes = []
     for profile in producer_profiles:
         env = environments.get(profile, shared_environment)
-        outbox, kanban_db = env.get("outbox"), env.get("kanban_db")
-        if not usable_absolute_path(outbox) or not usable_absolute_path(kanban_db):
-            fail(errors, f"terminal notification runtime pending {profile}: shared absolute environment missing")
+        outbox = env.get("outbox")
+        if not usable_absolute_path(outbox):
+            fail(errors, f"terminal notification runtime pending {profile}: shared absolute outbox missing")
         else:
-            paths.append((outbox, kanban_db))
+            outboxes.append(outbox)
     worker = runtime.get("worker", {}) if isinstance(runtime, dict) else {}
     if not worker.get("plist_rendered") or not worker.get("loaded"):
         fail(errors, "terminal notification runtime pending worker: LaunchAgent not rendered and loaded")
@@ -322,13 +359,13 @@ def check_terminal_notification_runtime(errors, runtime, producer_profiles):
     if not usable_absolute_path(outbox) or not usable_absolute_path(kanban_db):
         fail(errors, "terminal notification runtime pending worker: shared absolute environment missing")
         return
-    paths.append((outbox, kanban_db))
-    if len(set(paths)) != 1:
-        fail(errors, "terminal notification runtime drift: producers and worker must share one outbox and canonical Kanban DB")
+    outboxes.append(outbox)
+    if len(set(outboxes)) != 1:
+        fail(errors, "terminal notification runtime drift: producers and worker must share one outbox")
 
 
-GATEWAY_PROCESS_PATTERN = "hermes_cli.main gateway run"
-WORKER_ENV_KEYS = ("HERMES_TERMINAL_OUTBOX", "HERMES_KANBAN_DB")
+GATEWAY_PROCESS_PATTERN = re.compile(r"\bgateway\s+run\s+--external-supervisor\b")
+GATEWAY_OUTBOX_KEY = "HERMES_TERMINAL_OUTBOX"
 
 
 def parse_ps_environment(text):
@@ -379,22 +416,26 @@ def observe_gateway_environment(errors, runner):
         return {}
     environments = []
     for line in ps.stdout.splitlines():
-        if GATEWAY_PROCESS_PATTERN not in line:
+        if not GATEWAY_PROCESS_PATTERN.search(line):
+            continue
+        # LaunchAgent timestamp/supervisor wrappers include the child command in
+        # argv text but are not the gateway producer process itself.
+        if "--run-module hermes_cli.stderr_timestamp" in line:
             continue
         environments.append(parse_ps_environment(line))
     if not environments:
         fail(errors, "terminal notification runtime pending gateway: multiplex gateway is not running")
         return {}
-    gateway = {}
-    for key in WORKER_ENV_KEYS:
-        values = {env.get(key) for env in environments}
-        if len(values) > 1:
-            fail(errors, "terminal notification runtime drift: running gateway processes disagree on the shared environment")
-            return {}
-        gateway[key] = values.pop()
-    if any(gateway.get(key) is None for key in WORKER_ENV_KEYS):
+    outboxes = {env.get(GATEWAY_OUTBOX_KEY) for env in environments}
+    if len(outboxes) > 1:
+        fail(errors, "terminal notification runtime drift: running gateway processes disagree on the shared environment")
+        return {}
+    gateway = {GATEWAY_OUTBOX_KEY: outboxes.pop()}
+    if gateway[GATEWAY_OUTBOX_KEY] is None:
         fail(errors, "terminal notification runtime pending gateway: running gateway has not inherited "
-                     "HERMES_TERMINAL_OUTBOX/HERMES_KANBAN_DB (hermes gateway restart required)")
+                     "HERMES_TERMINAL_OUTBOX (hermes gateway restart required)")
+    if any(env.get("HERMES_KANBAN_DB") for env in environments):
+        fail(errors, "terminal notification runtime drift: multi-board gateway must not inherit HERMES_KANBAN_DB")
     return gateway
 
 
@@ -428,17 +469,24 @@ def build_live_terminal_runtime(errors, runner, producer_profiles, plist=None):
     """Observe the live runtime: running gateway environment, rendered plist, and the
     loaded LaunchAgent's effective arguments/environment (not merely the file on disk)."""
     gateway = observe_gateway_environment(errors, runner)
-    outbox, kanban_db = gateway.get(WORKER_ENV_KEYS[0]), gateway.get(WORKER_ENV_KEYS[1])
+    outbox = gateway.get(GATEWAY_OUTBOX_KEY)
     matrix = load(ROOT / "deployment/hermes-terminal-outcome-notification.example.yaml")
     label = matrix["worker"]["launchagent"]
-    worker = {"outbox": outbox, "kanban_db": kanban_db}
+    worker = {"outbox": None, "kanban_db": None}
     worker_path = None
     plist = plist if plist is not None else Path.home() / "Library" / "LaunchAgents" / f"{label}.plist"
     worker["plist_rendered"] = plist.is_file()
-    if worker["plist_rendered"] and outbox and kanban_db:
-        for key, want in (("EnvironmentVariables.HERMES_TERMINAL_OUTBOX", outbox),
-                          ("EnvironmentVariables.HERMES_KANBAN_DB", kanban_db),
-                          ("ProgramArguments.3", outbox), ("ProgramArguments.5", kanban_db)):
+    if worker["plist_rendered"]:
+        extracted = {}
+        for key in ("EnvironmentVariables.HERMES_TERMINAL_OUTBOX", "EnvironmentVariables.HERMES_KANBAN_DB"):
+            actual = runner("plutil", "-extract", key, "raw", str(plist))
+            extracted[key] = actual.stdout.strip() if not actual.returncode else None
+        worker["outbox"] = extracted["EnvironmentVariables.HERMES_TERMINAL_OUTBOX"]
+        worker["kanban_db"] = extracted["EnvironmentVariables.HERMES_KANBAN_DB"]
+        if worker["outbox"] != outbox or not usable_absolute_path(worker["kanban_db"]):
+            worker["plist_rendered"] = False
+        for key, want in (("ProgramArguments.3", worker["outbox"]),
+                          ("ProgramArguments.5", worker["kanban_db"])):
             actual = runner("plutil", "-extract", key, "raw", str(plist))
             if actual.returncode or actual.stdout.strip() != want:
                 worker["plist_rendered"] = False
@@ -449,15 +497,15 @@ def build_live_terminal_runtime(errors, runner, producer_profiles, plist=None):
     printed = runner("launchctl", "print", f"gui/{os.getuid()}/{label}")
     worker["loaded"] = not printed.returncode
     worker["loaded_state_matches"] = False
-    if worker["loaded"] and outbox and kanban_db and worker_path:
+    if worker["loaded"] and worker["outbox"] and worker["kanban_db"] and worker_path:
         state = parse_launchctl_print(printed.stdout)
         worker["loaded_state_matches"] = (
-            argument_after(state["arguments"], "--db") == outbox
-            and argument_after(state["arguments"], "--kanban-db") == kanban_db
-            and state["environment"].get("HERMES_TERMINAL_OUTBOX") == outbox
-            and state["environment"].get("HERMES_KANBAN_DB") == kanban_db
+            argument_after(state["arguments"], "--db") == worker["outbox"]
+            and argument_after(state["arguments"], "--kanban-db") == worker["kanban_db"]
+            and state["environment"].get("HERMES_TERMINAL_OUTBOX") == worker["outbox"]
+            and state["environment"].get("HERMES_KANBAN_DB") == worker["kanban_db"]
             and state["environment"].get("PATH") == worker_path)
-    return {"producer_environment": {profile: {"outbox": outbox, "kanban_db": kanban_db}
+    return {"producer_environment": {profile: {"outbox": outbox}
                                      for profile in producer_profiles},
             "worker": worker}
 
@@ -487,6 +535,7 @@ def main():
         fail(errors, "ladder_version expected glm-review-v2")
     check_terminal_notification_deployment(errors, roster, snapshot)
     check_terminal_retry_policy(errors, roster)
+    check_project_isolation(errors, snapshot.get("project_isolation"))
     expected_local_overrides = snapshot["skill"].get("profile_local_skill_overrides", {})
     check_profile_local_skill_overrides(errors, expected_local_overrides)
     expected = {p["name"]: p for p in roster.get("profiles", [])}
@@ -499,7 +548,7 @@ def main():
             return 2
         # Fail-closed fixture schema: a passing fixture must represent every required
         # observed field and every installed roster profile; omission is drift, not success.
-        for section in ("profile_models", "profile_providers", "plugins", "dispatch_profiles", "kanban", "skill_files", "profile_local_skill_overrides", "adapters", "terminal_notification_runtime", "terminal_retry_policy"):
+        for section in ("profile_models", "profile_providers", "plugins", "dispatch_profiles", "kanban", "skill_files", "profile_local_skill_overrides", "adapters", "terminal_notification_runtime", "terminal_retry_policy", "project_isolation"):
             if section not in observed:
                 fail(errors, f"incomplete fixture: missing required section '{section}'")
         kanban = observed.get("kanban", {})
@@ -532,6 +581,7 @@ def main():
         check_terminal_notification_runtime(errors, observed.get("terminal_notification_runtime", {}),
                                             snapshot["terminal_notification"]["producer_profiles"])
         check_terminal_retry_policy(errors, roster, observed)
+        check_project_isolation(errors, snapshot.get("project_isolation"), observed.get("project_isolation"))
         for name in expected:
             if name not in plugins:
                 fail(errors, f"incomplete fixture: plugins omits {name}")
@@ -585,6 +635,43 @@ def main():
             actual = json_config("default", f"kanban.{key}")
             if actual is UNREADABLE or actual != want:
                 fail(errors, f"concurrency/dispatch drift kanban.{key}: expected {want!r}, actual {'<unreadable>' if actual is UNREADABLE else actual!r}")
+        inherited_db_pin = os.environ.get("HERMES_KANBAN_DB", "").strip()
+        launchd_db_pin = run("launchctl", "getenv", "HERMES_KANBAN_DB")
+        if inherited_db_pin:
+            fail(errors, f"multi-board gateway is still pinned to one database via HERMES_KANBAN_DB: {inherited_db_pin}")
+        if not launchd_db_pin.returncode and launchd_db_pin.stdout.strip():
+            fail(errors, f"launchd still exports legacy HERMES_KANBAN_DB: {launchd_db_pin.stdout.strip()}")
+        boards_result = run("hermes", "-p", "default", "kanban", "boards", "list", "--json")
+        try:
+            boards = {entry["slug"]: entry for entry in json.loads(boards_result.stdout)} if not boards_result.returncode else {}
+        except (json.JSONDecodeError, KeyError, TypeError):
+            boards = {}
+        for project, fleet in snapshot["project_isolation"].items():
+            board = boards.get(fleet["board"])
+            if not board or board.get("archived") or board.get("default_workdir") != fleet["repository"]:
+                fail(errors, f"project board drift {project}: expected active board {fleet['board']} rooted at {fleet['repository']}")
+            for role in ("orchestrator", "worker", "reviewer"):
+                profile = fleet[role]
+                if json_config(profile, "terminal.cwd") != fleet["repository"]:
+                    fail(errors, f"project terminal root drift {profile}: expected {fleet['repository']}")
+            expected_toolsets = {
+                "orchestrator": ["clarify", "kanban", "memory", "session_search", "skills", "todo"],
+                "worker": ["browser", "clarify", "code_execution", "file", "memory", "skills", "terminal", "todo", "vision", "web"],
+                "reviewer": ["browser", "clarify", "code_execution", "file", "memory", "skills", "terminal", "todo", "vision", "web"],
+            }
+            for role, expected_tools in expected_toolsets.items():
+                profile = fleet[role]
+                tools = json_config(profile, "platform_toolsets.cli")
+                if tools != expected_tools:
+                    fail(errors, f"project {role} toolset drift {profile}: expected {expected_tools!r}")
+            launcher_name = {"jobcron": "run-jobcron-orchestrator", "cha-pt": "run-chapt-orchestrator"}[project]
+            launcher = ROOT / "scripts" / launcher_name
+            launcher_text = launcher.read_text() if launcher.is_file() else ""
+            if (not launcher.is_file() or not os.access(launcher, os.X_OK)
+                    or f"HERMES_KANBAN_BOARD={fleet['board']}" not in launcher_text
+                    or fleet["orchestrator"] not in launcher_text
+                    or fleet["repository"] not in launcher_text):
+                fail(errors, f"project orchestrator launcher drift: {launcher}")
         deployed_hashes = {}
         for entry in snapshot["skill"]["shared_skills"]:
             deployed_hashes[entry["name"]] = {}

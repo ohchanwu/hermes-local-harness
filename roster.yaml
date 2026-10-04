@@ -1,15 +1,499 @@
-{"schema_version": 2, "ladder_version": "glm-review-v2", "supported_ladder_versions": ["glm-review-v1", "glm-review-v2"], "terminal_retry": {"default": "bounded-human-block", "supported_opt_in": "astra-until-approve-v1", "required_card_metadata": ["ladder_version: glm-review-v2", "authorization_mode: autonomous", "terminal_retry_policy: astra-until-approve-v1"], "human_gates": ["user_stop", "product_decision", "credentials_or_prohibited_write", "unsafe_state", "capability_boundary", "policy_legal_security"], "infrastructure_exclusions": ["provider", "quota", "crash", "timeout", "context_exhaustion"], "terminal_assignee": "worker-astra"}, "escalation_rungs": ["flash", "luna", "terra", "glm-full", "sol", "astra", "human"], "permitted_direct_entry_rungs": ["flash", "terra", "glm-full"], "maximum_concurrent_implementation_runs": 5, "native_settings": {"kanban.max_in_progress": null, "kanban.max_in_progress_per_profile": 1}, "dispatch_pool": {"implementation_allowlist": ["worker-flash-1", "worker-flash-2", "worker-flash-3", "worker-luna-1", "worker-luna-2"], "dispatch_allowlist": ["worker-flash-1", "worker-flash-2", "worker-flash-3", "worker-luna-1", "worker-luna-2", "reviewer-sol"], "reviewer_outside_budget": "reviewer-sol"}, "automatic_decomposition": false, "revision_limits": {"default_same_rung": 1, "absolute_same_rung": 2, "infrastructure_failures_before_escalation": 2, "final_tier": "human_block",
- "terminal_default": "bounded-human-block",
- "terminal_opt_in": "astra-until-approve-v1"}, "profiles": [{"name": "default", "role": "orchestrator", "model": "gpt-5.6-sol", "provider": "openai-codex", "installed": true, "dispatch_eligible": false, "in_dispatch_pool": false, "lifecycle": "active", "concurrency_limit": 1, "required_plugins": ["hermes-terminal-outcome-notification"], "modes": [], "toolsets": "orchestrator", "credential_required": true, "credential_present": true},
-    {"name": "advisor", "role": "advisor", "model": "gpt-5.6-sol", "provider": "openai-codex", "installed": true, "dispatch_eligible": false, "in_dispatch_pool": false, "lifecycle": "active", "concurrency_limit": 1, "required_plugins": [], "modes": [], "toolsets": "read-only", "credential_required": true, "credential_present": true},
-    {"name": "reviewer-sol", "role": "independent reviewer", "model": "gpt-5.6-sol", "provider": "openai-codex", "installed": true, "dispatch_eligible": true, "in_dispatch_pool": true, "lifecycle": "active", "concurrency_limit": 1, "required_plugins": ["hermes-terminal-outcome-notification"], "modes": [], "toolsets": "review", "credential_required": true, "credential_present": true},
-    {"name": "worker-flash-1", "role": "implementation", "model": "glm-5.3-flash", "provider": "zai", "installed": true, "dispatch_eligible": true, "in_dispatch_pool": true, "lifecycle": "active", "concurrency_limit": 1, "required_plugins": ["hermes-terminal-outcome-notification"], "modes": [], "toolsets": "implementation", "credential_required": true, "credential_present": true, "installed_disabled_plugins": ["ponytail"]},
-    {"name": "worker-flash-2", "role": "implementation", "model": "glm-5.3-flash", "provider": "zai", "installed": true, "dispatch_eligible": true, "in_dispatch_pool": true, "lifecycle": "active", "concurrency_limit": 1, "required_plugins": ["hermes-terminal-outcome-notification"], "modes": [], "toolsets": "implementation", "credential_required": true, "credential_present": true, "installed_disabled_plugins": ["ponytail"]},
-    {"name": "worker-flash-3", "role": "implementation", "model": "glm-5.3-flash", "provider": "zai", "installed": true, "dispatch_eligible": true, "in_dispatch_pool": true, "lifecycle": "active", "concurrency_limit": 1, "required_plugins": ["hermes-terminal-outcome-notification"], "modes": [], "toolsets": "implementation", "credential_required": true, "credential_present": true, "installed_disabled_plugins": ["ponytail"]},
-    {"name": "worker-luna-1", "role": "implementation", "model": "gpt-5.6-luna", "provider": "openai-codex", "installed": true, "dispatch_eligible": true, "in_dispatch_pool": true, "lifecycle": "active", "concurrency_limit": 1, "required_plugins": ["hermes-terminal-outcome-notification"], "modes": [], "toolsets": "implementation", "credential_required": true, "credential_present": true, "installed_disabled_plugins": ["ponytail"]},
-    {"name": "worker-luna-2", "role": "implementation", "model": "gpt-5.6-luna", "provider": "openai-codex", "installed": true, "dispatch_eligible": true, "in_dispatch_pool": true, "lifecycle": "active", "concurrency_limit": 1, "required_plugins": ["hermes-terminal-outcome-notification"], "modes": [], "toolsets": "implementation", "credential_required": true, "credential_present": true, "installed_disabled_plugins": ["ponytail"]},
-    {"name": "worker-terra-1", "role": "implementation", "model": "gpt-5.6-terra", "provider": "openai-codex", "installed": true, "dispatch_eligible": true, "in_dispatch_pool": false, "lifecycle": "active", "concurrency_limit": 1, "required_plugins": ["hermes-terminal-outcome-notification"], "modes": [], "toolsets": "implementation", "credential_required": true, "credential_present": true, "installed_disabled_plugins": ["ponytail"]},
-    {"name": "worker-glm-full", "role": "implementation", "model": "glm-5.3", "provider": "zai", "installed": true, "dispatch_eligible": true, "in_dispatch_pool": false, "lifecycle": "active", "concurrency_limit": 1, "required_plugins": ["hermes-terminal-outcome-notification"], "modes": [], "toolsets": "implementation", "credential_required": true, "credential_present": true, "installed_disabled_plugins": ["ponytail"]},
-    {"name": "worker-sol", "role": "implementation", "model": "gpt-5.6-sol", "provider": "openai-codex", "installed": true, "dispatch_eligible": true, "in_dispatch_pool": false, "lifecycle": "active", "concurrency_limit": 1, "required_plugins": ["hermes-terminal-outcome-notification"], "modes": [], "toolsets": "implementation", "credential_required": true, "credential_present": true, "installed_disabled_plugins": ["ponytail"]},
-    {"name": "worker-astra", "role": "implementation", "model": "gpt-6-astra", "provider": "openai-codex", "installed": true, "dispatch_eligible": true, "in_dispatch_pool": false, "lifecycle": "active", "concurrency_limit": 1, "required_plugins": ["hermes-terminal-outcome-notification"], "modes": [], "toolsets": "implementation", "credential_required": true, "credential_present": true, "installed_disabled_plugins": ["ponytail"]},
-    {"name": "worker-terra-2", "role": "rollback spare", "model": "gpt-5.6-terra", "provider": "openai-codex", "installed": true, "dispatch_eligible": false, "in_dispatch_pool": false, "lifecycle": "dormant-spare", "concurrency_limit": 1, "required_plugins": [], "modes": [], "toolsets": "implementation", "credential_required": true, "credential_present": true, "installed_disabled_plugins": ["ponytail"]}]}
+{
+  "schema_version": 2,
+  "ladder_version": "glm-review-v2",
+  "supported_ladder_versions": [
+    "glm-review-v1",
+    "glm-review-v2"
+  ],
+  "terminal_retry": {
+    "default": "bounded-human-block",
+    "supported_opt_in": "astra-until-approve-v1",
+    "required_card_metadata": [
+      "ladder_version: glm-review-v2",
+      "authorization_mode: autonomous",
+      "terminal_retry_policy: astra-until-approve-v1"
+    ],
+    "human_gates": [
+      "user_stop",
+      "product_decision",
+      "credentials_or_prohibited_write",
+      "unsafe_state",
+      "capability_boundary",
+      "policy_legal_security"
+    ],
+    "infrastructure_exclusions": [
+      "provider",
+      "quota",
+      "crash",
+      "timeout",
+      "context_exhaustion"
+    ],
+    "terminal_assignee": "worker-astra"
+  },
+  "escalation_rungs": [
+    "flash",
+    "luna",
+    "terra",
+    "glm-full",
+    "sol",
+    "astra",
+    "human"
+  ],
+  "permitted_direct_entry_rungs": [
+    "flash",
+    "terra",
+    "glm-full"
+  ],
+  "maximum_concurrent_implementation_runs": 5,
+  "native_settings": {
+    "kanban.max_in_progress": null,
+    "kanban.max_in_progress_per_profile": 1
+  },
+  "dispatch_pool": {
+    "implementation_allowlist": [
+      "worker-flash-1",
+      "worker-flash-2",
+      "worker-flash-3",
+      "worker-luna-1",
+      "worker-luna-2"
+    ],
+    "dispatch_allowlist": [
+      "worker-flash-1",
+      "worker-flash-2",
+      "worker-flash-3",
+      "worker-luna-1",
+      "worker-luna-2",
+      "reviewer-sol"
+    ],
+    "reviewer_outside_budget": "reviewer-sol"
+  },
+  "automatic_decomposition": false,
+  "revision_limits": {
+    "default_same_rung": 1,
+    "absolute_same_rung": 2,
+    "infrastructure_failures_before_escalation": 2,
+    "final_tier": "human_block",
+    "terminal_default": "bounded-human-block",
+    "terminal_opt_in": "astra-until-approve-v1"
+  },
+  "profiles": [
+    {
+      "name": "default",
+      "role": "orchestrator",
+      "model": "gpt-5.6-sol",
+      "provider": "openai-codex",
+      "installed": true,
+      "dispatch_eligible": false,
+      "in_dispatch_pool": false,
+      "lifecycle": "active",
+      "concurrency_limit": 1,
+      "required_plugins": [
+        "hermes-terminal-outcome-notification"
+      ],
+      "modes": [],
+      "toolsets": "orchestrator",
+      "credential_required": true,
+      "credential_present": true
+    },
+    {
+      "name": "advisor",
+      "role": "advisor",
+      "model": "gpt-5.6-sol",
+      "provider": "openai-codex",
+      "installed": true,
+      "dispatch_eligible": false,
+      "in_dispatch_pool": false,
+      "lifecycle": "active",
+      "concurrency_limit": 1,
+      "required_plugins": [],
+      "modes": [],
+      "toolsets": "read-only",
+      "credential_required": true,
+      "credential_present": true
+    },
+    {
+      "name": "reviewer-sol",
+      "role": "independent reviewer",
+      "model": "gpt-5.6-sol",
+      "provider": "openai-codex",
+      "installed": true,
+      "dispatch_eligible": true,
+      "in_dispatch_pool": true,
+      "lifecycle": "active",
+      "concurrency_limit": 1,
+      "required_plugins": [
+        "hermes-terminal-outcome-notification"
+      ],
+      "modes": [],
+      "toolsets": "review",
+      "credential_required": true,
+      "credential_present": true
+    },
+    {
+      "name": "worker-flash-1",
+      "role": "implementation",
+      "model": "glm-5.3-flash",
+      "provider": "zai",
+      "installed": true,
+      "dispatch_eligible": true,
+      "in_dispatch_pool": true,
+      "lifecycle": "active",
+      "concurrency_limit": 1,
+      "required_plugins": [
+        "hermes-terminal-outcome-notification"
+      ],
+      "modes": [],
+      "toolsets": "implementation",
+      "credential_required": true,
+      "credential_present": true,
+      "installed_disabled_plugins": [
+        "ponytail"
+      ]
+    },
+    {
+      "name": "worker-flash-2",
+      "role": "implementation",
+      "model": "glm-5.3-flash",
+      "provider": "zai",
+      "installed": true,
+      "dispatch_eligible": true,
+      "in_dispatch_pool": true,
+      "lifecycle": "active",
+      "concurrency_limit": 1,
+      "required_plugins": [
+        "hermes-terminal-outcome-notification"
+      ],
+      "modes": [],
+      "toolsets": "implementation",
+      "credential_required": true,
+      "credential_present": true,
+      "installed_disabled_plugins": [
+        "ponytail"
+      ]
+    },
+    {
+      "name": "worker-flash-3",
+      "role": "implementation",
+      "model": "glm-5.3-flash",
+      "provider": "zai",
+      "installed": true,
+      "dispatch_eligible": true,
+      "in_dispatch_pool": true,
+      "lifecycle": "active",
+      "concurrency_limit": 1,
+      "required_plugins": [
+        "hermes-terminal-outcome-notification"
+      ],
+      "modes": [],
+      "toolsets": "implementation",
+      "credential_required": true,
+      "credential_present": true,
+      "installed_disabled_plugins": [
+        "ponytail"
+      ]
+    },
+    {
+      "name": "worker-luna-1",
+      "role": "implementation",
+      "model": "gpt-5.6-luna",
+      "provider": "openai-codex",
+      "installed": true,
+      "dispatch_eligible": true,
+      "in_dispatch_pool": true,
+      "lifecycle": "active",
+      "concurrency_limit": 1,
+      "required_plugins": [
+        "hermes-terminal-outcome-notification"
+      ],
+      "modes": [],
+      "toolsets": "implementation",
+      "credential_required": true,
+      "credential_present": true,
+      "installed_disabled_plugins": [
+        "ponytail"
+      ]
+    },
+    {
+      "name": "worker-luna-2",
+      "role": "implementation",
+      "model": "gpt-5.6-luna",
+      "provider": "openai-codex",
+      "installed": true,
+      "dispatch_eligible": true,
+      "in_dispatch_pool": true,
+      "lifecycle": "active",
+      "concurrency_limit": 1,
+      "required_plugins": [
+        "hermes-terminal-outcome-notification"
+      ],
+      "modes": [],
+      "toolsets": "implementation",
+      "credential_required": true,
+      "credential_present": true,
+      "installed_disabled_plugins": [
+        "ponytail"
+      ]
+    },
+    {
+      "name": "worker-terra-1",
+      "role": "implementation",
+      "model": "gpt-5.6-terra",
+      "provider": "openai-codex",
+      "installed": true,
+      "dispatch_eligible": true,
+      "in_dispatch_pool": false,
+      "lifecycle": "active",
+      "concurrency_limit": 1,
+      "required_plugins": [
+        "hermes-terminal-outcome-notification"
+      ],
+      "modes": [],
+      "toolsets": "implementation",
+      "credential_required": true,
+      "credential_present": true,
+      "installed_disabled_plugins": [
+        "ponytail"
+      ]
+    },
+    {
+      "name": "worker-glm-full",
+      "role": "implementation",
+      "model": "glm-5.3",
+      "provider": "zai",
+      "installed": true,
+      "dispatch_eligible": true,
+      "in_dispatch_pool": false,
+      "lifecycle": "active",
+      "concurrency_limit": 1,
+      "required_plugins": [
+        "hermes-terminal-outcome-notification"
+      ],
+      "modes": [],
+      "toolsets": "implementation",
+      "credential_required": true,
+      "credential_present": true,
+      "installed_disabled_plugins": [
+        "ponytail"
+      ]
+    },
+    {
+      "name": "worker-sol",
+      "role": "implementation",
+      "model": "gpt-5.6-sol",
+      "provider": "openai-codex",
+      "installed": true,
+      "dispatch_eligible": true,
+      "in_dispatch_pool": false,
+      "lifecycle": "active",
+      "concurrency_limit": 1,
+      "required_plugins": [
+        "hermes-terminal-outcome-notification"
+      ],
+      "modes": [],
+      "toolsets": "implementation",
+      "credential_required": true,
+      "credential_present": true,
+      "installed_disabled_plugins": [
+        "ponytail"
+      ]
+    },
+    {
+      "name": "worker-astra",
+      "role": "implementation",
+      "model": "gpt-6-astra",
+      "provider": "openai-codex",
+      "installed": true,
+      "dispatch_eligible": true,
+      "in_dispatch_pool": false,
+      "lifecycle": "active",
+      "concurrency_limit": 1,
+      "required_plugins": [
+        "hermes-terminal-outcome-notification"
+      ],
+      "modes": [],
+      "toolsets": "implementation",
+      "credential_required": true,
+      "credential_present": true,
+      "installed_disabled_plugins": [
+        "ponytail"
+      ]
+    },
+    {
+      "name": "worker-terra-2",
+      "role": "rollback spare",
+      "model": "gpt-5.6-terra",
+      "provider": "openai-codex",
+      "installed": true,
+      "dispatch_eligible": false,
+      "in_dispatch_pool": false,
+      "lifecycle": "dormant-spare",
+      "concurrency_limit": 1,
+      "required_plugins": [],
+      "modes": [],
+      "toolsets": "implementation",
+      "credential_required": true,
+      "credential_present": true,
+      "installed_disabled_plugins": [
+        "ponytail"
+      ]
+    },
+    {
+      "name": "jobcron-orchestrator",
+      "role": "project orchestrator",
+      "model": "gpt-6.1-sol",
+      "provider": "openai-codex",
+      "installed": true,
+      "dispatch_eligible": false,
+      "in_dispatch_pool": false,
+      "lifecycle": "project-active",
+      "concurrency_limit": 1,
+      "required_plugins": [],
+      "modes": [
+        "project-isolated",
+        "jobcron"
+      ],
+      "toolsets": "orchestrator",
+      "credential_required": true,
+      "credential_present": true,
+      "installed_disabled_plugins": [
+        "hermes-terminal-outcome-notification"
+      ]
+    },
+    {
+      "name": "jobcron-worker",
+      "role": "project implementation",
+      "model": "gpt-6.1-sol",
+      "provider": "openai-codex",
+      "installed": true,
+      "dispatch_eligible": true,
+      "in_dispatch_pool": true,
+      "lifecycle": "project-active",
+      "concurrency_limit": 1,
+      "required_plugins": [],
+      "modes": [
+        "project-isolated",
+        "jobcron"
+      ],
+      "toolsets": "implementation",
+      "credential_required": true,
+      "credential_present": true,
+      "installed_disabled_plugins": [
+        "ponytail",
+        "hermes-terminal-outcome-notification"
+      ]
+    },
+    {
+      "name": "jobcron-reviewer",
+      "role": "project independent reviewer",
+      "model": "gpt-6-astra",
+      "provider": "openai-codex",
+      "installed": true,
+      "dispatch_eligible": true,
+      "in_dispatch_pool": true,
+      "lifecycle": "project-active",
+      "concurrency_limit": 1,
+      "required_plugins": [],
+      "modes": [
+        "project-isolated",
+        "jobcron"
+      ],
+      "toolsets": "review",
+      "credential_required": true,
+      "credential_present": true,
+      "installed_disabled_plugins": [
+        "hermes-terminal-outcome-notification"
+      ]
+    },
+    {
+      "name": "chapt-orchestrator",
+      "role": "project orchestrator",
+      "model": "gpt-6.1-sol",
+      "provider": "openai-codex",
+      "installed": true,
+      "dispatch_eligible": false,
+      "in_dispatch_pool": false,
+      "lifecycle": "project-active",
+      "concurrency_limit": 1,
+      "required_plugins": [],
+      "modes": [
+        "project-isolated",
+        "cha-pt"
+      ],
+      "toolsets": "orchestrator",
+      "credential_required": true,
+      "credential_present": true,
+      "installed_disabled_plugins": [
+        "hermes-terminal-outcome-notification"
+      ]
+    },
+    {
+      "name": "chapt-worker",
+      "role": "project implementation",
+      "model": "gpt-6.1-sol",
+      "provider": "openai-codex",
+      "installed": true,
+      "dispatch_eligible": true,
+      "in_dispatch_pool": true,
+      "lifecycle": "project-active",
+      "concurrency_limit": 1,
+      "required_plugins": [],
+      "modes": [
+        "project-isolated",
+        "cha-pt"
+      ],
+      "toolsets": "implementation",
+      "credential_required": true,
+      "credential_present": true,
+      "installed_disabled_plugins": [
+        "ponytail",
+        "hermes-terminal-outcome-notification"
+      ]
+    },
+    {
+      "name": "chapt-reviewer",
+      "role": "project independent reviewer",
+      "model": "gpt-6-astra",
+      "provider": "openai-codex",
+      "installed": true,
+      "dispatch_eligible": true,
+      "in_dispatch_pool": true,
+      "lifecycle": "project-active",
+      "concurrency_limit": 1,
+      "required_plugins": [],
+      "modes": [
+        "project-isolated",
+        "cha-pt"
+      ],
+      "toolsets": "review",
+      "credential_required": true,
+      "credential_present": true,
+      "installed_disabled_plugins": [
+        "hermes-terminal-outcome-notification"
+      ]
+    }
+  ],
+  "project_fleets": {
+    "jobcron": {
+      "board": "jobcron",
+      "repository": "/Users/chanbla11mit/projects/jobcron",
+      "orchestrator": "jobcron-orchestrator",
+      "worker": "jobcron-worker",
+      "reviewer": "jobcron-reviewer",
+      "preview_port": 17777
+    },
+    "cha-pt": {
+      "board": "cha-pt",
+      "repository": "/Users/chanbla11mit/projects/cha-pt",
+      "orchestrator": "chapt-orchestrator",
+      "worker": "chapt-worker",
+      "reviewer": "chapt-reviewer",
+      "preview_port": 18080
+    }
+  },
+  "project_dispatch_allowlist": [
+    "jobcron-worker",
+    "jobcron-reviewer",
+    "chapt-worker",
+    "chapt-reviewer"
+  ]
+}

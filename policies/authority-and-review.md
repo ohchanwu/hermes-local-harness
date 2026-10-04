@@ -1,6 +1,6 @@
 # Authority and review
 
-The shared tracked skill is canonical; the `~/.hermes` copy is deployed state. Apply only through supported Hermes commands or a manual copy after explicit authorization. Each implementation change requires independent `reviewer-sol` review. No push, PR, deploy, credential change, or automatic deletion is authorized here.
+The shared tracked skill is canonical; the `~/.hermes` copies are deployed state. Apply only through supported Hermes commands or a manual copy after explicit authorization. Each implementation change requires the board-designated independent reviewer: `jobcron-reviewer` for `jobcron`, `chapt-reviewer` for `cha-pt`, and `reviewer-sol` only for the legacy default board. No push, PR, deploy, credential change, or automatic deletion is authorized here.
 
 For diagnostics, apply [diagnostic convergence](diagnostic-convergence.md). Review proportionality and decision utility before implementation minutiae. If an approach is overbuilt or low-value, direct simplify/pivot/abandon rather than serial micro-fixes. The first material correction requires approach reassessment; a second material failure or exhausted design budget requires a strategy pivot or abandonment. Campaign-level terminal retry authorization does not reset a hypothesis's two-generation budget.
 

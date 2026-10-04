@@ -9,10 +9,16 @@
     "worker-luna-1": "gpt-5.6-luna",
     "worker-luna-2": "gpt-5.6-luna",
     "worker-terra-1": "gpt-5.6-terra",
-    "worker-terra-2": "gpt-5.6-terra",
     "worker-glm-full": "glm-5.3",
     "worker-sol": "gpt-5.6-sol",
-    "worker-astra": "gpt-6-astra"
+    "worker-astra": "gpt-6-astra",
+    "worker-terra-2": "gpt-5.6-terra",
+    "jobcron-orchestrator": "gpt-6.1-sol",
+    "jobcron-worker": "gpt-6.1-sol",
+    "jobcron-reviewer": "gpt-6-astra",
+    "chapt-orchestrator": "gpt-6.1-sol",
+    "chapt-worker": "gpt-6.1-sol",
+    "chapt-reviewer": "gpt-6-astra"
   },
   "profile_providers": {
     "default": "openai-codex",
@@ -24,10 +30,16 @@
     "worker-luna-1": "openai-codex",
     "worker-luna-2": "openai-codex",
     "worker-terra-1": "openai-codex",
-    "worker-terra-2": "openai-codex",
     "worker-glm-full": "zai",
     "worker-sol": "openai-codex",
-    "worker-astra": "openai-codex"
+    "worker-astra": "openai-codex",
+    "worker-terra-2": "openai-codex",
+    "jobcron-orchestrator": "openai-codex",
+    "jobcron-worker": "openai-codex",
+    "jobcron-reviewer": "openai-codex",
+    "chapt-orchestrator": "openai-codex",
+    "chapt-worker": "openai-codex",
+    "chapt-reviewer": "openai-codex"
   },
   "plugins": {
     "default": {
@@ -61,9 +73,6 @@
       "hermes-terminal-outcome-notification": "enabled      git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification",
       "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail"
     },
-    "worker-terra-2": {
-      "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail"
-    },
     "worker-glm-full": {
       "hermes-terminal-outcome-notification": "enabled      git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification",
       "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail"
@@ -75,15 +84,38 @@
     "worker-astra": {
       "hermes-terminal-outcome-notification": "enabled      git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification",
       "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail"
+    },
+    "worker-terra-2": {
+      "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail"
+    },
+    "jobcron-orchestrator": {
+      "hermes-terminal-outcome-notification": "disabled     git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification"
+    },
+    "jobcron-worker": {
+      "hermes-terminal-outcome-notification": "disabled     git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification",
+      "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail"
+    },
+    "jobcron-reviewer": {
+      "hermes-terminal-outcome-notification": "disabled     git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification"
+    },
+    "chapt-orchestrator": {
+      "hermes-terminal-outcome-notification": "disabled     git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification"
+    },
+    "chapt-worker": {
+      "hermes-terminal-outcome-notification": "disabled     git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification",
+      "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail"
+    },
+    "chapt-reviewer": {
+      "hermes-terminal-outcome-notification": "disabled     git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification"
     }
   },
   "dispatch_profiles": [
-    "worker-flash-1",
-    "worker-flash-2",
-    "worker-flash-3",
-    "worker-luna-1",
-    "worker-luna-2",
-    "reviewer-sol"
+    "worker-astra",
+    "reviewer-sol",
+    "jobcron-worker",
+    "jobcron-reviewer",
+    "chapt-worker",
+    "chapt-reviewer"
   ],
   "kanban": {
     "max_in_progress": null,
@@ -92,7 +124,15 @@
   "skill_files": {
     "multi-agent-coding-orchestrator": {
       "default": {
-        "SKILL.md": "167c7cb06934236d22c15d6cb37562c691cf1b00274765ffe63944ca79f3bc12",
+        "SKILL.md": "04adfb4b427396c160e2d1717662b625538b94c5f39856c5e88e143e8ea7a93d",
+        "scripts/set-active-lanes.py": "157419c7c190b0a9f647271f7bd3839182f2e9324f8f9d74e43ec0553a5b77df"
+      },
+      "jobcron-orchestrator": {
+        "SKILL.md": "04adfb4b427396c160e2d1717662b625538b94c5f39856c5e88e143e8ea7a93d",
+        "scripts/set-active-lanes.py": "157419c7c190b0a9f647271f7bd3839182f2e9324f8f9d74e43ec0553a5b77df"
+      },
+      "chapt-orchestrator": {
+        "SKILL.md": "04adfb4b427396c160e2d1717662b625538b94c5f39856c5e88e143e8ea7a93d",
         "scripts/set-active-lanes.py": "157419c7c190b0a9f647271f7bd3839182f2e9324f8f9d74e43ec0553a5b77df"
       }
     },
@@ -122,6 +162,12 @@
         "SKILL.md": "a017ca2b203644ce6d5bd688c0b06875bbbe3908fe9dc6212ff39098ab53d794"
       },
       "worker-astra": {
+        "SKILL.md": "a017ca2b203644ce6d5bd688c0b06875bbbe3908fe9dc6212ff39098ab53d794"
+      },
+      "jobcron-worker": {
+        "SKILL.md": "a017ca2b203644ce6d5bd688c0b06875bbbe3908fe9dc6212ff39098ab53d794"
+      },
+      "chapt-worker": {
         "SKILL.md": "a017ca2b203644ce6d5bd688c0b06875bbbe3908fe9dc6212ff39098ab53d794"
       }
     },
@@ -154,6 +200,12 @@
         "SKILL.md": "d058cd37b2cf161097dfc51eafd373414603f5feb22ff22e8fe1e198679edb47"
       },
       "worker-astra": {
+        "SKILL.md": "d058cd37b2cf161097dfc51eafd373414603f5feb22ff22e8fe1e198679edb47"
+      },
+      "jobcron-worker": {
+        "SKILL.md": "d058cd37b2cf161097dfc51eafd373414603f5feb22ff22e8fe1e198679edb47"
+      },
+      "chapt-worker": {
         "SKILL.md": "d058cd37b2cf161097dfc51eafd373414603f5feb22ff22e8fe1e198679edb47"
       }
     },
@@ -204,6 +256,16 @@
         "references/release-ci-portability.md": "9ac3ca08733ff1810289b90e9834a12ad413a0762bfcdd046026ec0ec3e3dc13"
       },
       "worker-astra": {
+        "SKILL.md": "c38fdbc352fb56e73ab2e3498d11fb404ea675c8eda309febea067112c8f9173",
+        "references/live-state-reconciliation.md": "60b39c679849ba49f503cdda6844fc9678d837fac5279d496dbfd3e8450abed7",
+        "references/release-ci-portability.md": "9ac3ca08733ff1810289b90e9834a12ad413a0762bfcdd046026ec0ec3e3dc13"
+      },
+      "jobcron-worker": {
+        "SKILL.md": "c38fdbc352fb56e73ab2e3498d11fb404ea675c8eda309febea067112c8f9173",
+        "references/live-state-reconciliation.md": "60b39c679849ba49f503cdda6844fc9678d837fac5279d496dbfd3e8450abed7",
+        "references/release-ci-portability.md": "9ac3ca08733ff1810289b90e9834a12ad413a0762bfcdd046026ec0ec3e3dc13"
+      },
+      "chapt-worker": {
         "SKILL.md": "c38fdbc352fb56e73ab2e3498d11fb404ea675c8eda309febea067112c8f9173",
         "references/live-state-reconciliation.md": "60b39c679849ba49f503cdda6844fc9678d837fac5279d496dbfd3e8450abed7",
         "references/release-ci-portability.md": "9ac3ca08733ff1810289b90e9834a12ad413a0762bfcdd046026ec0ec3e3dc13"
@@ -259,6 +321,16 @@
         "SKILL.md": "50d28337a025102b29b766627eb527e862884cbabcca810b29da5c2cfb021089",
         "references/temporary-cloud-bootstrap-iam.md": "6a7c5b7180221ba4b8e3ddbfa54dc68e28724c12ab2e4e8d21822b04d565c51b",
         "references/frontend-origin-separation.md": "2051367f3203d0991cbe9df0ce14428e53f7c03f91dc00df5260532a17b878e6"
+      },
+      "jobcron-worker": {
+        "SKILL.md": "50d28337a025102b29b766627eb527e862884cbabcca810b29da5c2cfb021089",
+        "references/temporary-cloud-bootstrap-iam.md": "6a7c5b7180221ba4b8e3ddbfa54dc68e28724c12ab2e4e8d21822b04d565c51b",
+        "references/frontend-origin-separation.md": "2051367f3203d0991cbe9df0ce14428e53f7c03f91dc00df5260532a17b878e6"
+      },
+      "chapt-worker": {
+        "SKILL.md": "50d28337a025102b29b766627eb527e862884cbabcca810b29da5c2cfb021089",
+        "references/temporary-cloud-bootstrap-iam.md": "6a7c5b7180221ba4b8e3ddbfa54dc68e28724c12ab2e4e8d21822b04d565c51b",
+        "references/frontend-origin-separation.md": "2051367f3203d0991cbe9df0ce14428e53f7c03f91dc00df5260532a17b878e6"
       }
     }
   },
@@ -291,6 +363,8 @@
   },
   "profile_local_skill_overrides": {
     "worker-astra": {
+      "devops/production-deployment/SKILL.md": "af5f1f47f4b56b9d542ff3f174b23cecf8cd8db7ac1f60c216eabf996d4a6a3a",
+      "devops/production-deployment/references/release-ci-portability.md": "16b6768122232eea077e6623aa637e1123b255805edaf3ed21da2824c03c4297",
       "software-development/spike/SKILL.md": "64992df7588a511575cb4abb0615fed075a6f12bf0dc7df720deda6c942c9e27",
       "software-development/systematic-debugging/SKILL.md": "ba44896266af82366bcf316398282bfc792de1ced4d781be22d1406228d1a215",
       "software-development/test-driven-development/SKILL.md": "9e9a4bb630506f4f3b4ff19cca80bb464e57db19b8a175959388d2112fc096ff"
@@ -320,5 +394,23 @@
       "context_exhaustion"
     ],
     "terminal_assignee": "worker-astra"
+  },
+  "project_isolation": {
+    "jobcron": {
+      "board": "jobcron",
+      "repository": "/Users/chanbla11mit/projects/jobcron",
+      "orchestrator": "jobcron-orchestrator",
+      "worker": "jobcron-worker",
+      "reviewer": "jobcron-reviewer",
+      "preview_port": 17777
+    },
+    "cha-pt": {
+      "board": "cha-pt",
+      "repository": "/Users/chanbla11mit/projects/cha-pt",
+      "orchestrator": "chapt-orchestrator",
+      "worker": "chapt-worker",
+      "reviewer": "chapt-reviewer",
+      "preview_port": 18080
+    }
   }
 }

@@ -1,13 +1,13 @@
 # Manual apply / reconstruction procedure
 
-Reconstruct the non-secret harness from this repository using supported Hermes CLI commands only. No apply script exists by design. Every command form below was verified against the live CLI on 2026-09-20 (`hermes profile create --description`, `hermes profile describe --text`, `hermes -p X config set`, `hermes -p X plugins install --ref`, `hermes config set/unset`).
+Reconstruct the non-secret harness from this repository using supported Hermes CLI commands only. No apply script exists by design. The project-fleet command forms were reverified against Hermes `v0.21.5+6751.g9cf7960` on 2026-10-04.
 
 Global settings are scoped: always pass `-p default` explicitly so results do not depend on the caller's active profile (reviewer/worker profiles report `null` for unset-scoped queries).
 
 ## 0. Recovery point (before any change)
 
     hermes -p default config path          # note config location
-    git -C ~/.hermes/hermes-agent rev-parse HEAD   # record source commit (expect 7c6f21a5e12ba9b1c674ec9b410fa6b8c45de4f8)
+    git -C ~/.hermes/hermes-agent rev-parse HEAD   # record source commit (expect 9cf7960f274ea2bdfe672d64d26389e9954dfeb6)
     # create a private snapshot outside Git per decisions/260920-harness-baseline.md; never snapshot into this repo
     # exact per-profile/path restore commands for the timestamped trees under
     # ~/.hermes/private live in procedures/rollback-restore.md
@@ -166,6 +166,24 @@ repositories from here.
 
     ./scripts/verify-state        # must exit 0
     git add -A && git commit -m "Apply <change>"   # commit desired-state change separately from applying
+
+## 8b. Project-isolated concurrent fleets
+
+Create or repair the six project profiles and two named boards exactly as recorded in `docs/specs/261004-concurrent-project-fleets.md`. Use `--clone-from` only as a bootstrap; delete copied `MEMORY.md`/`USER.md`, replace `SOUL.md` with the project role contract, and do not clone messaging channels. Configure:
+
+- `jobcron-orchestrator`, `jobcron-worker`: `openai-codex/gpt-6.1-sol`; `jobcron-reviewer`: `openai-codex/gpt-6-astra`; all rooted at `/Users/chanbla11mit/projects/jobcron`.
+- `chapt-orchestrator`, `chapt-worker`: `openai-codex/gpt-6.1-sol`; `chapt-reviewer`: `openai-codex/gpt-6-astra`; all rooted at `/Users/chanbla11mit/projects/cha-pt`.
+- Project orchestrator CLI toolsets: `clarify`, `kanban`, `memory`, `session_search`, `skills`, `todo` only.
+- `kanban.dispatch_in_gateway: false` on every named project profile; the default multiplexed gateway remains the sole dispatcher.
+- Boards `jobcron` and `cha-pt` with their canonical repositories as `default_workdir`.
+- Default-profile `kanban.dispatch_profiles` includes each project's worker/reviewer pair plus explicitly retained legacy lanes. It excludes both orchestrators because dispatcher-spawned task sessions intentionally lack board-routing tools.
+- Clear any legacy global launchd database pin with `launchctl unsetenv HERMES_KANBAN_DB`; a gateway inheriting that variable intentionally resolves every board slug to the one pinned database. The notifier LaunchAgent keeps its own explicit database path and is unaffected.
+
+Disable `hermes-terminal-outcome-notification` on project profiles: its legacy shared-default-DB deployment is not the authority for named-board events. Named-board lifecycle and subscriptions remain inside stock Hermes Kanban.
+
+Launch controllers only through `scripts/run-jobcron-orchestrator` and `scripts/run-chapt-orchestrator`; these set the per-process board pin before starting the profile.
+
+After clearing the launchd pin, restart the default gateway once from a separate shell. Do not restart it from a gateway-owned agent process: the restart terminates that process before it can verify completion. Normal topology rollback may restore the legacy pin with `launchctl setenv HERMES_KANBAN_DB /Users/chanbla11mit/.hermes/kanban.db` only if named-board dispatch has first been paused or retired.
 
 ## 9. Authorized Astra terminal-retry upgrade (manual only)
 
