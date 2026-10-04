@@ -169,14 +169,14 @@ repositories from here.
 
 ## 8b. Project-isolated concurrent fleets
 
-Create or repair the six project profiles and two named boards exactly as recorded in `docs/specs/261004-concurrent-project-fleets.md`. Use `--clone-from` only as a bootstrap; delete copied `MEMORY.md`/`USER.md`, replace `SOUL.md` with the project role contract, and do not clone messaging channels. Configure:
+Create or repair the ten project profiles and two named boards exactly as recorded in `docs/specs/261004-concurrent-project-fleets.md`. Use `--clone-from` only as a bootstrap; delete copied `MEMORY.md`/`USER.md`, replace `SOUL.md` with the project role contract, and do not clone messaging channels. Configure:
 
-- `jobcron-orchestrator`, `jobcron-worker`: `openai-codex/gpt-6.1-sol`; `jobcron-reviewer`: `openai-codex/gpt-6-astra`; all rooted at `/Users/chanbla11mit/projects/jobcron`.
-- `chapt-orchestrator`, `chapt-worker`: `openai-codex/gpt-6.1-sol`; `chapt-reviewer`: `openai-codex/gpt-6-astra`; all rooted at `/Users/chanbla11mit/projects/cha-pt`.
+- `jobcron-orchestrator`, `jobcron-worker`: `openai-codex/gpt-6.1-sol`; `jobcron-worker-glm-1`, `jobcron-worker-glm-2`: `zai/glm-5.3`; `jobcron-reviewer`: `openai-codex/gpt-6-astra`; all rooted at `/Users/chanbla11mit/projects/jobcron`.
+- `chapt-orchestrator`, `chapt-worker`: `openai-codex/gpt-6.1-sol`; `chapt-worker-glm-1`, `chapt-worker-glm-2`: `zai/glm-5.3`; `chapt-reviewer`: `openai-codex/gpt-6-astra`; all rooted at `/Users/chanbla11mit/projects/cha-pt`.
 - Project orchestrator CLI toolsets: `clarify`, `kanban`, `memory`, `session_search`, `skills`, `todo` only.
 - `kanban.dispatch_in_gateway: false` on every named project profile; the default multiplexed gateway remains the sole dispatcher.
 - Boards `jobcron` and `cha-pt` with their canonical repositories as `default_workdir`.
-- Default-profile `kanban.dispatch_profiles` includes each project's worker/reviewer pair plus explicitly retained legacy lanes. It excludes both orchestrators because dispatcher-spawned task sessions intentionally lack board-routing tools.
+- Default-profile `kanban.dispatch_profiles` includes each project's three-worker pool and reviewer plus explicitly retained legacy lanes. It excludes both orchestrators because dispatcher-spawned task sessions intentionally lack board-routing tools.
 - Clear any legacy global launchd database pin with `launchctl unsetenv HERMES_KANBAN_DB`; a gateway inheriting that variable intentionally resolves every board slug to the one pinned database. The notifier LaunchAgent keeps its own explicit database path and is unaffected.
 
 Disable `hermes-terminal-outcome-notification` on project profiles: its legacy shared-default-DB deployment is not the authority for named-board events. Named-board lifecycle and subscriptions remain inside stock Hermes Kanban.

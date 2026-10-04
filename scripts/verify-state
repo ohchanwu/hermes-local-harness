@@ -192,7 +192,12 @@ def check_project_isolation(errors, fleets, observed=None):
             fail(errors, f"project isolation mapping malformed: {project}")
             continue
         board, repo, port = fleet.get("board"), fleet.get("repository"), fleet.get("preview_port")
-        profiles = [fleet.get(role) for role in ("orchestrator", "worker", "reviewer")]
+        workers = fleet.get("workers")
+        if (not isinstance(workers, list) or len(workers) != 3
+                or workers[0] != fleet.get("worker") or len(set(workers)) != len(workers)):
+            fail(errors, f"project worker pool mapping malformed: {project}")
+            workers = []
+        profiles = [fleet.get("orchestrator"), *workers, fleet.get("reviewer")]
         if board != project or not isinstance(repo, str) or not Path(repo).is_absolute():
             fail(errors, f"project isolation mapping malformed: {project}")
         if not isinstance(port, int) or not 1024 <= port <= 65535:
@@ -650,20 +655,20 @@ def main():
             board = boards.get(fleet["board"])
             if not board or board.get("archived") or board.get("default_workdir") != fleet["repository"]:
                 fail(errors, f"project board drift {project}: expected active board {fleet['board']} rooted at {fleet['repository']}")
-            for role in ("orchestrator", "worker", "reviewer"):
-                profile = fleet[role]
+            project_profiles = [fleet["orchestrator"], *fleet["workers"], fleet["reviewer"]]
+            for profile in project_profiles:
                 if json_config(profile, "terminal.cwd") != fleet["repository"]:
                     fail(errors, f"project terminal root drift {profile}: expected {fleet['repository']}")
+            worker_tools = ["browser", "clarify", "code_execution", "file", "memory", "skills", "terminal", "todo", "vision", "web"]
             expected_toolsets = {
-                "orchestrator": ["clarify", "kanban", "memory", "session_search", "skills", "todo"],
-                "worker": ["browser", "clarify", "code_execution", "file", "memory", "skills", "terminal", "todo", "vision", "web"],
-                "reviewer": ["browser", "clarify", "code_execution", "file", "memory", "skills", "terminal", "todo", "vision", "web"],
+                fleet["orchestrator"]: ["clarify", "kanban", "memory", "session_search", "skills", "todo"],
+                **{profile: worker_tools for profile in fleet["workers"]},
+                fleet["reviewer"]: worker_tools,
             }
-            for role, expected_tools in expected_toolsets.items():
-                profile = fleet[role]
+            for profile, expected_tools in expected_toolsets.items():
                 tools = json_config(profile, "platform_toolsets.cli")
                 if tools != expected_tools:
-                    fail(errors, f"project {role} toolset drift {profile}: expected {expected_tools!r}")
+                    fail(errors, f"project toolset drift {profile}: expected {expected_tools!r}")
             launcher_name = {"jobcron": "run-jobcron-orchestrator", "cha-pt": "run-chapt-orchestrator"}[project]
             launcher = ROOT / "scripts" / launcher_name
             launcher_text = launcher.read_text() if launcher.is_file() else ""

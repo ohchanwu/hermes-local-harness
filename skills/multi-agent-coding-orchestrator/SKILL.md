@@ -1,7 +1,7 @@
 ---
 name: multi-agent-coding-orchestrator
 description: "Use when orchestrating multi-agent coding with Hermes."
-version: 0.6.0
+version: 0.6.1
 author: chanbla11mit, Hermes Agent
 license: MIT
 platforms: [macos]
@@ -27,14 +27,14 @@ Do not use this procedure for a simple question that needs no repository change 
 
 Project-isolated fleets:
 
-- Jobcron board `jobcron`: `jobcron-orchestrator` (`gpt-6.1-sol`), `jobcron-worker` (`gpt-6.1-sol`), and `jobcron-reviewer` (`gpt-6-astra`). Repository root: `/Users/chanbla11mit/projects/jobcron`; preview port: `17777`.
-- Cha PT board `cha-pt`: `chapt-orchestrator` (`gpt-6.1-sol`), `chapt-worker` (`gpt-6.1-sol`), and `chapt-reviewer` (`gpt-6-astra`). Repository root: `/Users/chanbla11mit/projects/cha-pt`; preview port: `18080`.
+- Jobcron board `jobcron`: `jobcron-orchestrator` (`gpt-6.1-sol`); implementation pool `jobcron-worker` (`gpt-6.1-sol`), `jobcron-worker-glm-1` and `jobcron-worker-glm-2` (both `glm-5.3`); independent `jobcron-reviewer` (`gpt-6-astra`). Repository root: `/Users/chanbla11mit/projects/jobcron`; preview port: `17777`.
+- Cha PT board `cha-pt`: `chapt-orchestrator` (`gpt-6.1-sol`); implementation pool `chapt-worker` (`gpt-6.1-sol`), `chapt-worker-glm-1` and `chapt-worker-glm-2` (both `glm-5.3`); independent `chapt-reviewer` (`gpt-6-astra`). Repository root: `/Users/chanbla11mit/projects/cha-pt`; preview port: `18080`.
 
-Each project profile has an independent Hermes home, memory, sessions, and fixed terminal root. Named boards provide separate databases, logs, attachments, and workspaces. A project orchestrator may assign only its matching worker and reviewer. A task or callback with a mismatched board, profile, repository, or workspace is invalid and must be blocked before file access or mutation.
+Each project profile has an independent Hermes home, memory, sessions, and fixed terminal root. Named boards provide separate databases, logs, attachments, and workspaces. A project orchestrator may assign only its matching worker pool and reviewer. A task or callback with a mismatched board, profile, repository, or workspace is invalid and must be blocked before file access or mutation.
 
 Project orchestrators are interactive control-plane sessions, not dispatcher-spawned task workers. Hermes intentionally hides `kanban_list` and `kanban_unblock` whenever `HERMES_KANBAN_TASK` is set, so assigning a card to an orchestrator removes the board-routing tools it needs. Launch each controller through the tracked board-pinning wrapper (`scripts/run-jobcron-orchestrator` or `scripts/run-chapt-orchestrator`). Keep only project workers and reviewers in `kanban.dispatch_profiles`.
 
-The project fleets deliberately start with one implementation worker each. Do not recreate the legacy escalation fleet per project until observed queueing or capability failures justify the additional profiles. Review revision stays on the project's worker; a genuine capability boundary becomes a human block rather than silently crossing into the legacy fleet.
+Each project has one Sol worker and two GLM Full workers. Use Sol for routine bounded implementation; prefer GLM Full for large-context, repo-wide, long-horizon, multimodal, visual, or broadly specified work, and use either idle GLM worker for independent parallel slices. Capacity alone may select another matching project worker, but never a foreign-project or legacy worker. Review revision stays on the same assignee unless the reviewer identifies a concrete capability boundary; then the orchestrator may create a continuation card for another worker in the same project pool with explicit lineage and preserved evidence.
 
 Legacy/default-board control profiles remain installed for rollback and existing history:
 
@@ -53,7 +53,7 @@ Legacy/default-board implementation profiles, in escalation order:
 
 Keep `worker-terra-2` installed but dormant as a rollback/spare lane. It is outside the active legacy roster unless the human changes the policy.
 
-The escalation ladder and terminal-retry rules below apply only to cards that explicitly use the legacy/default-board roster. Project-isolated Jobcron and Cha PT cards use their three-profile fleets and never fall through to a legacy profile.
+The escalation ladder and terminal-retry rules below apply only to cards that explicitly use the legacy/default-board roster. Project-isolated Jobcron and Cha PT cards use their five-profile fleets and never fall through to a legacy profile.
 
 Ponytail never runs as a plugin on Hermes profiles. Implementation profiles keep the pinned package installed but `disabled`; the minimalism behavior lives in the per-card `minimal-implementation` skill instead (see Skills). The orchestrator, reviewer, and advisor neither load it nor the simplification skill.
 
@@ -363,9 +363,9 @@ Before declaring the harness or an autonomous workstream complete, verify:
 
 - The Hermes source checkout is clean and updateable.
 - Every active profile returns its configured model identity on a fresh inference probe.
-- The dispatch allowlist contains each project's worker/reviewer pair plus the intended legacy lanes, excludes project orchestrators, and has no project card assigned outside its project tuple.
+- The dispatch allowlist contains each project's three-worker pool and reviewer plus the intended legacy lanes, excludes project orchestrators, and has no project card assigned outside its project tuple.
 - Board `jobcron` resolves only the Jobcron repository/workspaces and board `cha-pt` only the Cha PT repository/workspaces.
-- Fresh project profile sessions have separate state homes and return `gpt-6.1-sol` for orchestrator/worker and `gpt-6-astra` for reviewer.
+- Fresh project profile sessions have separate state homes and return `gpt-6.1-sol` for orchestrator/primary worker, `glm-5.3` for both GLM Full workers, and `gpt-6-astra` for reviewer.
 - No running implementation profile was removed during a lane swap.
 - Reviews can start while five implementation profiles are running.
 - Every code change reaches independent review before integration.

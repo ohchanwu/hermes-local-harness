@@ -383,6 +383,54 @@
       ]
     },
     {
+      "name": "jobcron-worker-glm-1",
+      "role": "project GLM Full implementation",
+      "model": "glm-5.3",
+      "provider": "zai",
+      "installed": true,
+      "dispatch_eligible": true,
+      "in_dispatch_pool": true,
+      "lifecycle": "project-active",
+      "concurrency_limit": 1,
+      "required_plugins": [],
+      "modes": [
+        "project-isolated",
+        "jobcron",
+        "glm-full"
+      ],
+      "toolsets": "implementation",
+      "credential_required": true,
+      "credential_present": true,
+      "installed_disabled_plugins": [
+        "ponytail",
+        "hermes-terminal-outcome-notification"
+      ]
+    },
+    {
+      "name": "jobcron-worker-glm-2",
+      "role": "project GLM Full implementation",
+      "model": "glm-5.3",
+      "provider": "zai",
+      "installed": true,
+      "dispatch_eligible": true,
+      "in_dispatch_pool": true,
+      "lifecycle": "project-active",
+      "concurrency_limit": 1,
+      "required_plugins": [],
+      "modes": [
+        "project-isolated",
+        "jobcron",
+        "glm-full"
+      ],
+      "toolsets": "implementation",
+      "credential_required": true,
+      "credential_present": true,
+      "installed_disabled_plugins": [
+        "ponytail",
+        "hermes-terminal-outcome-notification"
+      ]
+    },
+    {
       "name": "jobcron-reviewer",
       "role": "project independent reviewer",
       "model": "gpt-6-astra",
@@ -450,6 +498,54 @@
       ]
     },
     {
+      "name": "chapt-worker-glm-1",
+      "role": "project GLM Full implementation",
+      "model": "glm-5.3",
+      "provider": "zai",
+      "installed": true,
+      "dispatch_eligible": true,
+      "in_dispatch_pool": true,
+      "lifecycle": "project-active",
+      "concurrency_limit": 1,
+      "required_plugins": [],
+      "modes": [
+        "project-isolated",
+        "cha-pt",
+        "glm-full"
+      ],
+      "toolsets": "implementation",
+      "credential_required": true,
+      "credential_present": true,
+      "installed_disabled_plugins": [
+        "ponytail",
+        "hermes-terminal-outcome-notification"
+      ]
+    },
+    {
+      "name": "chapt-worker-glm-2",
+      "role": "project GLM Full implementation",
+      "model": "glm-5.3",
+      "provider": "zai",
+      "installed": true,
+      "dispatch_eligible": true,
+      "in_dispatch_pool": true,
+      "lifecycle": "project-active",
+      "concurrency_limit": 1,
+      "required_plugins": [],
+      "modes": [
+        "project-isolated",
+        "cha-pt",
+        "glm-full"
+      ],
+      "toolsets": "implementation",
+      "credential_required": true,
+      "credential_present": true,
+      "installed_disabled_plugins": [
+        "ponytail",
+        "hermes-terminal-outcome-notification"
+      ]
+    },
+    {
       "name": "chapt-reviewer",
       "role": "project independent reviewer",
       "model": "gpt-6-astra",
@@ -479,7 +575,12 @@
       "orchestrator": "jobcron-orchestrator",
       "worker": "jobcron-worker",
       "reviewer": "jobcron-reviewer",
-      "preview_port": 17777
+      "preview_port": 17777,
+      "workers": [
+        "jobcron-worker",
+        "jobcron-worker-glm-1",
+        "jobcron-worker-glm-2"
+      ]
     },
     "cha-pt": {
       "board": "cha-pt",
@@ -487,13 +588,22 @@
       "orchestrator": "chapt-orchestrator",
       "worker": "chapt-worker",
       "reviewer": "chapt-reviewer",
-      "preview_port": 18080
+      "preview_port": 18080,
+      "workers": [
+        "chapt-worker",
+        "chapt-worker-glm-1",
+        "chapt-worker-glm-2"
+      ]
     }
   },
   "project_dispatch_allowlist": [
     "jobcron-worker",
+    "jobcron-worker-glm-1",
+    "jobcron-worker-glm-2",
     "jobcron-reviewer",
     "chapt-worker",
+    "chapt-worker-glm-1",
+    "chapt-worker-glm-2",
     "chapt-reviewer"
   ]
 }

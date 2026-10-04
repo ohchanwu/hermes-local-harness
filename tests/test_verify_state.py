@@ -191,7 +191,7 @@ check("--fixture", str(FIXTURES / "deployed-skill-divergence.yaml"), code=1, tex
 # The canonical orchestration policy is versioned and its source-to-live hash
 # enforcement covers the default profile's deployed orchestrator skill.
 orchestrator = (ROOT / "skills" / "multi-agent-coding-orchestrator" / "SKILL.md").read_text()
-assert "version: 0.6.0" in orchestrator
+assert "version: 0.6.1" in orchestrator
 assert "Routing validation and dispatch receipt" in orchestrator
 assert "Authentication expiry blocks a fresh observation" in orchestrator
 assert "currently_actionable" in orchestrator
@@ -199,7 +199,7 @@ assert "jobcron-orchestrator" in orchestrator
 assert "chapt-reviewer" in orchestrator
 assert "gpt-6.1-sol" in orchestrator
 # Terminal retry remains an explicit card-scoped v2 policy, never the default.
-assert "version: 0.6.0" in orchestrator
+assert "version: 0.6.1" in orchestrator
 assert "RETRY_TERMINAL" in orchestrator
 assert "terminal_retry_policy: astra-until-approve-v1" in orchestrator
 assert "glm-review-v2" in orchestrator
@@ -212,15 +212,27 @@ assert roster["terminal_retry"]["default"] == "bounded-human-block"
 assert roster["terminal_retry"]["supported_opt_in"] == "astra-until-approve-v1"
 assert roster["project_fleets"]["jobcron"]["reviewer"] == "jobcron-reviewer"
 assert roster["project_fleets"]["cha-pt"]["orchestrator"] == "chapt-orchestrator"
+assert roster["project_fleets"]["jobcron"]["workers"] == [
+    "jobcron-worker", "jobcron-worker-glm-1", "jobcron-worker-glm-2"]
+assert roster["project_fleets"]["cha-pt"]["workers"] == [
+    "chapt-worker", "chapt-worker-glm-1", "chapt-worker-glm-2"]
 assert roster["project_dispatch_allowlist"] == [
-    "jobcron-worker", "jobcron-reviewer", "chapt-worker", "chapt-reviewer"]
+    "jobcron-worker", "jobcron-worker-glm-1", "jobcron-worker-glm-2", "jobcron-reviewer",
+    "chapt-worker", "chapt-worker-glm-1", "chapt-worker-glm-2", "chapt-reviewer"]
 roster_profiles = {profile["name"]: profile for profile in roster["profiles"]}
 assert not roster_profiles["jobcron-orchestrator"]["dispatch_eligible"]
 assert not roster_profiles["chapt-orchestrator"]["dispatch_eligible"]
-for profile in ("jobcron-worker", "jobcron-reviewer", "chapt-worker", "chapt-reviewer"):
+project_workers = (
+    "jobcron-worker", "jobcron-worker-glm-1", "jobcron-worker-glm-2",
+    "chapt-worker", "chapt-worker-glm-1", "chapt-worker-glm-2")
+for profile in (*project_workers, "jobcron-reviewer", "chapt-reviewer"):
     assert roster_profiles[profile]["dispatch_eligible"]
-for profile in ("jobcron-orchestrator", "jobcron-worker", "jobcron-reviewer",
-                "chapt-orchestrator", "chapt-worker", "chapt-reviewer"):
+for profile in ("jobcron-worker-glm-1", "jobcron-worker-glm-2",
+                "chapt-worker-glm-1", "chapt-worker-glm-2"):
+    assert roster_profiles[profile]["model"] == "glm-5.3"
+    assert roster_profiles[profile]["provider"] == "zai"
+for profile in ("jobcron-orchestrator", *project_workers, "jobcron-reviewer",
+                "chapt-orchestrator", "chapt-reviewer"):
     assert "hermes-terminal-outcome-notification" in roster_profiles[profile]["installed_disabled_plugins"]
 errors = []
 with redirect_stdout(io.StringIO()):

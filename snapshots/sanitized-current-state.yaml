@@ -17,9 +17,13 @@
     "worker-terra-2",
     "jobcron-orchestrator",
     "jobcron-worker",
+    "jobcron-worker-glm-1",
+    "jobcron-worker-glm-2",
     "jobcron-reviewer",
     "chapt-orchestrator",
     "chapt-worker",
+    "chapt-worker-glm-1",
+    "chapt-worker-glm-2",
     "chapt-reviewer"
   ],
   "kanban": {
@@ -29,8 +33,12 @@
       "worker-astra",
       "reviewer-sol",
       "jobcron-worker",
+      "jobcron-worker-glm-1",
+      "jobcron-worker-glm-2",
       "jobcron-reviewer",
       "chapt-worker",
+      "chapt-worker-glm-1",
+      "chapt-worker-glm-2",
       "chapt-reviewer"
     ]
   },
@@ -83,9 +91,9 @@
           "jobcron-orchestrator",
           "chapt-orchestrator"
         ],
-        "version": "0.6.0",
+        "version": "0.6.1",
         "files": {
-          "SKILL.md": "04adfb4b427396c160e2d1717662b625538b94c5f39856c5e88e143e8ea7a93d",
+          "SKILL.md": "87fe6837b1b55eb2f9b9fef46cf5133411fda8162073e8597213a4bf57f32f51",
           "scripts/set-active-lanes.py": "157419c7c190b0a9f647271f7bd3839182f2e9324f8f9d74e43ec0553a5b77df"
         }
       },
@@ -104,7 +112,11 @@
           "worker-sol",
           "worker-astra",
           "jobcron-worker",
-          "chapt-worker"
+          "jobcron-worker-glm-1",
+          "jobcron-worker-glm-2",
+          "chapt-worker",
+          "chapt-worker-glm-1",
+          "chapt-worker-glm-2"
         ],
         "version": "1.0.0",
         "files": {
@@ -126,7 +138,11 @@
           "worker-sol",
           "worker-astra",
           "jobcron-worker",
-          "chapt-worker"
+          "jobcron-worker-glm-1",
+          "jobcron-worker-glm-2",
+          "chapt-worker",
+          "chapt-worker-glm-1",
+          "chapt-worker-glm-2"
         ],
         "version": "1.0.0",
         "files": {
@@ -148,7 +164,11 @@
           "worker-sol",
           "worker-astra",
           "jobcron-worker",
-          "chapt-worker"
+          "jobcron-worker-glm-1",
+          "jobcron-worker-glm-2",
+          "chapt-worker",
+          "chapt-worker-glm-1",
+          "chapt-worker-glm-2"
         ],
         "version": "0.2.0",
         "files": {
@@ -172,7 +192,11 @@
           "worker-sol",
           "worker-astra",
           "jobcron-worker",
-          "chapt-worker"
+          "jobcron-worker-glm-1",
+          "jobcron-worker-glm-2",
+          "chapt-worker",
+          "chapt-worker-glm-1",
+          "chapt-worker-glm-2"
         ],
         "version": "0.1.7",
         "files": {
@@ -220,7 +244,12 @@
       "orchestrator": "jobcron-orchestrator",
       "worker": "jobcron-worker",
       "reviewer": "jobcron-reviewer",
-      "preview_port": 17777
+      "preview_port": 17777,
+      "workers": [
+        "jobcron-worker",
+        "jobcron-worker-glm-1",
+        "jobcron-worker-glm-2"
+      ]
     },
     "cha-pt": {
       "board": "cha-pt",
@@ -228,7 +257,12 @@
       "orchestrator": "chapt-orchestrator",
       "worker": "chapt-worker",
       "reviewer": "chapt-reviewer",
-      "preview_port": 18080
+      "preview_port": 18080,
+      "workers": [
+        "chapt-worker",
+        "chapt-worker-glm-1",
+        "chapt-worker-glm-2"
+      ]
     }
   }
 }

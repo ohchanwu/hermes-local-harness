@@ -9,7 +9,8 @@ roster = json.loads((Path(__file__).resolve().parents[1] / "roster.yaml").read_t
 
 IMPL = ["worker-flash-1", "worker-flash-2", "worker-flash-3", "worker-luna-1", "worker-luna-2",
         "worker-terra-1", "worker-terra-2", "worker-glm-full", "worker-sol", "worker-astra",
-        "jobcron-worker", "chapt-worker"]
+        "jobcron-worker", "jobcron-worker-glm-1", "jobcron-worker-glm-2",
+        "chapt-worker", "chapt-worker-glm-1", "chapt-worker-glm-2"]
 NOTIF = "hermes-terminal-outcome-notification"
 ENABLED_NOTIF = f"enabled      git pinned@6ae2bf2d 0.2.0    {NOTIF}"
 DISABLED_NOTIF = f"disabled     git pinned@6ae2bf2d 0.2.0    {NOTIF}"
