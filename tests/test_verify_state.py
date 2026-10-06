@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import importlib.util
+import hashlib
 import io
 import json
 import shutil
@@ -194,7 +195,7 @@ check("--fixture", str(FIXTURES / "deployed-skill-divergence.yaml"), code=1, tex
 # The canonical orchestration policy is versioned and its source-to-live hash
 # enforcement covers the default profile's deployed orchestrator skill.
 orchestrator = (ROOT / "skills" / "multi-agent-coding-orchestrator" / "SKILL.md").read_text()
-assert "version: 0.6.1" in orchestrator
+assert "version: 0.6.2" in orchestrator
 assert "Routing validation and dispatch receipt" in orchestrator
 assert "Authentication expiry blocks a fresh observation" in orchestrator
 assert "currently_actionable" in orchestrator
@@ -202,7 +203,7 @@ assert "jobcron-orchestrator" in orchestrator
 assert "chapt-reviewer" in orchestrator
 assert "gpt-6.1-sol" in orchestrator
 # Terminal retry remains an explicit card-scoped v2 policy, never the default.
-assert "version: 0.6.1" in orchestrator
+assert "version: 0.6.2" in orchestrator
 assert "RETRY_TERMINAL" in orchestrator
 assert "terminal_retry_policy: astra-until-approve-v1" in orchestrator
 assert "glm-review-v2" in orchestrator
@@ -219,6 +220,39 @@ assert roster["project_fleets"]["jobcron"]["workers"] == [
     "jobcron-worker", "jobcron-worker-glm-1", "jobcron-worker-glm-2"]
 assert roster["project_fleets"]["cha-pt"]["workers"] == [
     "chapt-worker", "chapt-worker-glm-1", "chapt-worker-glm-2"]
+assert roster["project_fleets"]["cha-pt"]["repositories"] == [
+    "/Users/chanbla11mit/projects/cha-pt",
+    "/Users/chanbla11mit/projects/cha-pt-frontend",
+]
+assert roster["project_fleets"]["cha-pt"]["frontend_project"] == "cha-pt-frontend"
+snapshot = json.loads((ROOT / "snapshots" / "sanitized-current-state.yaml").read_text())
+assert roster["repository_policies"] == snapshot["repository_policies"]
+frontend_policy = roster["repository_policies"]["cha-pt-frontend"]
+errors = []
+with redirect_stdout(io.StringIO()):
+    verify_state.check_repository_policies(errors, roster["repository_policies"], {
+        "cha-pt-frontend": frontend_policy["sha256"]})
+assert errors == [], errors
+errors = []
+with redirect_stdout(io.StringIO()):
+    verify_state.check_repository_policies(errors, roster["repository_policies"], {
+        "cha-pt-frontend": "0" * 64})
+assert errors == ["repository policy drift cha-pt-frontend"], errors
+redirected_policy = json.loads(json.dumps(roster["repository_policies"]))
+redirected_policy["cha-pt-frontend"]["path"] = "/Users/chanbla11mit/projects/cha-pt-frontend/CLAUDE.md"
+errors = []
+with redirect_stdout(io.StringIO()):
+    verify_state.check_repository_policies(errors, redirected_policy)
+assert errors == ["repository policy path drift cha-pt-frontend"], errors
+redirected_soul = json.loads(json.dumps(roster["profile_souls"]))
+redirected_soul["chapt-worker"]["live"] = str(
+    ROOT / redirected_soul["chapt-worker"]["source"])
+errors = []
+with redirect_stdout(io.StringIO()):
+    verify_state.check_profile_souls(errors, redirected_soul)
+assert errors == ["profile SOUL path drift chapt-worker"], errors
+check("--fixture", str(FIXTURES / "frontend-repository-policy-drift.yaml"), code=1,
+      text="repository policy drift cha-pt-frontend")
 assert roster["project_dispatch_allowlist"] == [
     "jobcron-worker", "jobcron-worker-glm-1", "jobcron-worker-glm-2", "jobcron-reviewer",
     "chapt-worker", "chapt-worker-glm-1", "chapt-worker-glm-2", "chapt-reviewer"]
@@ -243,6 +277,259 @@ errors = []
 with redirect_stdout(io.StringIO()):
     verify_state.check_project_isolation(errors, roster["project_fleets"], roster["project_fleets"])
 assert errors == [], errors
+extra_repo = json.loads(json.dumps(roster["project_fleets"]))
+extra_repo["cha-pt"]["repositories"].append("/Users/chanbla11mit/projects/not-authorized")
+errors = []
+with redirect_stdout(io.StringIO()):
+    verify_state.check_project_isolation(errors, extra_repo, extra_repo)
+assert "project repository allowlist drift: cha-pt" in errors, errors
+check("--fixture", str(FIXTURES / "project-repository-allowlist-drift.yaml"), code=1,
+      text="project repository allowlist drift: cha-pt")
+
+valid_card = {
+    "id": "t_example", "status": "running", "assignee": "chapt-worker",
+    "workspace_kind": "worktree",
+    "workspace_path": "/Users/chanbla11mit/projects/cha-pt/.worktrees/t_example",
+    "body": ("Repository /Users/chanbla11mit/projects/cha-pt ONLY. "
+             "Baseline EXACT 0123456789abcdef0123456789abcdef01234567. "
+             "Independent reviewer chapt-reviewer.\n## Test contract\n`go test ./...`"),
+}
+errors = []
+with redirect_stdout(io.StringIO()):
+    verify_state.check_chapt_card_contract(errors, [valid_card])
+assert errors == [], errors
+legacy_p4_card = dict(
+    valid_card,
+    id="t_4d3c8997",
+    workspace_path="/Users/chanbla11mit/projects/cha-pt/.worktrees/t_4d3c8997",
+    body=("Repository /Users/chanbla11mit/projects/cha-pt ONLY. "
+          "Baseline EXACT 0123456789abcdef0123456789abcdef01234567. "
+          "Independent reviewer chapt-reviewer.\n## Execution resource/test ownership\n"
+          "Full go test -json ./... -count=1 and go test -race -json ./... -count=1; "
+          "vet/production scratch build/read-only gofmt/whitespace."),
+)
+errors = []
+with redirect_stdout(io.StringIO()):
+    verify_state.check_chapt_card_contract(errors, [legacy_p4_card])
+assert errors == [], errors
+frontend_card = dict(
+    valid_card,
+    project_id="cha-pt-frontend",
+    workspace_path="/Users/chanbla11mit/projects/cha-pt-frontend/.worktrees/t_example",
+    body=("Repository /Users/chanbla11mit/projects/cha-pt-frontend ONLY. "
+          "Baseline EXACT 0123456789abcdef0123456789abcdef01234567. "
+          "Independent reviewer chapt-reviewer. Follow AGENTS.md; operator-protected paths require "
+          "explicit human authorization.\n"
+          "Frontend project EXACT cha-pt-frontend.\n"
+          "Frontend editable paths EXACT site/index.html, site/static/styles/main.css.\n"
+          "External writes PROHIBITED without separate explicit human authorization on this card.\n"
+          "## Test contract\n`python3 checks/run.py --all`"),
+)
+errors = []
+with redirect_stdout(io.StringIO()):
+    verify_state.check_chapt_card_contract(errors, [frontend_card])
+assert errors == [], errors
+invalid_card = dict(valid_card, body=valid_card["body"].replace("## Test contract\n`go test ./...`", ""))
+errors = []
+with redirect_stdout(io.StringIO()):
+    verify_state.check_chapt_card_contract(errors, [invalid_card])
+assert errors == ["Cha PT card contract drift t_example: explicit test contract missing"], errors
+keyword_only_test = dict(
+    valid_card,
+    body=("Repository /Users/chanbla11mit/projects/cha-pt ONLY. "
+          "Baseline EXACT 0123456789abcdef0123456789abcdef01234567. "
+          "Independent reviewer chapt-reviewer.\n## Test contract\n"
+          "No executable test command is specified; pnpm is only mentioned as the package manager."),
+)
+errors = []
+with redirect_stdout(io.StringIO()):
+    verify_state.check_chapt_card_contract(errors, [keyword_only_test])
+assert errors == ["Cha PT card contract drift t_example: explicit test contract missing"], errors
+negated_test_command = dict(
+    valid_card,
+    body=valid_card["body"].replace("`go test ./...`", "Do not run go test ./..."),
+)
+errors = []
+with redirect_stdout(io.StringIO()):
+    verify_state.check_chapt_card_contract(errors, [negated_test_command])
+assert errors == ["Cha PT card contract drift t_example: explicit test contract missing"], errors
+negated_baseline = dict(
+    valid_card,
+    body=valid_card["body"].replace("Baseline EXACT", "No baseline exact"),
+)
+errors = []
+with redirect_stdout(io.StringIO()):
+    verify_state.check_chapt_card_contract(errors, [negated_baseline])
+assert errors == ["Cha PT card contract drift t_example: exact baseline missing"], errors
+negated_frontend_policy = dict(
+    frontend_card,
+    body=frontend_card["body"].replace(
+        "Follow AGENTS.md; operator-protected paths require explicit human authorization.",
+        "Do not follow AGENTS.md; operator-protected paths require explicit human authorization."),
+)
+errors = []
+with redirect_stdout(io.StringIO()):
+    verify_state.check_chapt_card_contract(errors, [negated_frontend_policy])
+assert errors == ["Cha PT card contract drift t_example: frontend protected-path contract missing"], errors
+negated_repository = dict(
+    valid_card,
+    body=valid_card["body"].replace("Repository ", "Do not use Repository "),
+)
+errors = []
+with redirect_stdout(io.StringIO()):
+    verify_state.check_chapt_card_contract(errors, [negated_repository])
+assert errors == ["Cha PT card contract drift t_example: expected exactly one repository"], errors
+negated_reviewer = dict(
+    valid_card,
+    body=valid_card["body"].replace(
+        "Independent reviewer chapt-reviewer.", "Do not request chapt-reviewer."),
+)
+errors = []
+with redirect_stdout(io.StringIO()):
+    verify_state.check_chapt_card_contract(errors, [negated_reviewer])
+assert errors == ["Cha PT card contract drift t_example: independent review contract missing"], errors
+negated_legacy_test = dict(
+    legacy_p4_card,
+    body=legacy_p4_card["body"].replace("Full go test", "Do not run Full go test"),
+)
+errors = []
+with redirect_stdout(io.StringIO()):
+    verify_state.check_chapt_card_contract(errors, [negated_legacy_test])
+assert errors == ["Cha PT card contract drift t_4d3c8997: explicit test contract missing"], errors
+malformed_assignee = dict(valid_card, assignee=[])
+errors = []
+with redirect_stdout(io.StringIO()):
+    verify_state.check_chapt_card_contract(errors, [malformed_assignee])
+assert errors == ["Cha PT card contract drift t_example: independent review contract missing"], errors
+missing_frontend_scope = dict(
+    frontend_card,
+    project_id=None,
+    body=frontend_card["body"].replace(
+        "Frontend project EXACT cha-pt-frontend.\n"
+        "Frontend editable paths EXACT site/index.html, site/static/styles/main.css.\n"
+        "External writes PROHIBITED without separate explicit human authorization on this card.\n",
+        ""),
+)
+errors = []
+with redirect_stdout(io.StringIO()):
+    verify_state.check_chapt_card_contract(errors, [missing_frontend_scope])
+assert errors == ["Cha PT card contract drift t_example: frontend authorization contract missing"], errors
+protected_frontend_path = dict(
+    frontend_card,
+    body=frontend_card["body"].replace(
+        "site/index.html, site/static/styles/main.css", "checks/**"),
+)
+errors = []
+with redirect_stdout(io.StringIO()):
+    verify_state.check_chapt_card_contract(errors, [protected_frontend_path])
+assert errors == ["Cha PT card contract drift t_example: frontend authorization contract missing"], errors
+for forbidden_path in (
+        "site/static/scripts/protected/override.html",
+        "site/static/styles/**",
+        "site/static/styles/"):
+    invalid_path_card = dict(
+        frontend_card,
+        body=frontend_card["body"].replace(
+            "site/index.html, site/static/styles/main.css", forbidden_path),
+    )
+    errors = []
+    with redirect_stdout(io.StringIO()):
+        verify_state.check_chapt_card_contract(errors, [invalid_path_card])
+    assert errors == [
+        "Cha PT card contract drift t_example: frontend authorization contract missing"], errors
+contradictory_external_write = dict(
+    frontend_card,
+    body=frontend_card["body"] + "\nPush is authorized for this local card.",
+)
+errors = []
+with redirect_stdout(io.StringIO()):
+    verify_state.check_chapt_card_contract(errors, [contradictory_external_write])
+assert errors == ["Cha PT card contract drift t_example: frontend authorization contract missing"], errors
+for contradictory_authority in (
+        "You are authorized to push this branch.",
+        "PR is permitted for this card.",
+        "Merging and an Amplify preview are allowed.",
+        "You may push.",
+        "Pushes are allowed.",
+        "You may merge.",
+        "Merging is allowed.",
+        "PRs are allowed.",
+        "Pull requests are approved.",
+        "Pull-requests are approved.",
+        "Previews are allowed.",
+        "You may deploy.",
+        "Deploying is permitted.",
+        "Cloud access is granted.",
+        "External-writes are allowed.",
+        "Authorization is granted to push."):
+    contradictory_card = dict(
+        frontend_card,
+        body=frontend_card["body"] + "\n" + contradictory_authority,
+    )
+    errors = []
+    with redirect_stdout(io.StringIO()):
+        verify_state.check_chapt_card_contract(errors, [contradictory_card])
+    assert errors == [
+        "Cha PT card contract drift t_example: frontend authorization contract missing"], errors
+duplicate_prohibition = dict(
+    frontend_card,
+    body=(frontend_card["body"] + "\n" +
+          "External writes PROHIBITED without separate explicit human authorization on this card."),
+)
+errors = []
+with redirect_stdout(io.StringIO()):
+    verify_state.check_chapt_card_contract(errors, [duplicate_prohibition])
+assert errors == [
+    "Cha PT card contract drift t_example: frontend authorization contract missing"], errors
+
+def failing_kanban_list(*args):
+    return subprocess.CompletedProcess(args, 2, stdout="", stderr="unrecognized arguments")
+
+errors = []
+with redirect_stdout(io.StringIO()):
+    assert verify_state.observe_open_chapt_cards(errors, failing_kanban_list) == []
+assert errors == ["unable to read open Cha PT card list"], errors
+
+def malformed_kanban_list(*args):
+    return subprocess.CompletedProcess(args, 0, stdout="[null]", stderr="")
+
+errors = []
+with redirect_stdout(io.StringIO()):
+    assert verify_state.observe_open_chapt_cards(errors, malformed_kanban_list) == []
+assert errors == ["unable to read open Cha PT card list"], errors
+
+# The Cha PT fleet has one board but two explicitly allowlisted repositories.
+# Every role contract keeps cards pinned to one repository/worktree/baseline/test
+# contract, and frontend work retains its protected-path + external-write gates.
+assert "`/Users/chanbla11mit/projects/cha-pt-frontend`" in orchestrator
+assert "one exact repository" in orchestrator
+assert "Operator-protected" in orchestrator
+for profile in ("chapt-orchestrator", "chapt-worker", "chapt-worker-glm-1",
+                "chapt-worker-glm-2", "chapt-reviewer"):
+    contract = (ROOT / "policies" / "profile-souls" / profile / "SOUL.md").read_text()
+    assert "/Users/chanbla11mit/projects/cha-pt" in contract
+    assert "/Users/chanbla11mit/projects/cha-pt-frontend" in contract
+    assert "board `cha-pt`" in contract
+    assert "baseline" in contract
+    assert "test contract" in contract
+    assert "push" in contract and "PR" in contract and "deploy" in contract
+assert "operator-protected" in (
+    ROOT / "policies" / "profile-souls" / "chapt-reviewer" / "SOUL.md").read_text()
+assert roster["profile_souls"] == json.loads(
+    (ROOT / "snapshots" / "sanitized-current-state.yaml").read_text())["profile_souls"]
+errors = []
+with redirect_stdout(io.StringIO()):
+    verify_state.check_profile_souls(errors, roster["profile_souls"], {
+        profile: entry["sha256"] for profile, entry in roster["profile_souls"].items()})
+assert errors == [], errors
+drifted_souls = {profile: entry["sha256"] for profile, entry in roster["profile_souls"].items()}
+drifted_souls["chapt-reviewer"] = "0" * 64
+errors = []
+with redirect_stdout(io.StringIO()):
+    verify_state.check_profile_souls(errors, roster["profile_souls"], drifted_souls)
+assert errors == ["profile SOUL drift chapt-reviewer"], errors
+check("--fixture", str(FIXTURES / "chapt-profile-soul-drift.yaml"), code=1,
+      text="profile SOUL drift chapt-reviewer")
 check("--fixture", str(FIXTURES / "terminal-retry-default-drift.yaml"), code=1,
       text="terminal retry default drift")
 check("--fixture", str(FIXTURES / "terminal-retry-missing-scope.yaml"), code=1,
@@ -265,6 +552,11 @@ errors = []
 with redirect_stdout(io.StringIO()):
     verify_state.check_profile_local_skill_overrides(errors, local_overrides, local_overrides)
 assert errors == [], errors
+for profile in ("jobcron-orchestrator", "chapt-orchestrator"):
+    rel, want = next(iter(local_overrides[profile].items()))
+    tracked = ROOT / "policies" / "profile-skills" / profile / rel
+    assert tracked.is_file()
+    assert hashlib.sha256(tracked.read_bytes()).hexdigest() == want
 drifted_overrides = json.loads(json.dumps(local_overrides))
 drifted_overrides["worker-astra"]["software-development/spike/SKILL.md"] = "0" * 64
 errors = []

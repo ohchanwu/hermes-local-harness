@@ -7,7 +7,7 @@ import os
 import re
 import subprocess
 import sys
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 ROOT = Path(__file__).resolve().parents[1]
 UNREADABLE = object()  # sentinel: command failed or output was not JSON — never equal to a desired value
@@ -174,11 +174,174 @@ def check_profile_local_skill_overrides(errors, expected, observed=None):
                     or not Path(path).name or not isinstance(want, str)
                     or not re.fullmatch(r"[0-9a-f]{64}", want)):
                 fail(errors, f"malformed profile-local skill override path: {profile}/{path!r}")
+                continue
+            tracked = ROOT / "policies" / "profile-skills" / profile / path
+            if profile in ("jobcron-orchestrator", "chapt-orchestrator"):
+                if not tracked.is_file():
+                    fail(errors, f"missing tracked profile-local skill override: {profile}/{path}")
+                elif hashlib.sha256(tracked.read_bytes()).hexdigest() != want:
+                    fail(errors, f"tracked profile-local skill override hash mismatch: {profile}/{path}")
     if observed is not None and observed != expected:
         fail(errors, "profile-local skill override declaration drift")
 
 
+PROFILE_SOUL_PATHS = {
+    profile: {
+        "source": f"policies/profile-souls/{profile}/SOUL.md",
+        "live": f"/Users/chanbla11mit/.hermes/profiles/{profile}/SOUL.md",
+    }
+    for profile in (
+        "chapt-orchestrator", "chapt-worker", "chapt-worker-glm-1",
+        "chapt-worker-glm-2", "chapt-reviewer",
+    )
+}
+
+
+def check_profile_souls(errors, expected, observed=None):
+    """Profile role contracts are tracked, hash-pinned, and deployed verbatim."""
+    if not isinstance(expected, dict) or set(expected) != set(PROFILE_SOUL_PATHS):
+        fail(errors, "profile SOUL policy missing")
+        return
+    expected_hashes = {}
+    for profile, entry in expected.items():
+        if not isinstance(profile, str) or not isinstance(entry, dict):
+            fail(errors, f"malformed profile SOUL policy: {profile!r}")
+            continue
+        source, live, want = entry.get("source"), entry.get("live"), entry.get("sha256")
+        source_path = ROOT / source if isinstance(source, str) else None
+        if (not isinstance(source, str) or source.startswith("/") or ".." in Path(source).parts
+                or not isinstance(live, str) or not Path(live).is_absolute()
+                or not isinstance(want, str) or not re.fullmatch(r"[0-9a-f]{64}", want)):
+            fail(errors, f"malformed profile SOUL policy: {profile}")
+            continue
+        if {"source": source, "live": live} != PROFILE_SOUL_PATHS[profile]:
+            fail(errors, f"profile SOUL path drift {profile}")
+            continue
+        expected_hashes[profile] = want
+        if not source_path.is_file():
+            fail(errors, f"missing tracked profile SOUL: {profile}")
+        elif hashlib.sha256(source_path.read_bytes()).hexdigest() != want:
+            fail(errors, f"tracked profile SOUL hash mismatch: {profile}")
+    if observed is None:
+        return
+    if not isinstance(observed, dict):
+        fail(errors, "profile SOUL observed state malformed")
+        return
+    for profile, want in expected_hashes.items():
+        if observed.get(profile) != want:
+            fail(errors, f"profile SOUL drift {profile}")
+    for profile in sorted(set(observed) - set(expected_hashes)):
+        fail(errors, f"unexpected profile SOUL observation: {profile}")
+
+
+REPOSITORY_POLICY_MARKERS = {
+    "cha-pt-frontend": [
+        "## Frontend-owner editable paths",
+        "## Operator-protected paths",
+        "A passing check does not permit changes to",
+        "Do not push, merge, change repository permissions or rulesets, modify AWS or",
+    ],
+}
+REPOSITORY_POLICY_PATHS = {
+    "cha-pt-frontend": "/Users/chanbla11mit/projects/cha-pt-frontend/AGENTS.md",
+}
+
+
+def check_repository_policies(errors, expected, observed=None):
+    """Authoritative repository instruction files are present, exact, and complete."""
+    if not isinstance(expected, dict) or set(expected) != set(REPOSITORY_POLICY_MARKERS):
+        fail(errors, "repository policy mapping malformed")
+        return
+    expected_hashes = {}
+    for name, entry in expected.items():
+        if not isinstance(entry, dict):
+            fail(errors, f"repository policy mapping malformed: {name}")
+            continue
+        path, want = entry.get("path"), entry.get("sha256")
+        if (not isinstance(path, str) or not Path(path).is_absolute()
+                or not isinstance(want, str) or not re.fullmatch(r"[0-9a-f]{64}", want)):
+            fail(errors, f"repository policy mapping malformed: {name}")
+            continue
+        if path != REPOSITORY_POLICY_PATHS[name]:
+            fail(errors, f"repository policy path drift {name}")
+            continue
+        expected_hashes[name] = want
+        candidate = Path(path)
+        if not candidate.is_file():
+            fail(errors, f"repository policy missing {name}: {path}")
+            continue
+        content = candidate.read_text(errors="ignore")
+        if hashlib.sha256(candidate.read_bytes()).hexdigest() != want:
+            fail(errors, f"repository policy drift {name}")
+        for marker in REPOSITORY_POLICY_MARKERS[name]:
+            if marker not in content:
+                fail(errors, f"repository policy marker missing {name}: {marker}")
+    if observed is None:
+        return
+    if not isinstance(observed, dict):
+        fail(errors, "repository policy observed state malformed")
+        return
+    for name, want in expected_hashes.items():
+        if observed.get(name) != want:
+            fail(errors, f"repository policy drift {name}")
+    for name in sorted(set(observed) - set(expected_hashes)):
+        fail(errors, f"unexpected repository policy observation: {name}")
+
+
 ADOPTION_REPOS = {"cha-pt": "adoption/cha-pt.md", "jobcron": "adoption/jobcron.md"}
+PROJECT_REPOSITORY_ALLOWLISTS = {
+    "jobcron": ["/Users/chanbla11mit/projects/jobcron"],
+    "cha-pt": [
+        "/Users/chanbla11mit/projects/cha-pt",
+        "/Users/chanbla11mit/projects/cha-pt-frontend",
+    ],
+}
+CHAPT_ASSIGNEES = {
+    "chapt-worker", "chapt-worker-glm-1", "chapt-worker-glm-2", "chapt-reviewer",
+}
+TEST_COMMAND_LINE = re.compile(
+    r"(?im)^\s*(?:[-*]\s+)?`{0,3}\s*(?:"
+    r"go\s+test\b.*|pytest\b.*|npm\s+(?:test\b.*|run\s+\S+.*)|"
+    r"pnpm\s+(?:test\b.*|run\s+\S+.*)|yarn\s+(?:test\b.*|run\s+\S+.*)|"
+    r"node\s+--test\b.*|cargo\s+test\b.*|make\s+test\b.*|"
+    r"python3?\s+\S*(?:check|test)\S*.*)\s*`{0,3}\s*$"
+)
+FRONTEND_POLICY_DECLARATION = (
+    "Follow AGENTS.md; operator-protected paths require explicit human authorization."
+)
+LEGACY_CHAPT_TEST_CONTRACTS = {
+    "t_4d3c8997": (
+        "Full go test -json ./... -count=1 and go test -race -json ./... -count=1"
+    ),
+}
+FRONTEND_PROJECT_DECLARATION = "Frontend project EXACT cha-pt-frontend."
+FRONTEND_EXTERNAL_WRITE_DECLARATION = (
+    "External writes PROHIBITED without separate explicit human authorization on this card."
+)
+FRONTEND_PATH_DECLARATION = re.compile(r"(?m)^Frontend editable paths EXACT ([^\n]+)\.$")
+EXTERNAL_ACTION_MENTION = re.compile(
+    r"(?i)\b(?:push(?:es|ed|ing)?|merg(?:e|es|ed|ing)|PRs?|pull[-\s]+requests?|"
+    r"Amplify\s+previews?|previews?|deploy(?:s|ed|ing|ments?)?|AWS|Cloudflare|"
+    r"production|cloud|external[-\s]+writes?)\b"
+)
+
+
+def frontend_path_allowed(path):
+    if (not path or path.startswith("/") or path.endswith("/")
+            or any(character in path for character in "*?[]{}")):
+        return False
+    candidate = PurePosixPath(path)
+    if str(candidate) != path or "." in candidate.parts or ".." in candidate.parts:
+        return False
+    if path.startswith("site/static/scripts/protected/") or not candidate.suffix:
+        return False
+    if path.startswith("site/") and path.endswith(".html"):
+        return True
+    return any(path.startswith(prefix) for prefix in (
+        "site/static/styles/", "site/static/images/", "site/static/fonts/",
+        "site/static/music/", "site/static/videos/",
+        "site/static/scripts/presentation/",
+    ))
 
 
 def check_project_isolation(errors, fleets, observed=None):
@@ -192,29 +355,147 @@ def check_project_isolation(errors, fleets, observed=None):
             fail(errors, f"project isolation mapping malformed: {project}")
             continue
         board, repo, port = fleet.get("board"), fleet.get("repository"), fleet.get("preview_port")
+        repos = fleet.get("repositories")
+        if repos != PROJECT_REPOSITORY_ALLOWLISTS.get(project):
+            fail(errors, f"project repository allowlist drift: {project}")
         workers = fleet.get("workers")
         if (not isinstance(workers, list) or len(workers) != 3
                 or workers[0] != fleet.get("worker") or len(set(workers)) != len(workers)):
             fail(errors, f"project worker pool mapping malformed: {project}")
             workers = []
         profiles = [fleet.get("orchestrator"), *workers, fleet.get("reviewer")]
-        if board != project or not isinstance(repo, str) or not Path(repo).is_absolute():
+        if (board != project or not isinstance(repo, str) or not Path(repo).is_absolute()
+                or not isinstance(repos, list) or not repos or repos[0] != repo
+                or len(set(repos)) != len(repos)
+                or any(not isinstance(candidate, str) or not Path(candidate).is_absolute()
+                       for candidate in repos)):
             fail(errors, f"project isolation mapping malformed: {project}")
+            repos = []
+        frontend_project = fleet.get("frontend_project")
+        if frontend_project is not None and (
+                project != "cha-pt" or frontend_project != "cha-pt-frontend"
+                or "/Users/chanbla11mit/projects/cha-pt-frontend" not in repos):
+            fail(errors, f"project frontend mapping malformed: {project}")
         if not isinstance(port, int) or not 1024 <= port <= 65535:
             fail(errors, f"project isolation preview port invalid: {project}")
         if any(not isinstance(profile, str) or not profile for profile in profiles):
             fail(errors, f"project isolation profile mapping malformed: {project}")
-        for value, seen, label in ((board, seen_boards, "board"), (repo, seen_repos, "repository"),
-                                   (port, seen_ports, "preview port")):
+        for value, seen, label in ((board, seen_boards, "board"), (port, seen_ports, "preview port")):
             if value in seen:
                 fail(errors, f"project isolation duplicate {label}: {value}")
             seen.add(value)
+        for candidate in repos:
+            if candidate in seen_repos:
+                fail(errors, f"project isolation duplicate repository: {candidate}")
+            seen_repos.add(candidate)
         for profile in profiles:
             if profile in seen_profiles:
                 fail(errors, f"project isolation duplicate profile: {profile}")
             seen_profiles.add(profile)
-    if observed is not None and observed != fleets:
-        fail(errors, "project isolation observed mapping drift")
+    if observed is not None:
+        if isinstance(observed, dict):
+            for project, allowlist in PROJECT_REPOSITORY_ALLOWLISTS.items():
+                observed_fleet = observed.get(project)
+                if not isinstance(observed_fleet, dict) or observed_fleet.get("repositories") != allowlist:
+                    fail(errors, f"project repository allowlist drift: {project}")
+        if observed != fleets:
+            fail(errors, "project isolation observed mapping drift")
+
+
+def check_chapt_card_contract(errors, tasks):
+    """Open Cha PT cards fail closed on repository/worktree/baseline/test scope."""
+    if not isinstance(tasks, list):
+        fail(errors, "Cha PT card contract observation malformed")
+        return
+    for task in tasks:
+        if not isinstance(task, dict):
+            fail(errors, "Cha PT card contract observation malformed")
+            continue
+        task_id = task.get("id") or "<unknown>"
+        body = task.get("body") if isinstance(task.get("body"), str) else ""
+        repositories = [repo for repo in PROJECT_REPOSITORY_ALLOWLISTS["cha-pt"] if re.search(
+            r"(?:^|[.!?;]\s+)Repository\s+" + re.escape(repo) + r"\s+ONLY\b", body)]
+        if len(repositories) != 1:
+            fail(errors, f"Cha PT card contract drift {task_id}: expected exactly one repository")
+            continue
+        repo = repositories[0]
+        expected_workspace = f"{repo}/.worktrees/{task_id}"
+        if task.get("workspace_kind") != "worktree" or task.get("workspace_path") != expected_workspace:
+            fail(errors, f"Cha PT card contract drift {task_id}: isolated worktree mismatch")
+        if not re.search(r"(?:^|[.!?]\s+)Baseline EXACT\s+[0-9a-f]{40}\b", body):
+            fail(errors, f"Cha PT card contract drift {task_id}: exact baseline missing")
+        headings = list(re.finditer(r"(?m)^(#{1,4})\s+([^\n]+)\n", body))
+        test_section = ""
+        for index, heading in enumerate(headings):
+            if not re.search(r"(?i)(?:test|verification)", heading.group(2)):
+                continue
+            level = len(heading.group(1))
+            end = len(body)
+            for later in headings[index + 1:]:
+                if len(later.group(1)) <= level:
+                    end = later.start()
+                    break
+            test_section = body[heading.end():end]
+            break
+        canonical_test = bool(test_section and TEST_COMMAND_LINE.search(test_section))
+        legacy_test = LEGACY_CHAPT_TEST_CONTRACTS.get(task_id)
+        legacy_match = bool(legacy_test and re.search(
+            r"(?:^|[.!?]\s+)" + re.escape(legacy_test), test_section))
+        if not canonical_test and not legacy_match:
+            fail(errors, f"Cha PT card contract drift {task_id}: explicit test contract missing")
+        reviewer_declared = re.search(
+            r"(?i)(?:^|[.!?;]\s+)(?:Independent reviewer(?: EXACT)?|Reviewer EXACT)\s+"
+            r"chapt-reviewer\b", body)
+        if (not isinstance(task.get("assignee"), str)
+                or task["assignee"] not in CHAPT_ASSIGNEES or not reviewer_declared):
+            fail(errors, f"Cha PT card contract drift {task_id}: independent review contract missing")
+        if repo.endswith("cha-pt-frontend") and FRONTEND_POLICY_DECLARATION not in body:
+            fail(errors, f"Cha PT card contract drift {task_id}: frontend protected-path contract missing")
+        if repo.endswith("cha-pt-frontend"):
+            path_match = FRONTEND_PATH_DECLARATION.search(body)
+            paths = ([item.strip() for item in path_match.group(1).split(",")]
+                     if path_match else [])
+            if (task.get("project_id") != "cha-pt-frontend"
+                    or FRONTEND_PROJECT_DECLARATION not in body
+                    or not paths or not all(frontend_path_allowed(path) for path in paths)
+                    or body.count(FRONTEND_EXTERNAL_WRITE_DECLARATION) != 1
+                    or EXTERNAL_ACTION_MENTION.search(
+                        body.replace(FRONTEND_EXTERNAL_WRITE_DECLARATION, "", 1))):
+                fail(errors, f"Cha PT card contract drift {task_id}: frontend authorization contract missing")
+
+
+def observe_open_chapt_cards(errors, runner=run):
+    listed = runner("hermes", "-p", "default", "kanban", "--board", "cha-pt", "list", "--json")
+    if listed.returncode:
+        fail(errors, "unable to read open Cha PT card list")
+        return []
+    try:
+        summaries = json.loads(listed.stdout)
+    except json.JSONDecodeError:
+        fail(errors, "unable to read open Cha PT card list")
+        return []
+    if not isinstance(summaries, list):
+        fail(errors, "unable to read open Cha PT card list")
+        return []
+    cards = []
+    for summary in summaries:
+        if (not isinstance(summary, dict) or not isinstance(summary.get("id"), str)
+                or not summary["id"].strip()):
+            fail(errors, "unable to read open Cha PT card list")
+            return []
+        if summary.get("status") in ("done", "archived"):
+            continue
+        shown = runner("hermes", "-p", "default", "kanban", "--board", "cha-pt", "show", summary["id"], "--json")
+        try:
+            payload = json.loads(shown.stdout) if not shown.returncode else {}
+            task = payload.get("task", payload)
+        except (json.JSONDecodeError, AttributeError):
+            task = {}
+        if not isinstance(task, dict) or task.get("id") != summary.get("id"):
+            fail(errors, f"unable to read Cha PT card contract {summary.get('id', '<unknown>')}")
+        else:
+            cards.append(task)
+    return cards
 
 
 def check_adoption(errors, adapters):
@@ -541,6 +822,14 @@ def main():
     check_terminal_notification_deployment(errors, roster, snapshot)
     check_terminal_retry_policy(errors, roster)
     check_project_isolation(errors, snapshot.get("project_isolation"))
+    profile_souls = roster.get("profile_souls", {})
+    if snapshot.get("profile_souls") != profile_souls:
+        fail(errors, "profile SOUL snapshot drift")
+    check_profile_souls(errors, profile_souls)
+    repository_policies = roster.get("repository_policies", {})
+    if snapshot.get("repository_policies") != repository_policies:
+        fail(errors, "repository policy snapshot drift")
+    check_repository_policies(errors, repository_policies)
     approval_policy = roster.get("approval_policy", {})
     approval_profiles = approval_policy.get("profiles", [])
     if approval_policy.get("mode") != "off":
@@ -560,7 +849,7 @@ def main():
             return 2
         # Fail-closed fixture schema: a passing fixture must represent every required
         # observed field and every installed roster profile; omission is drift, not success.
-        for section in ("profile_models", "profile_providers", "profile_approval_modes", "plugins", "dispatch_profiles", "kanban", "skill_files", "profile_local_skill_overrides", "adapters", "terminal_notification_runtime", "terminal_retry_policy", "project_isolation"):
+        for section in ("profile_models", "profile_providers", "profile_approval_modes", "plugins", "dispatch_profiles", "kanban", "skill_files", "profile_local_skill_overrides", "profile_soul_hashes", "repository_policy_hashes", "adapters", "terminal_notification_runtime", "terminal_retry_policy", "project_isolation"):
             if section not in observed:
                 fail(errors, f"incomplete fixture: missing required section '{section}'")
         kanban = observed.get("kanban", {})
@@ -600,6 +889,8 @@ def main():
                                             snapshot["terminal_notification"]["producer_profiles"])
         check_terminal_retry_policy(errors, roster, observed)
         check_project_isolation(errors, snapshot.get("project_isolation"), observed.get("project_isolation"))
+        check_profile_souls(errors, profile_souls, observed.get("profile_soul_hashes"))
+        check_repository_policies(errors, repository_policies, observed.get("repository_policy_hashes"))
         for name in expected:
             if name not in plugins:
                 fail(errors, f"incomplete fixture: plugins omits {name}")
@@ -685,6 +976,25 @@ def main():
                 tools = json_config(profile, "platform_toolsets.cli")
                 if tools != expected_tools:
                     fail(errors, f"project toolset drift {profile}: expected {expected_tools!r}")
+            frontend_project = fleet.get("frontend_project")
+            if frontend_project:
+                shown = run("hermes", "-p", fleet["orchestrator"], "project", "show", frontend_project)
+                frontend_repo = "/Users/chanbla11mit/projects/cha-pt-frontend"
+                folder_paths = re.findall(r"^\s+[ *]\s+(/.+)$", shown.stdout, re.MULTILINE)
+                if (shown.returncode or f"{frontend_project}  [" not in shown.stdout
+                        or f"  board:   {fleet['board']}" not in shown.stdout
+                        or f"  primary: {frontend_repo}" not in shown.stdout
+                        or folder_paths != [frontend_repo]):
+                    fail(errors, f"Hermes project drift {frontend_project}: expected board {fleet['board']} "
+                                 f"with sole primary folder {frontend_repo}")
+                for profile in project_profiles:
+                    projects = run("hermes", "-p", profile, "project", "list", "--all")
+                    observed_projects = set(re.findall(
+                        r"^\s*\*?\s*([a-z0-9][a-z0-9-]*)\s+", projects.stdout, re.MULTILINE))
+                    expected_projects = {frontend_project} if profile == fleet["orchestrator"] else set()
+                    if projects.returncode or observed_projects != expected_projects:
+                        fail(errors, f"Hermes project allowlist drift {profile}: expected "
+                                     f"{sorted(expected_projects)}, actual {sorted(observed_projects)}")
             launcher_name = {"jobcron": "run-jobcron-orchestrator", "cha-pt": "run-chapt-orchestrator"}[project]
             launcher = ROOT / "scripts" / launcher_name
             launcher_text = launcher.read_text() if launcher.is_file() else ""
@@ -693,6 +1003,7 @@ def main():
                     or fleet["orchestrator"] not in launcher_text
                     or fleet["repository"] not in launcher_text):
                 fail(errors, f"project orchestrator launcher drift: {launcher}")
+        check_chapt_card_contract(errors, observe_open_chapt_cards(errors))
         deployed_hashes = {}
         for entry in snapshot["skill"]["shared_skills"]:
             deployed_hashes[entry["name"]] = {}
@@ -717,6 +1028,18 @@ def main():
                 observed_local_overrides[profile][rel] = (
                     hashlib.sha256(candidate.read_bytes()).hexdigest() if candidate.is_file() else None)
         check_profile_local_skill_overrides(errors, expected_local_overrides, observed_local_overrides)
+        observed_souls = {}
+        for profile, entry in profile_souls.items():
+            candidate = Path(entry["live"])
+            observed_souls[profile] = (
+                hashlib.sha256(candidate.read_bytes()).hexdigest() if candidate.is_file() else None)
+        check_profile_souls(errors, profile_souls, observed_souls)
+        observed_repository_policies = {}
+        for name, entry in repository_policies.items():
+            candidate = Path(entry["path"])
+            observed_repository_policies[name] = (
+                hashlib.sha256(candidate.read_bytes()).hexdigest() if candidate.is_file() else None)
+        check_repository_policies(errors, repository_policies, observed_repository_policies)
         check_adoption(errors, None)
         source = Path(snapshot["hermes_source"]["path"])
         commit = run("git", "-C", str(source), "rev-parse", "HEAD")

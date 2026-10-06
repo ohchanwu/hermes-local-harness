@@ -1,10 +1,10 @@
 # Concurrent project fleets
 
-Status: implemented locally on 2026-10-04.
+Status: implemented locally; Cha PT dual-repository scope added on 2026-10-06.
 
 ## Goal
 
-Run autonomous Jobcron and Cha PT campaigns concurrently without sharing their orchestrator, implementation worker pool, reviewer, board database, Hermes profile state, repository root, worktree tree, preview port, logs, attachments, or evidence namespace.
+Run autonomous Jobcron and Cha PT campaigns concurrently without crossing their orchestrator, implementation worker pool, reviewer, board database, Hermes profile state, repository allowlist, worktree tree, preview port, logs, attachments, or evidence namespace. Within Cha PT, one board coordinates two repositories while every card remains pinned to exactly one repository.
 
 ## Topology
 
@@ -17,7 +17,9 @@ Run autonomous Jobcron and Cha PT campaigns concurrently without sharing their o
   - preview port: `17777`, loopback, `--no-open`
 - Cha PT
   - board: `cha-pt`
-  - repository: `/Users/chanbla11mit/projects/cha-pt`
+  - primary/default repository: `/Users/chanbla11mit/projects/cha-pt`
+  - additional authorized repository: `/Users/chanbla11mit/projects/cha-pt-frontend`
+  - frontend Hermes project: `cha-pt-frontend`, with the frontend repository as its sole primary folder and `cha-pt` as its board
   - orchestrator: `chapt-orchestrator` — `openai-codex/gpt-6.1-sol`
   - worker pool: `chapt-worker` — `openai-codex/gpt-6.1-sol`; `chapt-worker-glm-1` and `chapt-worker-glm-2` — `zai/glm-5.3`
   - reviewer: `chapt-reviewer` — `openai-codex/gpt-6-astra`
@@ -31,9 +33,15 @@ Hermes intentionally hides board-routing tools such as `kanban_list` and `kanban
 
 Hermes command approvals are disabled with `approvals.mode: off` on every installed roster profile. This affects the terminal approval gate only; project isolation and all authorization policies below remain mandatory.
 
-Named Kanban boards are the hard task boundary: each has its own SQLite database, workspaces, logs, and attachments, and dispatcher-spawned workers receive board-pinned environment variables. Each project profile has its own Hermes home, configuration, memory, sessions, logs, and state database. Each board's `default_workdir` points to one canonical repository, so coding tasks receive project-local worktrees.
+Named Kanban boards are the hard product boundary: each has its own SQLite database, workspaces, logs, and attachments, and dispatcher-spawned workers receive board-pinned environment variables. Each project profile has its own Hermes home, configuration, memory, sessions, logs, and state database. A board's `default_workdir` remains its primary repository. The `cha-pt-frontend` Hermes project supplies the alternate primary repository when a frontend card is created, so stock Hermes creates that card's worktree under `/Users/chanbla11mit/projects/cha-pt-frontend/.worktrees/` without changing the board default.
 
-Hermes profiles are not filesystem sandboxes. Repository/profile pairing is therefore also enforced by fixed `terminal.cwd`, role-specific `SOUL.md`, the canonical orchestration skill, explicit reviewer names, and `scripts/verify-state`. A card with a mismatched board, profile, repository, or workspace must block before file access or mutation.
+Hermes profiles are not filesystem sandboxes. Repository/profile pairing is therefore also enforced by fixed `terminal.cwd`, hash-pinned role-specific `SOUL.md`, the canonical orchestration skill, explicit reviewer names, and `scripts/verify-state`. Every card names one exact repository, one repository-owned isolated worktree, one protected baseline, and one explicit test contract. A mismatch in board, profile, repository, workspace, baseline, or test contract must block before file access or mutation.
+
+The live verifier fails closed on the exact repository/project allowlist and inspects every non-closed `cha-pt` card for its repository, task-ID worktree, 40-character baseline, executable test contract, and independent reviewer declaration. This supplements—rather than replaces—the orchestrator's pre-creation checks.
+
+For `/Users/chanbla11mit/projects/cha-pt-frontend`, `AGENTS.md` is authoritative and its exact SHA-256 plus required editable/protected-path markers are pinned in desired state. Ordinary frontend cards remain inside frontend-owner editable paths; operator-protected paths require explicit human authorization naming the exact protected scope on that card. Passing protected checks is evidence, not authorization. Local implementation and review never authorize credentials, pushes, PRs, Amplify previews, deployments, production/cloud mutations, or other external writes.
+
+Cross-repository work is represented by linked repository-specific cards. A policy expansion never changes an existing card's repository, worktree, baseline, test contract, or authority; this preserves the active P4 campaign without pausing, rewriting, or requeuing it.
 
 ## Operations
 
@@ -53,7 +61,7 @@ hermes kanban --board jobcron list
 hermes kanban --board cha-pt list
 ```
 
-Every coding card must use a board-local worktree, identify its baseline and repository, assign only a worker from the matching project pool, and request only the matching reviewer. Sol is the routine bounded lane; GLM Full is preferred for large-context, repo-wide, long-horizon, multimodal, visual, or broadly specified work. Review revisions return to the same assignee unless a capability-bound continuation card explicitly preserves lineage and evidence.
+Every coding card must use a repository-owned board worktree, identify its exact repository and protected baseline, state an explicit test contract, assign only a worker from the matching project pool, and request only the matching reviewer. A frontend card must set `project: cha-pt-frontend`; a backend card must not. Sol is the routine bounded lane; GLM Full is preferred for large-context, repo-wide, long-horizon, multimodal, visual, or broadly specified work. Review revisions return to the same assignee unless a capability-bound continuation card explicitly preserves lineage and evidence.
 
 ## Upgrade and rollback
 

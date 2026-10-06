@@ -600,6 +600,9 @@
     "jobcron": {
       "board": "jobcron",
       "repository": "/Users/chanbla11mit/projects/jobcron",
+      "repositories": [
+        "/Users/chanbla11mit/projects/jobcron"
+      ],
       "orchestrator": "jobcron-orchestrator",
       "worker": "jobcron-worker",
       "reviewer": "jobcron-reviewer",
@@ -613,6 +616,11 @@
     "cha-pt": {
       "board": "cha-pt",
       "repository": "/Users/chanbla11mit/projects/cha-pt",
+      "repositories": [
+        "/Users/chanbla11mit/projects/cha-pt",
+        "/Users/chanbla11mit/projects/cha-pt-frontend"
+      ],
+      "frontend_project": "cha-pt-frontend",
       "orchestrator": "chapt-orchestrator",
       "worker": "chapt-worker",
       "reviewer": "chapt-reviewer",
@@ -622,6 +630,39 @@
         "chapt-worker-glm-1",
         "chapt-worker-glm-2"
       ]
+    }
+  },
+  "profile_souls": {
+    "chapt-orchestrator": {
+      "source": "policies/profile-souls/chapt-orchestrator/SOUL.md",
+      "live": "/Users/chanbla11mit/.hermes/profiles/chapt-orchestrator/SOUL.md",
+      "sha256": "6cad04cc2a650ba78fea836aa124b4edb7e8c102da30120fb1bb80a41a610b52"
+    },
+    "chapt-worker": {
+      "source": "policies/profile-souls/chapt-worker/SOUL.md",
+      "live": "/Users/chanbla11mit/.hermes/profiles/chapt-worker/SOUL.md",
+      "sha256": "6bd46152500f54f4955b657d80a20f31db27f2d3162845fd8194436e03c5b5ab"
+    },
+    "chapt-worker-glm-1": {
+      "source": "policies/profile-souls/chapt-worker-glm-1/SOUL.md",
+      "live": "/Users/chanbla11mit/.hermes/profiles/chapt-worker-glm-1/SOUL.md",
+      "sha256": "79b114ac428183ec8140ff872490afed6a9512a729896aa99faf4f4554dcb7a1"
+    },
+    "chapt-worker-glm-2": {
+      "source": "policies/profile-souls/chapt-worker-glm-2/SOUL.md",
+      "live": "/Users/chanbla11mit/.hermes/profiles/chapt-worker-glm-2/SOUL.md",
+      "sha256": "420248cde44ce10386aa9ad46c2f145e964198ba5d02b906fc8d929cb591793b"
+    },
+    "chapt-reviewer": {
+      "source": "policies/profile-souls/chapt-reviewer/SOUL.md",
+      "live": "/Users/chanbla11mit/.hermes/profiles/chapt-reviewer/SOUL.md",
+      "sha256": "b8b07f2b210c08d9d97fe278665bf26e9b11d5ad2013b932d88cb590bca94e37"
+    }
+  },
+  "repository_policies": {
+    "cha-pt-frontend": {
+      "path": "/Users/chanbla11mit/projects/cha-pt-frontend/AGENTS.md",
+      "sha256": "113b81fd55294cfc3057f66163e1745d590f520003997d36c85b46c938342817"
     }
   },
   "project_dispatch_allowlist": [

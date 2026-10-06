@@ -472,7 +472,7 @@
     }
   },
   "terminal_retry_policy": {
-    "default": "astra-until-approve-v1",
+    "default": "bounded-human-block",
     "supported_opt_in": "astra-until-approve-v1",
     "required_card_metadata": [
       "ladder_version: glm-review-v2",
@@ -518,7 +518,8 @@
       "repository": "/Users/chanbla11mit/projects/cha-pt",
       "repositories": [
         "/Users/chanbla11mit/projects/cha-pt",
-        "/Users/chanbla11mit/projects/cha-pt-frontend"
+        "/Users/chanbla11mit/projects/cha-pt-frontend",
+        "/Users/chanbla11mit/projects/not-authorized"
       ],
       "frontend_project": "cha-pt-frontend",
       "orchestrator": "chapt-orchestrator",

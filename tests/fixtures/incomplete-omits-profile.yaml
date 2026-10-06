@@ -151,15 +151,15 @@
   "skill_files": {
     "multi-agent-coding-orchestrator": {
       "default": {
-        "SKILL.md": "87fe6837b1b55eb2f9b9fef46cf5133411fda8162073e8597213a4bf57f32f51",
+        "SKILL.md": "b017193ba00ca73c18798b67442306b690c11509118451052177b2c603956697",
         "scripts/set-active-lanes.py": "157419c7c190b0a9f647271f7bd3839182f2e9324f8f9d74e43ec0553a5b77df"
       },
       "jobcron-orchestrator": {
-        "SKILL.md": "87fe6837b1b55eb2f9b9fef46cf5133411fda8162073e8597213a4bf57f32f51",
+        "SKILL.md": "b017193ba00ca73c18798b67442306b690c11509118451052177b2c603956697",
         "scripts/set-active-lanes.py": "157419c7c190b0a9f647271f7bd3839182f2e9324f8f9d74e43ec0553a5b77df"
       },
       "chapt-orchestrator": {
-        "SKILL.md": "87fe6837b1b55eb2f9b9fef46cf5133411fda8162073e8597213a4bf57f32f51",
+        "SKILL.md": "b017193ba00ca73c18798b67442306b690c11509118451052177b2c603956697",
         "scripts/set-active-lanes.py": "157419c7c190b0a9f647271f7bd3839182f2e9324f8f9d74e43ec0553a5b77df"
       }
     },
@@ -462,6 +462,12 @@
       "software-development/spike/SKILL.md": "64992df7588a511575cb4abb0615fed075a6f12bf0dc7df720deda6c942c9e27",
       "software-development/systematic-debugging/SKILL.md": "ba44896266af82366bcf316398282bfc792de1ced4d781be22d1406228d1a215",
       "software-development/test-driven-development/SKILL.md": "9e9a4bb630506f4f3b4ff19cca80bb464e57db19b8a175959388d2112fc096ff"
+    },
+    "jobcron-orchestrator": {
+      "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md": "81ceeb65011bec137d9ab7ccf0efe2a70533e842a935133f169b687f2cb0c41b"
+    },
+    "chapt-orchestrator": {
+      "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md": "08a26d2db5aa4f71bf18702c8024d3d720f1d592a79a30c90454c876f5f485d4"
     }
   },
   "terminal_retry_policy": {
@@ -493,6 +499,9 @@
     "jobcron": {
       "board": "jobcron",
       "repository": "/Users/chanbla11mit/projects/jobcron",
+      "repositories": [
+        "/Users/chanbla11mit/projects/jobcron"
+      ],
       "orchestrator": "jobcron-orchestrator",
       "worker": "jobcron-worker",
       "reviewer": "jobcron-reviewer",
@@ -506,6 +515,11 @@
     "cha-pt": {
       "board": "cha-pt",
       "repository": "/Users/chanbla11mit/projects/cha-pt",
+      "repositories": [
+        "/Users/chanbla11mit/projects/cha-pt",
+        "/Users/chanbla11mit/projects/cha-pt-frontend"
+      ],
+      "frontend_project": "cha-pt-frontend",
       "orchestrator": "chapt-orchestrator",
       "worker": "chapt-worker",
       "reviewer": "chapt-reviewer",
@@ -541,5 +555,15 @@
     "chapt-worker-glm-1": "off",
     "chapt-worker-glm-2": "off",
     "chapt-reviewer": "off"
+  },
+  "profile_soul_hashes": {
+    "chapt-orchestrator": "6cad04cc2a650ba78fea836aa124b4edb7e8c102da30120fb1bb80a41a610b52",
+    "chapt-worker": "6bd46152500f54f4955b657d80a20f31db27f2d3162845fd8194436e03c5b5ab",
+    "chapt-worker-glm-1": "79b114ac428183ec8140ff872490afed6a9512a729896aa99faf4f4554dcb7a1",
+    "chapt-worker-glm-2": "420248cde44ce10386aa9ad46c2f145e964198ba5d02b906fc8d929cb591793b",
+    "chapt-reviewer": "b8b07f2b210c08d9d97fe278665bf26e9b11d5ad2013b932d88cb590bca94e37"
+  },
+  "repository_policy_hashes": {
+    "cha-pt-frontend": "113b81fd55294cfc3057f66163e1745d590f520003997d36c85b46c938342817"
   }
 }

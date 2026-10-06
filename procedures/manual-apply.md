@@ -117,11 +117,17 @@ Verify disabled-but-pinned on each:
 
 ## 4. Deploy the shared skills (manual copy; never symlink)
 
-Hermes skills load per profile: worker profiles read only `~/.hermes/profiles/<profile>/skills`, and the default profile reads `~/.hermes/skills`. A skill installed only under `~/.hermes/skills` is invisible to implementation lanes, so the two scoped skills are copied into every implementation profile home — including dormant `worker-terra-2` — and never into reviewer/advisor homes. The orchestrator skill stays in the default (control-plane) home.
+Hermes skills load per profile: worker profiles read only `~/.hermes/profiles/<profile>/skills`, and the default profile reads `~/.hermes/skills`. A skill installed only under `~/.hermes/skills` is invisible to implementation lanes, so the two scoped skills are copied into every implementation profile home — including dormant `worker-terra-2` — and never into reviewer/advisor homes. The canonical orchestration skill is deployed to the default home. The project orchestrators use separately tracked, hash-pinned variants under `policies/profile-skills/` so their learned project procedures are preserved instead of overwritten by a shared copy.
 
     mkdir -p ~/.hermes/skills/autonomous-ai-agents/multi-agent-coding-orchestrator/scripts
     cp skills/multi-agent-coding-orchestrator/SKILL.md ~/.hermes/skills/autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md
     cp skills/multi-agent-coding-orchestrator/scripts/set-active-lanes.py ~/.hermes/skills/autonomous-ai-agents/multi-agent-coding-orchestrator/scripts/
+
+    for profile in jobcron-orchestrator chapt-orchestrator; do
+      mkdir -p ~/.hermes/profiles/$profile/skills/autonomous-ai-agents/multi-agent-coding-orchestrator/scripts
+      cp policies/profile-skills/$profile/autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md ~/.hermes/profiles/$profile/skills/autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md
+      cp skills/multi-agent-coding-orchestrator/scripts/set-active-lanes.py ~/.hermes/profiles/$profile/skills/autonomous-ai-agents/multi-agent-coding-orchestrator/scripts/
+    done
 
     for profile in worker-flash-1 worker-flash-2 worker-flash-3 worker-luna-1 worker-luna-2 \
                    worker-terra-1 worker-terra-2 worker-glm-full worker-sol worker-astra; do
@@ -203,6 +209,23 @@ Create or repair the ten project profiles and two named boards exactly as record
 Disable `hermes-terminal-outcome-notification` on project profiles: its legacy shared-default-DB deployment is not the authority for named-board events. Named-board lifecycle and subscriptions remain inside stock Hermes Kanban.
 
 Launch controllers only through `scripts/run-jobcron-orchestrator` and `scripts/run-chapt-orchestrator`; these set the per-process board pin before starting the profile.
+
+Cha PT uses one board with two repository-specific worktree roots. Keep the board default and all five profile `terminal.cwd` values at `/Users/chanbla11mit/projects/cha-pt`. Create the frontend project only in the `chapt-orchestrator` profile; do not run `project bind-board` afterward because that command would replace the board default workdir:
+
+    hermes -p chapt-orchestrator project create "Cha PT Frontend" \
+      /Users/chanbla11mit/projects/cha-pt-frontend \
+      --slug cha-pt-frontend \
+      --primary /Users/chanbla11mit/projects/cha-pt-frontend \
+      --board cha-pt
+    hermes -p chapt-orchestrator project show cha-pt-frontend
+
+Deploy the exact tracked Cha PT role contracts; never patch the live copies directly:
+
+    for profile in chapt-orchestrator chapt-worker chapt-worker-glm-1 chapt-worker-glm-2 chapt-reviewer; do
+      cp "policies/profile-souls/$profile/SOUL.md" "$HOME/.hermes/profiles/$profile/SOUL.md"
+    done
+
+Every Cha PT card must name exactly one authorized repository, its repository-owned isolated worktree, the protected baseline commit, and the explicit test contract. Frontend cards set `project: cha-pt-frontend` and obey `/Users/chanbla11mit/projects/cha-pt-frontend/AGENTS.md`; protected paths, credentials, pushes, PRs, previews, deployments, production/cloud changes, and other external writes retain their separate human approval gates. Split cross-repository work into linked cards. Do not rewrite or broaden existing cards, including P4 campaign cards.
 
 After clearing the launchd pin, restart the default gateway once from a separate shell. Do not restart it from a gateway-owned agent process: the restart terminates that process before it can verify completion. Normal topology rollback may restore the legacy pin with `launchctl setenv HERMES_KANBAN_DB /Users/chanbla11mit/.hermes/kanban.db` only if named-board dispatch has first been paused or retired.
 

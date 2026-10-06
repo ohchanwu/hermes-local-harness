@@ -67,6 +67,10 @@ clean["dispatch_profiles"] = copy.deepcopy(desired["kanban"]["dispatch_profiles"
 clean["kanban"] = {key: copy.deepcopy(value) for key, value in desired["kanban"].items()
                    if key != "dispatch_profiles"}
 clean["project_isolation"] = copy.deepcopy(desired["project_isolation"])
+clean["profile_soul_hashes"] = {
+    profile: entry["sha256"] for profile, entry in desired["profile_souls"].items()}
+clean["repository_policy_hashes"] = {
+    name: entry["sha256"] for name, entry in desired["repository_policies"].items()}
 clean["plugins"] = base_plugins()
 set_skill_files(clean)
 clean["terminal_retry_policy"] = copy.deepcopy(
@@ -122,6 +126,28 @@ def skill_divergence(d):
 
 
 write("deployed-skill-divergence.yaml", delta(skill_divergence))
+
+
+def chapt_profile_soul_drift(d):
+    d["profile_soul_hashes"]["chapt-reviewer"] = "0" * 64
+
+
+write("chapt-profile-soul-drift.yaml", delta(chapt_profile_soul_drift))
+
+
+def project_repository_allowlist_drift(d):
+    d["project_isolation"]["cha-pt"]["repositories"].append(
+        "/Users/chanbla11mit/projects/not-authorized")
+
+
+write("project-repository-allowlist-drift.yaml", delta(project_repository_allowlist_drift))
+
+
+def frontend_repository_policy_drift(d):
+    d["repository_policy_hashes"]["cha-pt-frontend"] = "0" * 64
+
+
+write("frontend-repository-policy-drift.yaml", delta(frontend_repository_policy_drift))
 
 
 def skill_missing(d):

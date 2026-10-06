@@ -472,7 +472,7 @@
     }
   },
   "terminal_retry_policy": {
-    "default": "astra-until-approve-v1",
+    "default": "bounded-human-block",
     "supported_opt_in": "astra-until-approve-v1",
     "required_card_metadata": [
       "ladder_version: glm-review-v2",
@@ -565,6 +565,6 @@
     "chapt-reviewer": "b8b07f2b210c08d9d97fe278665bf26e9b11d5ad2013b932d88cb590bca94e37"
   },
   "repository_policy_hashes": {
-    "cha-pt-frontend": "113b81fd55294cfc3057f66163e1745d590f520003997d36c85b46c938342817"
+    "cha-pt-frontend": "0000000000000000000000000000000000000000000000000000000000000000"
   }
 }

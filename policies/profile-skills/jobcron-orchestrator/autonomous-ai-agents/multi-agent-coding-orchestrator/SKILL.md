@@ -1,7 +1,7 @@
 ---
 name: multi-agent-coding-orchestrator
 description: "Use when orchestrating multi-agent coding with Hermes."
-version: 0.6.2
+version: 0.6.1
 author: chanbla11mit, Hermes Agent
 license: MIT
 platforms: [macos]
@@ -28,15 +28,9 @@ Do not use this procedure for a simple question that needs no repository change 
 Project-isolated fleets:
 
 - Jobcron board `jobcron`: `jobcron-orchestrator` (`gpt-6.1-sol`); implementation pool `jobcron-worker` (`gpt-6.1-sol`), `jobcron-worker-glm-1` and `jobcron-worker-glm-2` (both `glm-5.3`); independent `jobcron-reviewer` (`gpt-6-astra`). Repository root: `/Users/chanbla11mit/projects/jobcron`; preview port: `17777`.
-- Cha PT board `cha-pt`: `chapt-orchestrator` (`gpt-6.1-sol`); implementation pool `chapt-worker` (`gpt-6.1-sol`), `chapt-worker-glm-1` and `chapt-worker-glm-2` (both `glm-5.3`); independent `chapt-reviewer` (`gpt-6-astra`). Repository allowlist: `/Users/chanbla11mit/projects/cha-pt` and `/Users/chanbla11mit/projects/cha-pt-frontend`; primary board root `/Users/chanbla11mit/projects/cha-pt`; frontend Hermes project `cha-pt-frontend`; backend preview port: `18080`.
+- Cha PT board `cha-pt`: `chapt-orchestrator` (`gpt-6.1-sol`); implementation pool `chapt-worker` (`gpt-6.1-sol`), `chapt-worker-glm-1` and `chapt-worker-glm-2` (both `glm-5.3`); independent `chapt-reviewer` (`gpt-6-astra`). Repository root: `/Users/chanbla11mit/projects/cha-pt`; preview port: `18080`.
 
-Each project profile has an independent Hermes home, memory, sessions, and fixed terminal root. Named boards provide separate databases, logs, attachments, and workspaces. A project orchestrator may assign only its matching worker pool and reviewer. Every card is pinned to one exact repository, repository-owned isolated worktree, protected baseline, and explicit test contract. A task or callback with a mismatched board, profile, repository, workspace, baseline, or test contract is invalid and must be blocked before file access or mutation.
-
-### Cha PT dual-repository routing
-
-The `cha-pt` board may coordinate local work in either allowlisted Cha PT repository, but one card may use only one repository. Keep the board's primary/default workdir and every profile's `terminal.cwd` at `/Users/chanbla11mit/projects/cha-pt`. For a `/Users/chanbla11mit/projects/cha-pt-frontend` card, set `project: cha-pt-frontend` so stock Kanban creates `/Users/chanbla11mit/projects/cha-pt-frontend/.worktrees/<task-id>` from that repository. Never rely on the board default for a frontend card, reuse another card's worktree, or switch repository scope in place. Existing cards retain their original repository and authority; a policy expansion never broadens an active card such as the current P4 campaign.
-
-Frontend cards must follow `/Users/chanbla11mit/projects/cha-pt-frontend/AGENTS.md`. The card must identify the intended editable paths and its exact test contract. Operator-protected paths require explicit human authorization naming the protected scope on that card; passing `checks/run.py` is evidence, not authorization. Local preparation and independent review do not authorize a push, PR, Amplify preview, deployment, credential operation, production mutation, or other external write.
+Each project profile has an independent Hermes home, memory, sessions, and fixed terminal root. Named boards provide separate databases, logs, attachments, and workspaces. A project orchestrator may assign only its matching worker pool and reviewer. A task or callback with a mismatched board, profile, repository, or workspace is invalid and must be blocked before file access or mutation.
 
 Project orchestrators are interactive control-plane sessions, not dispatcher-spawned task workers. Hermes intentionally hides `kanban_list` and `kanban_unblock` whenever `HERMES_KANBAN_TASK` is set, so assigning a card to an orchestrator removes the board-routing tools it needs. Launch each controller through the tracked board-pinning wrapper (`scripts/run-jobcron-orchestrator` or `scripts/run-chapt-orchestrator`). Keep only project workers and reviewers in `kanban.dispatch_profiles`.
 
@@ -290,10 +284,10 @@ Preserve all external-read/write, credential, mutation, deployment, and cutover 
 
 Each implementation card must include:
 
-- One exact repository from the fleet allowlist and the tenant.
+- Repository and tenant.
 - Specification path and exact assigned slice.
 - Base branch or commit and recovery procedure.
-- Required repository-owned worktree/branch isolation.
+- Required worktree/branch isolation.
 - Acceptance criteria and test commands.
 - An explicit per-run runtime cap and its rationale.
 - Ladder metadata and routing rationale.
@@ -353,14 +347,18 @@ Send only milestone completions, genuine blockers, and approval requests. Do not
 ## Pitfalls
 
 - When the user says stop, terminate every owned background worker, reviewer, preview server, and watcher before replying, then verify they stopped. Do not resume because a delayed completion notification arrives.
-- Run every Git command with an explicit repository `workdir` or `git -C`; printing a repository path inside a loop does not change the command's working repository.
+- Run every Git command with an explicit repository `workdir` or `git -C`; printing a repository path inside a loop does not change the command's working repository. Set explicit pinned `workdir` on every dispatcher-worker terminal call, including absolute-path helper/test invocations: shell cwd persistence can differ by backend. A receipt's cwd derived from its artifact root is declarative, not observed process-cwd evidence; use same-call native `pwd` or an actual `Path.cwd()` assertion when proving execution context.
 - For Hermes plugin or service specifications, validate every required hook and payload against the installed source or current official documentation on each emitting surface. CLI, TUI, gateway, and automatic lifecycle paths can expose different identifiers and ordering.
 - Standard `kanban_request_changes` immediately routes back to the original implementer; use a structured block for tier escalation to prevent a reassignment race. A normal unblock preserves review provenance and returns to review, so escalation must reassign and then explicitly promote the card to `ready`.
 - Hermes's global `kanban.max_in_progress` counts review tasks. Do not use it for the implementation-only cap; enforce the active profile pool instead.
 - Profile isolation does not isolate files. Every code-changing card needs its own worktree.
+- Inspect integration-test fixture routing before enabling optional database environment variables for a broad suite. A URL override does not prove isolation: subprocess scripts can hard-code an existing managed service. Scope owned disposable-fixture URLs to inspected targeted package commands, run the ordinary broad suite without optional integration activation, and keep fixture-boundary incidents separate from code correctness; reported cleanup neither authorizes the original access nor bypasses an independent HUMAN_BLOCK.
+- Resolve handoff filenames from the native run's submitted artifact paths before comparing hashes. A prepared `.md` placeholder may coexist with an authored `.txt` or `.json` deliverable; preserve both and verify the exact submitted bytes before diagnosing wrong placement or requesting revision.
 - A skill installed only under `default` cannot be force-loaded by a worker profile. Put the minimum role contract in each worker's `SOUL.md` and card.
 - Never copy OpenAI Codex OAuth stores between profiles. Complete separate authorization when a profile needs an independent grant.
 - Do not manually force `hermes kanban dispatch` while the gateway-embedded dispatcher is already active merely to accelerate a handoff. Let the next gateway tick claim it; overlapping immediate ticks can produce a short-lived duplicate/protocol-violation retry even though the board lock preserves correctness.
+- Inspect the actual persisted/CLI JSON schema rather than assuming tool-view fields are stored verbatim. CLI `show --json` can wrap the card under `task`; a reviewer-owned closed card can retain the reviewer as assignee. A completed native run can be stored as `status: done` plus `outcome: completed`, rather than `status: completed`. Match the actual board/profile/workspace and durable outcome before accepting a receipt. `hermes kanban --board <project> show <id> --json` may omit tool-added `unsatisfied_parents` and comment `id`; verify dependencies from listed parents' current states and comment writes by exact author/body. Native cron may render `continuity: true` from persisted `context_from`, without a stored `continuity` key; self-continuity can be stored literally as `["self"]`, not as the job ID. Verify the actual context source and exact owner-profile job/script/workdir; a local verifier's missing-field error is not a task, scheduler, or product failure.
+- Treat `tmux capture-pane` text as rendered terminal data: trailing prompt spaces may be trimmed. Match a fixed masked-input label without its trailing space and confirm it is the last nonempty line, with no anchored exit or consumption marker. Trace the actual prompt call into its delegated helper before deriving labels; an entrypoint can delegate to a module's `prompt()` rather than contain any `getpass()` calls. If a post-launch presence assertion fails, inspect the exact pane and phase value-blindly before any retry; preserve the original receipt and record the verifier correction separately instead of relaunching a healthy waiting process.
 - Do not enable automatic decomposition until observed use shows manual decomposition is the bottleneck.
 
 ## Verification

@@ -472,7 +472,7 @@
     }
   },
   "terminal_retry_policy": {
-    "default": "astra-until-approve-v1",
+    "default": "bounded-human-block",
     "supported_opt_in": "astra-until-approve-v1",
     "required_card_metadata": [
       "ladder_version: glm-review-v2",
@@ -562,7 +562,7 @@
     "chapt-worker": "6bd46152500f54f4955b657d80a20f31db27f2d3162845fd8194436e03c5b5ab",
     "chapt-worker-glm-1": "79b114ac428183ec8140ff872490afed6a9512a729896aa99faf4f4554dcb7a1",
     "chapt-worker-glm-2": "420248cde44ce10386aa9ad46c2f145e964198ba5d02b906fc8d929cb591793b",
-    "chapt-reviewer": "b8b07f2b210c08d9d97fe278665bf26e9b11d5ad2013b932d88cb590bca94e37"
+    "chapt-reviewer": "0000000000000000000000000000000000000000000000000000000000000000"
   },
   "repository_policy_hashes": {
     "cha-pt-frontend": "113b81fd55294cfc3057f66163e1745d590f520003997d36c85b46c938342817"
