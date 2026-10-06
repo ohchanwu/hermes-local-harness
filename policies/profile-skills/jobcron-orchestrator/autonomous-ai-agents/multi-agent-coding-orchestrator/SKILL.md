@@ -1,7 +1,7 @@
 ---
 name: multi-agent-coding-orchestrator
 description: "Use when orchestrating multi-agent coding with Hermes."
-version: 0.6.1
+version: 0.6.3-jobcron.1
 author: chanbla11mit, Hermes Agent
 license: MIT
 platforms: [macos]
@@ -35,6 +35,19 @@ Each project profile has an independent Hermes home, memory, sessions, and fixed
 Project orchestrators are interactive control-plane sessions, not dispatcher-spawned task workers. Hermes intentionally hides `kanban_list` and `kanban_unblock` whenever `HERMES_KANBAN_TASK` is set, so assigning a card to an orchestrator removes the board-routing tools it needs. Launch each controller through the tracked board-pinning wrapper (`scripts/run-jobcron-orchestrator` or `scripts/run-chapt-orchestrator`). Keep only project workers and reviewers in `kanban.dispatch_profiles`.
 
 Each project has one Sol worker and two GLM Full workers. Use Sol for routine bounded implementation; prefer GLM Full for large-context, repo-wide, long-horizon, multimodal, visual, or broadly specified work, and use either idle GLM worker for independent parallel slices. Capacity alone may select another matching project worker, but never a foreign-project or legacy worker. Review revision stays on the same assignee unless the reviewer identifies a concrete capability boundary; then the orchestrator may create a continuation card for another worker in the same project pool with explicit lineage and preserved evidence.
+
+### Autonomous project repair budget
+
+Project-fleet repair is independent of the legacy escalation ladder. Enable it only when the exact `jobcron` or `cha-pt` card body records exactly one full line `authorization_mode: autonomous` and one full line `repair_policy: bounded-convergence-v1`. Before the first dispatch, append a card comment containing one single-line `repair_history: <JSON array>` snapshot; append a complete successor snapshot comment for every state transition. Kanban comments are the append-only card-wide counter and evidence ledger. Continue on the same card—bounded-convergence-v1 repair authority never transfers to a replacement card. Reassign the same card when authorized, or human-block.
+
+Each approach object has exactly `approach_id`, `strategy`, `strategy_sha256`, `material_difference_review_run_id`, and `attempts`. The strategy hash is calculated from the whitespace-normalized written strategy; approaches after the first require a distinct independent material-difference review run. Each attempt has exactly `candidate_commit`, `implementation_run_id`, `review_run_id`, `infrastructure_retries`, and `outcome`. Start an in-flight attempt with null candidate/review and `outcome: pending`. A successor snapshot may update only that final pending attempt, append one next attempt, or append one next approach; all prior snapshot content remains immutable.
+
+- `max_approaches: 3`: an approach is a materially distinct written implementation strategy. Hash the normalized strategy as `strategy_sha256`; changing a worker, model, card, branch, or worktree, prompt, commit, label, or approach ID is not a new approach. The verifier rejects reused IDs or exact strategy hashes; the independent reviewer must reject a superficial semantic rewrite.
+- `max_attempts_per_approach: 3`: the initial implementation and at most two reviewer-directed corrections. Every completed semantic attempt records a unique 40-hex candidate commit and non-empty independent review run ID.
+- `max_infrastructure_retries_per_attempt: 1`: retry the materially unchanged pending operation once after a provider, process, transport, timeout, unavailable-model, or environment failure. If that retry also fails, the attempt is spent and becomes `infrastructure_failed`; advance within the remaining attempt/approach budget or human-block. An implementation defect is not infrastructure failure.
+- A rejected third attempt cannot be approved. Retire the approach and either begin one recorded materially different approach on the same card or human-block. A third attempt that independently passes may be `approve`.
+- Exhausting three approaches always human-blocks under `bounded-convergence-v1`. Further work requires a newly authorized policy version or explicit amended limits on the exact card; retain the complete prior history rather than resetting v1.
+- An approach stop is not a campaign stop. The orchestrator may autonomously reassess and continue within the remaining budget, but user stop, product decisions, credentials/MFA, prohibited or external writes, unsafe state, capability boundaries, and policy/legal/security decisions still human-block immediately.
 
 Legacy/default-board control profiles remain installed for rollback and existing history:
 

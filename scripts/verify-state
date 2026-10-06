@@ -402,6 +402,253 @@ def check_project_isolation(errors, fleets, observed=None):
             fail(errors, "project isolation observed mapping drift")
 
 
+PROJECT_REPAIR_POLICY = {
+    "version": "bounded-convergence-v1",
+    "requires_authorization_mode": "autonomous",
+    "max_approaches": 3,
+    "max_attempts_per_approach": 3,
+    "max_infrastructure_retries_per_attempt": 1,
+    "project_boards": ["jobcron", "cha-pt"],
+}
+
+
+def check_project_repair_policy(errors, policy, observed=None):
+    """Keep autonomous project repair bounded and independent of ladder depth."""
+    if policy != PROJECT_REPAIR_POLICY:
+        fail(errors, "project repair policy desired mapping drift")
+        return
+    if observed is not None and observed != policy:
+        fail(errors, "project repair policy observed mapping drift")
+
+
+REPAIR_AUTHORIZATION_LINE = re.compile(r"(?m)^authorization_mode: autonomous$")
+REPAIR_POLICY_LINE = re.compile(r"(?m)^repair_policy: bounded-convergence-v1$")
+REPAIR_HISTORY_LINE = re.compile(r"(?m)^repair_history: ([^\n]+)$")
+REPAIR_APPROACH_ID = re.compile(r"^[a-z0-9][a-z0-9-]{0,63}$")
+REPAIR_SHA256 = re.compile(r"^[0-9a-f]{64}$")
+REPAIR_COMMIT = re.compile(r"^[0-9a-f]{40}$")
+REPAIR_OUTCOMES = {"pending", "revise", "pivot", "approve", "blocked", "infrastructure_failed"}
+
+
+def valid_project_repair_history(history):
+    if not isinstance(history, list) or not 1 <= len(history) <= PROJECT_REPAIR_POLICY["max_approaches"]:
+        return False
+    approach_ids, strategies, candidates, implementation_runs, review_runs = set(), set(), set(), set(), set()
+    for approach_index, approach in enumerate(history):
+        if not isinstance(approach, dict) or set(approach) != {
+                "approach_id", "strategy", "strategy_sha256",
+                "material_difference_review_run_id", "attempts"}:
+            return False
+        approach_id = approach["approach_id"]
+        strategy_text, strategy = approach["strategy"], approach["strategy_sha256"]
+        material_review = approach["material_difference_review_run_id"]
+        attempts = approach["attempts"]
+        normalized_strategy = " ".join(strategy_text.split()) if isinstance(strategy_text, str) else ""
+        if (not isinstance(approach_id, str) or not REPAIR_APPROACH_ID.fullmatch(approach_id)
+                or approach_id in approach_ids or not normalized_strategy
+                or not isinstance(strategy, str) or not REPAIR_SHA256.fullmatch(strategy)
+                or strategy != hashlib.sha256(normalized_strategy.encode()).hexdigest()
+                or strategy in strategies
+                or (approach_index == 0 and material_review is not None)
+                or (approach_index > 0 and (not isinstance(material_review, str)
+                                            or not material_review.strip()
+                                            or material_review != material_review.strip()
+                                            or material_review in review_runs))
+                or not isinstance(attempts, list)
+                or not 1 <= len(attempts) <= PROJECT_REPAIR_POLICY["max_attempts_per_approach"]):
+            return False
+        approach_ids.add(approach_id)
+        strategies.add(strategy)
+        if material_review is not None:
+            review_runs.add(material_review)
+        for attempt_index, attempt in enumerate(attempts):
+            if not isinstance(attempt, dict) or set(attempt) != {
+                    "candidate_commit", "implementation_run_id", "review_run_id",
+                    "infrastructure_retries", "outcome"}:
+                return False
+            candidate = attempt["candidate_commit"]
+            implementation_run = attempt["implementation_run_id"]
+            review = attempt["review_run_id"]
+            retries, outcome = attempt["infrastructure_retries"], attempt["outcome"]
+            incomplete = outcome in {"pending", "infrastructure_failed"}
+            evidenced = (isinstance(candidate, str) and bool(REPAIR_COMMIT.fullmatch(candidate))
+                         and isinstance(review, str) and bool(review.strip())
+                         and review == review.strip())
+            candidate_valid = candidate is None if incomplete else (
+                (candidate is None and review is None) or evidenced if outcome == "blocked" else evidenced)
+            review_valid = review is None if incomplete else (
+                (candidate is None and review is None) or evidenced if outcome == "blocked" else evidenced)
+            if (not candidate_valid or (candidate is not None and candidate in candidates)
+                    or not isinstance(implementation_run, str) or not implementation_run.strip()
+                    or implementation_run != implementation_run.strip()
+                    or implementation_run in implementation_runs or not review_valid
+                    or (review is not None and review in review_runs)
+                    or isinstance(retries, bool) or not isinstance(retries, int)
+                    or not 0 <= retries <= PROJECT_REPAIR_POLICY["max_infrastructure_retries_per_attempt"]
+                    or outcome not in REPAIR_OUTCOMES
+                    or (outcome == "infrastructure_failed" and retries != 1)):
+                return False
+            implementation_runs.add(implementation_run)
+            if candidate is not None:
+                candidates.add(candidate)
+            if review is not None:
+                review_runs.add(review)
+            final_attempt = attempt_index == len(attempts) - 1
+            final_approach = approach_index == len(history) - 1
+            if not final_attempt and outcome not in {"revise", "infrastructure_failed"}:
+                return False
+            exhausted = (len(attempts) == PROJECT_REPAIR_POLICY["max_attempts_per_approach"]
+                         and outcome in {"revise", "infrastructure_failed"})
+            if final_attempt and not final_approach and outcome != "pivot" and not exhausted:
+                return False
+            if outcome in {"pending", "approve", "blocked"} and not (final_attempt and final_approach):
+                return False
+            if (outcome == "pivot" and final_approach
+                    and len(history) == PROJECT_REPAIR_POLICY["max_approaches"]):
+                return False
+    return True
+
+
+def project_repair_transition_valid(previous, current):
+    """Only the final pending attempt may advance, or one bounded item may append."""
+    if not valid_project_repair_history(previous) or not valid_project_repair_history(current):
+        return False
+    if previous == current:
+        return False
+    prev_approach, current_approach = previous[-1], current[-1]
+    prev_attempt, current_attempt = prev_approach["attempts"][-1], current_approach["attempts"][-1]
+
+    # Update only the final pending attempt: either one infrastructure retry or completion.
+    if len(previous) == len(current) and all(
+            previous[index] == current[index] for index in range(len(previous) - 1)):
+        if ({key: value for key, value in prev_approach.items() if key != "attempts"}
+                == {key: value for key, value in current_approach.items() if key != "attempts"}
+                and len(prev_approach["attempts"]) == len(current_approach["attempts"])
+                and prev_approach["attempts"][:-1] == current_approach["attempts"][:-1]
+                and prev_attempt["outcome"] == "pending"):
+            if current_attempt["outcome"] == "pending":
+                return (prev_attempt["infrastructure_retries"] == 0
+                        and current_attempt["infrastructure_retries"] == 1
+                        and current_attempt["implementation_run_id"]
+                            != prev_attempt["implementation_run_id"]
+                        and prev_attempt["candidate_commit"] is None
+                        and current_attempt["candidate_commit"] is None
+                        and prev_attempt["review_run_id"] is None
+                        and current_attempt["review_run_id"] is None)
+            return (current_attempt["infrastructure_retries"]
+                    == prev_attempt["infrastructure_retries"]
+                    and current_attempt["implementation_run_id"]
+                    == prev_attempt["implementation_run_id"])
+
+    # Append the next pending attempt to the same approach.
+    if (len(previous) == len(current)
+            and previous[:-1] == current[:-1]
+            and {key: value for key, value in prev_approach.items() if key != "attempts"}
+                == {key: value for key, value in current_approach.items() if key != "attempts"}
+            and current_approach["attempts"][:-1] == prev_approach["attempts"]
+            and len(current_approach["attempts"]) == len(prev_approach["attempts"]) + 1
+            and len(prev_approach["attempts"]) < PROJECT_REPAIR_POLICY["max_attempts_per_approach"]
+            and prev_attempt["outcome"] in {"revise", "infrastructure_failed"}
+            and current_attempt["outcome"] == "pending"
+            and current_attempt["infrastructure_retries"] == 0):
+        return True
+
+    # Append a materially reviewed new approach after pivot or exhausted approach.
+    exhausted = (len(prev_approach["attempts"])
+                 == PROJECT_REPAIR_POLICY["max_attempts_per_approach"]
+                 and prev_attempt["outcome"] in {"revise", "infrastructure_failed"})
+    return (len(current) == len(previous) + 1
+            and current[:-1] == previous
+            and len(previous) < PROJECT_REPAIR_POLICY["max_approaches"]
+            and (prev_attempt["outcome"] == "pivot" or exhausted)
+            and len(current_approach["attempts"]) == 1
+            and current_attempt["outcome"] == "pending"
+            and current_attempt["infrastructure_retries"] == 0)
+
+
+def check_project_repair_cards(errors, cards):
+    """Fail closed on opt-in project cards with malformed or exhausted repair history."""
+    if not isinstance(cards, list):
+        fail(errors, "project repair card observation malformed")
+        return
+    for card in cards:
+        if not isinstance(card, dict):
+            fail(errors, "project repair card observation malformed")
+            continue
+        card_id = card.get("id") if isinstance(card.get("id"), str) else "<unknown>"
+        board = card.get("board")
+        body = card.get("body") if isinstance(card.get("body"), str) else ""
+        comments = card.get("comments") if isinstance(card.get("comments"), list) else []
+        comment_bodies = [comment.get("body", "") for comment in comments if isinstance(comment, dict)]
+        history_groups = [REPAIR_HISTORY_LINE.findall(comment_body) for comment_body in comment_bodies]
+        batched_history = any(len(group) > 1 for group in history_groups)
+        history_lines = [group[0] for group in history_groups if len(group) == 1]
+        if not REPAIR_POLICY_LINE.search(body) and not history_lines and not batched_history:
+            continue
+        if board not in PROJECT_REPAIR_POLICY["project_boards"]:
+            fail(errors, f"project repair contract drift {card_id}: unauthorized board")
+            continue
+        if len(REPAIR_AUTHORIZATION_LINE.findall(body)) != 1:
+            fail(errors, f"project repair contract drift {card_id}: exact authorization missing")
+            continue
+        if len(REPAIR_POLICY_LINE.findall(body)) != 1:
+            fail(errors, f"project repair contract drift {card_id}: exact policy declaration missing")
+            continue
+        histories = []
+        for line in history_lines:
+            try:
+                histories.append(json.loads(line))
+            except json.JSONDecodeError:
+                histories.append(None)
+        if (batched_history or not histories or not valid_project_repair_history(histories[0])
+                or len(histories[0]) != 1 or len(histories[0][0]["attempts"]) != 1
+                or histories[0][0]["attempts"][0]["outcome"] != "pending"
+                or histories[0][0]["attempts"][0]["infrastructure_retries"] != 0
+                or any(not project_repair_transition_valid(previous, current)
+                       for previous, current in zip(histories, histories[1:]))):
+            fail(errors, f"project repair contract drift {card_id}: invalid repair history")
+
+
+def observe_open_project_cards(errors, runner=run):
+    cards = []
+    for board in PROJECT_REPAIR_POLICY["project_boards"]:
+        listed = runner("hermes", "-p", "default", "kanban", "--board", board, "list", "--json")
+        try:
+            summaries = json.loads(listed.stdout) if not listed.returncode else None
+        except json.JSONDecodeError:
+            summaries = None
+        if not isinstance(summaries, list):
+            fail(errors, f"unable to read open project card list {board}")
+            continue
+        malformed = False
+        for summary in summaries:
+            if (not isinstance(summary, dict) or not isinstance(summary.get("id"), str)
+                    or not summary["id"].strip()):
+                fail(errors, f"unable to read open project card list {board}")
+                malformed = True
+                break
+            if summary.get("status") in ("done", "archived"):
+                continue
+            shown = runner("hermes", "-p", "default", "kanban", "--board", board,
+                           "show", summary["id"], "--json")
+            try:
+                payload = json.loads(shown.stdout) if not shown.returncode else {}
+                card = payload.get("task", payload)
+                comments = payload.get("comments", []) if isinstance(payload, dict) else []
+            except (json.JSONDecodeError, AttributeError):
+                card = {}
+            if not isinstance(card, dict) or card.get("id") != summary["id"]:
+                fail(errors, f"unable to read project card contract {board}/{summary['id']}")
+                continue
+            card = dict(card)
+            card["board"] = board
+            card["comments"] = comments
+            cards.append(card)
+        if malformed:
+            continue
+    return cards
+
+
 def check_chapt_card_contract(errors, tasks):
     """Open Cha PT cards fail closed on repository/worktree/baseline/test scope."""
     if not isinstance(tasks, list):
@@ -822,6 +1069,10 @@ def main():
     check_terminal_notification_deployment(errors, roster, snapshot)
     check_terminal_retry_policy(errors, roster)
     check_project_isolation(errors, snapshot.get("project_isolation"))
+    project_repair_policy = roster.get("project_repair_policy")
+    check_project_repair_policy(errors, project_repair_policy)
+    if snapshot.get("project_repair_policy") != project_repair_policy:
+        fail(errors, "project repair policy snapshot drift")
     profile_souls = roster.get("profile_souls", {})
     if snapshot.get("profile_souls") != profile_souls:
         fail(errors, "profile SOUL snapshot drift")
@@ -849,7 +1100,7 @@ def main():
             return 2
         # Fail-closed fixture schema: a passing fixture must represent every required
         # observed field and every installed roster profile; omission is drift, not success.
-        for section in ("profile_models", "profile_providers", "profile_approval_modes", "plugins", "dispatch_profiles", "kanban", "skill_files", "profile_local_skill_overrides", "profile_soul_hashes", "repository_policy_hashes", "adapters", "terminal_notification_runtime", "terminal_retry_policy", "project_isolation"):
+        for section in ("profile_models", "profile_providers", "profile_approval_modes", "plugins", "dispatch_profiles", "kanban", "skill_files", "profile_local_skill_overrides", "profile_soul_hashes", "repository_policy_hashes", "adapters", "terminal_notification_runtime", "terminal_retry_policy", "project_isolation", "project_repair_policy", "project_repair_cards"):
             if section not in observed:
                 fail(errors, f"incomplete fixture: missing required section '{section}'")
         kanban = observed.get("kanban", {})
@@ -889,6 +1140,8 @@ def main():
                                             snapshot["terminal_notification"]["producer_profiles"])
         check_terminal_retry_policy(errors, roster, observed)
         check_project_isolation(errors, snapshot.get("project_isolation"), observed.get("project_isolation"))
+        check_project_repair_policy(errors, project_repair_policy, observed.get("project_repair_policy"))
+        check_project_repair_cards(errors, observed.get("project_repair_cards"))
         check_profile_souls(errors, profile_souls, observed.get("profile_soul_hashes"))
         check_repository_policies(errors, repository_policies, observed.get("repository_policy_hashes"))
         for name in expected:
@@ -1004,6 +1257,7 @@ def main():
                     or fleet["repository"] not in launcher_text):
                 fail(errors, f"project orchestrator launcher drift: {launcher}")
         check_chapt_card_contract(errors, observe_open_chapt_cards(errors))
+        check_project_repair_cards(errors, observe_open_project_cards(errors))
         deployed_hashes = {}
         for entry in snapshot["skill"]["shared_skills"]:
             deployed_hashes[entry["name"]] = {}

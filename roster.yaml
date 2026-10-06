@@ -632,6 +632,17 @@
       ]
     }
   },
+  "project_repair_policy": {
+    "version": "bounded-convergence-v1",
+    "requires_authorization_mode": "autonomous",
+    "max_approaches": 3,
+    "max_attempts_per_approach": 3,
+    "max_infrastructure_retries_per_attempt": 1,
+    "project_boards": [
+      "jobcron",
+      "cha-pt"
+    ]
+  },
   "profile_souls": {
     "chapt-orchestrator": {
       "source": "policies/profile-souls/chapt-orchestrator/SOUL.md",

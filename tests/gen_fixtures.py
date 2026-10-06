@@ -67,6 +67,8 @@ clean["dispatch_profiles"] = copy.deepcopy(desired["kanban"]["dispatch_profiles"
 clean["kanban"] = {key: copy.deepcopy(value) for key, value in desired["kanban"].items()
                    if key != "dispatch_profiles"}
 clean["project_isolation"] = copy.deepcopy(desired["project_isolation"])
+clean["project_repair_policy"] = copy.deepcopy(desired["project_repair_policy"])
+clean["project_repair_cards"] = []
 clean["profile_soul_hashes"] = {
     profile: entry["sha256"] for profile, entry in desired["profile_souls"].items()}
 clean["repository_policy_hashes"] = {
@@ -141,6 +143,40 @@ def project_repository_allowlist_drift(d):
 
 
 write("project-repository-allowlist-drift.yaml", delta(project_repository_allowlist_drift))
+
+
+def project_repair_policy_drift(d):
+    d["project_repair_policy"]["max_attempts_per_approach"] = 2
+
+
+write("project-repair-policy-drift.yaml", delta(project_repair_policy_drift))
+
+
+def project_repair_card_drift(d):
+    strategy = "Use transaction fencing around the retry clock"
+    d["project_repair_cards"] = [{
+        "id": "t_fixture_repair",
+        "board": "jobcron",
+        "body": "repair_policy: bounded-convergence-v1",
+        "comments": [{
+            "body": "repair_history: " + json.dumps([{
+                "approach_id": "a1",
+                "strategy": strategy,
+                "strategy_sha256": __import__("hashlib").sha256(strategy.encode()).hexdigest(),
+                "material_difference_review_run_id": None,
+                "attempts": [{
+                    "candidate_commit": None,
+                    "implementation_run_id": "worker-1",
+                    "review_run_id": None,
+                    "infrastructure_retries": 0,
+                    "outcome": "pending",
+                }],
+            }], separators=(",", ":")),
+        }],
+    }]
+
+
+write("project-repair-card-drift.yaml", delta(project_repair_card_drift))
 
 
 def frontend_repository_policy_drift(d):

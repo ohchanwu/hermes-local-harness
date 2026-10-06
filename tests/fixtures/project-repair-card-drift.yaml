@@ -565,7 +565,7 @@
     "chapt-reviewer": "b8b07f2b210c08d9d97fe278665bf26e9b11d5ad2013b932d88cb590bca94e37"
   },
   "repository_policy_hashes": {
-    "cha-pt-frontend": "0000000000000000000000000000000000000000000000000000000000000000"
+    "cha-pt-frontend": "113b81fd55294cfc3057f66163e1745d590f520003997d36c85b46c938342817"
   },
   "project_repair_policy": {
     "version": "bounded-convergence-v1",
@@ -578,5 +578,16 @@
       "cha-pt"
     ]
   },
-  "project_repair_cards": []
+  "project_repair_cards": [
+    {
+      "id": "t_fixture_repair",
+      "board": "jobcron",
+      "body": "repair_policy: bounded-convergence-v1",
+      "comments": [
+        {
+          "body": "repair_history: [{\"approach_id\":\"a1\",\"strategy\":\"Use transaction fencing around the retry clock\",\"strategy_sha256\":\"897e66e6c02d36e8c6dccd36959b45236efa524eb0fcf67ebdfcc9931fb56754\",\"material_difference_review_run_id\":null,\"attempts\":[{\"candidate_commit\":null,\"implementation_run_id\":\"worker-1\",\"review_run_id\":null,\"infrastructure_retries\":0,\"outcome\":\"pending\"}]}]"
+        }
+      ]
+    }
+  ]
 }

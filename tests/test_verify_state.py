@@ -195,7 +195,7 @@ check("--fixture", str(FIXTURES / "deployed-skill-divergence.yaml"), code=1, tex
 # The canonical orchestration policy is versioned and its source-to-live hash
 # enforcement covers the default profile's deployed orchestrator skill.
 orchestrator = (ROOT / "skills" / "multi-agent-coding-orchestrator" / "SKILL.md").read_text()
-assert "version: 0.6.2" in orchestrator
+assert "version: 0.6.3" in orchestrator
 assert "Routing validation and dispatch receipt" in orchestrator
 assert "Authentication expiry blocks a fresh observation" in orchestrator
 assert "currently_actionable" in orchestrator
@@ -203,7 +203,7 @@ assert "jobcron-orchestrator" in orchestrator
 assert "chapt-reviewer" in orchestrator
 assert "gpt-6.1-sol" in orchestrator
 # Terminal retry remains an explicit card-scoped v2 policy, never the default.
-assert "version: 0.6.2" in orchestrator
+assert "version: 0.6.3" in orchestrator
 assert "RETRY_TERMINAL" in orchestrator
 assert "terminal_retry_policy: astra-until-approve-v1" in orchestrator
 assert "glm-review-v2" in orchestrator
@@ -226,6 +226,203 @@ assert roster["project_fleets"]["cha-pt"]["repositories"] == [
 ]
 assert roster["project_fleets"]["cha-pt"]["frontend_project"] == "cha-pt-frontend"
 snapshot = json.loads((ROOT / "snapshots" / "sanitized-current-state.yaml").read_text())
+project_repair_policy = {
+    "version": "bounded-convergence-v1",
+    "requires_authorization_mode": "autonomous",
+    "max_approaches": 3,
+    "max_attempts_per_approach": 3,
+    "max_infrastructure_retries_per_attempt": 1,
+    "project_boards": ["jobcron", "cha-pt"],
+}
+assert roster["project_repair_policy"] == project_repair_policy
+assert snapshot["project_repair_policy"] == project_repair_policy
+errors = []
+with redirect_stdout(io.StringIO()):
+    verify_state.check_project_repair_policy(errors, project_repair_policy, project_repair_policy)
+assert errors == [], errors
+drifted_repair_policy = json.loads(json.dumps(project_repair_policy))
+drifted_repair_policy["max_attempts_per_approach"] = 2
+errors = []
+with redirect_stdout(io.StringIO()):
+    verify_state.check_project_repair_policy(
+        errors, project_repair_policy, drifted_repair_policy)
+assert errors == ["project repair policy observed mapping drift"], errors
+check("--fixture", str(FIXTURES / "project-repair-policy-drift.yaml"), code=1,
+      text="project repair policy observed mapping drift")
+assert "bounded-convergence-v1" in orchestrator
+assert "max_attempts_per_approach: 3" in orchestrator
+assert "max_infrastructure_retries_per_attempt: 1" in orchestrator
+assert "changing a worker, model, card, branch, or worktree" in orchestrator
+
+repair_strategy = "Use transaction fencing around the retry clock"
+valid_repair_history = [{
+    "approach_id": "transaction-fence",
+    "strategy": repair_strategy,
+    "strategy_sha256": hashlib.sha256(repair_strategy.encode()).hexdigest(),
+    "material_difference_review_run_id": None,
+    "attempts": [{
+        "candidate_commit": None,
+        "implementation_run_id": "run-worker-1",
+        "review_run_id": None,
+        "infrastructure_retries": 0,
+        "outcome": "pending",
+    }],
+}]
+valid_repair_card = {
+    "id": "t_repair", "board": "jobcron",
+    "body": "authorization_mode: autonomous\nrepair_policy: bounded-convergence-v1",
+    "comments": [{
+        "body": f"repair_history: {json.dumps(valid_repair_history, separators=(',', ':'))}",
+    }],
+}
+errors = []
+with redirect_stdout(io.StringIO()):
+    verify_state.check_project_repair_cards(errors, [valid_repair_card])
+assert errors == [], errors
+completed_repair_history = json.loads(json.dumps(valid_repair_history))
+completed_repair_history[0]["attempts"][0].update({
+    "candidate_commit": "2" * 40,
+    "review_run_id": "run-review-1",
+    "outcome": "revise",
+})
+assert verify_state.project_repair_transition_valid(
+    valid_repair_history, completed_repair_history)
+next_attempt_history = json.loads(json.dumps(completed_repair_history))
+next_attempt_history[0]["attempts"].append({
+    "candidate_commit": None,
+    "implementation_run_id": "run-worker-2",
+    "review_run_id": None,
+    "infrastructure_retries": 0,
+    "outcome": "pending",
+})
+assert verify_state.project_repair_transition_valid(
+    completed_repair_history, next_attempt_history)
+retried_history = json.loads(json.dumps(valid_repair_history))
+retried_history[0]["attempts"][0].update({
+    "implementation_run_id": "run-worker-retry",
+    "infrastructure_retries": 1,
+})
+assert verify_state.project_repair_transition_valid(valid_repair_history, retried_history)
+infrastructure_failed_history = json.loads(json.dumps(retried_history))
+infrastructure_failed_history[0]["attempts"][0]["outcome"] = "infrastructure_failed"
+assert verify_state.project_repair_transition_valid(
+    retried_history, infrastructure_failed_history)
+blocked_history = json.loads(json.dumps(valid_repair_history))
+blocked_history[0]["attempts"][0]["outcome"] = "blocked"
+assert verify_state.project_repair_transition_valid(valid_repair_history, blocked_history)
+whitespace_review_history = json.loads(json.dumps(completed_repair_history))
+whitespace_review_history[0]["attempts"][0]["review_run_id"] = " run-review-1 "
+assert not verify_state.valid_project_repair_history(whitespace_review_history)
+reset_history = json.loads(json.dumps(valid_repair_history))
+reset_history[0]["approach_id"] = "fresh-reset"
+reset_strategy = "Rename the old idea and reset its counters"
+reset_history[0]["strategy"] = reset_strategy
+reset_history[0]["strategy_sha256"] = hashlib.sha256(reset_strategy.encode()).hexdigest()
+reset_card = dict(
+    valid_repair_card,
+    comments=[
+        {"body": f"repair_history: {json.dumps(completed_repair_history, separators=(',', ':'))}"},
+        {"body": f"repair_history: {json.dumps(reset_history, separators=(',', ':'))}"},
+    ],
+)
+errors = []
+with redirect_stdout(io.StringIO()):
+    verify_state.check_project_repair_cards(errors, [reset_card])
+assert errors == ["project repair contract drift t_repair: invalid repair history"], errors
+batched_transition_card = dict(
+    valid_repair_card,
+    comments=[{
+        "body": (f"repair_history: {json.dumps(valid_repair_history, separators=(',', ':'))}\n"
+                 f"repair_history: {json.dumps(completed_repair_history, separators=(',', ':'))}"),
+    }],
+)
+errors = []
+with redirect_stdout(io.StringIO()):
+    verify_state.check_project_repair_cards(errors, [batched_transition_card])
+assert errors == ["project repair contract drift t_repair: invalid repair history"], errors
+unauthorized_batched_card = dict(
+    batched_transition_card,
+    body="Legacy card without repair authorization",
+)
+errors = []
+with redirect_stdout(io.StringIO()):
+    verify_state.check_project_repair_cards(errors, [unauthorized_batched_card])
+assert errors == ["project repair contract drift t_repair: exact authorization missing"], errors
+missing_authorization = dict(
+    valid_repair_card,
+    body=valid_repair_card["body"].replace("authorization_mode: autonomous\n", ""),
+)
+errors = []
+with redirect_stdout(io.StringIO()):
+    verify_state.check_project_repair_cards(errors, [missing_authorization])
+assert errors == ["project repair contract drift t_repair: exact authorization missing"], errors
+too_many_attempts = json.loads(json.dumps(valid_repair_history))
+too_many_attempts[0]["attempts"] *= 2
+over_budget_card = dict(
+    valid_repair_card,
+    comments=[{
+        "body": f"repair_history: {json.dumps(too_many_attempts, separators=(',', ':'))}",
+    }],
+)
+errors = []
+with redirect_stdout(io.StringIO()):
+    verify_state.check_project_repair_cards(errors, [over_budget_card])
+assert errors == ["project repair contract drift t_repair: invalid repair history"], errors
+duplicate_strategy = json.loads(json.dumps(valid_repair_history))
+duplicate_strategy.append({
+    "approach_id": "renamed-approach",
+    "strategy": repair_strategy,
+    "strategy_sha256": hashlib.sha256(repair_strategy.encode()).hexdigest(),
+    "material_difference_review_run_id": "run-material-review-1",
+    "attempts": [{
+        "candidate_commit": None,
+        "implementation_run_id": "run-worker-3",
+        "review_run_id": None,
+        "infrastructure_retries": 0,
+        "outcome": "pending",
+    }],
+})
+duplicate_strategy_card = dict(
+    valid_repair_card,
+    comments=[{
+        "body": f"repair_history: {json.dumps(duplicate_strategy, separators=(',', ':'))}",
+    }],
+)
+errors = []
+with redirect_stdout(io.StringIO()):
+    verify_state.check_project_repair_cards(errors, [duplicate_strategy_card])
+assert errors == ["project repair contract drift t_repair: invalid repair history"], errors
+prefixed_authorization = dict(
+    valid_repair_card,
+    body="not_authorization_mode: autonomous\nrepair_policy: bounded-convergence-v1",
+)
+errors = []
+with redirect_stdout(io.StringIO()):
+    verify_state.check_project_repair_cards(errors, [prefixed_authorization])
+assert errors == ["project repair contract drift t_repair: exact authorization missing"], errors
+legacy_policy_mention = {
+    "id": "t_legacy", "board": "jobcron",
+    "body": "Legacy note: do not add repair_policy: bounded-convergence-v1",
+    "comments": [],
+}
+errors = []
+with redirect_stdout(io.StringIO()):
+    verify_state.check_project_repair_cards(errors, [legacy_policy_mention])
+assert errors == [], errors
+infra_failed_without_retry = json.loads(json.dumps(valid_repair_history))
+infra_failed_without_retry[0]["attempts"][0]["outcome"] = "infrastructure_failed"
+bad_infra_card = dict(
+    valid_repair_card,
+    comments=[{
+        "body": f"repair_history: {json.dumps(infra_failed_without_retry, separators=(',', ':'))}",
+    }],
+)
+errors = []
+with redirect_stdout(io.StringIO()):
+    verify_state.check_project_repair_cards(errors, [bad_infra_card])
+assert errors == ["project repair contract drift t_repair: invalid repair history"], errors
+check("--fixture", str(FIXTURES / "project-repair-card-drift.yaml"), code=1,
+      text="project repair contract drift t_fixture_repair: exact authorization missing")
 assert roster["repository_policies"] == snapshot["repository_policies"]
 frontend_policy = roster["repository_policies"]["cha-pt-frontend"]
 errors = []
