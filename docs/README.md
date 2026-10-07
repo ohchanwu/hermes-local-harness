@@ -19,6 +19,11 @@ This index is the entry point for durable harness documentation tracked in Git. 
 - [Hermes terminal outcome notification specification](specs/260921-hermes-terminal-outcome-notification.md)
 - [Completed local Hermes harness tracking plan](archive/260920-hermes-local-harness-tracking-plan.md)
 
+## Bugs
+
+- [Jobcron upgrade orchestration: repeated first-launch ceremony](bugs/261007-jobcron-upgrade-orchestration-repeated-first-launch-ceremony.md)
+- [Jobcron test-boundary incident incorrectly halted autonomous implementation](bugs/261007-jobcron-test-boundary-incident-overblocked-autonomous-implementation.md)
+
 ## Scoped Ponytail separation (approved design summary)
 
 Diagnostic design, including infrastructure diagnostics, now attaches `minimal-implementation` subject to verification/safety precedence. The leave-off categories below continue to govern ordinary production/mutation implementation, not diagnostic design. See the diagnostic-convergence policy above.
