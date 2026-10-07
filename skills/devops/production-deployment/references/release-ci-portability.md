@@ -56,6 +56,22 @@ Command substitution strips trailing newline bytes. When decoded output can cont
 
 When a test fixture or infrastructure plan embeds the digest of a runtime asset, update that digest in the same candidate as every byte change to the asset. Recompute it from the exact repository bytes, assert the current digest occurs at the expected count and the stale digest is absent, then run the consuming contract under the hosted-runner environment. A locally green producer test does not prove its downstream digest fixture is current.
 
+## Local integration database ownership
+
+Use the repository's managed database startup path when integration tests validate container or Compose ownership. A generic disposable container on the expected port can pass direct database tests while failing preview or bootstrap ownership checks. Inspect the workflow and startup contract before reserving that port, and create a uniquely named test database inside the supported managed instance rather than substituting the instance. Do not enable optional database variables for a broad suite until every subprocess's routing has been inspected.
+
+## Real-process timeout enforcement
+
+Exercise timeout and cleanup behavior against a real disposable local child in the actual execution environment before certifying a bounded live probe. Mocked process-group kills do not establish syscall permission. A failed kill or reap is failed acceptance even when later inspection finds no surviving child. This validates a technical operation timeout; it does not create a campaign deadline.
+
+## Bundled CLI SDK contracts
+
+When reusing an SDK bundled inside a pinned cloud CLI, inspect that installation's import and retry contracts rather than assuming standalone-library behavior. Some distributions install aliases only after importing the CLI package or interpret `max_attempts` as total attempts. Validate the exact configuration with an offline stub before using it in an authorized packet.
+
+## TLS-terminating database bridges
+
+A terminating PostgreSQL bridge creates two TLS sessions with different certificates. A client choosing `SCRAM-SHA-256-PLUS` binds its proof to the bridge certificate, not the upstream certificate, so a byte relay cannot preserve end-to-end channel binding. Prefer a direct endpoint-verifying or transparent tunnel. If a reviewed one-shot bridge is unavoidable, make any ordinary-SCRAM disposition explicit, retain upstream CA and hostname verification, keep each TLS socket's relay operations in one bounded nonblocking owner, and stress the exact client handshake plus shutdown behavior against disposable peers.
+
 ## Synthetic Git repositories
 
 Tests that create commits must supply `user.name` and `user.email` through command-scoped `git -c` options. Verify them with system and global Git configuration disabled and `user.useConfigOnly=true`; relying on a developer's ambient identity makes the test fail only on clean runners and weakens isolation.

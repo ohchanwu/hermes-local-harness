@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Static policy contracts, not a runtime dispatcher or permission grant."""
 from pathlib import Path
+import json
 import re
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -8,6 +9,7 @@ POLICY = "policies/diagnostic-convergence.md"
 ORCHESTRATOR = "skills/multi-agent-coding-orchestrator/SKILL.md"
 DEPLOYMENT = "skills/devops/production-deployment/SKILL.md"
 AUTHORITY = "policies/authority-and-review.md"
+RELEASE_CI = "skills/devops/production-deployment/references/release-ci-portability.md"
 JOBCRON_ORCHESTRATOR = "policies/profile-skills/jobcron-orchestrator/autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md"
 CHAPT_ORCHESTRATOR = "policies/profile-skills/chapt-orchestrator/autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md"
 
@@ -25,8 +27,9 @@ for path in (POLICY, ORCHESTRATOR, DEPLOYMENT):
             "sealed reusable controller requires written justification",
             "first material review correction",
             "second material failure or exhausted",
-            "external-read/write, credential, mutation, deployment, and cutover HUMAN GATEs",
-            "pre-provider", "no external-call units", "completed provider request")
+            "external-read/write, credential, mutation, deployment, and cutover HUMAN GATEs")
+for path in (ORCHESTRATOR, DEPLOYMENT):
+    require(path, "pre-provider", "no external-call units", "completed provider request")
 for path in (ORCHESTRATOR, DEPLOYMENT):
     require(path,
             "Do not invent campaign deadlines",
@@ -46,6 +49,17 @@ for path in (POLICY, ORCHESTRATOR):
             "require a strategy pivot or abandon the probe",
             "campaign-level problem solving, not unlimited refinement of one diagnostic design",
             "trusted direct command → local synthetic repro → one-off bounded script → sealed reusable controller")
+diagnostic = require(POLICY,
+                     "## External operation bounds",
+                     "per-operation request or poll cap",
+                     "pre-provider/no-submission failure",
+                     "Do not infer campaign-wide call or credential-acquisition totals",
+                     "artificial authorization expiry")
+for forbidden in ("maximum external-call units", "extending any envelope requires fresh owner approval"):
+    assert forbidden not in diagnostic, f"{POLICY}: obsolete aggregate envelope rule: {forbidden}"
+for path in (ORCHESTRATOR, JOBCRON_ORCHESTRATOR, CHAPT_ORCHESTRATOR):
+    text = require(path, "`complexity_budget` (scope, files/dependencies, at most two design generations")
+    assert "`complexity_budget` (time, files/dependencies, external-call units" not in text
 require(ORCHESTRATOR,
         "Attach for diagnostic design, including infrastructure diagnostics",
         "Leave off for ordinary implementation",
@@ -82,6 +96,16 @@ require(CHAPT_ORCHESTRATOR,
         "explicitly authorized operator exception must be reported as an exception, not green CI",
         "proven pre-provider/no-submission failure",
         "It never covers pushes, PR creation, deployments, production mutations")
+require(RELEASE_CI,
+        "## Local integration database ownership",
+        "## Real-process timeout enforcement",
+        "## Bundled CLI SDK contracts",
+        "## TLS-terminating database bridges")
+snapshot = json.loads((ROOT / "snapshots/sanitized-current-state.yaml").read_text())
+astra_overrides = snapshot["skill"]["profile_local_skill_overrides"]["worker-astra"]
+assert not any(path.startswith("devops/production-deployment/") or
+               path == "devops/production-deployment/SKILL.md"
+               for path in astra_overrides), "worker-astra must use canonical production-deployment"
 require(DEPLOYMENT,
         "A deployment plan or specification is not authorization to perform them",
         "obtain approval for the temporary lock write",

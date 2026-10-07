@@ -1,7 +1,7 @@
 ---
 name: multi-agent-coding-orchestrator
 description: "Use when orchestrating multi-agent coding with Hermes."
-version: 0.6.4-jobcron.1
+version: 0.6.5-jobcron.1
 author: chanbla11mit, Hermes Agent
 license: MIT
 platforms: [macos]
@@ -293,7 +293,7 @@ Completion criterion: the next action is grounded in current files, Git state, a
 
 ### Diagnostic convergence
 
-For `work_kind: diagnostic`, require `decision_to_unlock`, one falsifiable `hypothesis`, `minimum_probe`, `risk_tier`, `outcome_to_next_action` (positive, negative, INDETERMINATE), and `complexity_budget` (time, files/dependencies, external-call units, at most two design generations). Put the harness policy `policies/diagnostic-convergence.md` and applicable authority rules in the card context; workers need not have the harness checkout.
+For `work_kind: diagnostic`, require `decision_to_unlock`, one falsifiable `hypothesis`, `minimum_probe`, `risk_tier`, `outcome_to_next_action` (positive, negative, INDETERMINATE), and `complexity_budget` (scope, files/dependencies, at most two design generations, plus only risk-justified per-operation safety bounds). Put the harness policy `policies/diagnostic-convergence.md` and applicable authority rules in the card context; workers need not have the harness checkout.
 
 Reject likely-INDETERMINATE probes that do not change the next action. Follow the probe ladder: trusted direct command → local synthetic repro → one-off bounded script → sealed reusable controller. Ascend only with reasons simpler rungs cannot answer the decision; a sealed reusable controller requires written justification of decision value, reuse, and concrete threat.
 

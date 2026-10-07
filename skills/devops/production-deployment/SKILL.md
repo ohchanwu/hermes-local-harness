@@ -1,7 +1,7 @@
 ---
 name: production-deployment
 description: "Use when planning or executing production deployments."
-version: 0.2.1
+version: 0.2.2
 author: Hermes Agent
 license: MIT
 platforms: [macos, linux]
