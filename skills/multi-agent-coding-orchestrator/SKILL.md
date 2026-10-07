@@ -1,7 +1,7 @@
 ---
 name: multi-agent-coding-orchestrator
 description: "Use when orchestrating multi-agent coding with Hermes."
-version: 0.6.3
+version: 0.6.4
 author: chanbla11mit, Hermes Agent
 license: MIT
 platforms: [macos]
@@ -244,6 +244,14 @@ For work expected to last hours or days, send the approved specification through
 
 Authorization covers local branches, worktrees, commits, tests, and recoverable local destructive operations. It never covers pushes, PR creation, deployments, production mutations, messages beyond the configured progress protocol, purchases, credential changes, or other external writes.
 
+## Proportional operational constraints
+
+Do not invent campaign deadlines, latest-start cutoffs, authorization expiry, full-path timing admission tests, or aggregate session/CI elapsed-time caps merely to make work feel bounded. Exact-scope authorization remains valid until completion of its approved effects, owner revocation, relevant invalidating state change, or a real external constraint. Preserve provider-issued credential expiry, maintenance windows, per-operation timeouts, hung-process watchdogs, retry backoff, cleanup, worker runtime caps, and minimum stability-observation periods as technical controls; never silently promote them into campaign authority.
+
+Do not create campaign-wide protected-read or credential-acquisition ceilings, reserved-slot arithmetic, or approval amendments whose only purpose is increasing an aggregate count. Acquire a credential or secret bundle once per execution session when practical, securely reuse it, and reacquire normally after provider expiry under the same identity and scope. Permit at most one retry after a proven pre-provider/no-submission failure; an ambiguous provider response stops for reconciliation. Keep value-blind audit events and narrowly justified per-operation request/poll caps, but do not use their campaign-wide total as an authorization gate.
+
+Judge controls by total system risk. Extra ledgers, envelopes, counters, reviews, artifacts, and exception paths are not inherently safer; require each control to address a named threat with decision value greater than its complexity, delay, and failure surface. Prefer the simplest observable boundary that preserves authorization, data safety, recovery, and independent review.
+
 ## Operator Effort and Evidence Lifecycle
 
 Do not manufacture manual work. Recommend an operator action only when all of these are true:
@@ -299,7 +307,7 @@ Unlimited terminal retries mean campaign-level problem solving, not unlimited re
 
 Accept one-time diagnostics with representative positive, negative, and indeterminate/error checks, risk-required verification, stated coverage/limitations, and an observed outcome selecting the next action; synthetic tests are not live proof. Do not require generalized automation. Accepted platform/system tools need proportional identity/target/permission/output checks, not recursive toolchain attestation absent a concrete threat.
 
-Preserve all external-read/write, credential, mutation, deployment, and cutover HUMAN GATEs. Owner-approved call envelopes must state target, operations, unit/cap, expiry, retries/pagination/polling, and output custody: a proven local pre-provider failure consumes no external-call units; each completed provider request (including errors) consumes one. Count SDK retries/pages/polls separately; ambiguous submissions reserve a possible unit and stop for authorized reconciliation, never a free retry. Local retries remain subject to time/design and explicit attempt caps; missing semantics or envelope extensions need owner approval.
+Preserve all external-read/write, credential, mutation, deployment, and cutover HUMAN GATEs. For an authorized external operation, state the exact actor, target, operation/effect, permissions, output custody, and retry behavior. A proven local pre-provider failure consumes no external-call units; a completed provider request, including an error or ambiguous response, is not a free retry. Disable uncontrolled SDK retries, pages, and polls when practical; use a per-operation cap only for a concrete cost, rate, mutation, or ambiguity risk. Missing authority or materially broader effects require owner approval, but campaign-wide acquisition totals and artificial expiry do not.
 
 Each implementation card must include:
 

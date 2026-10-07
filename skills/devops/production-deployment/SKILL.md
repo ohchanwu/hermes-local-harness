@@ -1,7 +1,7 @@
 ---
 name: production-deployment
 description: "Use when planning or executing production deployments."
-version: 0.2.0
+version: 0.2.1
 author: Hermes Agent
 license: MIT
 platforms: [macos, linux]
@@ -22,7 +22,9 @@ Prefer trusted direct bounded read-only commands when safer/simpler than custom 
 
 Limit each hypothesis to two design generations across cards/models. Reassess the approach after the first material review correction; after a second material failure or exhausted budget, pivot strategy or abandon rather than refine by default. Accept one-time probes with representative positive/negative/indeterminate checks, required risk-based verification, and evidence selecting the next action; synthetic success is not live proof.
 
-All external-read/write, credential, mutation, deployment, and cutover HUMAN GATEs remain unchanged. Read-only payloads can still require provider writes and owner approval. Explicit owner-approved call envelopes count each completed provider request (including errors, retries, pages, and polls); proven local pre-provider failures consume no external-call units but still consume time/design budget. Ambiguous submissions stop for authorized reconciliation with a possible unit reserved, not a free retry. Never infer permission or extend an envelope without owner approval.
+All external-read/write, credential, mutation, deployment, and cutover HUMAN GATEs remain unchanged. Read-only payloads can still require provider writes and owner approval. Bound external work at the actual risk boundary: exact actor, target, operation, effect, permissions, output custody, and retry behavior. A proven local pre-provider failure consumes no external-call units; a completed provider request, including an error or ambiguous response, is not a free retry. Disable uncontrolled automatic retries, pagination, and polling when practical, and stop an ambiguous provider response for reconciliation.
+
+Do not create campaign-wide protected-read or credential-acquisition ceilings, reserved-slot arithmetic, or owner amendments whose only purpose is increasing an aggregate count. Acquire each credential or secret bundle once per execution session when practical, securely reuse it, and reacquire normally after provider expiry under the same identity and scope. Permit at most one retry after a proven pre-provider/no-submission failure; a request that may have reached the provider stops for reconciliation. Keep value-blind acquisition audit events, but use a per-operation request or poll cap only when a concrete provider cost, rate, mutation, or ambiguity risk justifies it.
 
 ## Procedure
 
@@ -60,7 +62,7 @@ Publish structural inventories atomically under owner-only custody and keep life
 
 ### 4. Compress scope, not safeguards
 
-For a time-bounded small launch, use one host, one supported managed database, one scheduler, one immutable application artifact, and manual operations where practical. Defer high availability, autoscaling, orchestration platforms, generalized automation, broad observability, exhaustive failure injection, and cleanup unless they are required for correctness.
+For a small launch, use one host, one supported managed database, one scheduler, one immutable application artifact, and manual operations where practical. Defer high availability, autoscaling, orchestration platforms, generalized automation, broad observability, exhaustive failure injection, and cleanup unless they are required for correctness.
 
 Keep these release gates:
 
@@ -74,7 +76,9 @@ Keep these release gates:
 - private functional acceptance before public traffic;
 - explicit cutover approval and a written rollback path.
 
-Set early hard deadlines for infrastructure reconciliation and release readiness. Missing a deadline is a no-go, not permission to weaken a gate.
+Do not invent campaign deadlines, latest-start cutoffs, authorization expiry, full-path timing admission tests, or aggregate session/CI elapsed-time caps merely to make the deployment feel bounded. Approved scope remains valid until its effects complete, the owner revokes it, relevant state changes invalidate it, or a real external constraint requires renewal. A target date expresses priority unless the owner explicitly makes it a deadline.
+
+Preserve technically meaningful timing controls: provider-issued credential expiry, externally imposed maintenance windows, network and subprocess timeouts, hung-process watchdogs, retry backoff, cleanup deadlines, and minimum stability-observation periods. State whether each duration is an external fact, a maximum local safety bound, or a minimum acceptance requirement. Do not promote those durations into campaign authority or require the entire worst-case serial path to fit a guessed wall-clock envelope before starting an otherwise safe operation.
 
 ### 5. Execute one concise attended runbook
 

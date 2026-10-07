@@ -119,9 +119,9 @@
           "jobcron-orchestrator",
           "chapt-orchestrator"
         ],
-        "version": "0.6.3",
+        "version": "0.6.4",
         "files": {
-          "SKILL.md": "91b537f9704112e5f324eac8a8130848fbd7c31e3a36af604248e94bc278c7df",
+          "SKILL.md": "db65285f2a1b7527c2e566ea29233c4bbd09b87ac92c8406776dce6a2bab9066",
           "scripts/set-active-lanes.py": "157419c7c190b0a9f647271f7bd3839182f2e9324f8f9d74e43ec0553a5b77df"
         }
       },
@@ -194,13 +194,17 @@
           "jobcron-worker",
           "jobcron-worker-glm-1",
           "jobcron-worker-glm-2",
+          "jobcron-orchestrator",
+          "jobcron-reviewer",
           "chapt-worker",
           "chapt-worker-glm-1",
-          "chapt-worker-glm-2"
+          "chapt-worker-glm-2",
+          "chapt-orchestrator",
+          "chapt-reviewer"
         ],
-        "version": "0.2.0",
+        "version": "0.2.1",
         "files": {
-          "SKILL.md": "c38fdbc352fb56e73ab2e3498d11fb404ea675c8eda309febea067112c8f9173",
+          "SKILL.md": "4f62c7f6362aa85e7ba9c9d78de88d67de4cb506001291629c01bc63f04e1699",
           "references/live-state-reconciliation.md": "60b39c679849ba49f503cdda6844fc9678d837fac5279d496dbfd3e8450abed7",
           "references/release-ci-portability.md": "9ac3ca08733ff1810289b90e9834a12ad413a0762bfcdd046026ec0ec3e3dc13"
         }
@@ -243,10 +247,10 @@
         "software-development/test-driven-development/SKILL.md": "9e9a4bb630506f4f3b4ff19cca80bb464e57db19b8a175959388d2112fc096ff"
       },
       "jobcron-orchestrator": {
-        "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md": "81f417972a3ac8c475d424708b181b66e852cdc6fd08d324f85d454f066ab753"
+        "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md": "7d529b0209ead95eded55824148f2c9d4bc9c22d89d97229e9f6354d3fa33ff3"
       },
       "chapt-orchestrator": {
-        "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md": "038de04515e8d208a84b8aef77a92a568602143a0208d03b774abdb76feea15a"
+        "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md": "c17f78f7ecce69758473a747c0681f84a572c218d57231097046fbfdf8d71b3c"
       }
     }
   },

@@ -1,7 +1,7 @@
 ---
 name: multi-agent-coding-orchestrator
 description: "Use when orchestrating multi-agent coding with Hermes."
-version: 0.6.3-jobcron.1
+version: 0.6.4-jobcron.1
 author: chanbla11mit, Hermes Agent
 license: MIT
 platforms: [macos]
@@ -181,6 +181,8 @@ Before creating a card with `skills`, run the reviewed harness preflight for the
 
 It imports Hermes's installed resolver under that profile's `HERMES_HOME`; it does not parse `hermes skills list` table output and does not start model inference. A nonzero result, including a mixed present/missing request, rejects the card creation. Do not rely on Hermes's current partial-load behavior, which skips unknown names when another requested skill resolves.
 
+Preflight the runtime-effective forced set for every intended lane, not only the creation assignee. Same-card review inherits `task.skills`, and the native dispatcher additionally force-loads `sdlc-review`; include both in the exact reviewer's resolver check before enabling that handoff. Run that check with invocation-local `HERMES_KANBAN_TASK=<actual-card>` and `HERMES_KANBAN_BOARD=<exact-board>` when validating a Kanban lane: environment-scoped skills can be hidden by offer-time discovery outside the worker context even though they are installed and explicitly loadable. Verify existing files and the correct context before diagnosing a missing installation; never overwrite an existing skill to repair a discovery false negative. Do not set worker environment flags globally in the controller. A passing `requesting-code-review` check cannot substitute for missing inherited or auto-added skills. If review capability is unavailable, continue useful authorized artifact preparation while gating review dispatch separately; preserve the existing card and evidence, do not edit the database or another profile's skills/configuration without authorization, and do not reinterpret the control-plane prerequisite as an application failure or a repair-budget reset. Task-scoped policy excerpts are reference data, not proof that a forced skill is installed.
+
 After activating a lane and assigning or promoting a card intended to run immediately:
 
 1. Read the card back and verify its exact assignee, eligible status, dependency state, and that the destination profile is active in `kanban.dispatch_profiles`.
@@ -238,6 +240,14 @@ For work expected to last hours or days, send the approved specification through
 
 Authorization covers local branches, worktrees, commits, tests, and recoverable local destructive operations. It never covers pushes, PR creation, deployments, production mutations, messages beyond the configured progress protocol, purchases, credential changes, or other external writes.
 
+## Proportional operational constraints
+
+The Jobcron owner removed owner/controller-imposed time limits and requested no new artificial time limits. Do not invent campaign deadlines, latest-start cutoffs, authorization expiry, full-path timing admission tests, or aggregate session/CI elapsed-time caps unless the owner later explicitly reinstates one or a real external constraint requires it. Existing exact-scope authorization remains valid until revocation, completion of its approved effects, or relevant invalidating state change; this grants no new external effects. Preserve provider-issued credential expiry, maintenance windows, per-operation timeouts, hung-process watchdogs, retry backoff, cleanup, worker runtime caps, and minimum stability-observation periods as technical controls, not campaign authority. A watchdog timeout stops and reconciles that operation; it does not automatically end the authorized campaign.
+
+Do not create campaign-wide protected-read or credential-acquisition ceilings, reserved-slot arithmetic, or approval amendments whose only purpose is increasing an aggregate count. Acquire a credential or secret bundle once per execution session when practical, securely reuse it, and reacquire normally after provider expiry under the same identity and scope. Permit at most one retry after a proven pre-provider/no-submission failure; an ambiguous provider response stops for reconciliation. Keep value-blind audit events and narrowly justified per-operation request/poll caps, but do not use their campaign-wide total as an authorization gate.
+
+Judge controls by total system risk. Extra ledgers, envelopes, counters, reviews, artifacts, and exception paths are not inherently safer; require each control to address a named threat with decision value greater than its complexity, delay, and failure surface. Prefer the simplest observable boundary that preserves authorization, data safety, recovery, and independent review.
+
 ## Operator Effort and Evidence Lifecycle
 
 Do not manufacture manual work. Recommend an operator action only when all of these are true:
@@ -293,7 +303,7 @@ Unlimited terminal retries mean campaign-level problem solving, not unlimited re
 
 Accept one-time diagnostics with representative positive, negative, and indeterminate/error checks, risk-required verification, stated coverage/limitations, and an observed outcome selecting the next action; synthetic tests are not live proof. Do not require generalized automation. Accepted platform/system tools need proportional identity/target/permission/output checks, not recursive toolchain attestation absent a concrete threat.
 
-Preserve all external-read/write, credential, mutation, deployment, and cutover HUMAN GATEs. Owner-approved call envelopes must state target, operations, unit/cap, expiry, retries/pagination/polling, and output custody: a proven local pre-provider failure consumes no external-call units; each completed provider request (including errors) consumes one. Count SDK retries/pages/polls separately; ambiguous submissions reserve a possible unit and stop for authorized reconciliation, never a free retry. Local retries remain subject to time/design and explicit attempt caps; missing semantics or envelope extensions need owner approval.
+Preserve all external-read/write, credential, mutation, deployment, and cutover HUMAN GATEs. For an authorized external operation, state the exact actor, target, operation/effect, permissions, output custody, and retry behavior. A proven local pre-provider failure consumes no external-call units; a completed provider request, including an error or ambiguous response, is not a free retry. Disable uncontrolled SDK retries, pages, and polls when practical; use a per-operation cap only for a concrete cost, rate, mutation, or ambiguity risk. Missing authority or materially broader effects require owner approval, but campaign-wide acquisition totals and artificial expiry do not.
 
 Each implementation card must include:
 
@@ -366,6 +376,7 @@ Send only milestone completions, genuine blockers, and approval requests. Do not
 - Hermes's global `kanban.max_in_progress` counts review tasks. Do not use it for the implementation-only cap; enforce the active profile pool instead.
 - Profile isolation does not isolate files. Every code-changing card needs its own worktree.
 - Inspect integration-test fixture routing before enabling optional database environment variables for a broad suite. A URL override does not prove isolation: subprocess scripts can hard-code an existing managed service. Scope owned disposable-fixture URLs to inspected targeted package commands, run the ordinary broad suite without optional integration activation, and keep fixture-boundary incidents separate from code correctness; reported cleanup neither authorizes the original access nor bypasses an independent HUMAN_BLOCK.
+- When canonical `gofmt -l .` reports only ignored evidence inside nested worktrees, preserve those files and the literal command result; check all Git-indexed Go files separately instead of editing private historical fixtures or treating them as application defects. Never claim the literal command was empty. A canonical rebuild without `-trimpath` can differ in bytes from an exact-tree nested-worktree build because compile paths differ: record separate hashes and source/version bindings, exercise the canonical artifact, and reuse unchanged source-bound review evidence without claiming binary identity.
 - Resolve handoff filenames from the native run's submitted artifact paths before comparing hashes. A prepared `.md` placeholder may coexist with an authored `.txt` or `.json` deliverable; preserve both and verify the exact submitted bytes before diagnosing wrong placement or requesting revision.
 - A skill installed only under `default` cannot be force-loaded by a worker profile. Put the minimum role contract in each worker's `SOUL.md` and card.
 - Never copy OpenAI Codex OAuth stores between profiles. Complete separate authorization when a profile needs an independent grant.
