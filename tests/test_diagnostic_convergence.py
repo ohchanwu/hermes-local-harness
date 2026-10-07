@@ -10,6 +10,7 @@ ORCHESTRATOR = "skills/multi-agent-coding-orchestrator/SKILL.md"
 DEPLOYMENT = "skills/devops/production-deployment/SKILL.md"
 AUTHORITY = "policies/authority-and-review.md"
 RELEASE_CI = "skills/devops/production-deployment/references/release-ci-portability.md"
+LIVE_RECONCILIATION = "skills/devops/production-deployment/references/live-state-reconciliation.md"
 JOBCRON_ORCHESTRATOR = "policies/profile-skills/jobcron-orchestrator/autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md"
 CHAPT_ORCHESTRATOR = "policies/profile-skills/chapt-orchestrator/autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md"
 
@@ -97,10 +98,16 @@ require(CHAPT_ORCHESTRATOR,
         "proven pre-provider/no-submission failure",
         "It never covers pushes, PR creation, deployments, production mutations")
 require(RELEASE_CI,
+        "## Exact-source CI and private image readback",
+        "Bind an already-submitted run by source SHA, ref and event",
         "## Local integration database ownership",
         "## Real-process timeout enforcement",
         "## Bundled CLI SDK contracts",
         "## TLS-terminating database bridges")
+require(LIVE_RECONCILIATION,
+        "restored authentication alone does not require repeating completed gates",
+        "managed prefix-list sources",
+        "Do not impose an arbitrary evidence-expiry window")
 snapshot = json.loads((ROOT / "snapshots/sanitized-current-state.yaml").read_text())
 astra_overrides = snapshot["skill"]["profile_local_skill_overrides"]["worker-astra"]
 assert not any(path.startswith("devops/production-deployment/") or
@@ -108,6 +115,10 @@ assert not any(path.startswith("devops/production-deployment/") or
                for path in astra_overrides), "worker-astra must use canonical production-deployment"
 require(DEPLOYMENT,
         "A deployment plan or specification is not authorization to perform them",
+        "When the owner requests a policy reload",
+        "published tag derived from the inspected publisher workflow",
+        "Resolve accepted command labels and receipt paths from the current manifest",
+        "Reconcile an already-submitted workflow by exact source, ref and event",
         "obtain approval for the temporary lock write",
         "Apply private infrastructure only after its bounded approval",
         "Present the cutover packet and obtain explicit approval",

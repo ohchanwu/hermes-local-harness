@@ -1,10 +1,10 @@
 # Live-state reconciliation
 
-Use this recipe after cloud authentication is restored and before any resource start, Terraform plan, image publication, or infrastructure mutation.
+Use the applicable steps before a materially dependent resource start, Terraform plan, image publication, or infrastructure mutation. On resumption, retain accepted observations and refresh only unknown or relevantly invalidated surfaces; restored authentication alone does not require repeating completed gates.
 
 ## 1. Pin identity and source
 
-1. Verify the exact cloud profile, account, and region with the provider identity API.
+1. Establish the exact cloud profile, account, and region with the provider identity API when that proof is missing or relevant identity selection changed. Reuse a still-applicable signed identity proof on resumption; acquiring usable credentials under the same selected identity is separate from repeating the identity gate.
 2. Verify the repository branch is clean, local and remote release SHAs match, and release CI is genuinely green through every required downstream gate.
 3. Keep account IDs, resource IDs, ARNs, endpoints, addresses, bucket names, database names, secret names, and recovered input values out of shared output.
 
@@ -40,7 +40,7 @@ Parse selectors internally from the pulled state and query read-only describe/li
 - existence, lifecycle status, and state/live agreement;
 - compute architecture, instance type, encrypted root volume, instance profile, public-address and EIP-association booleans, and management-agent status;
 - VPC, subnet, route-table, Internet-gateway, and inherited/explicit route relationships;
-- security-group rule counts, ports, and source categories rather than source identifiers;
+- security-group rule counts, ports, and source categories rather than source identifiers; include managed prefix-list sources, compare them internally with accepted source bindings, and do not impose an inline-CIDR-only predicate on a prefix-list-based deployment;
 - database status, encryption, public accessibility, deletion protection, backup retention, restore-window availability, subnet/SG attachment counts, and TLS parameter state;
 - manual snapshot count/status/latest age;
 - recovery and state bucket public block, versioning, encryption, TLS-deny policy, lifecycle, and object/version presence without downloading objects or exposing keys;
@@ -92,7 +92,7 @@ If the plan creates a missing EIP, verify there is no association resource or ed
 
 Validate the complete observed action combination, not each action in isolation. When a legitimate recovery combines drift classes that the checked-in validator does not support (for example, one missing unattached EIP create plus one explicit host replacement), stop and add an explicit validator mode with an exact argument contract. Require the full allowlisted address set, exact actions and reasons, no imports or moves, known-null association controls, no extra diagnostics or outputs, and mutation tests derived from a valid fixture. Preserve ordinary create and replacement modes unchanged; never make a broad mode more permissive just to pass one live plan.
 
-Generate a fresh value-blind reconciliation checkpoint for recovery modes. Historical phase checkpoints remain evidence of that phase, not reusable claims about current state. The current checkpoint should have an exact schema, a short freshness window, the clean release commit, selected-target confidence, the approved host disposition, retained rollback assets, EIP/exposure facts, database protection and restore metadata, recovery/backend safety, and runtime-secret metadata without reading or asserting secret content. Record the observed secret-version count as a number when useful, but do not require an obsolete value such as zero after an unmanaged version legitimately exists. Mutation-test stale, missing, renamed, false, and unexpected fields. The plan must continue to exclude secret-version resources regardless of checkpoint count.
+Generate a fresh value-blind reconciliation checkpoint for recovery modes. Historical phase checkpoints remain evidence of that phase, not reusable claims about current state. The current checkpoint should bind the pending mutation to an exact schema, observation provenance, the clean release commit, selected-target confidence, the approved host disposition, retained rollback assets, EIP/exposure facts, database protection and restore metadata, recovery/backend safety, and runtime-secret metadata without reading or asserting secret content. Do not impose an arbitrary evidence-expiry window; reconcile relevant observed changes and satisfy the actual operation's current-state prerequisites. Record the observed secret-version count as a number when useful, but do not require an obsolete value such as zero after an unmanaged version legitimately exists. Mutation-test invalidated, missing, renamed, false, and unexpected fields. The plan must continue to exclude secret-version resources regardless of checkpoint count.
 
 ## 9. Stop and report before mutation
 

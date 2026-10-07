@@ -265,104 +265,104 @@
     },
     "production-deployment": {
       "worker-flash-1": {
-        "SKILL.md": "63359b4e28c6445572bca31ba10d81711f5ba01c2b52b8c725928b531fcdabc1",
-        "references/live-state-reconciliation.md": "60b39c679849ba49f503cdda6844fc9678d837fac5279d496dbfd3e8450abed7",
-        "references/release-ci-portability.md": "4f4200cc32f4cb66b90b09b16b45c9e006bd088849ad33a3df681729f71995aa"
+        "SKILL.md": "e057e4d0e133246e69a0f5223f020e69be4aaf72e7c2c116ad6ab03af3c7fab9",
+        "references/live-state-reconciliation.md": "67e4bcbf1ca79059ed961f99d0c008eac9d92c8c5413da83365188bffe70a9f9",
+        "references/release-ci-portability.md": "e1f016b1c60f713729cb9e93c5b2090b311dea09e662f93baa09d50c04e8c3f7"
       },
       "worker-flash-2": {
-        "SKILL.md": "63359b4e28c6445572bca31ba10d81711f5ba01c2b52b8c725928b531fcdabc1",
-        "references/live-state-reconciliation.md": "60b39c679849ba49f503cdda6844fc9678d837fac5279d496dbfd3e8450abed7",
-        "references/release-ci-portability.md": "4f4200cc32f4cb66b90b09b16b45c9e006bd088849ad33a3df681729f71995aa"
+        "SKILL.md": "e057e4d0e133246e69a0f5223f020e69be4aaf72e7c2c116ad6ab03af3c7fab9",
+        "references/live-state-reconciliation.md": "67e4bcbf1ca79059ed961f99d0c008eac9d92c8c5413da83365188bffe70a9f9",
+        "references/release-ci-portability.md": "e1f016b1c60f713729cb9e93c5b2090b311dea09e662f93baa09d50c04e8c3f7"
       },
       "worker-flash-3": {
-        "SKILL.md": "63359b4e28c6445572bca31ba10d81711f5ba01c2b52b8c725928b531fcdabc1",
-        "references/live-state-reconciliation.md": "60b39c679849ba49f503cdda6844fc9678d837fac5279d496dbfd3e8450abed7",
-        "references/release-ci-portability.md": "4f4200cc32f4cb66b90b09b16b45c9e006bd088849ad33a3df681729f71995aa"
+        "SKILL.md": "e057e4d0e133246e69a0f5223f020e69be4aaf72e7c2c116ad6ab03af3c7fab9",
+        "references/live-state-reconciliation.md": "67e4bcbf1ca79059ed961f99d0c008eac9d92c8c5413da83365188bffe70a9f9",
+        "references/release-ci-portability.md": "e1f016b1c60f713729cb9e93c5b2090b311dea09e662f93baa09d50c04e8c3f7"
       },
       "worker-luna-1": {
-        "SKILL.md": "63359b4e28c6445572bca31ba10d81711f5ba01c2b52b8c725928b531fcdabc1",
-        "references/live-state-reconciliation.md": "60b39c679849ba49f503cdda6844fc9678d837fac5279d496dbfd3e8450abed7",
-        "references/release-ci-portability.md": "4f4200cc32f4cb66b90b09b16b45c9e006bd088849ad33a3df681729f71995aa"
+        "SKILL.md": "e057e4d0e133246e69a0f5223f020e69be4aaf72e7c2c116ad6ab03af3c7fab9",
+        "references/live-state-reconciliation.md": "67e4bcbf1ca79059ed961f99d0c008eac9d92c8c5413da83365188bffe70a9f9",
+        "references/release-ci-portability.md": "e1f016b1c60f713729cb9e93c5b2090b311dea09e662f93baa09d50c04e8c3f7"
       },
       "worker-luna-2": {
-        "SKILL.md": "63359b4e28c6445572bca31ba10d81711f5ba01c2b52b8c725928b531fcdabc1",
-        "references/live-state-reconciliation.md": "60b39c679849ba49f503cdda6844fc9678d837fac5279d496dbfd3e8450abed7",
-        "references/release-ci-portability.md": "4f4200cc32f4cb66b90b09b16b45c9e006bd088849ad33a3df681729f71995aa"
+        "SKILL.md": "e057e4d0e133246e69a0f5223f020e69be4aaf72e7c2c116ad6ab03af3c7fab9",
+        "references/live-state-reconciliation.md": "67e4bcbf1ca79059ed961f99d0c008eac9d92c8c5413da83365188bffe70a9f9",
+        "references/release-ci-portability.md": "e1f016b1c60f713729cb9e93c5b2090b311dea09e662f93baa09d50c04e8c3f7"
       },
       "worker-terra-1": {
-        "SKILL.md": "63359b4e28c6445572bca31ba10d81711f5ba01c2b52b8c725928b531fcdabc1",
-        "references/live-state-reconciliation.md": "60b39c679849ba49f503cdda6844fc9678d837fac5279d496dbfd3e8450abed7",
-        "references/release-ci-portability.md": "4f4200cc32f4cb66b90b09b16b45c9e006bd088849ad33a3df681729f71995aa"
+        "SKILL.md": "e057e4d0e133246e69a0f5223f020e69be4aaf72e7c2c116ad6ab03af3c7fab9",
+        "references/live-state-reconciliation.md": "67e4bcbf1ca79059ed961f99d0c008eac9d92c8c5413da83365188bffe70a9f9",
+        "references/release-ci-portability.md": "e1f016b1c60f713729cb9e93c5b2090b311dea09e662f93baa09d50c04e8c3f7"
       },
       "worker-terra-2": {
-        "SKILL.md": "63359b4e28c6445572bca31ba10d81711f5ba01c2b52b8c725928b531fcdabc1",
-        "references/live-state-reconciliation.md": "60b39c679849ba49f503cdda6844fc9678d837fac5279d496dbfd3e8450abed7",
-        "references/release-ci-portability.md": "4f4200cc32f4cb66b90b09b16b45c9e006bd088849ad33a3df681729f71995aa"
+        "SKILL.md": "e057e4d0e133246e69a0f5223f020e69be4aaf72e7c2c116ad6ab03af3c7fab9",
+        "references/live-state-reconciliation.md": "67e4bcbf1ca79059ed961f99d0c008eac9d92c8c5413da83365188bffe70a9f9",
+        "references/release-ci-portability.md": "e1f016b1c60f713729cb9e93c5b2090b311dea09e662f93baa09d50c04e8c3f7"
       },
       "worker-glm-full": {
-        "SKILL.md": "63359b4e28c6445572bca31ba10d81711f5ba01c2b52b8c725928b531fcdabc1",
-        "references/live-state-reconciliation.md": "60b39c679849ba49f503cdda6844fc9678d837fac5279d496dbfd3e8450abed7",
-        "references/release-ci-portability.md": "4f4200cc32f4cb66b90b09b16b45c9e006bd088849ad33a3df681729f71995aa"
+        "SKILL.md": "e057e4d0e133246e69a0f5223f020e69be4aaf72e7c2c116ad6ab03af3c7fab9",
+        "references/live-state-reconciliation.md": "67e4bcbf1ca79059ed961f99d0c008eac9d92c8c5413da83365188bffe70a9f9",
+        "references/release-ci-portability.md": "e1f016b1c60f713729cb9e93c5b2090b311dea09e662f93baa09d50c04e8c3f7"
       },
       "worker-sol": {
-        "SKILL.md": "63359b4e28c6445572bca31ba10d81711f5ba01c2b52b8c725928b531fcdabc1",
-        "references/live-state-reconciliation.md": "60b39c679849ba49f503cdda6844fc9678d837fac5279d496dbfd3e8450abed7",
-        "references/release-ci-portability.md": "4f4200cc32f4cb66b90b09b16b45c9e006bd088849ad33a3df681729f71995aa"
+        "SKILL.md": "e057e4d0e133246e69a0f5223f020e69be4aaf72e7c2c116ad6ab03af3c7fab9",
+        "references/live-state-reconciliation.md": "67e4bcbf1ca79059ed961f99d0c008eac9d92c8c5413da83365188bffe70a9f9",
+        "references/release-ci-portability.md": "e1f016b1c60f713729cb9e93c5b2090b311dea09e662f93baa09d50c04e8c3f7"
       },
       "worker-astra": {
-        "SKILL.md": "63359b4e28c6445572bca31ba10d81711f5ba01c2b52b8c725928b531fcdabc1",
-        "references/live-state-reconciliation.md": "60b39c679849ba49f503cdda6844fc9678d837fac5279d496dbfd3e8450abed7",
-        "references/release-ci-portability.md": "4f4200cc32f4cb66b90b09b16b45c9e006bd088849ad33a3df681729f71995aa"
+        "SKILL.md": "e057e4d0e133246e69a0f5223f020e69be4aaf72e7c2c116ad6ab03af3c7fab9",
+        "references/live-state-reconciliation.md": "67e4bcbf1ca79059ed961f99d0c008eac9d92c8c5413da83365188bffe70a9f9",
+        "references/release-ci-portability.md": "e1f016b1c60f713729cb9e93c5b2090b311dea09e662f93baa09d50c04e8c3f7"
       },
       "jobcron-worker": {
-        "SKILL.md": "63359b4e28c6445572bca31ba10d81711f5ba01c2b52b8c725928b531fcdabc1",
-        "references/live-state-reconciliation.md": "60b39c679849ba49f503cdda6844fc9678d837fac5279d496dbfd3e8450abed7",
-        "references/release-ci-portability.md": "4f4200cc32f4cb66b90b09b16b45c9e006bd088849ad33a3df681729f71995aa"
+        "SKILL.md": "e057e4d0e133246e69a0f5223f020e69be4aaf72e7c2c116ad6ab03af3c7fab9",
+        "references/live-state-reconciliation.md": "67e4bcbf1ca79059ed961f99d0c008eac9d92c8c5413da83365188bffe70a9f9",
+        "references/release-ci-portability.md": "e1f016b1c60f713729cb9e93c5b2090b311dea09e662f93baa09d50c04e8c3f7"
       },
       "jobcron-worker-glm-1": {
-        "SKILL.md": "63359b4e28c6445572bca31ba10d81711f5ba01c2b52b8c725928b531fcdabc1",
-        "references/live-state-reconciliation.md": "60b39c679849ba49f503cdda6844fc9678d837fac5279d496dbfd3e8450abed7",
-        "references/release-ci-portability.md": "4f4200cc32f4cb66b90b09b16b45c9e006bd088849ad33a3df681729f71995aa"
+        "SKILL.md": "e057e4d0e133246e69a0f5223f020e69be4aaf72e7c2c116ad6ab03af3c7fab9",
+        "references/live-state-reconciliation.md": "67e4bcbf1ca79059ed961f99d0c008eac9d92c8c5413da83365188bffe70a9f9",
+        "references/release-ci-portability.md": "e1f016b1c60f713729cb9e93c5b2090b311dea09e662f93baa09d50c04e8c3f7"
       },
       "jobcron-worker-glm-2": {
-        "SKILL.md": "63359b4e28c6445572bca31ba10d81711f5ba01c2b52b8c725928b531fcdabc1",
-        "references/live-state-reconciliation.md": "60b39c679849ba49f503cdda6844fc9678d837fac5279d496dbfd3e8450abed7",
-        "references/release-ci-portability.md": "4f4200cc32f4cb66b90b09b16b45c9e006bd088849ad33a3df681729f71995aa"
+        "SKILL.md": "e057e4d0e133246e69a0f5223f020e69be4aaf72e7c2c116ad6ab03af3c7fab9",
+        "references/live-state-reconciliation.md": "67e4bcbf1ca79059ed961f99d0c008eac9d92c8c5413da83365188bffe70a9f9",
+        "references/release-ci-portability.md": "e1f016b1c60f713729cb9e93c5b2090b311dea09e662f93baa09d50c04e8c3f7"
       },
       "jobcron-orchestrator": {
-        "SKILL.md": "63359b4e28c6445572bca31ba10d81711f5ba01c2b52b8c725928b531fcdabc1",
-        "references/live-state-reconciliation.md": "60b39c679849ba49f503cdda6844fc9678d837fac5279d496dbfd3e8450abed7",
-        "references/release-ci-portability.md": "4f4200cc32f4cb66b90b09b16b45c9e006bd088849ad33a3df681729f71995aa"
+        "SKILL.md": "e057e4d0e133246e69a0f5223f020e69be4aaf72e7c2c116ad6ab03af3c7fab9",
+        "references/live-state-reconciliation.md": "67e4bcbf1ca79059ed961f99d0c008eac9d92c8c5413da83365188bffe70a9f9",
+        "references/release-ci-portability.md": "e1f016b1c60f713729cb9e93c5b2090b311dea09e662f93baa09d50c04e8c3f7"
       },
       "jobcron-reviewer": {
-        "SKILL.md": "63359b4e28c6445572bca31ba10d81711f5ba01c2b52b8c725928b531fcdabc1",
-        "references/live-state-reconciliation.md": "60b39c679849ba49f503cdda6844fc9678d837fac5279d496dbfd3e8450abed7",
-        "references/release-ci-portability.md": "4f4200cc32f4cb66b90b09b16b45c9e006bd088849ad33a3df681729f71995aa"
+        "SKILL.md": "e057e4d0e133246e69a0f5223f020e69be4aaf72e7c2c116ad6ab03af3c7fab9",
+        "references/live-state-reconciliation.md": "67e4bcbf1ca79059ed961f99d0c008eac9d92c8c5413da83365188bffe70a9f9",
+        "references/release-ci-portability.md": "e1f016b1c60f713729cb9e93c5b2090b311dea09e662f93baa09d50c04e8c3f7"
       },
       "chapt-worker": {
-        "SKILL.md": "63359b4e28c6445572bca31ba10d81711f5ba01c2b52b8c725928b531fcdabc1",
-        "references/live-state-reconciliation.md": "60b39c679849ba49f503cdda6844fc9678d837fac5279d496dbfd3e8450abed7",
-        "references/release-ci-portability.md": "4f4200cc32f4cb66b90b09b16b45c9e006bd088849ad33a3df681729f71995aa"
+        "SKILL.md": "e057e4d0e133246e69a0f5223f020e69be4aaf72e7c2c116ad6ab03af3c7fab9",
+        "references/live-state-reconciliation.md": "67e4bcbf1ca79059ed961f99d0c008eac9d92c8c5413da83365188bffe70a9f9",
+        "references/release-ci-portability.md": "e1f016b1c60f713729cb9e93c5b2090b311dea09e662f93baa09d50c04e8c3f7"
       },
       "chapt-worker-glm-1": {
-        "SKILL.md": "63359b4e28c6445572bca31ba10d81711f5ba01c2b52b8c725928b531fcdabc1",
-        "references/live-state-reconciliation.md": "60b39c679849ba49f503cdda6844fc9678d837fac5279d496dbfd3e8450abed7",
-        "references/release-ci-portability.md": "4f4200cc32f4cb66b90b09b16b45c9e006bd088849ad33a3df681729f71995aa"
+        "SKILL.md": "e057e4d0e133246e69a0f5223f020e69be4aaf72e7c2c116ad6ab03af3c7fab9",
+        "references/live-state-reconciliation.md": "67e4bcbf1ca79059ed961f99d0c008eac9d92c8c5413da83365188bffe70a9f9",
+        "references/release-ci-portability.md": "e1f016b1c60f713729cb9e93c5b2090b311dea09e662f93baa09d50c04e8c3f7"
       },
       "chapt-worker-glm-2": {
-        "SKILL.md": "63359b4e28c6445572bca31ba10d81711f5ba01c2b52b8c725928b531fcdabc1",
-        "references/live-state-reconciliation.md": "60b39c679849ba49f503cdda6844fc9678d837fac5279d496dbfd3e8450abed7",
-        "references/release-ci-portability.md": "4f4200cc32f4cb66b90b09b16b45c9e006bd088849ad33a3df681729f71995aa"
+        "SKILL.md": "e057e4d0e133246e69a0f5223f020e69be4aaf72e7c2c116ad6ab03af3c7fab9",
+        "references/live-state-reconciliation.md": "67e4bcbf1ca79059ed961f99d0c008eac9d92c8c5413da83365188bffe70a9f9",
+        "references/release-ci-portability.md": "e1f016b1c60f713729cb9e93c5b2090b311dea09e662f93baa09d50c04e8c3f7"
       },
       "chapt-orchestrator": {
-        "SKILL.md": "63359b4e28c6445572bca31ba10d81711f5ba01c2b52b8c725928b531fcdabc1",
-        "references/live-state-reconciliation.md": "60b39c679849ba49f503cdda6844fc9678d837fac5279d496dbfd3e8450abed7",
-        "references/release-ci-portability.md": "4f4200cc32f4cb66b90b09b16b45c9e006bd088849ad33a3df681729f71995aa"
+        "SKILL.md": "e057e4d0e133246e69a0f5223f020e69be4aaf72e7c2c116ad6ab03af3c7fab9",
+        "references/live-state-reconciliation.md": "67e4bcbf1ca79059ed961f99d0c008eac9d92c8c5413da83365188bffe70a9f9",
+        "references/release-ci-portability.md": "e1f016b1c60f713729cb9e93c5b2090b311dea09e662f93baa09d50c04e8c3f7"
       },
       "chapt-reviewer": {
-        "SKILL.md": "63359b4e28c6445572bca31ba10d81711f5ba01c2b52b8c725928b531fcdabc1",
-        "references/live-state-reconciliation.md": "60b39c679849ba49f503cdda6844fc9678d837fac5279d496dbfd3e8450abed7",
-        "references/release-ci-portability.md": "4f4200cc32f4cb66b90b09b16b45c9e006bd088849ad33a3df681729f71995aa"
+        "SKILL.md": "e057e4d0e133246e69a0f5223f020e69be4aaf72e7c2c116ad6ab03af3c7fab9",
+        "references/live-state-reconciliation.md": "67e4bcbf1ca79059ed961f99d0c008eac9d92c8c5413da83365188bffe70a9f9",
+        "references/release-ci-portability.md": "e1f016b1c60f713729cb9e93c5b2090b311dea09e662f93baa09d50c04e8c3f7"
       }
     },
     "production-deployment-planning": {

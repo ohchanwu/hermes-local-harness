@@ -1,7 +1,7 @@
 ---
 name: production-deployment
 description: "Use when planning or executing production deployments."
-version: 0.2.2
+version: 0.2.3
 author: Hermes Agent
 license: MIT
 platforms: [macos, linux]
@@ -33,6 +33,8 @@ Do not create campaign-wide protected-read or credential-acquisition ceilings, r
 Classify the run as unattended, human-assisted, or advisory before planning commands. In a human-assisted run, divide work explicitly: the operator handles interactive authentication, console-only inspection, sensitive values, and approvals; the agent validates repository state, plans, value-blind evidence, and ordered gates.
 
 Treat repository push, infrastructure apply, credential change, image publication, EIP association, DNS/proxy change, and public traffic as separate external effects. A deployment plan or specification is not authorization to perform them.
+
+When the owner requests a policy reload, read every named skill before any further campaign action; retain the same session, source pins, approvals and completed evidence. Apply the fresh policy directly rather than creating replacement packets, reviews or counters merely to record the change. Preserve global user-stop behavior; a later explicit resumption does not authorize broader effects.
 
 ### 2. Reconcile live state before choosing an architecture
 
@@ -66,7 +68,7 @@ For a small launch, use one host, one supported managed database, one scheduler,
 
 Keep these release gates:
 
-- exact clean source revision and immutable artifact digest;
+- exact clean source revision and immutable artifact digest, with the published tag derived from the inspected publisher workflow rather than an assumed full-SHA convention;
 - green release CI, including stages that an earlier failure may have skipped;
 - HTTPS and least-exposure networking;
 - secrets outside source, images, logs, shell history, and infrastructure state;
@@ -117,6 +119,8 @@ Record the effective pre-cutover routing state and the new resource identities a
 
 - Regenerate plans after console changes — saved plans encode an older world and can no longer prove the intended action set.
 - Inspect workflow step ordering when CI fails early — downstream integration, race, or build gates may be skipped even when local smoke tests pass.
+- Resolve accepted command labels and receipt paths from the current manifest before invoking them — guessed label names can fail locally and waste time without advancing a gate.
+- Reconcile an already-submitted workflow by exact source, ref and event before any redispatch — an initially empty run list can reflect eventual consistency rather than a failed submission. For exact-source CI logs and private image readback, follow [release CI portability](references/release-ci-portability.md).
 - Reproduce release-contract scripts with the hosted runner's exact command line and explicit shell, then match its OS and tool major versions before calling a local pass portable — an explicit `sh script` overrides a Bash shebang, while macOS and newer `awk`/`jq` behavior can accept syntax or mutation helpers that fail on Linux CI. Use the recipes in [release CI portability](references/release-ci-portability.md).
 - Audit workflow authentication as executable code, not rendered logs — reference the scoped token variable in request headers and make mutation tests reject both the wrong token source and the wrong number of pre/post publication checks, because redaction placeholders can otherwise become literal credentials.
 - Verify the origin path as one contract: container target, host bind, firewall/security-group port, proxy source restriction, and EIP/DNS attachment must agree. Distinguish an all-interface listener from external reachability, because a socket alone neither proves exposure nor satisfies an ingress rule on a different port.
