@@ -11,6 +11,7 @@ Launch concurrent project control planes from this repository with:
 ```sh
 ./scripts/run-jobcron-orchestrator
 ./scripts/run-chapt-orchestrator
+./scripts/run-harness-orchestrator
 ```
 
-These wrappers pin separate named boards before Hermes starts. Do not assign Kanban cards to orchestrator profiles; stock Hermes intentionally limits dispatcher-spawned task sessions to task-lifecycle tools.
+These wrappers pin separate named boards before Hermes starts. Do not assign Kanban cards to orchestrator profiles; stock Hermes intentionally limits dispatcher-spawned task sessions to task-lifecycle tools. The Harness fleet's attended live rollout is complete and operational. Future live profile, policy, board, gateway, credential, or other external-state changes still require separate explicit human authorization.

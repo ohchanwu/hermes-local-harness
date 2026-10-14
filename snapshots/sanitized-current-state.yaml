@@ -24,7 +24,12 @@
     "chapt-worker",
     "chapt-worker-glm-1",
     "chapt-worker-glm-2",
-    "chapt-reviewer"
+    "chapt-reviewer",
+    "harness-orchestrator",
+    "harness-worker",
+    "harness-worker-glm-1",
+    "harness-worker-glm-2",
+    "harness-reviewer"
   ],
   "approvals": {
     "mode": "off",
@@ -51,7 +56,12 @@
       "chapt-worker",
       "chapt-worker-glm-1",
       "chapt-worker-glm-2",
-      "chapt-reviewer"
+      "chapt-reviewer",
+      "harness-orchestrator",
+      "harness-worker",
+      "harness-worker-glm-1",
+      "harness-worker-glm-2",
+      "harness-reviewer"
     ]
   },
   "kanban": {
@@ -67,7 +77,11 @@
       "chapt-worker",
       "chapt-worker-glm-1",
       "chapt-worker-glm-2",
-      "chapt-reviewer"
+      "chapt-reviewer",
+      "harness-worker",
+      "harness-worker-glm-1",
+      "harness-worker-glm-2",
+      "harness-reviewer"
     ]
   },
   "plugins": {
@@ -117,11 +131,12 @@
         "deploy_profiles": [
           "default",
           "jobcron-orchestrator",
-          "chapt-orchestrator"
+          "chapt-orchestrator",
+          "harness-orchestrator"
         ],
         "version": "0.6.5",
         "files": {
-          "SKILL.md": "6f762f694dee215ea31bafb1ecca6404bd32e00d6bbc1f630566df626d55632d",
+          "SKILL.md": "6f78bb7457ea0c63dbb0f66b2415d32c4a16bed642c3097b2b70f65184848089",
           "scripts/set-active-lanes.py": "157419c7c190b0a9f647271f7bd3839182f2e9324f8f9d74e43ec0553a5b77df"
         }
       },
@@ -144,7 +159,10 @@
           "jobcron-worker-glm-2",
           "chapt-worker",
           "chapt-worker-glm-1",
-          "chapt-worker-glm-2"
+          "chapt-worker-glm-2",
+          "harness-worker",
+          "harness-worker-glm-1",
+          "harness-worker-glm-2"
         ],
         "version": "1.0.0",
         "files": {
@@ -170,7 +188,10 @@
           "jobcron-worker-glm-2",
           "chapt-worker",
           "chapt-worker-glm-1",
-          "chapt-worker-glm-2"
+          "chapt-worker-glm-2",
+          "harness-worker",
+          "harness-worker-glm-1",
+          "harness-worker-glm-2"
         ],
         "version": "1.0.0",
         "files": {
@@ -200,7 +221,12 @@
           "chapt-worker-glm-1",
           "chapt-worker-glm-2",
           "chapt-orchestrator",
-          "chapt-reviewer"
+          "chapt-reviewer",
+          "harness-worker",
+          "harness-worker-glm-1",
+          "harness-worker-glm-2",
+          "harness-orchestrator",
+          "harness-reviewer"
         ],
         "version": "0.2.3",
         "files": {
@@ -228,7 +254,10 @@
           "jobcron-worker-glm-2",
           "chapt-worker",
           "chapt-worker-glm-1",
-          "chapt-worker-glm-2"
+          "chapt-worker-glm-2",
+          "harness-worker",
+          "harness-worker-glm-1",
+          "harness-worker-glm-2"
         ],
         "version": "0.1.7",
         "files": {
@@ -249,6 +278,9 @@
       },
       "chapt-orchestrator": {
         "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md": "97219b20bea1aad2695180dd9e57f9c8662ca3d7c13cd51e182103e654791654"
+      },
+      "harness-orchestrator": {
+        "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md": "8fee6ffef1f7d69aa0236b631e1e8a214f53ca889fde8999c26e35c5998a6f9b"
       }
     }
   },
@@ -265,6 +297,12 @@
         "path": "/Users/chanbla11mit/projects/jobcron/docs/archive/2026-09-24-hermes-orchestration-transition/260919-hermes-orchestration-transition.md",
         "marker": "Status: archived; the transition it records is complete and was validated.",
         "record_marker": "Status: operational, local adoption validated."
+      },
+      {
+        "repo": "harness",
+        "path": "/Users/chanbla11mit/hermes-local-harness/docs/specs/261004-concurrent-project-fleets.md",
+        "marker": "Status: operational; attended live rollout verified.",
+        "record_marker": "Status: operational; attended live rollout verified."
       }
     ]
   },
@@ -307,6 +345,21 @@
         "chapt-worker-glm-1",
         "chapt-worker-glm-2"
       ]
+    },
+    "harness": {
+      "board": "harness",
+      "repository": "/Users/chanbla11mit/hermes-local-harness",
+      "repositories": [
+        "/Users/chanbla11mit/hermes-local-harness"
+      ],
+      "orchestrator": "harness-orchestrator",
+      "worker": "harness-worker",
+      "reviewer": "harness-reviewer",
+      "workers": [
+        "harness-worker",
+        "harness-worker-glm-1",
+        "harness-worker-glm-2"
+      ]
     }
   },
   "project_repair_policy": {
@@ -317,7 +370,8 @@
     "max_infrastructure_retries_per_attempt": 1,
     "project_boards": [
       "jobcron",
-      "cha-pt"
+      "cha-pt",
+      "harness"
     ]
   },
   "profile_souls": {
@@ -345,6 +399,31 @@
       "source": "policies/profile-souls/chapt-reviewer/SOUL.md",
       "live": "/Users/chanbla11mit/.hermes/profiles/chapt-reviewer/SOUL.md",
       "sha256": "b8b07f2b210c08d9d97fe278665bf26e9b11d5ad2013b932d88cb590bca94e37"
+    },
+    "harness-orchestrator": {
+      "source": "policies/profile-souls/harness-orchestrator/SOUL.md",
+      "live": "/Users/chanbla11mit/.hermes/profiles/harness-orchestrator/SOUL.md",
+      "sha256": "0146225230db3d1afaf4ea3ccdf8a12a5bf9b2ac719bd606fba563091ff7e519"
+    },
+    "harness-worker": {
+      "source": "policies/profile-souls/harness-worker/SOUL.md",
+      "live": "/Users/chanbla11mit/.hermes/profiles/harness-worker/SOUL.md",
+      "sha256": "8ee6127b833f8278b3ed3932aa05c77cac917ee8391ccc633474b4ce8fc1ef61"
+    },
+    "harness-worker-glm-1": {
+      "source": "policies/profile-souls/harness-worker-glm-1/SOUL.md",
+      "live": "/Users/chanbla11mit/.hermes/profiles/harness-worker-glm-1/SOUL.md",
+      "sha256": "1d08b686385ea599cadcaabbfd39ecc9065ae9ec1863859d4fdbc53c3193a708"
+    },
+    "harness-worker-glm-2": {
+      "source": "policies/profile-souls/harness-worker-glm-2/SOUL.md",
+      "live": "/Users/chanbla11mit/.hermes/profiles/harness-worker-glm-2/SOUL.md",
+      "sha256": "1d08b686385ea599cadcaabbfd39ecc9065ae9ec1863859d4fdbc53c3193a708"
+    },
+    "harness-reviewer": {
+      "source": "policies/profile-souls/harness-reviewer/SOUL.md",
+      "live": "/Users/chanbla11mit/.hermes/profiles/harness-reviewer/SOUL.md",
+      "sha256": "2ce61d59db24691da2782f8dd9519404432203892e4e781f4978dae3db4b2ecc"
     }
   },
   "repository_policies": {

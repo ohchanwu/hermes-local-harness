@@ -176,7 +176,7 @@ def check_profile_local_skill_overrides(errors, expected, observed=None):
                 fail(errors, f"malformed profile-local skill override path: {profile}/{path!r}")
                 continue
             tracked = ROOT / "policies" / "profile-skills" / profile / path
-            if profile in ("jobcron-orchestrator", "chapt-orchestrator"):
+            if profile in ("jobcron-orchestrator", "chapt-orchestrator", "harness-orchestrator"):
                 if not tracked.is_file():
                     fail(errors, f"missing tracked profile-local skill override: {profile}/{path}")
                 elif hashlib.sha256(tracked.read_bytes()).hexdigest() != want:
@@ -193,6 +193,8 @@ PROFILE_SOUL_PATHS = {
     for profile in (
         "chapt-orchestrator", "chapt-worker", "chapt-worker-glm-1",
         "chapt-worker-glm-2", "chapt-reviewer",
+        "harness-orchestrator", "harness-worker", "harness-worker-glm-1",
+        "harness-worker-glm-2", "harness-reviewer",
     )
 }
 
@@ -288,16 +290,24 @@ def check_repository_policies(errors, expected, observed=None):
         fail(errors, f"unexpected repository policy observation: {name}")
 
 
-ADOPTION_REPOS = {"cha-pt": "adoption/cha-pt.md", "jobcron": "adoption/jobcron.md"}
+ADOPTION_REPOS = {
+    "cha-pt": "adoption/cha-pt.md",
+    "jobcron": "adoption/jobcron.md",
+    "harness": "adoption/harness.md",
+}
 PROJECT_REPOSITORY_ALLOWLISTS = {
     "jobcron": ["/Users/chanbla11mit/projects/jobcron"],
     "cha-pt": [
         "/Users/chanbla11mit/projects/cha-pt",
         "/Users/chanbla11mit/projects/cha-pt-frontend",
     ],
+    "harness": ["/Users/chanbla11mit/hermes-local-harness"],
 }
 CHAPT_ASSIGNEES = {
     "chapt-worker", "chapt-worker-glm-1", "chapt-worker-glm-2", "chapt-reviewer",
+}
+HARNESS_ASSIGNEES = {
+    "harness-worker", "harness-worker-glm-1", "harness-worker-glm-2", "harness-reviewer",
 }
 TEST_COMMAND_LINE = re.compile(
     r"(?im)^\s*(?:[-*]\s+)?`{0,3}\s*(?:"
@@ -346,8 +356,8 @@ def frontend_path_allowed(path):
 
 def check_project_isolation(errors, fleets, observed=None):
     """Validate the hard board/repository/profile mapping for concurrent projects."""
-    if not isinstance(fleets, dict) or set(fleets) != {"jobcron", "cha-pt"}:
-        fail(errors, "project isolation mapping must contain exactly jobcron and cha-pt")
+    if not isinstance(fleets, dict) or set(fleets) != {"jobcron", "cha-pt", "harness"}:
+        fail(errors, "project isolation mapping must contain exactly jobcron, cha-pt, and harness")
         return
     seen_profiles, seen_boards, seen_repos, seen_ports = set(), set(), set(), set()
     for project, fleet in fleets.items():
@@ -376,11 +386,16 @@ def check_project_isolation(errors, fleets, observed=None):
                 project != "cha-pt" or frontend_project != "cha-pt-frontend"
                 or "/Users/chanbla11mit/projects/cha-pt-frontend" not in repos):
             fail(errors, f"project frontend mapping malformed: {project}")
-        if not isinstance(port, int) or not 1024 <= port <= 65535:
+        if (project == "harness" and port is not None) or (
+                project != "harness" and
+                (not isinstance(port, int) or not 1024 <= port <= 65535)):
             fail(errors, f"project isolation preview port invalid: {project}")
         if any(not isinstance(profile, str) or not profile for profile in profiles):
             fail(errors, f"project isolation profile mapping malformed: {project}")
-        for value, seen, label in ((board, seen_boards, "board"), (port, seen_ports, "preview port")):
+        unique_values = [(board, seen_boards, "board")]
+        if port is not None:
+            unique_values.append((port, seen_ports, "preview port"))
+        for value, seen, label in unique_values:
             if value in seen:
                 fail(errors, f"project isolation duplicate {label}: {value}")
             seen.add(value)
@@ -408,7 +423,7 @@ PROJECT_REPAIR_POLICY = {
     "max_approaches": 3,
     "max_attempts_per_approach": 3,
     "max_infrastructure_retries_per_attempt": 1,
-    "project_boards": ["jobcron", "cha-pt"],
+    "project_boards": ["jobcron", "cha-pt", "harness"],
 }
 
 
@@ -709,6 +724,53 @@ def check_chapt_card_contract(errors, tasks):
                     or EXTERNAL_ACTION_MENTION.search(
                         body.replace(FRONTEND_EXTERNAL_WRITE_DECLARATION, "", 1))):
                 fail(errors, f"Cha PT card contract drift {task_id}: frontend authorization contract missing")
+
+
+def check_harness_card_contract(errors, tasks):
+    """Every open Harness card fails closed on its isolated execution contract."""
+    if not isinstance(tasks, list):
+        fail(errors, "Harness card contract observation malformed")
+        return
+    repository = PROJECT_REPOSITORY_ALLOWLISTS["harness"][0]
+    for task in tasks:
+        if not isinstance(task, dict):
+            fail(errors, "Harness card contract observation malformed")
+            continue
+        if task.get("board") != "harness":
+            continue
+        task_id = task.get("id") if isinstance(task.get("id"), str) else "<unknown>"
+        body = task.get("body") if isinstance(task.get("body"), str) else ""
+        repository_declared = re.search(
+            r"(?:^|[.!?;]\s+)Repository\s+" + re.escape(repository) + r"\s+ONLY\b", body)
+        if not repository_declared:
+            fail(errors, f"Harness card contract drift {task_id}: expected exact repository")
+        expected_workspace = f"{repository}/.worktrees/{task_id}"
+        if task.get("workspace_kind") != "worktree" or task.get("workspace_path") != expected_workspace:
+            fail(errors, f"Harness card contract drift {task_id}: isolated worktree mismatch")
+        if not re.search(r"(?:^|[.!?]\s+)Baseline EXACT\s+[0-9a-f]{40}\b", body):
+            fail(errors, f"Harness card contract drift {task_id}: exact baseline missing")
+        headings = list(re.finditer(r"(?m)^(#{1,4})\s+([^\n]+)\n", body))
+        test_section = ""
+        for index, heading in enumerate(headings):
+            if not re.search(r"(?i)(?:test|verification)", heading.group(2)):
+                continue
+            level = len(heading.group(1))
+            end = len(body)
+            for later in headings[index + 1:]:
+                if len(later.group(1)) <= level:
+                    end = later.start()
+                    break
+            test_section = body[heading.end():end]
+            break
+        if not test_section or not TEST_COMMAND_LINE.search(test_section):
+            fail(errors, f"Harness card contract drift {task_id}: explicit test contract missing")
+        if task.get("assignee") not in HARNESS_ASSIGNEES:
+            fail(errors, f"Harness card contract drift {task_id}: Harness worker assignment invalid")
+        reviewer_declared = re.search(
+            r"(?im)^\s*(?:Independent reviewer(?: EXACT)?|Reviewer EXACT)\s+"
+            r"harness-reviewer\b", body)
+        if not reviewer_declared:
+            fail(errors, f"Harness card contract drift {task_id}: independent review contract missing")
 
 
 def observe_open_chapt_cards(errors, runner=run):
@@ -1141,7 +1203,9 @@ def main():
         check_terminal_retry_policy(errors, roster, observed)
         check_project_isolation(errors, snapshot.get("project_isolation"), observed.get("project_isolation"))
         check_project_repair_policy(errors, project_repair_policy, observed.get("project_repair_policy"))
-        check_project_repair_cards(errors, observed.get("project_repair_cards"))
+        project_cards = observed.get("project_repair_cards")
+        check_harness_card_contract(errors, project_cards)
+        check_project_repair_cards(errors, project_cards)
         check_profile_souls(errors, profile_souls, observed.get("profile_soul_hashes"))
         check_repository_policies(errors, repository_policies, observed.get("repository_policy_hashes"))
         for name in expected:
@@ -1248,7 +1312,11 @@ def main():
                     if projects.returncode or observed_projects != expected_projects:
                         fail(errors, f"Hermes project allowlist drift {profile}: expected "
                                      f"{sorted(expected_projects)}, actual {sorted(observed_projects)}")
-            launcher_name = {"jobcron": "run-jobcron-orchestrator", "cha-pt": "run-chapt-orchestrator"}[project]
+            launcher_name = {
+                "jobcron": "run-jobcron-orchestrator",
+                "cha-pt": "run-chapt-orchestrator",
+                "harness": "run-harness-orchestrator",
+            }[project]
             launcher = ROOT / "scripts" / launcher_name
             launcher_text = launcher.read_text() if launcher.is_file() else ""
             if (not launcher.is_file() or not os.access(launcher, os.X_OK)
@@ -1257,7 +1325,9 @@ def main():
                     or fleet["repository"] not in launcher_text):
                 fail(errors, f"project orchestrator launcher drift: {launcher}")
         check_chapt_card_contract(errors, observe_open_chapt_cards(errors))
-        check_project_repair_cards(errors, observe_open_project_cards(errors))
+        project_cards = observe_open_project_cards(errors)
+        check_harness_card_contract(errors, project_cards)
+        check_project_repair_cards(errors, project_cards)
         deployed_hashes = {}
         for entry in snapshot["skill"]["shared_skills"]:
             deployed_hashes[entry["name"]] = {}

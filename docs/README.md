@@ -11,7 +11,7 @@ This index is the entry point for durable harness documentation tracked in Git. 
 
 ## Current entries
 
-- [Concurrent project fleets](specs/261004-concurrent-project-fleets.md) — implemented Jobcron/Cha PT profile, board, worktree, port, and review isolation.
+- [Concurrent project fleets](specs/261004-concurrent-project-fleets.md) — implemented and verified Jobcron, Cha PT, and Harness isolation; the Harness attended live rollout is operational.
 - [Diagnostic convergence policy](../policies/diagnostic-convergence.md) — maintained design and review contract; [authority boundaries](../policies/authority-and-review.md).
 - [Completed diagnostic-convergence implementation plan](archive/261003-diagnostic-convergence.md)
 
@@ -23,6 +23,8 @@ This index is the entry point for durable harness documentation tracked in Git. 
 
 - [Jobcron upgrade orchestration: repeated first-launch ceremony](bugs/261007-jobcron-upgrade-orchestration-repeated-first-launch-ceremony.md)
 - [Jobcron test-boundary incident incorrectly halted autonomous implementation](bugs/261007-jobcron-test-boundary-incident-overblocked-autonomous-implementation.md)
+- [Jobcron over-gating read-only incident assessment stalls autonomous work](bugs/261013-jobcron-over-gating-readonly-incident-assessment.md) — recurrence focused on unnecessary authorization gates and campaign-wide dependency invention.
+- [Cha PT calendar rollout accumulated disproportionate ceremony](bugs/261013-chapt-calendar-rollout-overcomplicated-bootstrap-plan.md) — near miss caused by carrying proof-oriented migration scaffolding into a narrow empty-state transition.
 
 ## Scoped Ponytail separation (approved design summary)
 

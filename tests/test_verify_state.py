@@ -201,6 +201,8 @@ assert "Authentication expiry blocks a fresh observation" in orchestrator
 assert "currently_actionable" in orchestrator
 assert "jobcron-orchestrator" in orchestrator
 assert "chapt-reviewer" in orchestrator
+assert "harness-orchestrator" in orchestrator
+assert "docs/bugs" in orchestrator
 assert "gpt-6.1-sol" in orchestrator
 # Terminal retry remains an explicit card-scoped v2 policy, never the default.
 assert "version: 0.6.5" in orchestrator
@@ -220,6 +222,15 @@ assert roster["project_fleets"]["jobcron"]["workers"] == [
     "jobcron-worker", "jobcron-worker-glm-1", "jobcron-worker-glm-2"]
 assert roster["project_fleets"]["cha-pt"]["workers"] == [
     "chapt-worker", "chapt-worker-glm-1", "chapt-worker-glm-2"]
+assert roster["project_fleets"]["harness"] == {
+    "board": "harness",
+    "repository": "/Users/chanbla11mit/hermes-local-harness",
+    "repositories": ["/Users/chanbla11mit/hermes-local-harness"],
+    "orchestrator": "harness-orchestrator",
+    "worker": "harness-worker",
+    "reviewer": "harness-reviewer",
+    "workers": ["harness-worker", "harness-worker-glm-1", "harness-worker-glm-2"],
+}
 assert roster["project_fleets"]["cha-pt"]["repositories"] == [
     "/Users/chanbla11mit/projects/cha-pt",
     "/Users/chanbla11mit/projects/cha-pt-frontend",
@@ -232,7 +243,7 @@ project_repair_policy = {
     "max_approaches": 3,
     "max_attempts_per_approach": 3,
     "max_infrastructure_retries_per_attempt": 1,
-    "project_boards": ["jobcron", "cha-pt"],
+    "project_boards": ["jobcron", "cha-pt", "harness"],
 }
 assert roster["project_repair_policy"] == project_repair_policy
 assert snapshot["project_repair_policy"] == project_repair_policy
@@ -452,23 +463,28 @@ check("--fixture", str(FIXTURES / "frontend-repository-policy-drift.yaml"), code
       text="repository policy drift cha-pt-frontend")
 assert roster["project_dispatch_allowlist"] == [
     "jobcron-worker", "jobcron-worker-glm-1", "jobcron-worker-glm-2", "jobcron-reviewer",
-    "chapt-worker", "chapt-worker-glm-1", "chapt-worker-glm-2", "chapt-reviewer"]
+    "chapt-worker", "chapt-worker-glm-1", "chapt-worker-glm-2", "chapt-reviewer",
+    "harness-worker", "harness-worker-glm-1", "harness-worker-glm-2", "harness-reviewer"]
 roster_profiles = {profile["name"]: profile for profile in roster["profiles"]}
 assert roster["approval_policy"]["mode"] == "off"
 assert roster["approval_policy"]["profiles"] == list(roster_profiles)
 assert not roster_profiles["jobcron-orchestrator"]["dispatch_eligible"]
 assert not roster_profiles["chapt-orchestrator"]["dispatch_eligible"]
+assert not roster_profiles["harness-orchestrator"]["dispatch_eligible"]
 project_workers = (
     "jobcron-worker", "jobcron-worker-glm-1", "jobcron-worker-glm-2",
-    "chapt-worker", "chapt-worker-glm-1", "chapt-worker-glm-2")
-for profile in (*project_workers, "jobcron-reviewer", "chapt-reviewer"):
+    "chapt-worker", "chapt-worker-glm-1", "chapt-worker-glm-2",
+    "harness-worker", "harness-worker-glm-1", "harness-worker-glm-2")
+for profile in (*project_workers, "jobcron-reviewer", "chapt-reviewer", "harness-reviewer"):
     assert roster_profiles[profile]["dispatch_eligible"]
 for profile in ("jobcron-worker-glm-1", "jobcron-worker-glm-2",
-                "chapt-worker-glm-1", "chapt-worker-glm-2"):
+                "chapt-worker-glm-1", "chapt-worker-glm-2",
+                "harness-worker-glm-1", "harness-worker-glm-2"):
     assert roster_profiles[profile]["model"] == "glm-5.3"
     assert roster_profiles[profile]["provider"] == "zai"
 for profile in ("jobcron-orchestrator", *project_workers, "jobcron-reviewer",
-                "chapt-orchestrator", "chapt-reviewer"):
+                "chapt-orchestrator", "chapt-reviewer",
+                "harness-orchestrator", "harness-reviewer"):
     assert "hermes-terminal-outcome-notification" in roster_profiles[profile]["installed_disabled_plugins"]
 errors = []
 with redirect_stdout(io.StringIO()):
@@ -749,11 +765,86 @@ errors = []
 with redirect_stdout(io.StringIO()):
     verify_state.check_profile_local_skill_overrides(errors, local_overrides, local_overrides)
 assert errors == [], errors
-for profile in ("jobcron-orchestrator", "chapt-orchestrator"):
+for profile in ("jobcron-orchestrator", "chapt-orchestrator", "harness-orchestrator"):
     rel, want = next(iter(local_overrides[profile].items()))
     tracked = ROOT / "policies" / "profile-skills" / profile / rel
     assert tracked.is_file()
     assert hashlib.sha256(tracked.read_bytes()).hexdigest() == want
+
+harness_launcher = (ROOT / "scripts" / "run-harness-orchestrator")
+assert harness_launcher.is_file()
+assert harness_launcher.stat().st_mode & 0o111
+harness_launcher_text = harness_launcher.read_text()
+assert "HERMES_KANBAN_BOARD=harness" in harness_launcher_text
+assert "harness-orchestrator" in harness_launcher_text
+assert "/Users/chanbla11mit/hermes-local-harness" in harness_launcher_text
+
+for profile in ("harness-orchestrator", "harness-worker", "harness-worker-glm-1",
+                "harness-worker-glm-2", "harness-reviewer"):
+    contract = (ROOT / "policies" / "profile-souls" / profile / "SOUL.md").read_text()
+    contract_lower = contract.lower()
+    assert "board `harness`" in contract
+    assert "/Users/chanbla11mit/hermes-local-harness" in contract
+    assert "same-card" in contract
+    assert "push" in contract_lower and "live" in contract_lower and "external" in contract_lower
+assert "docs/bugs" in (
+    ROOT / "policies" / "profile-souls" / "harness-orchestrator" / "SOUL.md").read_text()
+assert "active live policy" in (
+    ROOT / "policies" / "profile-souls" / "harness-orchestrator" / "SOUL.md").read_text()
+
+# Every open Harness card is pinned to the one repository, its task worktree,
+# an exact baseline and executable tests, and the dedicated worker/reviewer tuple.
+harness_body = (
+    "Repository /Users/chanbla11mit/hermes-local-harness ONLY.\n"
+    f"Baseline EXACT {'a' * 40}.\n"
+    "## Tests\n- `python3 tests/test_verify_state.py`\n"
+    "Reviewer EXACT harness-reviewer."
+)
+harness_card = {
+    "id": "t_harness", "board": "harness", "body": harness_body,
+    "assignee": "harness-worker", "workspace_kind": "worktree",
+    "workspace_path": "/Users/chanbla11mit/hermes-local-harness/.worktrees/t_harness",
+}
+errors = []
+with redirect_stdout(io.StringIO()):
+    verify_state.check_harness_card_contract(errors, [harness_card])
+assert errors == [], errors
+for changed, expected in (
+    ({"body": harness_body.replace("Repository /Users/chanbla11mit/hermes-local-harness ONLY.\n", "")},
+     "expected exact repository"),
+    ({"workspace_path": "/Users/chanbla11mit/hermes-local-harness"}, "isolated worktree mismatch"),
+    ({"body": harness_body.replace(f"Baseline EXACT {'a' * 40}.\n", "")}, "exact baseline missing"),
+    ({"body": harness_body.replace("- `python3 tests/test_verify_state.py`", "No checks.")},
+     "explicit test contract missing"),
+    ({"assignee": "chapt-worker"}, "Harness worker assignment invalid"),
+    ({"body": harness_body.replace("Reviewer EXACT harness-reviewer.", "")},
+     "independent review contract missing"),
+):
+    errors = []
+    with redirect_stdout(io.StringIO()):
+        verify_state.check_harness_card_contract(errors, [dict(harness_card, **changed)])
+    assert any(expected in error for error in errors), errors
+
+# Harness has no preview service; assigning it a port is policy drift.
+harness_with_port = json.loads(json.dumps(roster["project_fleets"]))
+harness_with_port["harness"]["preview_port"] = 19090
+errors = []
+with redirect_stdout(io.StringIO()):
+    verify_state.check_project_isolation(errors, harness_with_port)
+assert "project isolation preview port invalid: harness" in errors, errors
+
+harness_skill = (ROOT / "policies" / "profile-skills" / "harness-orchestrator" /
+                 "autonomous-ai-agents" / "multi-agent-coding-orchestrator" / "SKILL.md").read_text()
+for foreign in ("jobcron", "cha-pt", "chapt-", "worker-astra", "reviewer-sol"):
+    assert foreign not in harness_skill.lower(), foreign
+for line in harness_skill.splitlines():
+    if "hermes kanban " in line:
+        assert "--board harness" in line, line
+for tool_name in ("kanban_create", "kanban_show", "kanban_list", "kanban_comment",
+                  "kanban_block", "kanban_complete", "kanban_request_review",
+                  "kanban_request_changes"):
+    if tool_name in harness_skill:
+        assert "board: harness" in harness_skill
 drifted_overrides = json.loads(json.dumps(local_overrides))
 drifted_overrides["worker-astra"]["software-development/spike/SKILL.md"] = "0" * 64
 errors = []

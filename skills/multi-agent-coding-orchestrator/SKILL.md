@@ -18,7 +18,7 @@ Coordinate specification-driven coding through Hermes profiles, Kanban, Git work
 ## When to Use
 
 - Planning or executing code changes through the model escalation fleet.
-- Resuming an autonomous Jobcron or Cha Physical Therapy workstream.
+- Resuming an autonomous Jobcron, Cha Physical Therapy, or Hermes local harness workstream.
 - Routing, reviewing, escalating, integrating, pausing, or reporting Kanban work.
 
 Do not use this procedure for a simple question that needs no repository change or multi-agent coordination.
@@ -29,6 +29,7 @@ Project-isolated fleets:
 
 - Jobcron board `jobcron`: `jobcron-orchestrator` (`gpt-6.1-sol`); implementation pool `jobcron-worker` (`gpt-6.1-sol`), `jobcron-worker-glm-1` and `jobcron-worker-glm-2` (both `glm-5.3`); independent `jobcron-reviewer` (`gpt-6-astra`). Repository root: `/Users/chanbla11mit/projects/jobcron`; preview port: `17777`.
 - Cha PT board `cha-pt`: `chapt-orchestrator` (`gpt-6.1-sol`); implementation pool `chapt-worker` (`gpt-6.1-sol`), `chapt-worker-glm-1` and `chapt-worker-glm-2` (both `glm-5.3`); independent `chapt-reviewer` (`gpt-6-astra`). Repository allowlist: `/Users/chanbla11mit/projects/cha-pt` and `/Users/chanbla11mit/projects/cha-pt-frontend`; primary board root `/Users/chanbla11mit/projects/cha-pt`; frontend Hermes project `cha-pt-frontend`; backend preview port: `18080`.
+- Harness board `harness`: `harness-orchestrator` (`gpt-6.1-sol`); implementation pool `harness-worker` (`gpt-6.1-sol`), `harness-worker-glm-1` and `harness-worker-glm-2` (both `glm-5.3`); independent `harness-reviewer` (`gpt-6-astra`). Sole repository/default workdir: `/Users/chanbla11mit/hermes-local-harness`.
 
 Each project profile has an independent Hermes home, memory, sessions, and fixed terminal root. Named boards provide separate databases, logs, attachments, and workspaces. A project orchestrator may assign only its matching worker pool and reviewer. Every card is pinned to one exact repository, repository-owned isolated worktree, protected baseline, and explicit test contract. A task or callback with a mismatched board, profile, repository, workspace, baseline, or test contract is invalid and must be blocked before file access or mutation.
 
@@ -38,13 +39,13 @@ The `cha-pt` board may coordinate local work in either allowlisted Cha PT reposi
 
 Frontend cards must follow `/Users/chanbla11mit/projects/cha-pt-frontend/AGENTS.md`. The card must identify the intended editable paths and its exact test contract. Operator-protected paths require explicit human authorization naming the protected scope on that card; passing `checks/run.py` is evidence, not authorization. Local preparation and independent review do not authorize a push, PR, Amplify preview, deployment, credential operation, production mutation, or other external write.
 
-Project orchestrators are interactive control-plane sessions, not dispatcher-spawned task workers. Hermes intentionally hides `kanban_list` and `kanban_unblock` whenever `HERMES_KANBAN_TASK` is set, so assigning a card to an orchestrator removes the board-routing tools it needs. Launch each controller through the tracked board-pinning wrapper (`scripts/run-jobcron-orchestrator` or `scripts/run-chapt-orchestrator`). Keep only project workers and reviewers in `kanban.dispatch_profiles`.
+Project orchestrators are interactive control-plane sessions, not dispatcher-spawned task workers. Hermes intentionally hides `kanban_list` and `kanban_unblock` whenever `HERMES_KANBAN_TASK` is set, so assigning a card to an orchestrator removes the board-routing tools it needs. Launch each controller through its tracked board-pinning wrapper (`scripts/run-jobcron-orchestrator`, `scripts/run-chapt-orchestrator`, or `scripts/run-harness-orchestrator`). Keep only project workers and reviewers in `kanban.dispatch_profiles`.
 
 Each project has one Sol worker and two GLM Full workers. Use Sol for routine bounded implementation; prefer GLM Full for large-context, repo-wide, long-horizon, multimodal, visual, or broadly specified work, and use either idle GLM worker for independent parallel slices. Capacity alone may select another matching project worker, but never a foreign-project or legacy worker. Review revision stays on the same assignee unless the reviewer identifies a concrete capability boundary; then the orchestrator may create a continuation card for another worker in the same project pool with explicit lineage and preserved evidence.
 
 ### Autonomous project repair budget
 
-Project-fleet repair is independent of the legacy escalation ladder. Enable it only when the exact `jobcron` or `cha-pt` card body records exactly one full line `authorization_mode: autonomous` and one full line `repair_policy: bounded-convergence-v1`. Before the first dispatch, append a card comment containing one single-line `repair_history: <JSON array>` snapshot; append a complete successor snapshot comment for every state transition. Kanban comments are the append-only card-wide counter and evidence ledger. Continue on the same card—bounded-convergence-v1 repair authority never transfers to a replacement card. Reassign the same card when authorized, or human-block.
+Project-fleet repair is independent of the legacy escalation ladder. Enable it only when the exact `jobcron`, `cha-pt`, or `harness` card body records exactly one full line `authorization_mode: autonomous` and one full line `repair_policy: bounded-convergence-v1`. Before the first dispatch, append a card comment containing one single-line `repair_history: <JSON array>` snapshot; append a complete successor snapshot comment for every state transition. Kanban comments are the append-only card-wide counter and evidence ledger. Continue on the same card—bounded-convergence-v1 repair authority never transfers to a replacement card. Reassign the same card when authorized, or human-block.
 
 Each approach object has exactly `approach_id`, `strategy`, `strategy_sha256`, `material_difference_review_run_id`, and `attempts`. The strategy hash is calculated from the whitespace-normalized written strategy; approaches after the first require a distinct independent material-difference review run. Each attempt has exactly `candidate_commit`, `implementation_run_id`, `review_run_id`, `infrastructure_retries`, and `outcome`. Start an in-flight attempt with null candidate/review and `outcome: pending`. A successor snapshot may update only that final pending attempt, append one next attempt, or append one next approach; all prior snapshot content remains immutable.
 
@@ -72,7 +73,7 @@ Legacy/default-board implementation profiles, in escalation order:
 
 Keep `worker-terra-2` installed but dormant as a rollback/spare lane. It is outside the active legacy roster unless the human changes the policy.
 
-The escalation ladder and terminal-retry rules below apply only to cards that explicitly use the legacy/default-board roster. Project-isolated Jobcron and Cha PT cards use their five-profile fleets and never fall through to a legacy profile.
+The escalation ladder and terminal-retry rules below apply only to cards that explicitly use the legacy/default-board roster. Project-isolated Jobcron, Cha PT, and harness cards use their five-profile fleets and never fall through to a legacy profile.
 
 Ponytail never runs as a plugin on Hermes profiles. Implementation profiles keep the pinned package installed but `disabled`; the minimalism behavior lives in the per-card `minimal-implementation` skill instead (see Skills). The orchestrator, reviewer, and advisor neither load it nor the simplification skill.
 
@@ -240,9 +241,11 @@ Begin only when both conditions are true:
 1. The specification and acceptance criteria are approved.
 2. The user explicitly says `run autonomously` or an unambiguous equivalent for that specification.
 
-For work expected to last hours or days, send the approved specification through the board-designated independent reviewer (`jobcron-reviewer`, `chapt-reviewer`, or legacy `reviewer-sol`) before dispatching implementation.
+For work expected to last hours or days, send the approved specification through the board-designated independent reviewer (`jobcron-reviewer`, `chapt-reviewer`, `harness-reviewer`, or legacy `reviewer-sol`) before dispatching implementation.
 
 Authorization covers local branches, worktrees, commits, tests, and recoverable local destructive operations. It never covers pushes, PR creation, deployments, production mutations, messages beyond the configured progress protocol, purchases, credential changes, or other external writes.
+
+Harness-board work is local-only by default. Local commits are permitted in isolated task worktrees, but pushes, PRs, live profile or skill deployment, board or gateway changes, credentials, production/cloud mutations, and external writes require separate explicit human authorization. Files under `docs/bugs/` are evidence and triage input, not automatic implementation authorization. The harness orchestrator must not autonomously modify or deploy its own active live policy: repository policy changes require same-card `harness-reviewer` review, and live rollout is a separate attended operation.
 
 ## Proportional operational constraints
 
@@ -342,7 +345,7 @@ Estimate the whole worker attempt, not just editing time: repository discovery, 
 3. Implement only the assigned slice in the pinned worktree.
 4. Run focused tests, then required broader gates.
 5. Commit successful work locally.
-6. Request review with the exact reviewer named by the project contract (`jobcron-reviewer`, `chapt-reviewer`, or legacy `reviewer-sol`) and concise evidence.
+6. Request review with the exact reviewer named by the project contract (`jobcron-reviewer`, `chapt-reviewer`, `harness-reviewer`, or legacy `reviewer-sol`) and concise evidence.
 7. Block for a genuine decision, prohibited action, credential need, unsafe state, or infrastructure outcome that the orchestrator must classify.
 8. Never push, open a PR, deploy, mutate production, or bypass review.
 
@@ -391,7 +394,7 @@ Before declaring the harness or an autonomous workstream complete, verify:
 - The Hermes source checkout is clean and updateable.
 - Every active profile returns its configured model identity on a fresh inference probe.
 - The dispatch allowlist contains each project's three-worker pool and reviewer plus the intended legacy lanes, excludes project orchestrators, and has no project card assigned outside its project tuple.
-- Board `jobcron` resolves only the Jobcron repository/workspaces and board `cha-pt` only the Cha PT repository/workspaces.
+- Boards `jobcron`, `cha-pt`, and `harness` resolve only their declared repository/workspace allowlists.
 - Fresh project profile sessions have separate state homes and return `gpt-6.1-sol` for orchestrator/primary worker, `glm-5.3` for both GLM Full workers, and `gpt-6-astra` for reviewer.
 - No running implementation profile was removed during a lane swap.
 - Reviews can start while five implementation profiles are running.

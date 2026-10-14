@@ -74,7 +74,12 @@
       "chapt-worker",
       "chapt-worker-glm-1",
       "chapt-worker-glm-2",
-      "chapt-reviewer"
+      "chapt-reviewer",
+      "harness-orchestrator",
+      "harness-worker",
+      "harness-worker-glm-1",
+      "harness-worker-glm-2",
+      "harness-reviewer"
     ]
   },
   "dispatch_pool": {
@@ -594,6 +599,121 @@
       "installed_disabled_plugins": [
         "hermes-terminal-outcome-notification"
       ]
+    },
+    {
+      "name": "harness-orchestrator",
+      "role": "project orchestrator",
+      "model": "gpt-6.1-sol",
+      "provider": "openai-codex",
+      "installed": true,
+      "dispatch_eligible": false,
+      "in_dispatch_pool": false,
+      "lifecycle": "project-active",
+      "concurrency_limit": 1,
+      "required_plugins": [],
+      "modes": [
+        "project-isolated",
+        "harness"
+      ],
+      "toolsets": "orchestrator",
+      "credential_required": true,
+      "credential_present": true,
+      "installed_disabled_plugins": [
+        "hermes-terminal-outcome-notification"
+      ]
+    },
+    {
+      "name": "harness-worker",
+      "role": "project implementation",
+      "model": "gpt-6.1-sol",
+      "provider": "openai-codex",
+      "installed": true,
+      "dispatch_eligible": true,
+      "in_dispatch_pool": true,
+      "lifecycle": "project-active",
+      "concurrency_limit": 1,
+      "required_plugins": [],
+      "modes": [
+        "project-isolated",
+        "harness"
+      ],
+      "toolsets": "implementation",
+      "credential_required": true,
+      "credential_present": true,
+      "installed_disabled_plugins": [
+        "ponytail",
+        "hermes-terminal-outcome-notification"
+      ]
+    },
+    {
+      "name": "harness-worker-glm-1",
+      "role": "project GLM Full implementation",
+      "model": "glm-5.3",
+      "provider": "zai",
+      "installed": true,
+      "dispatch_eligible": true,
+      "in_dispatch_pool": true,
+      "lifecycle": "project-active",
+      "concurrency_limit": 1,
+      "required_plugins": [],
+      "modes": [
+        "project-isolated",
+        "harness",
+        "glm-full"
+      ],
+      "toolsets": "implementation",
+      "credential_required": true,
+      "credential_present": true,
+      "installed_disabled_plugins": [
+        "ponytail",
+        "hermes-terminal-outcome-notification"
+      ]
+    },
+    {
+      "name": "harness-worker-glm-2",
+      "role": "project GLM Full implementation",
+      "model": "glm-5.3",
+      "provider": "zai",
+      "installed": true,
+      "dispatch_eligible": true,
+      "in_dispatch_pool": true,
+      "lifecycle": "project-active",
+      "concurrency_limit": 1,
+      "required_plugins": [],
+      "modes": [
+        "project-isolated",
+        "harness",
+        "glm-full"
+      ],
+      "toolsets": "implementation",
+      "credential_required": true,
+      "credential_present": true,
+      "installed_disabled_plugins": [
+        "ponytail",
+        "hermes-terminal-outcome-notification"
+      ]
+    },
+    {
+      "name": "harness-reviewer",
+      "role": "project independent reviewer",
+      "model": "gpt-6-astra",
+      "provider": "openai-codex",
+      "installed": true,
+      "dispatch_eligible": true,
+      "in_dispatch_pool": true,
+      "lifecycle": "project-active",
+      "concurrency_limit": 1,
+      "required_plugins": [],
+      "modes": [
+        "project-isolated",
+        "harness"
+      ],
+      "toolsets": "review",
+      "credential_required": true,
+      "credential_present": true,
+      "installed_disabled_plugins": [
+        "hermes-terminal-outcome-notification"
+      ]
     }
   ],
   "project_fleets": {
@@ -630,6 +750,21 @@
         "chapt-worker-glm-1",
         "chapt-worker-glm-2"
       ]
+    },
+    "harness": {
+      "board": "harness",
+      "repository": "/Users/chanbla11mit/hermes-local-harness",
+      "repositories": [
+        "/Users/chanbla11mit/hermes-local-harness"
+      ],
+      "orchestrator": "harness-orchestrator",
+      "worker": "harness-worker",
+      "reviewer": "harness-reviewer",
+      "workers": [
+        "harness-worker",
+        "harness-worker-glm-1",
+        "harness-worker-glm-2"
+      ]
     }
   },
   "project_repair_policy": {
@@ -640,7 +775,8 @@
     "max_infrastructure_retries_per_attempt": 1,
     "project_boards": [
       "jobcron",
-      "cha-pt"
+      "cha-pt",
+      "harness"
     ]
   },
   "profile_souls": {
@@ -668,6 +804,31 @@
       "source": "policies/profile-souls/chapt-reviewer/SOUL.md",
       "live": "/Users/chanbla11mit/.hermes/profiles/chapt-reviewer/SOUL.md",
       "sha256": "b8b07f2b210c08d9d97fe278665bf26e9b11d5ad2013b932d88cb590bca94e37"
+    },
+    "harness-orchestrator": {
+      "source": "policies/profile-souls/harness-orchestrator/SOUL.md",
+      "live": "/Users/chanbla11mit/.hermes/profiles/harness-orchestrator/SOUL.md",
+      "sha256": "0146225230db3d1afaf4ea3ccdf8a12a5bf9b2ac719bd606fba563091ff7e519"
+    },
+    "harness-worker": {
+      "source": "policies/profile-souls/harness-worker/SOUL.md",
+      "live": "/Users/chanbla11mit/.hermes/profiles/harness-worker/SOUL.md",
+      "sha256": "8ee6127b833f8278b3ed3932aa05c77cac917ee8391ccc633474b4ce8fc1ef61"
+    },
+    "harness-worker-glm-1": {
+      "source": "policies/profile-souls/harness-worker-glm-1/SOUL.md",
+      "live": "/Users/chanbla11mit/.hermes/profiles/harness-worker-glm-1/SOUL.md",
+      "sha256": "1d08b686385ea599cadcaabbfd39ecc9065ae9ec1863859d4fdbc53c3193a708"
+    },
+    "harness-worker-glm-2": {
+      "source": "policies/profile-souls/harness-worker-glm-2/SOUL.md",
+      "live": "/Users/chanbla11mit/.hermes/profiles/harness-worker-glm-2/SOUL.md",
+      "sha256": "1d08b686385ea599cadcaabbfd39ecc9065ae9ec1863859d4fdbc53c3193a708"
+    },
+    "harness-reviewer": {
+      "source": "policies/profile-souls/harness-reviewer/SOUL.md",
+      "live": "/Users/chanbla11mit/.hermes/profiles/harness-reviewer/SOUL.md",
+      "sha256": "2ce61d59db24691da2782f8dd9519404432203892e4e781f4978dae3db4b2ecc"
     }
   },
   "repository_policies": {
@@ -684,6 +845,10 @@
     "chapt-worker",
     "chapt-worker-glm-1",
     "chapt-worker-glm-2",
-    "chapt-reviewer"
+    "chapt-reviewer",
+    "harness-worker",
+    "harness-worker-glm-1",
+    "harness-worker-glm-2",
+    "harness-reviewer"
   ]
 }

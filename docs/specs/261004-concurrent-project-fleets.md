@@ -1,10 +1,12 @@
 # Concurrent project fleets
 
-Status: implemented locally; Cha PT dual-repository scope added on 2026-10-06.
+Status: operational; attended live rollout verified.
+
+Jobcron, Cha PT, and Harness are implemented locally. The Harness board, five-profile fleet, role policy, and profile-local orchestrator skill are deployed and verified; future live policy changes remain separately attended.
 
 ## Goal
 
-Run autonomous Jobcron and Cha PT campaigns concurrently without crossing their orchestrator, implementation worker pool, reviewer, board database, Hermes profile state, repository allowlist, worktree tree, preview port, logs, attachments, or evidence namespace. Within Cha PT, one board coordinates two repositories while every card remains pinned to exactly one repository.
+Run autonomous Jobcron, Cha PT, and harness campaigns concurrently without crossing their orchestrator, implementation worker pool, reviewer, board database, Hermes profile state, repository allowlist, worktree tree, logs, attachments, or evidence namespace. Within Cha PT, one board coordinates two repositories while every card remains pinned to exactly one repository.
 
 ## Topology
 
@@ -24,8 +26,15 @@ Run autonomous Jobcron and Cha PT campaigns concurrently without crossing their 
   - worker pool: `chapt-worker` — `openai-codex/gpt-6.1-sol`; `chapt-worker-glm-1` and `chapt-worker-glm-2` — `zai/glm-5.3`
   - reviewer: `chapt-reviewer` — `openai-codex/gpt-6-astra`
   - preview port: `18080`, loopback; routine smoke tests do not start the shared production-shaped Compose stack
+- Hermes local harness
+  - board: `harness`
+  - sole repository and default workdir: `/Users/chanbla11mit/hermes-local-harness`
+  - orchestrator: `harness-orchestrator` — `openai-codex/gpt-6.1-sol`
+  - worker pool: `harness-worker` — `openai-codex/gpt-6.1-sol`; `harness-worker-glm-1` and `harness-worker-glm-2` — `zai/glm-5.3`
+  - reviewer: `harness-reviewer` — `openai-codex/gpt-6-astra`
+  - no preview-port contract is invented for this control repository
 
-The default multiplexed gateway remains the only dispatcher owner. The ten project profiles set `kanban.dispatch_in_gateway: false`. The default profile's `kanban.dispatch_profiles` includes each project's three workers and reviewer, but deliberately excludes both orchestrators. `kanban.max_in_progress_per_profile: 1` permits three independent implementation runs per project while preventing duplicate runs on one profile.
+The default multiplexed gateway remains the only dispatcher owner. All project profiles set `kanban.dispatch_in_gateway: false`. The default profile's `kanban.dispatch_profiles` includes each project's three workers and reviewer, but deliberately excludes all project orchestrators. `kanban.max_in_progress_per_profile: 1` permits three independent implementation runs per project while preventing duplicate runs on one profile.
 
 Hermes intentionally hides board-routing tools such as `kanban_list` and `kanban_unblock` from every dispatcher-spawned task worker. Therefore each orchestrator runs as a normal interactive control-plane session with an explicit `HERMES_KANBAN_BOARD` pin; it must not be assigned a Kanban card.
 
@@ -36,6 +45,8 @@ Hermes command approvals are disabled with `approvals.mode: off` on every instal
 Named Kanban boards are the hard product boundary: each has its own SQLite database, workspaces, logs, and attachments, and dispatcher-spawned workers receive board-pinned environment variables. Each project profile has its own Hermes home, configuration, memory, sessions, logs, and state database. A board's `default_workdir` remains its primary repository. The `cha-pt-frontend` Hermes project supplies the alternate primary repository when a frontend card is created, so stock Hermes creates that card's worktree under `/Users/chanbla11mit/projects/cha-pt-frontend/.worktrees/` without changing the board default.
 
 Hermes profiles are not filesystem sandboxes. Repository/profile pairing is therefore also enforced by fixed `terminal.cwd`, hash-pinned role-specific `SOUL.md`, the canonical orchestration skill, explicit reviewer names, and `scripts/verify-state`. Every card names one exact repository, one repository-owned isolated worktree, one protected baseline, and one explicit test contract. A mismatch in board, profile, repository, workspace, baseline, or test contract must block before file access or mutation.
+
+Harness-board work is local-only by default. Local commits are permitted in isolated task worktrees. Pushes, PRs, live profile or policy deployment, board or gateway changes, credentials, production/cloud mutations, and all other external writes require separate explicit human authorization. `docs/bugs/` entries are evidence and triage input, not automatic implementation authorization. The harness orchestrator must not autonomously modify or deploy its own active live policy: repository changes require same-card `harness-reviewer` review, and live rollout is a separate attended operation.
 
 The live verifier fails closed on the exact repository/project allowlist and inspects every non-closed `cha-pt` card for its repository, task-ID worktree, 40-character baseline, executable test contract, and independent reviewer declaration. This supplements—rather than replaces—the orchestrator's pre-creation checks.
 
@@ -50,6 +61,7 @@ Launch interactive controllers in separate terminals or tmux panes through the t
 ```sh
 ./scripts/run-jobcron-orchestrator
 ./scripts/run-chapt-orchestrator
+./scripts/run-harness-orchestrator
 ```
 
 The wrappers pin `HERMES_KANBAN_BOARD` before Hermes starts, so concurrent sessions cannot race on the global `kanban/current` pointer.
@@ -59,9 +71,10 @@ Human or script operations must always name the board:
 ```sh
 hermes kanban --board jobcron list
 hermes kanban --board cha-pt list
+hermes kanban --board harness list
 ```
 
-Every coding card must use a repository-owned board worktree, identify its exact repository and protected baseline, state an explicit test contract, assign only a worker from the matching project pool, and request only the matching reviewer. A frontend card must set `project: cha-pt-frontend`; a backend card must not. Sol is the routine bounded lane; GLM Full is preferred for large-context, repo-wide, long-horizon, multimodal, visual, or broadly specified work. Review revisions return to the same assignee unless a capability-bound continuation card explicitly preserves lineage and evidence.
+Every coding card must use a repository-owned board worktree, identify its exact repository and protected baseline, state an explicit proportional test contract, assign only a worker from the matching project pool, and request only the matching reviewer on the same card. A frontend card must set `project: cha-pt-frontend`; a backend card must not. Sol is the routine bounded lane; GLM Full is preferred for large-context, repo-wide, long-horizon, multimodal, visual, or broadly specified work. Review revisions return to the same assignee unless a capability-bound continuation card explicitly preserves lineage and evidence.
 
 ## Upgrade and rollback
 
@@ -69,9 +82,20 @@ Hermes core is unmodified. The topology uses supported profiles, profile configu
 
 Recovery point: `/Users/chanbla11mit/.hermes/backups/pre-update-2026-10-04-144022.zip`.
 
-Rollback is additive: pause dispatch, remove the ten project profiles from the default dispatch allowlist, switch operators back to the legacy `default` board/profile, and archive (not delete) the named boards. Preserve project profiles and boards until their history is no longer needed. Restoring the full pre-update archive is the last-resort machine-wide rollback, not the normal topology rollback.
+Rollback is additive: pause dispatch, remove project workers and reviewers from the default dispatch allowlist, switch operators back to the legacy `default` board/profile, and archive (not delete) the named boards. Preserve project profiles and boards until their history is no longer needed. Restoring the full pre-update archive is the last-resort machine-wide rollback, not the normal topology rollback.
 
 ## Verification receipt
+
+The 2026-10-04 receipt below covers the original Jobcron and Cha PT fleets. The Harness fleet was rolled out and verified separately on 2026-10-14.
+
+Harness rollout receipt:
+
+- Board `harness` is active with sole default workdir `/Users/chanbla11mit/hermes-local-harness`; the five Harness profiles have the configured models, providers, terminal root, approval mode `off`, memory-write approval disabled, and per-profile gateway dispatch disabled.
+- The default multiplex dispatcher allowlist contains the three Harness workers and `harness-reviewer`, and excludes `harness-orchestrator`.
+- Tracked and live role policies are byte-identical. The tracked and live Harness-only orchestrator skill are byte-identical at SHA-256 `8fee6ffef1f7d69aa0236b631e1e8a214f53ca889fde8999c26e35c5998a6f9b`.
+- Fresh inference probes returned `gpt-6.1-sol` for `harness-orchestrator` and `harness-worker`, `glm-5.3` for both GLM workers, and `gpt-6-astra` for `harness-reviewer`. Session receipts: `20261014_134853_e9c2fa`, `20261014_134907_82b242`, `20261014_141216_095e19`, `20261014_141232_eb269a`, and `20261014_134918_6fa3c2`.
+- Canonical tests, generated fixtures, `git diff --check`, and focused live checks passed. The focused live checks confirmed a shared terminal-notification outbox and no inherited `HERMES_KANBAN_DB` pin on the multi-board gateway.
+- No Harness dispatch smoke card was created merely to prove topology; the verifier now fails closed on every real open Harness card's repository, task-ID worktree, 40-hex baseline, executable test contract, Harness-only assignee, and same-card `harness-reviewer` declaration.
 
 Verified on 2026-10-04 against Hermes `v0.21.5+6751.g9cf7960`, source commit `9cf7960f274ea2bdfe672d64d26389e9954dfeb6`. The tested rollback archive is `/Users/chanbla11mit/.hermes/backups/pre-update-2026-10-04-144022.zip`.
 

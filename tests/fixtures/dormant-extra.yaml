@@ -22,7 +22,12 @@
     "chapt-worker": "gpt-6.1-sol",
     "chapt-worker-glm-1": "glm-5.3",
     "chapt-worker-glm-2": "glm-5.3",
-    "chapt-reviewer": "gpt-6-astra"
+    "chapt-reviewer": "gpt-6-astra",
+    "harness-orchestrator": "gpt-6.1-sol",
+    "harness-worker": "gpt-6.1-sol",
+    "harness-worker-glm-1": "glm-5.3",
+    "harness-worker-glm-2": "glm-5.3",
+    "harness-reviewer": "gpt-6-astra"
   },
   "profile_providers": {
     "default": "openai-codex",
@@ -47,7 +52,12 @@
     "chapt-worker": "openai-codex",
     "chapt-worker-glm-1": "zai",
     "chapt-worker-glm-2": "zai",
-    "chapt-reviewer": "openai-codex"
+    "chapt-reviewer": "openai-codex",
+    "harness-orchestrator": "openai-codex",
+    "harness-worker": "openai-codex",
+    "harness-worker-glm-1": "zai",
+    "harness-worker-glm-2": "zai",
+    "harness-reviewer": "openai-codex"
   },
   "plugins": {
     "default": {
@@ -131,6 +141,24 @@
     },
     "chapt-reviewer": {
       "hermes-terminal-outcome-notification": "disabled     git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification"
+    },
+    "harness-orchestrator": {
+      "hermes-terminal-outcome-notification": "disabled     git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification"
+    },
+    "harness-worker": {
+      "hermes-terminal-outcome-notification": "disabled     git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification",
+      "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail"
+    },
+    "harness-worker-glm-1": {
+      "hermes-terminal-outcome-notification": "disabled     git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification",
+      "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail"
+    },
+    "harness-worker-glm-2": {
+      "hermes-terminal-outcome-notification": "disabled     git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification",
+      "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail"
+    },
+    "harness-reviewer": {
+      "hermes-terminal-outcome-notification": "disabled     git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification"
     }
   },
   "dispatch_profiles": [
@@ -143,7 +171,11 @@
     "chapt-worker",
     "chapt-worker-glm-1",
     "chapt-worker-glm-2",
-    "chapt-reviewer"
+    "chapt-reviewer",
+    "harness-worker",
+    "harness-worker-glm-1",
+    "harness-worker-glm-2",
+    "harness-reviewer"
   ],
   "kanban": {
     "max_in_progress": null,
@@ -152,15 +184,19 @@
   "skill_files": {
     "multi-agent-coding-orchestrator": {
       "default": {
-        "SKILL.md": "6f762f694dee215ea31bafb1ecca6404bd32e00d6bbc1f630566df626d55632d",
+        "SKILL.md": "6f78bb7457ea0c63dbb0f66b2415d32c4a16bed642c3097b2b70f65184848089",
         "scripts/set-active-lanes.py": "157419c7c190b0a9f647271f7bd3839182f2e9324f8f9d74e43ec0553a5b77df"
       },
       "jobcron-orchestrator": {
-        "SKILL.md": "6f762f694dee215ea31bafb1ecca6404bd32e00d6bbc1f630566df626d55632d",
+        "SKILL.md": "6f78bb7457ea0c63dbb0f66b2415d32c4a16bed642c3097b2b70f65184848089",
         "scripts/set-active-lanes.py": "157419c7c190b0a9f647271f7bd3839182f2e9324f8f9d74e43ec0553a5b77df"
       },
       "chapt-orchestrator": {
-        "SKILL.md": "6f762f694dee215ea31bafb1ecca6404bd32e00d6bbc1f630566df626d55632d",
+        "SKILL.md": "6f78bb7457ea0c63dbb0f66b2415d32c4a16bed642c3097b2b70f65184848089",
+        "scripts/set-active-lanes.py": "157419c7c190b0a9f647271f7bd3839182f2e9324f8f9d74e43ec0553a5b77df"
+      },
+      "harness-orchestrator": {
+        "SKILL.md": "6f78bb7457ea0c63dbb0f66b2415d32c4a16bed642c3097b2b70f65184848089",
         "scripts/set-active-lanes.py": "157419c7c190b0a9f647271f7bd3839182f2e9324f8f9d74e43ec0553a5b77df"
       }
     },
@@ -212,6 +248,15 @@
       },
       "chapt-worker-glm-2": {
         "SKILL.md": "a017ca2b203644ce6d5bd688c0b06875bbbe3908fe9dc6212ff39098ab53d794"
+      },
+      "harness-worker": {
+        "SKILL.md": "a017ca2b203644ce6d5bd688c0b06875bbbe3908fe9dc6212ff39098ab53d794"
+      },
+      "harness-worker-glm-1": {
+        "SKILL.md": "a017ca2b203644ce6d5bd688c0b06875bbbe3908fe9dc6212ff39098ab53d794"
+      },
+      "harness-worker-glm-2": {
+        "SKILL.md": "a017ca2b203644ce6d5bd688c0b06875bbbe3908fe9dc6212ff39098ab53d794"
       }
     },
     "simplification-review": {
@@ -261,6 +306,15 @@
         "SKILL.md": "d058cd37b2cf161097dfc51eafd373414603f5feb22ff22e8fe1e198679edb47"
       },
       "chapt-worker-glm-2": {
+        "SKILL.md": "d058cd37b2cf161097dfc51eafd373414603f5feb22ff22e8fe1e198679edb47"
+      },
+      "harness-worker": {
+        "SKILL.md": "d058cd37b2cf161097dfc51eafd373414603f5feb22ff22e8fe1e198679edb47"
+      },
+      "harness-worker-glm-1": {
+        "SKILL.md": "d058cd37b2cf161097dfc51eafd373414603f5feb22ff22e8fe1e198679edb47"
+      },
+      "harness-worker-glm-2": {
         "SKILL.md": "d058cd37b2cf161097dfc51eafd373414603f5feb22ff22e8fe1e198679edb47"
       }
     },
@@ -364,6 +418,31 @@
         "SKILL.md": "e057e4d0e133246e69a0f5223f020e69be4aaf72e7c2c116ad6ab03af3c7fab9",
         "references/live-state-reconciliation.md": "67e4bcbf1ca79059ed961f99d0c008eac9d92c8c5413da83365188bffe70a9f9",
         "references/release-ci-portability.md": "e1f016b1c60f713729cb9e93c5b2090b311dea09e662f93baa09d50c04e8c3f7"
+      },
+      "harness-worker": {
+        "SKILL.md": "e057e4d0e133246e69a0f5223f020e69be4aaf72e7c2c116ad6ab03af3c7fab9",
+        "references/live-state-reconciliation.md": "67e4bcbf1ca79059ed961f99d0c008eac9d92c8c5413da83365188bffe70a9f9",
+        "references/release-ci-portability.md": "e1f016b1c60f713729cb9e93c5b2090b311dea09e662f93baa09d50c04e8c3f7"
+      },
+      "harness-worker-glm-1": {
+        "SKILL.md": "e057e4d0e133246e69a0f5223f020e69be4aaf72e7c2c116ad6ab03af3c7fab9",
+        "references/live-state-reconciliation.md": "67e4bcbf1ca79059ed961f99d0c008eac9d92c8c5413da83365188bffe70a9f9",
+        "references/release-ci-portability.md": "e1f016b1c60f713729cb9e93c5b2090b311dea09e662f93baa09d50c04e8c3f7"
+      },
+      "harness-worker-glm-2": {
+        "SKILL.md": "e057e4d0e133246e69a0f5223f020e69be4aaf72e7c2c116ad6ab03af3c7fab9",
+        "references/live-state-reconciliation.md": "67e4bcbf1ca79059ed961f99d0c008eac9d92c8c5413da83365188bffe70a9f9",
+        "references/release-ci-portability.md": "e1f016b1c60f713729cb9e93c5b2090b311dea09e662f93baa09d50c04e8c3f7"
+      },
+      "harness-orchestrator": {
+        "SKILL.md": "e057e4d0e133246e69a0f5223f020e69be4aaf72e7c2c116ad6ab03af3c7fab9",
+        "references/live-state-reconciliation.md": "67e4bcbf1ca79059ed961f99d0c008eac9d92c8c5413da83365188bffe70a9f9",
+        "references/release-ci-portability.md": "e1f016b1c60f713729cb9e93c5b2090b311dea09e662f93baa09d50c04e8c3f7"
+      },
+      "harness-reviewer": {
+        "SKILL.md": "e057e4d0e133246e69a0f5223f020e69be4aaf72e7c2c116ad6ab03af3c7fab9",
+        "references/live-state-reconciliation.md": "67e4bcbf1ca79059ed961f99d0c008eac9d92c8c5413da83365188bffe70a9f9",
+        "references/release-ci-portability.md": "e1f016b1c60f713729cb9e93c5b2090b311dea09e662f93baa09d50c04e8c3f7"
       }
     },
     "production-deployment-planning": {
@@ -446,6 +525,21 @@
         "SKILL.md": "50d28337a025102b29b766627eb527e862884cbabcca810b29da5c2cfb021089",
         "references/temporary-cloud-bootstrap-iam.md": "6a7c5b7180221ba4b8e3ddbfa54dc68e28724c12ab2e4e8d21822b04d565c51b",
         "references/frontend-origin-separation.md": "2051367f3203d0991cbe9df0ce14428e53f7c03f91dc00df5260532a17b878e6"
+      },
+      "harness-worker": {
+        "SKILL.md": "50d28337a025102b29b766627eb527e862884cbabcca810b29da5c2cfb021089",
+        "references/temporary-cloud-bootstrap-iam.md": "6a7c5b7180221ba4b8e3ddbfa54dc68e28724c12ab2e4e8d21822b04d565c51b",
+        "references/frontend-origin-separation.md": "2051367f3203d0991cbe9df0ce14428e53f7c03f91dc00df5260532a17b878e6"
+      },
+      "harness-worker-glm-1": {
+        "SKILL.md": "50d28337a025102b29b766627eb527e862884cbabcca810b29da5c2cfb021089",
+        "references/temporary-cloud-bootstrap-iam.md": "6a7c5b7180221ba4b8e3ddbfa54dc68e28724c12ab2e4e8d21822b04d565c51b",
+        "references/frontend-origin-separation.md": "2051367f3203d0991cbe9df0ce14428e53f7c03f91dc00df5260532a17b878e6"
+      },
+      "harness-worker-glm-2": {
+        "SKILL.md": "50d28337a025102b29b766627eb527e862884cbabcca810b29da5c2cfb021089",
+        "references/temporary-cloud-bootstrap-iam.md": "6a7c5b7180221ba4b8e3ddbfa54dc68e28724c12ab2e4e8d21822b04d565c51b",
+        "references/frontend-origin-separation.md": "2051367f3203d0991cbe9df0ce14428e53f7c03f91dc00df5260532a17b878e6"
       }
     }
   },
@@ -463,6 +557,11 @@
       "repo": "jobcron",
       "content": "# Jobcron adapter\n**Status: archived; the transition it records is complete and was validated.**\n",
       "record": "/Users/chanbla11mit/projects/jobcron/docs/archive/2026-09-24-hermes-orchestration-transition/260919-hermes-orchestration-transition.md\nStatus: operational, local adoption validated."
+    },
+    {
+      "repo": "harness",
+      "content": "Status: operational; attended live rollout verified.",
+      "record": "# Hermes local harness adoption\n\nAdapter: `/Users/chanbla11mit/hermes-local-harness/docs/specs/261004-concurrent-project-fleets.md`.\n\nStatus: operational; attended live rollout verified. Board `harness` is rooted solely at `/Users/chanbla11mit/hermes-local-harness` and routes only through `harness-orchestrator`, the worker pool (`harness-worker`, `harness-worker-glm-1`, `harness-worker-glm-2`), and `harness-reviewer`. The orchestrator and primary worker use `openai-codex/gpt-6.1-sol`; both GLM workers use `zai/glm-5.3`; the reviewer uses `openai-codex/gpt-6-astra`. Fresh inference probes succeeded for all five profiles.\n\nHarness work is local-only by default. Local commits are permitted only in isolated task worktrees. Pushes, PRs, live profile or skill deployment, board or gateway changes, credentials, production/cloud mutations, and other external writes require separate explicit human authorization. `docs/bugs/` entries are evidence and triage input, not automatic implementation authorization. The harness orchestrator may not autonomously modify or deploy its own active live policy; repository policy changes require same-card `harness-reviewer` review, and live rollout is separately attended.\n"
     }
   ],
   "terminal_notification_runtime": {
@@ -489,6 +588,9 @@
     },
     "chapt-orchestrator": {
       "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md": "97219b20bea1aad2695180dd9e57f9c8662ca3d7c13cd51e182103e654791654"
+    },
+    "harness-orchestrator": {
+      "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md": "8fee6ffef1f7d69aa0236b631e1e8a214f53ca889fde8999c26e35c5998a6f9b"
     }
   },
   "terminal_retry_policy": {
@@ -550,6 +652,21 @@
         "chapt-worker-glm-1",
         "chapt-worker-glm-2"
       ]
+    },
+    "harness": {
+      "board": "harness",
+      "repository": "/Users/chanbla11mit/hermes-local-harness",
+      "repositories": [
+        "/Users/chanbla11mit/hermes-local-harness"
+      ],
+      "orchestrator": "harness-orchestrator",
+      "worker": "harness-worker",
+      "reviewer": "harness-reviewer",
+      "workers": [
+        "harness-worker",
+        "harness-worker-glm-1",
+        "harness-worker-glm-2"
+      ]
     }
   },
   "profile_approval_modes": {
@@ -575,14 +692,24 @@
     "chapt-worker": "off",
     "chapt-worker-glm-1": "off",
     "chapt-worker-glm-2": "off",
-    "chapt-reviewer": "off"
+    "chapt-reviewer": "off",
+    "harness-orchestrator": "off",
+    "harness-worker": "off",
+    "harness-worker-glm-1": "off",
+    "harness-worker-glm-2": "off",
+    "harness-reviewer": "off"
   },
   "profile_soul_hashes": {
     "chapt-orchestrator": "6cad04cc2a650ba78fea836aa124b4edb7e8c102da30120fb1bb80a41a610b52",
     "chapt-worker": "6bd46152500f54f4955b657d80a20f31db27f2d3162845fd8194436e03c5b5ab",
     "chapt-worker-glm-1": "79b114ac428183ec8140ff872490afed6a9512a729896aa99faf4f4554dcb7a1",
     "chapt-worker-glm-2": "420248cde44ce10386aa9ad46c2f145e964198ba5d02b906fc8d929cb591793b",
-    "chapt-reviewer": "b8b07f2b210c08d9d97fe278665bf26e9b11d5ad2013b932d88cb590bca94e37"
+    "chapt-reviewer": "b8b07f2b210c08d9d97fe278665bf26e9b11d5ad2013b932d88cb590bca94e37",
+    "harness-orchestrator": "0146225230db3d1afaf4ea3ccdf8a12a5bf9b2ac719bd606fba563091ff7e519",
+    "harness-worker": "8ee6127b833f8278b3ed3932aa05c77cac917ee8391ccc633474b4ce8fc1ef61",
+    "harness-worker-glm-1": "1d08b686385ea599cadcaabbfd39ecc9065ae9ec1863859d4fdbc53c3193a708",
+    "harness-worker-glm-2": "1d08b686385ea599cadcaabbfd39ecc9065ae9ec1863859d4fdbc53c3193a708",
+    "harness-reviewer": "2ce61d59db24691da2782f8dd9519404432203892e4e781f4978dae3db4b2ecc"
   },
   "repository_policy_hashes": {
     "cha-pt-frontend": "113b81fd55294cfc3057f66163e1745d590f520003997d36c85b46c938342817"
@@ -595,7 +722,8 @@
     "max_infrastructure_retries_per_attempt": 1,
     "project_boards": [
       "jobcron",
-      "cha-pt"
+      "cha-pt",
+      "harness"
     ]
   },
   "project_repair_cards": []
