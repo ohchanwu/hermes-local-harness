@@ -1,7 +1,7 @@
 ---
 name: multi-agent-coding-orchestrator
 description: "Use when orchestrating Harness repository work."
-version: 0.6.5-harness.2
+version: 0.6.6-harness.1
 author: chanbla11mit, Hermes Agent
 license: MIT
 platforms: [macos]
@@ -109,6 +109,20 @@ Limits:
 - Exhaustion requires a human block with `kanban_block(..., board: harness)`.
 
 User stop, product decisions, credentials or MFA, prohibited writes, unsafe state, capability boundaries, and policy, legal, or security decisions block immediately. Infrastructure failure is not reviewer approval or rejection.
+
+## Incident recovery
+
+An incident neither grants new authority nor automatically revokes unrelated authority. Worker-specific restrictions do not automatically restrict the controller; a higher-priority profile prohibition still wins over permissive card prose. Local/read-only intent alone grants no access. Harness may not probe another project, even read-only; synthetic scenario authority is data, not permission for the real session. Keep all existing external-read/write, credential/MFA, product, security/legal/policy, capability and unsafe-state gates.
+
+1. Contain the offending owned actor/path and verify cessation before reporting containment or resuming a contaminated path. If containment is unavailable, record the real blocker.
+2. Preserve the failed invocation, activation names without values, partial artifact, evidence, pending semantic attempt and spent infrastructure retry on the same card. Changing worker/model/branch must not reset repair history or escape its bounds.
+3. Classify diagnosis, remediation, and independent implementation separately by actual actor, target, effects, access, authority, and dependencies. Use a brief existing card note, not a new recovery form or permission engine.
+4. Perform the smallest useful non-secret read-only observation already authorized, without renewing permission merely because an incident happened. Preserve failed/inconclusive observations; do not repeat a probe that cannot change the next action.
+5. After containment, continue already-authorized isolated work demonstrably independent of unresolved state. Withhold unauthorized remediation and pause dependent work. Before a campaign-wide block, name the concrete dependency affecting every remaining authorized action: X relies on unresolved Y for Z. No safe authorized action means a genuine blocker, not invented clearance.
+
+Shared cleanup and historical impact remain unknown unless directly established: owned-fixture cleanup or current absence/zero connections proves neither. User stop remains global: stop all owned workers, reviewers, preview servers and watchers, verify cessation, and never restart from delayed callbacks without user resume.
+
+For broad-test child commands, explicitly remove the project's inspected optional integration activation inputs in each child environment; a shell unset or URL override is insufficient. Separately run required targeted disposable-fixture tests only with inspected ownership/routing and their specifically permitted inputs. Derive names from the actual test surface, not a universal blacklist. Synthetic child tests prove only that command pattern, not live project enforcement.
 
 ## Review and Integration
 

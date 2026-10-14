@@ -126,7 +126,9 @@ require(DEPLOYMENT,
 
 # Validate local destinations in the touched docs, including reference definitions.
 for path in (POLICY, ORCHESTRATOR, DEPLOYMENT, AUTHORITY, "docs/README.md",
-             "docs/archive/261003-diagnostic-convergence.md"):
+             "docs/archive/261003-diagnostic-convergence.md",
+             "docs/specs/261014-incident-recovery-without-over-gating.md",
+             "docs/plans/261014-incident-recovery-implementation-plan.md"):
     text = (ROOT / path).read_text()
     links = re.findall(r"\]\(([^)]+)\)", text)
     links += re.findall(r"^\s*\[[^\]]+\]:\s+(\S+)", text, re.M)

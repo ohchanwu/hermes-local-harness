@@ -182,19 +182,19 @@
   "skill_files": {
     "multi-agent-coding-orchestrator": {
       "default": {
-        "SKILL.md": "6f78bb7457ea0c63dbb0f66b2415d32c4a16bed642c3097b2b70f65184848089",
+        "SKILL.md": "46cdee823a905d257c2a50f74f009db37097557b263a9c59f2b67e71a2aebd03",
         "scripts/set-active-lanes.py": "157419c7c190b0a9f647271f7bd3839182f2e9324f8f9d74e43ec0553a5b77df"
       },
       "jobcron-orchestrator": {
-        "SKILL.md": "6f78bb7457ea0c63dbb0f66b2415d32c4a16bed642c3097b2b70f65184848089",
+        "SKILL.md": "46cdee823a905d257c2a50f74f009db37097557b263a9c59f2b67e71a2aebd03",
         "scripts/set-active-lanes.py": "157419c7c190b0a9f647271f7bd3839182f2e9324f8f9d74e43ec0553a5b77df"
       },
       "chapt-orchestrator": {
-        "SKILL.md": "6f78bb7457ea0c63dbb0f66b2415d32c4a16bed642c3097b2b70f65184848089",
+        "SKILL.md": "46cdee823a905d257c2a50f74f009db37097557b263a9c59f2b67e71a2aebd03",
         "scripts/set-active-lanes.py": "157419c7c190b0a9f647271f7bd3839182f2e9324f8f9d74e43ec0553a5b77df"
       },
       "harness-orchestrator": {
-        "SKILL.md": "6f78bb7457ea0c63dbb0f66b2415d32c4a16bed642c3097b2b70f65184848089",
+        "SKILL.md": "46cdee823a905d257c2a50f74f009db37097557b263a9c59f2b67e71a2aebd03",
         "scripts/set-active-lanes.py": "157419c7c190b0a9f647271f7bd3839182f2e9324f8f9d74e43ec0553a5b77df"
       }
     },
@@ -580,13 +580,13 @@
       "software-development/test-driven-development/SKILL.md": "9e9a4bb630506f4f3b4ff19cca80bb464e57db19b8a175959388d2112fc096ff"
     },
     "jobcron-orchestrator": {
-      "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md": "df37e9c413a64971d4e0b0715365096c596dfa1636705f55e553d0ba1727671a"
+      "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md": "649b874d98367aa7bd61f90da9071718e51c5865ccb3ca1606fb1b864e12a2a1"
     },
     "chapt-orchestrator": {
       "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md": "97219b20bea1aad2695180dd9e57f9c8662ca3d7c13cd51e182103e654791654"
     },
     "harness-orchestrator": {
-      "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md": "8fee6ffef1f7d69aa0236b631e1e8a214f53ca889fde8999c26e35c5998a6f9b"
+      "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md": "cebb889760ef03d01193db35a2a054dde722901db87c453df7b4931dd1df8560"
     }
   },
   "terminal_retry_policy": {

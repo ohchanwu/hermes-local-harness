@@ -1,7 +1,7 @@
 ---
 name: multi-agent-coding-orchestrator
 description: "Use when orchestrating multi-agent coding with Hermes."
-version: 0.6.5-jobcron.1
+version: 0.6.6-jobcron.1
 author: chanbla11mit, Hermes Agent
 license: MIT
 platforms: [macos]
@@ -289,6 +289,20 @@ When the user refers to another session, "the spec," or prior work from another 
 
 Completion criterion: the next action is grounded in current files, Git state, active lanes, and board state rather than transcript memory.
 
+## Incident recovery
+
+An incident neither grants new authority nor automatically revokes unrelated authority. Worker-specific restrictions do not automatically restrict the controller; a higher-priority profile prohibition still wins over permissive card prose. Local/read-only intent alone grants no access. Keep all existing external-read/write, credential/MFA, product, security/legal/policy, capability and unsafe-state gates.
+
+1. Contain the offending owned actor/path and verify cessation before reporting containment or resuming a contaminated path. If containment is unavailable, record the real blocker.
+2. Preserve the failed invocation, activation names without values, partial artifact, evidence, pending semantic attempt and spent infrastructure retry on the same card. Changing worker/model/branch must not reset repair history or escape its bounds.
+3. Classify diagnosis, remediation, and independent implementation separately by actual actor, target, effects, access, authority, and dependencies. Use a brief existing card note, not a new recovery form or permission engine.
+4. Perform the smallest useful non-secret read-only observation already authorized, without renewing permission merely because an incident happened. Preserve failed/inconclusive observations; do not repeat a probe that cannot change the next action.
+5. After containment, continue already-authorized isolated work demonstrably independent of unresolved state. Withhold unauthorized remediation and pause dependent work. Before a campaign-wide block, name the concrete dependency affecting every remaining authorized action: X relies on unresolved Y for Z. No safe authorized action means a genuine blocker, not invented clearance.
+
+Shared cleanup and historical impact remain unknown unless directly established: owned-fixture cleanup or current absence/zero connections proves neither. User stop remains global: stop all owned workers, reviewers, preview servers and watchers, verify cessation, and never restart from delayed callbacks without user resume.
+
+For broad-test child commands, explicitly remove the project's inspected optional integration activation inputs in each child environment; a shell unset or URL override is insufficient. Separately run required targeted disposable-fixture tests only with inspected ownership/routing and their specifically permitted inputs. Derive names from the actual test surface, not a universal blacklist. Synthetic child tests prove only that command pattern, not live project enforcement.
+
 ## Task Construction
 
 ### Diagnostic convergence
@@ -375,7 +389,7 @@ Send only milestone completions, genuine blockers, and approval requests. Do not
 - Standard `kanban_request_changes` immediately routes back to the original implementer; use a structured block for tier escalation to prevent a reassignment race. A normal unblock preserves review provenance and returns to review, so escalation must reassign and then explicitly promote the card to `ready`.
 - Hermes's global `kanban.max_in_progress` counts review tasks. Do not use it for the implementation-only cap; enforce the active profile pool instead.
 - Profile isolation does not isolate files. Every code-changing card needs its own worktree.
-- Inspect integration-test fixture routing before enabling optional database environment variables for a broad suite. A URL override does not prove isolation: subprocess scripts can hard-code an existing managed service. Scope owned disposable-fixture URLs to inspected targeted package commands, run the ordinary broad suite without optional integration activation, and keep fixture-boundary incidents separate from code correctness; reported cleanup neither authorizes the original access nor bypasses an independent HUMAN_BLOCK.
+- Apply Incident recovery at fixture-boundary failures; keep incident effects separate from code correctness. Inspect subprocess scripts, which can hard-code an existing managed service. Reported cleanup neither authorizes the original access nor bypasses an independent HUMAN_BLOCK.
 - When canonical `gofmt -l .` reports only ignored evidence inside nested worktrees, preserve those files and the literal command result; check all Git-indexed Go files separately instead of editing private historical fixtures or treating them as application defects. Never claim the literal command was empty. A canonical rebuild without `-trimpath` can differ in bytes from an exact-tree nested-worktree build because compile paths differ: record separate hashes and source/version bindings, exercise the canonical artifact, and reuse unchanged source-bound review evidence without claiming binary identity.
 - Resolve handoff filenames from the native run's submitted artifact paths before comparing hashes. A prepared `.md` placeholder may coexist with an authored `.txt` or `.json` deliverable; preserve both and verify the exact submitted bytes before diagnosing wrong placement or requesting revision.
 - A skill installed only under `default` cannot be force-loaded by a worker profile. Put the minimum role contract in each worker's `SOUL.md` and card.

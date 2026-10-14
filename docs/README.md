@@ -11,6 +11,9 @@ This index is the entry point for durable harness documentation tracked in Git. 
 
 ## Current entries
 
+- [Incident recovery without invented authorization gates](specs/261014-incident-recovery-without-over-gating.md) — authorized local implementation; behavioral evidence and same-card review required, no live rollout.
+- [Incident-recovery implementation plan](plans/261014-incident-recovery-implementation-plan.md) — adopted standalone plan with the foreign-read fixture verification correction.
+
 - [Concurrent project fleets](specs/261004-concurrent-project-fleets.md) — implemented and verified Jobcron, Cha PT, and Harness isolation; the Harness attended live rollout is operational.
 - [Diagnostic convergence policy](../policies/diagnostic-convergence.md) — maintained design and review contract; [authority boundaries](../policies/authority-and-review.md).
 - [Completed diagnostic-convergence implementation plan](archive/261003-diagnostic-convergence.md)
