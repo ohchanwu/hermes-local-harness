@@ -106,7 +106,8 @@ class FixtureIsolationTests(unittest.TestCase):
             path = Path(directory) / "observation.yaml"
             for section, wrong_container in (
                     ("adapters", {}), ("skill_files", []),
-                    ("profile_soul_hashes", []), ("profile_local_skill_overrides", [])):
+                    ("profile_soul_hashes", []), ("profile_local_skill_overrides", []),
+                    ("project_isolation", []), ("project_repair_policy", [])):
                 for observation in (None, wrong_container, "not an observation", False, 1):
                     with self.subTest(section=section, observation=observation):
                         path.write_text(json.dumps({**clean, section: observation}))
@@ -132,7 +133,8 @@ class FixtureIsolationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix="fixture-isolation-") as directory:
             path = Path(directory) / "observation.yaml"
             for section in ("adapters", "skill_files", "profile_soul_hashes",
-                            "profile_local_skill_overrides"):
+                            "profile_local_skill_overrides", "project_isolation",
+                            "project_repair_policy"):
                 with self.subTest(section=section, observation="missing"):
                     fixture = dict(clean)
                     del fixture[section]
@@ -145,6 +147,51 @@ class FixtureIsolationTests(unittest.TestCase):
                     code, output, _ = fixture_result(path)
                     self.assertEqual(code, 1, output)
                     self.assertNotIn("OK: desired state matches observed state", output)
+
+    def test_project_helpers_preserve_desired_only_validation(self):
+        verifier = load_verifier()
+        snapshot = json.loads((ROOT / "snapshots/sanitized-current-state.yaml").read_text())
+        for check, section, diagnostic in (
+                (verifier.check_project_isolation, "project_isolation", "project isolation mapping"),
+                (verifier.check_project_repair_policy, "project_repair_policy", "project repair policy desired")):
+            with self.subTest(section=section), ObservedReads(), redirect_stdout(io.StringIO()):
+                errors = []
+                check(errors, snapshot[section])
+                self.assertEqual(errors, [])
+                check(errors, {}, None)
+                self.assertTrue(any(diagnostic in error for error in errors), errors)
+
+    def test_required_section_null_sweep_has_no_false_ok_or_live_fallback(self):
+        clean = json.loads((ROOT / "tests/fixtures/clean.yaml").read_text())
+        results = {}
+        with tempfile.TemporaryDirectory(prefix="fixture-isolation-") as directory:
+            path = Path(directory) / "observation.yaml"
+            for section in (
+                    "profile_models", "profile_providers", "profile_approval_modes", "plugins",
+                    "dispatch_profiles", "kanban", "skill_files", "profile_local_skill_overrides",
+                    "profile_soul_hashes", "repository_policy_hashes", "adapters",
+                    "terminal_notification_runtime", "terminal_retry_policy", "project_isolation",
+                    "project_repair_policy", "project_repair_cards"):
+                with self.subTest(section=section):
+                    self.assertIn(section, clean)
+                    path.write_text(json.dumps({**clean, section: None}))
+                    verifier = load_verifier()
+                    output = io.StringIO()
+                    guard = ObservedReads((path,))
+                    with guard, patch.object(sys, "argv", ["verify-state", "--fixture", str(path)]), redirect_stdout(output):
+                        try:
+                            code = verifier.main()
+                        except (TypeError, AttributeError) as exc:
+                            # Existing malformed-input crashes fail, but are not graceful
+                            # diagnostics. Record honestly; general schema hardening is not
+                            # this sentinel-isolation contract. BoundaryError is NOT caught.
+                            results[section] = {"exception": type(exc).__name__}
+                        else:
+                            results[section] = {"verifier_exit": code}
+                            self.assertIn(code, (1, 2), output.getvalue())
+                    self.assertNotIn("OK: desired state matches observed state", output.getvalue())
+                    self.assertTrue(all(attempt in guard.allowed for attempt in guard.attempts))
+        print("Required-section null sweep observed: " + json.dumps(results, sort_keys=True))
 
     def test_guard_rejects_foreign_metadata_reads_commands_and_network_before_io(self):
         path = Path("/synthetic-foreign/never-accessed")

@@ -1171,7 +1171,8 @@ def main():
         # None is a live/desired-only sentinel in these helpers, not a fixture
         # observation. Reject malformed supplied sections before calling them.
         for section, kind in (("skill_files", dict), ("profile_soul_hashes", dict),
-                              ("profile_local_skill_overrides", dict), ("adapters", list)):
+                              ("profile_local_skill_overrides", dict), ("adapters", list),
+                              ("project_isolation", dict), ("project_repair_policy", dict)):
             if section in observed and not isinstance(observed[section], kind):
                 fail(errors, f"malformed fixture: section '{section}' expected {kind.__name__}")
                 return 2
