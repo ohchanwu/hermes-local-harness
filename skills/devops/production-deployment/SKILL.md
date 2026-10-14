@@ -1,7 +1,7 @@
 ---
 name: production-deployment
 description: "Use when planning or executing production deployments."
-version: 0.2.3
+version: 0.2.4
 author: Hermes Agent
 license: MIT
 platforms: [macos, linux]
@@ -12,7 +12,7 @@ metadata:
 
 # Production Deployment
 
-Plan and execute production launches from observed runtime state. Prefer the smallest supported architecture that meets the near-term load, but never trade away data recovery, secret isolation, exact-artifact identity, or explicit public-cutover approval.
+Plan and execute production changes from verified state. Classify changed surfaces before choosing launch or upgrade gates. Prefer the smallest supported architecture that meets the near-term load, but never trade away data recovery, secret isolation, exact-artifact identity, or explicit public-cutover approval.
 
 ## Diagnostic Convergence
 
@@ -26,6 +26,21 @@ All external-read/write, credential, mutation, deployment, and cutover HUMAN GAT
 
 Do not create campaign-wide protected-read or credential-acquisition ceilings, reserved-slot arithmetic, or owner amendments whose only purpose is increasing an aggregate count. Acquire each credential or secret bundle once per execution session when practical, securely reuse it, and reacquire normally after provider expiry under the same identity and scope. Permit at most one retry after a proven pre-provider/no-submission failure; a request that may have reached the provider stops for reconciliation. Keep value-blind acquisition audit events, but use a per-operation request or poll cap only when a concrete provider cost, rate, mutation, or ambiguity risk justifies it.
 
+## Release change selection
+
+Before selecting the procedure, classify the requested change from the source diff and current verified state:
+
+- **Existing-platform application-only update:** no schema, infrastructure, topology or security-configuration change. Reuse accepted unchanged platform, topology, security and recovery/restore evidence. Obtain exact-source/new-artifact CI evidence (including previously skipped gates), immutable image identity and focused app acceptance. Use the existing supported replacement step, retain the prior schema-compatible image and applicable recovery, and verify effective target/image/runtime state plus focused acceptance after the authorized replacement. Do not repeat unrelated inventory, architecture, plan/apply or restore rehearsals, or request a new proof packet merely because this is production.
+- **Migration-bearing update:** reuse unaffected platform evidence, but retain exact-image identity, migration compatibility, pre-change recovery protection for useful data/schema, schema-compatible recovery and post-change app/data acceptance. Apply the verified-empty/unused exception below only when its facts hold. After useful writes, keep current data authoritative; ordinary app rollback must not restore a stale writable database.
+- **Infrastructure-changing release:** invalidate only evidence and saved plans genuinely affected by observed or proposed changes. Reconcile the affected identities/configuration, review the exact new plan when infrastructure planning is required, and obtain separate authority for its effects. Preserve unrelated accepted evidence; do not redesign the platform by default.
+- **First launch:** use discovery, architecture selection, reconciliation, independent plan review, recovery and cutover gates where their actual preconditions exist. A historical sketch is not observed current topology. An existing service with a genuinely unknown material surface needs the smallest material uncertainty resolved before choosing dependent gates, not an automatic full platform redesign.
+
+Mixed changes take every applicable branch; unknown changes must not be labeled application-only for convenience. Start with the smallest authorized decision-changing source/state check. The branches select relevant parts of the existing procedure, not a second deployment system, and grant no external access or mutation authority.
+
+Distinguish reusable platform evidence, new-release evidence and current execution prerequisites. Reuse is not a claim of current runtime identity or capability: confirm exact target/scope/image and fresh materially dependent facts at the next authorized operation. Identify the dependent credential/capability sequence value-blind before requesting an execution window or publishing prerequisite refs: which actor needs which operation/scope, safe acquisition path, readiness check and real expiry, including later host-management access after registry publication. Unknown capability/path facts remain explicit dependencies. Reservations, guessed key names or file presence do not prove readiness. Do not acquire credentials merely to finish paperwork; acquire only when the authorized dependent operation needs them. Operator credential/MFA boundaries remain intact; no secret values may enter prompts, logs, argv, fixtures or ordinary files.
+
+Expired auth blocks its dependent fresh operation, not independent authorized readiness work or accepted evidence. Recompute remaining work from verified state and state the next useful authorized action concisely. Missing prose for a previously verified reversible step calls for concise guarded one-time guidance derived from accepted commands/targets/recovery, not a new campaign or proof packet. A registry image publisher is not automatically a host deployment pipeline: if host replacement is missing, state that exact gap and required decision/authority; do not claim deployment or silently implement automation.
+
 ## Procedure
 
 ### 1. Establish the operating mode and authority
@@ -36,9 +51,11 @@ Treat repository push, infrastructure apply, credential change, image publicatio
 
 When the owner requests a policy reload, read every named skill before any further campaign action; retain the same session, source pins, approvals and completed evidence. Apply the fresh policy directly rather than creating replacement packets, reviews or counters merely to record the change. Preserve global user-stop behavior; a later explicit resumption does not authorize broader effects.
 
-### 2. Reconcile live state before choosing an architecture
+### 2. Reconcile affected live state when discovery or architecture selection is needed
 
-Inspect the current repository, deployment artifact, infrastructure state, and live provider inventory before relying on a historical plan. Ask the operator for value-blind confirmations such as correct account/region, resource status, encryption, backup freshness, and unexpected ingress; never request secret values or paste private identifiers into shared output.
+Use this full discovery path for first launch or genuinely unresolved topology/identity; for an existing update, reconcile only the materially dependent or invalidated surface selected above. Do not restart full inventory solely for a new application image.
+
+Inspect the current repository, deployment artifact, relevant infrastructure state, and affected live provider inventory before relying on a historical plan. Ask the operator for necessary value-blind confirmations such as correct account/region, resource status, encryption, backup freshness, and unexpected ingress; never request secret values or paste private identifiers into shared output.
 
 Stage recovered controller inputs into an owner-only scratch directory before use; never execute or edit recovery copies in place. Pull remote state into a mode-`0600` file, then compare state-managed resources, live resources, extra plausible candidates, and public DNS without printing selectors. Treat a per-resource not-found response as drift and continue the remaining read-only inventory. If multiple plausible hosts or databases remain, stop before starting anything or generating a plan. Use the detailed [live-state reconciliation](references/live-state-reconciliation.md) recipe.
 
@@ -49,6 +66,8 @@ Before starting a reconciled host or database, obtain bounded approval that name
 Choose among existing supported deployment paths only after reconciliation. Do not invent a PaaS, local-database stack, or new network topology merely to meet a deadline. If no supported path satisfies the gates, declare no-go.
 
 ### 3. Invalidate stale plans after drift
+
+This section applies to affected infrastructure plans and authority after relevant drift, not to an app-only replacement with unchanged infrastructure and no plan to apply.
 
 Treat any out-of-band create, delete, stop, replacement, or network change as drift until proved otherwise. Discard saved plans and regenerate them after a fresh provider refresh; a lifecycle guard such as Terraform `prevent_destroy` cannot protect against console-side deletion.
 
@@ -66,7 +85,7 @@ Publish structural inventories atomically under owner-only custody and keep life
 
 For a small launch, use one host, one supported managed database, one scheduler, one immutable application artifact, and manual operations where practical. Defer high availability, autoscaling, orchestration platforms, generalized automation, broad observability, exhaustive failure injection, and cleanup unless they are required for correctness.
 
-Keep these release gates:
+Keep these release gates for their applicable surfaces; reuse accepted unchanged platform and recovery evidence rather than reperforming it for every image. New-source/image CI and app acceptance remain new-release evidence:
 
 - exact clean source revision and immutable artifact digest, with the published tag derived from the inspected publisher workflow rather than an assumed full-SHA convention;
 - green release CI, including stages that an earlier failure may have skipped;
@@ -94,7 +113,9 @@ When replacing a deployment documentation set:
 - repair inline links, reference-style link definitions, documentation indexes, and tests that hard-code old paths; and
 - run both a Markdown destination check and the focused tests that consume the moved documentation before broader repository gates.
 
-Run in this order:
+The first-launch sequence below orders applicable gates; it is not a mandatory full sequence for routine upgrades. An app-only update follows release checks → authorized existing host replacement → focused runtime/app acceptance and observation, with applicable recovery retained. A migration adds its compatibility/pre-change protection and schema/data acceptance; infrastructure changes add affected reconciliation/plan/review/apply gates. Skip unrelated or already accepted unchanged work, never its materially dependent execution prerequisites.
+
+For a first launch, run the applicable steps in this order:
 
 1. Authenticate and reconcile live state.
 2. Start or recover required resources and wait for effective readiness.
@@ -139,4 +160,4 @@ Record the effective pre-cutover routing state and the new resource identities a
 
 ## Verification
 
-Before reporting completion, verify the exact artifact, live runtime identity, database target and privilege level, effective ingress, HTTPS, core user journey, persistence across restart or recreation, backup restoration, public routing, and rollback readiness. Report any unexecuted gate or unverifiable live state as incomplete rather than inferring success from configuration.
+Before reporting completion, verify only the selected changed surfaces and their materially dependent execution facts: exact artifact and effective live runtime identity, focused app acceptance, and applicable database/privilege, ingress/HTTPS, persistence, recovery/restore, routing and rollback gates. Reuse accepted unchanged evidence for unaffected surfaces, while first launch must establish its required evidence. Report any unexecuted applicable gate or unverifiable dependent live state as incomplete rather than inferring success from configuration or image publication.

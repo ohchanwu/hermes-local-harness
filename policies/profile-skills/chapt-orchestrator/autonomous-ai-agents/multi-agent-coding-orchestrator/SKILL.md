@@ -1,7 +1,7 @@
 ---
 name: multi-agent-coding-orchestrator
 description: "Use when orchestrating multi-agent coding with Hermes."
-version: 0.6.5-chapt.1
+version: 0.6.5-chapt.2
 author: chanbla11mit, Hermes Agent
 license: MIT
 platforms: [macos]
@@ -257,6 +257,16 @@ Do not invent campaign deadlines, latest-start cutoffs, authorization expiry, fu
 Do not create campaign-wide protected-read or credential-acquisition ceilings, reserved-slot arithmetic, or approval amendments whose only purpose is increasing an aggregate count. Acquire a credential or secret bundle once per execution session when practical, securely reuse it, and reacquire normally after provider expiry under the same identity and scope. Permit at most one retry after a proven pre-provider/no-submission failure; an ambiguous provider response stops for reconciliation. Keep value-blind audit events and narrowly justified per-operation request/poll caps, but do not use their campaign-wide total as an authorization gate.
 
 Judge controls by total system risk. Extra ledgers, envelopes, counters, reviews, artifacts, and exception paths are not inherently safer; require each control to address a named threat with decision value greater than its complexity, delay, and failure surface. Prefer the simplest observable boundary that preserves authorization, data safety, recovery, and independent review.
+
+## Routine upgrade selection
+
+Apply `production-deployment`'s Release change selection before selecting production gates or dispatching release work: existing-platform application-only, migration-bearing, infrastructure-changing, or first launch. Resolve unknown material surfaces with the smallest authorized check; mixed changes take every applicable branch, never a convenient app-only label.
+
+For app-only updates, reuse accepted unchanged platform/topology/security/recovery evidence; require exact-source/new-image CI and focused app acceptance, applicable recovery and exact authorized replacement/readback. Migration adds compatibility, pre-change protection and schema-compatible recovery; after useful writes, never ordinary rollback to a stale writable database. Infrastructure changes invalidate only affected evidence/plans; first-launch discovery/plan safeguards apply when their preconditions exist, not for every production image.
+
+Separate reusable platform evidence, new-release evidence and current execution prerequisites. Identify the whole dependent credential/capability sequence value-blind before an execution window or prerequisite refs, including later host-management access; guessed names/reservations are not readiness and acquisition is not paperwork. Preserve credential/MFA, exact actor/target/scope, fresh dependent observation, external read/write, stop, ambiguity reconciliation and independent implementation-review gates. Apply the existing evidence-expiry and technical timing rules below, not new counters or campaign deadlines.
+
+Derive the concise next useful authorized action from current verified state. Missing prose for a verified reversible step calls for guarded one-time guidance, not a new campaign/proof packet. Image publication alone does not supply host replacement: report the missing step without claiming deployment or silently building automation.
 
 ## Operator Effort and Evidence Lifecycle
 
