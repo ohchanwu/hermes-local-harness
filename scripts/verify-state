@@ -1168,6 +1168,16 @@ def main():
         for section in ("profile_models", "profile_providers", "profile_approval_modes", "plugins", "dispatch_profiles", "kanban", "skill_files", "profile_local_skill_overrides", "profile_soul_hashes", "repository_policy_hashes", "adapters", "terminal_notification_runtime", "terminal_retry_policy", "project_isolation", "project_repair_policy", "project_repair_cards"):
             if section not in observed:
                 fail(errors, f"incomplete fixture: missing required section '{section}'")
+        # None is a live/desired-only sentinel in these helpers, not a fixture
+        # observation. Reject malformed supplied sections before calling them.
+        for section, kind in (("skill_files", dict), ("profile_soul_hashes", dict),
+                              ("profile_local_skill_overrides", dict), ("adapters", list)):
+            if section in observed and not isinstance(observed[section], kind):
+                fail(errors, f"malformed fixture: section '{section}' expected {kind.__name__}")
+                return 2
+        if any(not isinstance(adapter, dict) for adapter in observed.get("adapters", [])):
+            fail(errors, "malformed fixture: section 'adapters' expected observation mappings")
+            return 2
         kanban = observed.get("kanban", {})
         for key, want in snapshot["kanban"].items():
             if key == "dispatch_profiles":

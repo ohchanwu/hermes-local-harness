@@ -100,6 +100,52 @@ class FixtureIsolationTests(unittest.TestCase):
             self.assertEqual(code, 1, output)
             self.assertIn("missing required section 'repository_policy_hashes'", output)
 
+    def test_malformed_observation_sections_never_select_live_or_skip_checks(self):
+        clean = json.loads((ROOT / "tests/fixtures/clean.yaml").read_text())
+        with tempfile.TemporaryDirectory(prefix="fixture-isolation-") as directory:
+            path = Path(directory) / "observation.yaml"
+            for section, wrong_container in (
+                    ("adapters", {}), ("skill_files", []),
+                    ("profile_soul_hashes", []), ("profile_local_skill_overrides", [])):
+                for observation in (None, wrong_container, "not an observation", False, 1):
+                    with self.subTest(section=section, observation=observation):
+                        path.write_text(json.dumps({**clean, section: observation}))
+                        code, output, guard = fixture_result(path)
+                        self.assertEqual(code, 2, output)
+                        self.assertIn(f"malformed fixture: section '{section}'", output)
+                        self.assertNotIn("OK: desired state matches observed state", output)
+                        self.assertTrue(all(attempt in guard.allowed for attempt in guard.attempts))
+
+    def test_adapter_entries_must_be_observation_mappings(self):
+        clean = json.loads((ROOT / "tests/fixtures/clean.yaml").read_text())
+        with tempfile.TemporaryDirectory(prefix="fixture-isolation-") as directory:
+            path = Path(directory) / "observation.yaml"
+            for entry in (None, [], "not an adapter", False, 1):
+                with self.subTest(entry=entry):
+                    path.write_text(json.dumps({**clean, "adapters": [entry]}))
+                    code, output, _ = fixture_result(path)
+                    self.assertEqual(code, 2, output)
+                    self.assertIn("malformed fixture: section 'adapters'", output)
+
+    def test_missing_and_empty_observation_sections_remain_incomplete(self):
+        clean = json.loads((ROOT / "tests/fixtures/clean.yaml").read_text())
+        with tempfile.TemporaryDirectory(prefix="fixture-isolation-") as directory:
+            path = Path(directory) / "observation.yaml"
+            for section in ("adapters", "skill_files", "profile_soul_hashes",
+                            "profile_local_skill_overrides"):
+                with self.subTest(section=section, observation="missing"):
+                    fixture = dict(clean)
+                    del fixture[section]
+                    path.write_text(json.dumps(fixture))
+                    code, output, _ = fixture_result(path)
+                    self.assertEqual(code, 1, output)
+                    self.assertIn(f"missing required section '{section}'", output)
+                with self.subTest(section=section, observation="empty"):
+                    path.write_text(json.dumps({**clean, section: [] if section == "adapters" else {}}))
+                    code, output, _ = fixture_result(path)
+                    self.assertEqual(code, 1, output)
+                    self.assertNotIn("OK: desired state matches observed state", output)
+
     def test_guard_rejects_foreign_metadata_reads_commands_and_network_before_io(self):
         path = Path("/synthetic-foreign/never-accessed")
         with ObservedReads():
