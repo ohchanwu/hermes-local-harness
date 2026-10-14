@@ -249,8 +249,8 @@ REPOSITORY_POLICY_PATHS = {
 }
 
 
-def check_repository_policies(errors, expected, observed=None):
-    """Authoritative repository instruction files are present, exact, and complete."""
+def check_repository_policies(errors, expected, observed=None, *, live=True):
+    """Validate declarations/observations; only live checks inspect external files."""
     if not isinstance(expected, dict) or set(expected) != set(REPOSITORY_POLICY_MARKERS):
         fail(errors, "repository policy mapping malformed")
         return
@@ -268,17 +268,18 @@ def check_repository_policies(errors, expected, observed=None):
             fail(errors, f"repository policy path drift {name}")
             continue
         expected_hashes[name] = want
-        candidate = Path(path)
-        if not candidate.is_file():
-            fail(errors, f"repository policy missing {name}: {path}")
-            continue
-        content = candidate.read_text(errors="ignore")
-        if hashlib.sha256(candidate.read_bytes()).hexdigest() != want:
-            fail(errors, f"repository policy drift {name}")
-        for marker in REPOSITORY_POLICY_MARKERS[name]:
-            if marker not in content:
-                fail(errors, f"repository policy marker missing {name}: {marker}")
-    if observed is None:
+        if live:
+            candidate = Path(path)
+            if not candidate.is_file():
+                fail(errors, f"repository policy missing {name}: {path}")
+                continue
+            content = candidate.read_text(errors="ignore")
+            if hashlib.sha256(candidate.read_bytes()).hexdigest() != want:
+                fail(errors, f"repository policy drift {name}")
+            for marker in REPOSITORY_POLICY_MARKERS[name]:
+                if marker not in content:
+                    fail(errors, f"repository policy marker missing {name}: {marker}")
+    if observed is None and live:
         return
     if not isinstance(observed, dict):
         fail(errors, "repository policy observed state malformed")
@@ -1142,7 +1143,6 @@ def main():
     repository_policies = roster.get("repository_policies", {})
     if snapshot.get("repository_policies") != repository_policies:
         fail(errors, "repository policy snapshot drift")
-    check_repository_policies(errors, repository_policies)
     approval_policy = roster.get("approval_policy", {})
     approval_profiles = approval_policy.get("profiles", [])
     if approval_policy.get("mode") != "off":
@@ -1154,11 +1154,14 @@ def main():
     expected_local_overrides = snapshot["skill"].get("profile_local_skill_overrides", {})
     check_profile_local_skill_overrides(errors, expected_local_overrides)
     dispatch_profiles = snapshot["kanban"]["dispatch_profiles"]
-    if args.fixture:
+    if args.fixture is not None:
         try:
             observed = load(args.fixture)
         except (OSError, json.JSONDecodeError) as exc:
             print(f"FAIL: malformed fixture: {exc}")
+            return 2
+        if not isinstance(observed, dict):
+            print("FAIL: malformed fixture: expected an observed-state mapping")
             return 2
         # Fail-closed fixture schema: a passing fixture must represent every required
         # observed field and every installed roster profile; omission is drift, not success.
@@ -1207,7 +1210,8 @@ def main():
         check_harness_card_contract(errors, project_cards)
         check_project_repair_cards(errors, project_cards)
         check_profile_souls(errors, profile_souls, observed.get("profile_soul_hashes"))
-        check_repository_policies(errors, repository_policies, observed.get("repository_policy_hashes"))
+        check_repository_policies(errors, repository_policies,
+                                  observed.get("repository_policy_hashes"), live=False)
         for name in expected:
             if name not in plugins:
                 fail(errors, f"incomplete fixture: plugins omits {name}")
@@ -1229,6 +1233,7 @@ def main():
         check_skill(errors, observed.get("skill_files", {}))
         check_adoption(errors, observed.get("adapters", []))
     else:
+        check_repository_policies(errors, repository_policies)
         listed = run("hermes", "-p", "default", "profile", "list")
         if listed.returncode:
             fail(errors, "unable to read Hermes profile list")

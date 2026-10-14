@@ -16,7 +16,7 @@ import unittest
 from unittest.mock import patch
 
 from incident_recovery_verify_fixture import (
-    BoundaryError, LocalReads, ROOT, declared_repository_binding,
+    BoundaryError, LocalReads, ROOT,
     exercise, load_verifier, main as fixture_main, matches,
 )
 
@@ -97,16 +97,16 @@ class IncidentRecoveryTests(unittest.TestCase):
 
     def test_exact_fixture_results(self):
         for name in ("clean.yaml", "incomplete-empty.yaml", "deployed-skill-divergence.yaml"):
-            actual_name, code, output, calls = exercise(ROOT / "tests/fixtures" / name)
-            self.assertTrue(matches(actual_name, code, output, calls), (name, code, output))
+            actual_name, code, output = exercise(ROOT / "tests/fixtures" / name)
+            self.assertTrue(matches(actual_name, code, output), (name, code, output))
 
     def test_wrapper_fails_closed(self):
-        calls = ["declared-binding-only"] * 2
-        self.assertFalse(matches("clean.yaml", 1, "OK: desired state matches observed state", calls))
-        self.assertFalse(matches("clean.yaml", 0, "OK: desired state matches observed state\nFAIL: surprise", calls))
-        self.assertFalse(matches("incomplete-empty.yaml", 0, "incomplete fixture", calls))
-        self.assertFalse(matches("incomplete-empty.yaml", 1, "unrelated failure", calls))
-        self.assertFalse(matches("deployed-skill-divergence.yaml", 1, "deployed skill hash mismatch", []))
+        self.assertFalse(matches("clean.yaml", 1, "OK: desired state matches observed state"))
+        self.assertFalse(matches("clean.yaml", 0, "OK: desired state matches observed state\nFAIL: surprise"))
+        self.assertFalse(matches("clean.yaml", False, "OK: desired state matches observed state"))
+        self.assertFalse(matches("incomplete-empty.yaml", 0, "incomplete fixture"))
+        self.assertFalse(matches("incomplete-empty.yaml", 1, "unrelated failure"))
+        self.assertFalse(matches("deployed-skill-divergence.yaml", 2, "deployed skill hash mismatch"))
         with redirect_stdout(io.StringIO()):
             self.assertEqual(fixture_main([]), 2)
             self.assertEqual(fixture_main(["../foreign.yaml"]), 2)
@@ -125,13 +125,14 @@ class IncidentRecoveryTests(unittest.TestCase):
                 with self.assertRaises(BoundaryError):
                     operation()
 
-    def test_declared_binding_negative_control(self):
+    def test_production_policy_fixture_negative_control(self):
         verifier = load_verifier()
         expected = json.loads((ROOT / "roster.yaml").read_text())["repository_policies"]
         errors = []
         with LocalReads(), redirect_stdout(io.StringIO()):
-            declared_repository_binding(verifier, errors, expected, {"cha-pt-frontend": "0" * 64})
-        self.assertEqual(errors, ["repository policy fixture binding drift"])
+            verifier.check_repository_policies(errors, expected,
+                                               {"cha-pt-frontend": "0" * 64}, live=False)
+        self.assertEqual(errors, ["repository policy drift cha-pt-frontend"])
 
 
 if __name__ == "__main__":

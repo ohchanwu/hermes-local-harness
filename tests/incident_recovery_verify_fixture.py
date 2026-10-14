@@ -1,18 +1,14 @@
 #!/usr/bin/env python3
-"""TEST ONLY: scoped fixture coverage, never a live foreign-policy validation.
+"""TEST ONLY: real fixture coverage, never a live foreign-policy validation.
 
-The production verifier's pre-fixture repository-policy read is substituted by
-its declared path/hash contract. All other file access is fenced to existing
-worktree resources, read-only; commands and sockets are forbidden. No production
-verifier or Hermes code is modified. Wrapper exit is distinct from verifier exit.
+The production verifier runs unchanged under read-only worktree resource fences;
+commands and sockets are forbidden. Wrapper exit is distinct from verifier exit.
 """
 import builtins
 from contextlib import ExitStack, redirect_stdout
 import io
-import json
 import os
 from pathlib import Path
-import re
 import socket
 import subprocess
 import sys
@@ -83,30 +79,13 @@ class LocalReads:
                     raise BoundaryError("relative descriptor access forbidden")
                 return _original(path, *args, **kwargs)
             self.stack.enter_context(patch.object(os, name, inspected))
-        for owner, name in ((subprocess, "Popen"), (os, "system"), (socket, "socket")):
+        for owner, name in ((subprocess, "Popen"), (os, "system"), (socket, "socket"),
+                            (socket, "getaddrinfo")):
             self.stack.enter_context(patch.object(owner, name, side_effect=BoundaryError("commands/network forbidden")))
         return self
 
     def __exit__(self, *args):
         return self.stack.__exit__(*args)
-
-
-def declared_repository_binding(verifier, errors, expected, observed=None):
-    """Honest replacement: declaration/fixture comparison, never read path."""
-    if not isinstance(expected, dict) or set(expected) != set(verifier.REPOSITORY_POLICY_PATHS):
-        verifier.fail(errors, "repository policy mapping malformed")
-        return
-    hashes = {}
-    for name, entry in expected.items():
-        if (not isinstance(entry, dict)
-                or entry.get("path") != verifier.REPOSITORY_POLICY_PATHS[name]
-                or not isinstance(entry.get("sha256"), str)
-                or not re.fullmatch(r"[0-9a-f]{64}", entry["sha256"])):
-            verifier.fail(errors, "repository policy declared binding malformed")
-            continue
-        hashes[name] = entry["sha256"]
-    if observed is not None and observed != hashes:
-        verifier.fail(errors, "repository policy fixture binding drift")
 
 
 def exercise(fixture):
@@ -116,21 +95,16 @@ def exercise(fixture):
     if path not in names:
         raise BoundaryError("fixture not in exact approved test allowlist")
     verifier = load_verifier()
-    calls = []
-    def replacement(errors, expected, observed=None):
-        calls.append("declared-binding-only")
-        declared_repository_binding(verifier, errors, expected, observed)
     output = io.StringIO()
-    with LocalReads(), patch.object(verifier, "check_repository_policies", replacement), \
-            patch.object(sys, "argv", ["TEST-ONLY", "--fixture", path]), redirect_stdout(output):
+    with LocalReads(), patch.object(sys, "argv", ["TEST-ONLY", "--fixture", path]), redirect_stdout(output):
         code = verifier.main()
-    return names[path], code, output.getvalue(), calls
+    return names[path], code, output.getvalue()
 
 
-def matches(name, code, output, calls):
+def matches(name, code, output):
     expected_code, diagnostic = EXPECTED[name]
     return (type(code) is int and code == expected_code and diagnostic in output
-            and len(calls) == 2 and (code != 0 or "FAIL:" not in output))
+            and (code != 0 or "FAIL:" not in output))
 
 
 def main(argv=None):
@@ -139,11 +113,11 @@ def main(argv=None):
         print("TEST-ONLY: one exact approved fixture required")
         return 2
     try:
-        name, code, output, calls = exercise(args[0])
-        print("TEST-ONLY: foreign source assertion substituted by declared-binding/fixture comparison; NOT live verification")
+        name, code, output = exercise(args[0])
+        print("TEST-ONLY: real production fixture path under resource fences; NOT live verification")
         print(output, end="")
-        print(f"embedded_verifier_exit={code}; substitution_calls={len(calls)}")
-        if not matches(name, code, output, calls):
+        print(f"embedded_verifier_exit={code}")
+        if not matches(name, code, output):
             print("wrapper: unexpected verifier result")
             return 1
         print("wrapper: expected fixture result observed")
