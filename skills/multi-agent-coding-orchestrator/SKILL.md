@@ -1,7 +1,7 @@
 ---
 name: multi-agent-coding-orchestrator
 description: "Use when orchestrating multi-agent coding with Hermes."
-version: 0.6.7
+version: 0.6.8
 author: chanbla11mit, Hermes Agent
 license: MIT
 platforms: [macos]
@@ -260,6 +260,8 @@ Judge controls by total system risk. Extra ledgers, envelopes, counters, reviews
 Apply `production-deployment`'s Release change selection before selecting production gates or dispatching release work: existing-platform application-only, migration-bearing, infrastructure-changing, or first launch. Resolve unknown material surfaces with the smallest authorized check; mixed changes take every applicable branch, never a convenient app-only label.
 
 For app-only updates, reuse accepted unchanged platform/topology/security/recovery evidence; require exact-source/new-image CI and focused app acceptance, applicable recovery and exact authorized replacement/readback. Migration adds compatibility, pre-change protection and schema-compatible recovery; after useful writes, never ordinary rollback to a stale writable database. Infrastructure changes invalidate only affected evidence/plans; first-launch discovery/plan safeguards apply when their preconditions exist, not for every production image.
+
+For first launch or changed infrastructure requiring a plan, retain independent review of the exact saved plan before apply in concise next-action guidance, separately from owner authorization for that apply. Name both remaining dependencies even during local readiness; this is not an extra gate for unchanged-platform app-only updates with no infrastructure plan to apply.
 
 Separate reusable platform evidence, new-release evidence and current execution prerequisites. Identify the whole dependent credential/capability sequence value-blind before an execution window or prerequisite refs, including later host-management access; guessed names/reservations are not readiness and acquisition is not paperwork. Preserve credential/MFA, exact actor/target/scope, fresh dependent observation, external read/write, stop, ambiguity reconciliation and independent implementation-review gates. Apply the existing evidence-expiry and technical timing rules below, not new counters or campaign deadlines.
 

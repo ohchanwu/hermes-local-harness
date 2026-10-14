@@ -110,6 +110,18 @@ class UpgradeProportionalityTests(unittest.TestCase):
         self.assertIn("first-launch sequence", text)
         self.assertIn("only the selected changed surfaces", text)
 
+    def test_applicable_plan_review_is_not_owner_authorization(self):
+        deployment = (ROOT / DEPLOYMENT).read_text()
+        section = deployment.split("## Release change selection", 1)[1].split("## Procedure", 1)[0]
+        for clause in ("concise next-action guidance", "independent review of the exact saved plan before apply",
+                       "separately from owner authorization", "not an extra gate for unchanged-platform app-only updates"):
+            self.assertIn(clause, section)
+        for path in (SHARED, *OVERRIDES.values()):
+            section = (ROOT / path).read_text().split("## Routine upgrade selection", 1)[1].split("\n## ", 1)[0]
+            for clause in ("independent review of the exact saved plan before apply",
+                           "separately from owner authorization", "not an extra gate for unchanged-platform app-only updates"):
+                self.assertIn(clause, section)
+
     def test_shared_rule_and_project_specific_controls(self):
         sections = []
         for path in (SHARED, *OVERRIDES.values()):

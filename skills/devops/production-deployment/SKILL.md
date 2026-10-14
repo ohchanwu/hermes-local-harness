@@ -1,7 +1,7 @@
 ---
 name: production-deployment
 description: "Use when planning or executing production deployments."
-version: 0.2.4
+version: 0.2.5
 author: Hermes Agent
 license: MIT
 platforms: [macos, linux]
@@ -36,6 +36,8 @@ Before selecting the procedure, classify the requested change from the source di
 - **First launch:** use discovery, architecture selection, reconciliation, independent plan review, recovery and cutover gates where their actual preconditions exist. A historical sketch is not observed current topology. An existing service with a genuinely unknown material surface needs the smallest material uncertainty resolved before choosing dependent gates, not an automatic full platform redesign.
 
 Mixed changes take every applicable branch; unknown changes must not be labeled application-only for convenience. Start with the smallest authorized decision-changing source/state check. The branches select relevant parts of the existing procedure, not a second deployment system, and grant no external access or mutation authority.
+
+For first launch or changed infrastructure requiring a plan, concise next-action guidance must retain independent review of the exact saved plan before apply, separately from owner authorization for that apply. Name both as remaining dependencies even when only local readiness is currently authorized; brevity must not hide the review gate. This is not an extra gate for unchanged-platform app-only updates with no infrastructure plan to apply.
 
 Distinguish reusable platform evidence, new-release evidence and current execution prerequisites. Reuse is not a claim of current runtime identity or capability: confirm exact target/scope/image and fresh materially dependent facts at the next authorized operation. Identify the dependent credential/capability sequence value-blind before requesting an execution window or publishing prerequisite refs: which actor needs which operation/scope, safe acquisition path, readiness check and real expiry, including later host-management access after registry publication. Unknown capability/path facts remain explicit dependencies. Reservations, guessed key names or file presence do not prove readiness. Do not acquire credentials merely to finish paperwork; acquire only when the authorized dependent operation needs them. Operator credential/MFA boundaries remain intact; no secret values may enter prompts, logs, argv, fixtures or ordinary files.
 
