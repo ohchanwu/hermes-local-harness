@@ -128,6 +128,13 @@
         "baseline": "fdc59293262e15c0376cfaa9f25244e7c317fc58",
         "protected_reference": "refs/harness/baselines/t_252afc92",
         "status": "repository-only upgrade-proportionality desired-source pins, not observed deployment; live rollout unperformed and live verification pending"
+      },
+      "chapt_policy_reconciliation": {
+        "baseline": "e3aa92a20227c780fde4c09d3b3a1402a7115db9",
+        "protected_reference": "refs/harness/baselines/t_acb614c0",
+        "installed_input_sha256": "e1e5d81f39353eabc49850354d4d76964587cd8b884de2276751b89018edb4f1",
+        "retained_rule_sha256": "0b3349307eaaf7bc4de6716198dfdd5e72d3f99862ee335a0fdc4124ad5e1d5e",
+        "status": "repository-only preservation merge and desired-source pin, not observed deployment; live rollout unperformed and live verification pending"
       }
     },
     "policy_version": "scoped-ponytail-separation-v1",
@@ -287,7 +294,7 @@
         "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md": "6c93bbe42da4bd5448dd3d3c0400af75dc857c8a8bfa725097a60d31cb49bb58"
       },
       "chapt-orchestrator": {
-        "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md": "3fa1151192959b77e23921a813994517cb3cad8c655c901e425f0f958fb7674c"
+        "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md": "575419e386187a028b7c449bf6da7f298e88dfa3d4250619c06caa8d5a52e330"
       },
       "harness-orchestrator": {
         "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md": "cebb889760ef03d01193db35a2a054dde722901db87c453df7b4931dd1df8560"

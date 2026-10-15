@@ -1,7 +1,7 @@
 ---
 name: multi-agent-coding-orchestrator
 description: "Use when orchestrating multi-agent coding with Hermes."
-version: 0.6.5-chapt.3
+version: 0.6.5-chapt.4
 author: chanbla11mit, Hermes Agent
 license: MIT
 platforms: [macos]
@@ -271,6 +271,8 @@ Separate reusable platform evidence, new-release evidence and current execution 
 Derive the concise next useful authorized action from current verified state. Missing prose for a verified reversible step calls for guarded one-time guidance, not a new campaign/proof packet. Image publication alone does not supply host replacement: report the missing step without claiming deployment or silently building automation.
 
 ## Operator Effort and Evidence Lifecycle
+
+Distinguish worker-stop conditions from controller-disposition points and actual human authorization boundaries. Record the provenance and scope of a retry limit; preserve explicit owner caps and activated hard campaign budgets. A controller-authored halt or automatic triage status alone does not revoke valid autonomous scope. After a worker yields, assess the remaining bounded recovery under that scope before asking the owner: repairing tooling or an exact inspected identity binding around a healthy owned fixture is not necessarily another fixture-replacement attempt. Preserve counters, failed evidence and acceptance pins; update/read back the current card and use supported transitions, never unlimited retries or a history reset. Require human input only at a genuine new decision, prohibited effect, unsafe/unowned state, capability limit or exhausted authorized recovery path. An explicit user stop always controls until a later resumption.
 
 Do not add unrelated collaborator-role or whole-governance audits to a narrow owner-directed release. When the owner supplies the exact operator bypass setting and the artifact already passed independent review, reuse that evidence and attempt the authorized release; distinguish an actual permission/authentication rejection from a hypothetical blocker. Retain only indispensable exact-target/concurrency safeguards and external-write outcome readbacks. Do not redesign the validator merely because an intentional protected-path rejection remains RED; an explicitly authorized operator exception must be reported as an exception, not green CI.
 
