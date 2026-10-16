@@ -1,17 +1,19 @@
 # Claude Max 20x inside Hermes — executable implementation plan
 
 Date: 2026-10-16 KST.
-Status: plan authored; execution unexecuted/unapproved.
+Status: bounded M0/native pre-inference assessment executed; documented NATIVE_FAILURE, M1 comparison UNRUN. Not a full M0 pass, measured billing result or completed plan.
 Source: [approved native-first specification](../specs/261016-claude-max20x-model-portability.md), exact path `docs/specs/261016-claude-max20x-model-portability.md`.
 Inspected baseline: `09a8355c6d6d68d46df26c685b73a4a4b810cf24`.
 Provenance: `kanban://harness/t_83714ad6#body`; source approval `t_e7f80baf`, review run 26.
 Source SHA256: `c0a5b7b752ac056e189c73149caec6d7b43e7c87245571c4e6db3c2d5ca9cf5a`.
 
+Current execution provenance: `kanban://harness/t_ef3a8463#body`, run 33, user instruction “Start autonomous implementation.” Protected baseline `60850828e75bad23ed846c974440ce40edbfff07`; isolated branch `wt/t_ef3a8463`. The [actual gate record](../operations/261016-claude-max20x-native-preflight.md) records reused version/current-contract observations, three anonymous pinned-source GETs, frozen synthetic read fixture and a pre-inference stop: native Hermes documents extra/overage usage rather than the included Max pool. Zero Claude experiment calls or account/credential access. Only read-only conditional M2 eligibility/interface assessment was included; intended-use eligibility and sole-Hermes-executor/fail-closed capability remain unresolved, so no adapter or live proof. The current card supersedes the historical documentation-only authority below only for its bounded assessment, fixture/status and local verification/review; future-stage requirements and side-effect gates are unchanged.
+
 ## Scope, authority and inspected starting point
 
 Goal: Claude inside Hermes, retaining its tools, roles and native task/review lifecycle, using only the included Max 20x pool. Purchase is USER-REPORTED PURCHASED; account entitlement, exact Claude Opus 5.5 availability/model slug and allowed route are UNVERIFIED. Never substitute an `opus` alias, self-report or another model for that exact requested label. No extra usage, overage, API-credit consumption, paid/cloud fallback or cancelled-provider spend. Preserve OpenAI and Zai contracts for explicit selection, never automatic Claude-only fallback.
 
-The original October 18, 2026 KST target remains a target, not readiness, authorization or a new countdown. This card authorizes only this plan, one index line, offline doc checks, local commit, same-card independent review and exact approved local integration. It authorizes no account/credential access, inference, adapter/spike, config/policy deployment, runtime update, push or PR. No future cards or live task graph are created here.
+The original October 18, 2026 KST target remains a target, not readiness, authorization or a new countdown. The original planning card authorized only this plan, one index line, offline doc checks, local commit, same-card independent review and exact approved local integration. It authorized no account/credential access, inference, adapter/spike, config/policy deployment, runtime update, push or PR. No future cards or live task graph were created by planning; current bounded execution authority is recorded above.
 
 Inspected tracked Harness surfaces (desired state, not live observations):
 
@@ -24,7 +26,7 @@ Inspected tracked Harness surfaces (desired state, not live observations):
 | `README.md`, `procedures/manual-apply.md` §§2, 8b, `policies/authority-and-review.md` | Repository integration, manual per-target apply and independent review are distinct. Own active live policy is not autonomously deployable. |
 | `plugins/hermes-terminal-outcome-notification/README.md` and tracked plugin inventory | Only terminal notification plugin source exists here; no existing Claude provider plugin. Notification/session evidence is not model delivery evidence. |
 
-Upstream interface facts are dated claims from source spec S1–S5, not installed-source discoveries: native `claude-code` aliases Anthropic HTTP at pinned upstream revision; `ProviderProfile.create_client`/`external_process` and Copilot ACP are extension precedents. `create_client` exceptions may fall back to HTTP. Current supported interfaces, installed provenance, auth-resolution and helper overrides remain future authorized discovery. Do not browse network or installed Hermes source under this card.
+At planning time, upstream interface facts were dated claims from source spec S1–S5, not installed-source discoveries: native `claude-code` aliases Anthropic HTTP at pinned upstream revision; `ProviderProfile.create_client`/`external_process` and Copilot ACP are extension precedents. `create_client` exceptions may fall back to HTTP. The current gate record adds bounded public pinned-source observations, not installed-source integrity, effective auth-resolution or helper-override discovery. The original planning card authorized neither network nor installed-source access; the current execution card permits only its scoped public reads, never installed-source access.
 
 ## Execution slices and common evidence contract
 
@@ -157,7 +159,7 @@ Artifact V7: tested-version matrix including negative control, per-target attend
 | P6 / update and rollout | V5/V7 + affected V0/V1/V3/V4/V6 reruns; exact tested versions, per-target consumption, safe pause rollback |
 | P7 / provenance and publication | Stage record distinguishes fact/proposal/simulation/unexecuted; full staged review and scans, same-card exact candidate approval |
 
-For THIS doc card only, stage both allowed files, preserve frozen checker unchanged, and run these six existing offline checks (not V0–V7):
+Historical planning-card verification only: stage both allowed files, preserve frozen checker unchanged, and run these six existing offline checks (not V0–V7). These are not the current execution card's verification contract:
 
 ```sh
 python3 private/controller-inputs/verify_impl_plan.py
@@ -170,4 +172,4 @@ git diff --cached -- docs/plans/261016-claude-max20x-implementation-plan.md docs
 
 Record real outputs/exits and candidate SHA/tree on this card. Checker covers scope/hash/structure/links/syntax, not semantic completeness or capability; author and `harness-reviewer` independently inspect P1–P7 and full staged publication surface. No broad suites, `verify-state`, network, account inspection, inference or future test commands are documentation verification.
 
-Known gaps: current eligibility, actual auth/route interfaces, exact model entitlement/slug, safe native billing behavior, supported mediation and lifecycle interfaces, helper overrides, served-model evidence and tested version pairs remain unknown. No proposed plugin/test exists or has passed. Final execution status: M0–M5 and V0–V7 unexecuted/unapproved; plan approval/local integration grants no execution, account-tested, deployed or Claude-ready claim.
+Current gaps: intended-use eligibility, actual auth/route interfaces, exact Claude Opus 5.5 entitlement/slug, measured account billing, supported mediation/lifecycle/fail-closed interfaces, helper overrides, served-model evidence and tested version pairs remain unknown. The current gate record documents M0's pre-inference stop and native incompatibility, not V0 acceptance. M1 comparison remains UNRUN; M2 live proof, M3 implementation, M4 measured roles and M5 rollout remain unexecuted and unreleased. No proposed plugin or V3–V7 test exists or has passed; the new read fixture is synthetic, not tool-execution proof. Plan approval/local integration grants no account-tested, deployed or Claude-ready status. Use the current card's exact local checks and same-card harness-reviewer review, not the historical six-command checker above.
