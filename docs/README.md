@@ -12,6 +12,7 @@ This index is the entry point for durable harness documentation tracked in Git. 
 ## Current entries
 
 - [Claude Max 20x inside Hermes and model portability](specs/261016-claude-max20x-model-portability.md) — execution specification; native billing verification first; implementation/live testing not yet authorized.
+- [Claude Max 20x implementation plan](plans/261016-claude-max20x-implementation-plan.md) — native-first M0–M5 execution plan; execution unexecuted/unapproved.
 - [Incident recovery without invented authorization gates](specs/261014-incident-recovery-without-over-gating.md) — authorized local implementation; behavioral evidence and same-card review required, no live rollout.
 - [Incident-recovery implementation plan](plans/261014-incident-recovery-implementation-plan.md) — adopted standalone plan with the foreign-read fixture verification correction.
 
