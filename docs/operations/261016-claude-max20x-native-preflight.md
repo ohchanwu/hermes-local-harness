@@ -75,3 +75,23 @@ A future native trial would require materially changed authoritative contract ev
 - Local verification is exactly this card's fixture/hash, gate UTF-8/fences/relative links/one index entry, baseline diff whitespace, three scoped gitleaks scans, staged stat/full four-path diff, binding/allowlist/spec/input hashes and manual E1–E5/publication review. Exact executable commands, real stdout/stderr/exits and candidate SHA/tree are preserved in the same-card review handoff and ignored verification receipts. They prove local artifact integrity only, not semantic approval or billing.
 - M0 is assessed and stopped, **not safe-to-infer V0 acceptance**. M1 control/comparison remains **UNRUN** due to documented incompatibility. M2 live feasibility/proof and all M3 adapter work, M4 measured roles/helpers/readiness and M5 rollout/rollback remain **UNRUN**, with eligibility/mediation/fallback gates unresolved and no applicable live authority. Future V3–V7 tests, broad suites and `verify-state` were not run.
 - Local commit is a candidate only. Same-card independent `harness-reviewer` must review E1–E5 and the exact candidate; controller local integration is distinct from installation. No supported version range, account-tested result, model readiness, deployment or cutover is claimed. All original role, task, model, spend and authority boundaries remain in force.
+
+## 2026-10-16 current scope clarification — offline M2
+
+The preceding record is retained historical evidence, including its then-current
+clarification-first stop, GET accounting, NATIVE_FAILURE and M1 UNRUN. Current
+`kanban://harness/t_a409287e#body` supersedes that generic external-clarification
+prerequisite for bounded private/local non-inference technical work only. Separate
+Anthropic Support approval is not required for public interface/source tracing
+or an inert offline spike. This does not declare terms waived, invent provider
+approval, or settle account-use applicability. No-token/no-paid/core-patch rules,
+account-test prerequisites, independent review and attended rollout remain.
+
+The [offline feasibility record](../../spikes/claude-subscription-feasibility/README.md)
+reports PARTIAL: actual pinned main constructor fallback and distinct auxiliary
+behavior were exercised with route spies, plus a source-shaped MCP exchange and
+owned-child cleanup. Five passing offline tests are not an official Claude/Hermes
+roundtrip, sole-executor proof or all-path fail-closed result. No account/credential
+access, Claude/SDK process or model experiment was performed; native findings and
+zero-call evidence above are unchanged. Further production implementation/live
+testing is not released by this clarification.

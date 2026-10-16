@@ -1,0 +1,31 @@
+{
+  "request": {
+    "type": "control_request",
+    "request_id": "control-1",
+    "request": {
+      "subtype": "mcp_message",
+      "server_name": "hermes",
+      "message": {
+        "jsonrpc": "2.0",
+        "id": 7,
+        "method": "tools/call",
+        "params": {"name": "fixture_read", "arguments": {"path": "fixture.txt"}}
+      }
+    }
+  },
+  "result": {"content": [{"type": "text", "text": "HARNESS_READ_OK\n"}], "isError": false},
+  "response": {
+    "type": "control_response",
+    "response": {
+      "subtype": "success",
+      "request_id": "control-1",
+      "response": {
+        "mcp_response": {
+          "jsonrpc": "2.0",
+          "id": 7,
+          "result": {"content": [{"type": "text", "text": "HARNESS_READ_OK\n"}], "isError": false}
+        }
+      }
+    }
+  }
+}
