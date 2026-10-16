@@ -76,7 +76,7 @@ Owners: controller states unmet requirement; account owner/authoritative contrac
 
 Artifact / proposed V2: concise accepted/rejected feasibility record, exact interface/version findings, structured tool/lifecycle proof and source/test map. Expected outcome: all required controls feasible, or explicit rejection; no expansion to bypass controls. Only accepted V2 plus separate implementation authority releases M3. An infeasible result ends this architecture.
 
-Proposed minimal surface map, NOT existing files or approved changes (plain code paths intentionally are not links):
+Proposed minimal surface map, NOT existing files or approved changes (plain code paths intentionally are not links). Plugin/protocol surfaces are conditional M2/M3 work; shared portability/version tests can be prepared on the native M4 path without a plugin:
 
 | Proposed surface | Bounded responsibility |
 | --- | --- |
@@ -84,7 +84,7 @@ Proposed minimal surface map, NOT existing files or approved changes (plain code
 | `tests/test_claude_subscription_provider.py` | Offline fake-runtime, route-spy, tool/protocol and lifecycle contract cases; no credentials/network. |
 | `tests/test_model_selection_portability.py` | Harness-only explicit-selection, role/pin/history and OpenAI/Zai regression using fixtures. |
 | `tests/fixtures/claude-subscription-protocol.json` | Synthetic message/tool/error/stream events, malformed cases and exact expected output/order. |
-| `tests/test_claude_version_contract.py` | Supported-interface fixtures, exact tested version pairs and incompatible-version negative control. |
+| `tests/test_claude_version_contract.py` | Native selection/diagnostic/version-interface fixtures and incompatible-version negative control; conditional adapter registration/translation/lifecycle contracts only when applicable. |
 
 ## M3 — conditional red/green implementation and reviewed local integration
 
@@ -95,14 +95,14 @@ Owners: assigned worker implements; `harness-reviewer` independently reviews exa
 3. Cover cancel at startup/streaming, startup races, timeout/process death and idempotent cleanup: no orphan, duplicate request/tool, late callback or stale resume. Test profile/role/task/session/worktree separation and continuation; the same model must never share private reviewer state or attach old state to a new task.
 4. Implement only enough supported plugin/translation/lifecycle code to make these mechanism oracles green. Run the portability/version checks below as the bounded broader contract, not unrelated campaigns. Reject unsafe interfaces rather than patch core. No retry-budget resets or provider switching on errors.
 
-Proposed exact OFFLINE test commands V3–V5; unshipped/unexecuted, usable only AFTER M2 fixes layout/interfaces and M3 creates these stdlib-unittest-compatible tests. A future authorized card must freeze/confirm the commands and explicit network-denying fake transports before execution:
+Proposed exact OFFLINE test commands V3–V5; unshipped/unexecuted. V3 requires accepted M2 interfaces and M3 mechanism tests. V4/V5 instead require the shared offline preparation assigned in M4 below, reachable on either branch; they do not require M2/M3 or a provider plugin. The authorized slice must select/author and review these stdlib-unittest-compatible tests, freeze/confirm commands and explicit network-denying fake transports before execution:
 
 ```sh
 # V3 — provider mechanism red/green; depends on accepted V2 and synthetic fixtures
 python3 -m unittest discover -s tests -p 'test_claude_subscription_provider.py'
-# V4 — explicit-selection/identity regression; depends on Harness-only selection fixtures
+# V4 — both branches; depends on reviewed shared tests and Harness-only selection fixtures
 python3 -m unittest discover -s tests -p 'test_model_selection_portability.py'
-# V5 — supported-version contracts plus incompatibility negative control
+# V5 — both branches; depends on reviewed shared tests and applicable version/interface fixtures
 python3 -m unittest discover -s tests -p 'test_claude_version_contract.py'
 ```
 
@@ -111,6 +111,12 @@ Artifacts: source/tests/fixtures, red and green outputs with mechanism-specific 
 ## M4 — actual roles, helpers, tool audit and readiness
 
 Owners: controller inventories; account owner supplies authorized billing observations; named workers and independent reviewer execute their distinct roles. Prerequisites: native M1 main-path pass OR reviewed M3, plus separate bounded live-workflow authority, fresh V0 safeguards and per-path budgets. Do not read live configuration now to fill unknowns.
+
+Shared offline preparation: within the future authorized native M4 slice (or earlier within the adapter M3 implementation slice), the assigned Harness worker selects suitable existing tests or authors the two proposed V4/V5 test files and minimal synthetic fixtures; `harness-reviewer` reviews their exact candidate, interfaces and network-denying contract before controller integration/use. Freeze that bounded test allowlist/contract with the fresh card bindings; no extra campaign or plugin is needed. Inputs are tracked Harness selection/role/history contracts plus supported native version/interface discoveries from M0; adapter coverage additionally uses accepted V2 interfaces. First demonstrate failing mechanism assertions/negative controls, then passing expected behavior, without real provider calls. Artifact: reviewed tests/fixtures, exact V4/V5 commands, nonempty case inventory, outputs/exits and candidate provenance. Stop if a real observable contract/interface is unavailable; a fabricated stub or empty discovery pass cannot substitute. V4/V5 must pass before V6 readiness and M5 promotion.
+
+V5 native scope tests verified stock Hermes/Claude selection, diagnostics and version-interface assumptions, including incompatible-version rejection before inference; it does not assert a plugin exists or patch native runtime enforcement. Adapter scope retains those shared checks and adds its registration/translation/lifecycle compatibility and fail-closed rejection. If native supported controls cannot reject incompatible interfaces safely, stop rollout rather than guess compatibility. Offline checks establish contract behavior only, not account/model/billing readiness.
+
+Successful branch walks: native V0 → M1 main-path pass → native M4 shared test preparation/review → V4 + native V5 → measured V6/readiness review → attended M5/V7, with no M2/M3/V3. Conditional adapter branch: M1 justified unmet requirement → authorized M2/V2 acceptance → authorized M3, shared test preparation/review, V3 + V4 + adapter V5 and exact-candidate integration → separately authorized measured M4/V6 → attended M5/V7. Both retain V0 safeguards, independent review and stage-specific authority; failed gates stop, not route around them.
 
 Required inventory artifact V6 below: expand each row per actual configured instance/override during authorized discovery. Columns record requested label/resolved selection, effective provider/model/auth scope, trustworthy served-model/route evidence, included/extra usage attribution, tool audit and required/optional disposition. All effective/live evidence is UNKNOWN here; desired current values are repository facts only. Intended target for all model paths is Claude Opus 5.5 with verified slug, never a hardcoded guessed ID.
 
@@ -133,7 +139,7 @@ Expected V6 outcome: every required row has trustworthy exact-model, allowed inc
 Owners: controller integrates approved repository candidate; account owner/operator performs separately authorized attended per-target installation/selection; independent reviewer assesses readiness/evidence. Prerequisites: V6 acceptance, exact approved SHA/tree, enumerated targets, tested version bounds and safe rollback decision.
 
 1. Publish only exact tested Hermes/Claude version pairs, not universal support. Spec's reported Hermes `v0.21.5+6751.g9cf7960 (2026.9.24)` / upstream `9cf7960f` and Claude `2.1.283` are dated observations, not inspected current installation or compatibility promises. V5 must reject an incompatible interface/version before inference; no guessing translation.
-2. Before any update, rerun affected contracts: provider/translation changes V3; selection/helper changes V4/V6 affected rows; runtime/lifecycle changes V3/V5 and affected live audits; billing/terms changes V0/V1 and affected attribution. Reuse unchanged evidence with provenance rather than reflexively repeat entire campaign. Updates need separate scope and tested exact versions.
+2. Before any update, rerun affected contracts: adapter provider/translation changes V3; selection/helper changes V4/V6 affected rows; native runtime/interface changes native V5 and affected live audits, with V3/adapter V5 additionally for an adapter's runtime/lifecycle changes; billing/terms changes V0/V1 and affected attribution. Reuse unchanged evidence with provenance rather than reflexively repeat entire campaign. Updates need separate scope and tested exact versions.
 3. Keep reviewed repository integration separate from attended installation per authorized target and new target-session consumption. Verify candidate/version, effective selection, route/tool/helper behavior and allowed billing for each target; never infer deployment from Git or another session. No own active-policy deployment, push, PR, board/gateway change or live update is implicit.
 4. Proposed V7 rollback rehearsal: offline selection fixture demonstrates prior approved selection or pause state, retained task attempts/audits/reviews and zero unauthorized provider calls. Before live promotion operator confirms supported rollback interface/target scope. In Claude-only/no-extra-spend mode rollback may mean pause/no inference; OpenAI/Zai/paid/cancelled-provider switch is never automatic or authorized by rollback wording. External rollback remains attended/explicitly authorized.
 
