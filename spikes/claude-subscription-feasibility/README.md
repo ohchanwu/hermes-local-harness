@@ -181,3 +181,143 @@ rollout. Full focused output, scoped scans, staged publication review, UTF-8/
 fence/link/embedded-command syntax and exact allowlist results accompany the
 same-card `harness-reviewer` handoff. No broad runtime suite or `verify-state` is
 appropriate for these changed surfaces.
+
+## Generation2 — final bounded diagnostic, not V2 acceptance
+
+2026-10-16 KST; `kanban://harness/t_2812605d#body`, run39. Baseline
+`562c77a304df9d3e89da583c016db34228a2d88c`. Generation2/2 continues the
+accepted generation1 PARTIAL result (t_a409287e/run36, review37); setup run38
+was not a semantic attempt. Material review corrections consumed: zero at handoff.
+Everything above remains generation1 evidence, not newly claimed compatibility.
+
+Final OFFLINE verdict: **PARTIAL**. The Hermes-side seam is mechanically usable
+in this constrained simulation; official-runtime rendezvous and all-path routing
+are NOT established. **V2 is not accepted; M3/account trials remain unreleased.**
+Stop this diagnostic line here: retain the artifacts, do not create generation3,
+build a production adapter, broaden the architecture or reset the attempt budget.
+
+### What actually ran, and what was faked
+
+`rendezvous.py` executes only hash-checked, named, inspected Hermes AST bodies
+at the same pinned revision as generation1. It removes imports, decorators and
+function annotations, supplies restricted builtins with imports denied, and
+injects explicit fake peripheral dependencies. It never executes a downloaded
+module wholesale or imports installed Hermes/Claude/SDK code.
+
+- `chat_completion_helpers.py:761–794` is the actual nonstreaming client dispatch;
+  `1622–1663,1666–1761` serialize the assistant/tool-call ID. Actual
+  `turn_tool_round.py:46–230,233–308` stages that row, checks persistence, invokes
+  the owning-side executor and returns `continue` after its result. The full
+  conversation loop, request assembler, transport wrappers and error caller are
+  not executed. `conversation_loop.py:41–58` identifies those separate phases.
+- Across two actual dispatch-body calls, the inert child emits an independently
+  generated synthetic assistant `tool_use` event and MCP request, then waits.
+  The facade exposes one structured Hermes-style tool call without answering MCP;
+  the owning-side fake executor supplies the result through the actual tool-round
+  body. The second dispatch validates assistant/result lineage and replies to the
+  parked MCP request. The child computes a SHA256 receipt of the received text;
+  it does not return an answer-key/model-text success. IDs stay distinct:
+  `toolu-synthetic-1` (model-shaped), `control-1` (control), `7` (JSON-RPC).
+- These are **synthetic IDs, not observed official model tool-use IDs**. Only the
+  owning test side performs `fake_permission`/`fake_execution` once. The actual
+  Hermes permission implementation, tool executor, registry, durability store and
+  post-tool compression are explicitly fake. A failed persistence dependency
+  makes the actual round stop before that fake executor. Missing/duplicate/
+  mismatched results, duplicate/missing model events, argument mismatch, replay,
+  cancellation and changes to each profile/role/task/session/worktree tuple field
+  terminate the facade without another tool dispatch or stale child attachment.
+  The scope argument is synthetic harness scaffolding, not proof that stock
+  Hermes passes all those identities through its client interface.
+- Owned inert children use absolute Python, `-I -S`, synthetic HOME/cwd, exactly
+  four environment keys and isolated process groups; per-read monotonic deadlines,
+  bounded output/wait, group kill, reap and repeated cleanup are exercised on
+  success, startup/continuation timeout, process death and cancellation. No secret
+  environment is inherited. Scoped Python audit guards deny network, unexpected
+  file access and other child commands; these are test protections, not an OS
+  sandbox or a production security claim.
+
+The reused SDK retrieval snapshots clarify the remaining capability gap:
+`types.py:1209–1223` separates ToolUseBlock.id from ToolResultBlock.tool_use_id;
+`2837–2840` exposes no model ID in SDKControlMcpMessageRequest. Query
+`412–425,505–506` dispatches control requests separately from regular assistant
+messages; `656–688` awaits MCP then writes the correlated control response.
+This does not specify the official CLI's emission order or uniquely correlate
+parallel identical MCP calls to model IDs. The prototype assumes one assistant
+tool-use event is available before one MCP request; it rejects ambiguity instead
+of inventing a model ID from the control/RPC ID. No SDK was fetched again or run.
+
+### Routing controls: narrow proofs, not a universal stop switch
+
+| Actual pinned path exercised | Result and boundary |
+| --- | --- |
+| `agent_init.py:815–843,986–1022` → main factory → `client_lifecycle.py:288–311` | A nonthrowing lazy factory is used at explicit initialization and replacement; both return the custom client, with zero HTTP constructor attempts. Header/TLS/profile lookup peripherals are fake. Replacement is called directly with a synthetic failure reason, not by the full error handler. |
+| Main `create_openai_client:2015–2125` with actual aux validators `2880–2913` | `acp://synthetic` passes the real validator. A throwing factory still attempts the intercepted HTTP constructor. Non-HTTP URL alone does NOT prohibit HTTP client construction; no request is sent. Generation1's no-op validator is not reused as proof. |
+| `try_activate_fallback:2074–2199`, `_fallback_chain_exhausted:1935–1943`, `recover_with_credential_pool:1005–1016` | Explicit empty main chain and absent pool return false/no recovery with zero route attempts in these bodies. Cooldown helpers are fake. This does not exercise quota classification, retries, `turn_api_error` or every main recovery caller. |
+| Aux `_resolve_call_client:7422–7479` → `_resolve_external_process_branch:5359–5396` and actual empty-chain bodies `4417–4477` | External factory startup failure returns unavailable; explicit text task plus empty task chain raises without auto rescue. Cache lookup/config/profile are injected, not live reads. |
+| Aux `_try_payment_fallback:4262–4273` → `_discovery_chain_allowed:4654–4666` | An explicit main provider blocks built-in discovery before the discovery-chain spy is called. This is a supported narrow control, not a helper-disable switch or all-helper proof. |
+| Aux `_ladder_provider_fallback:7850–7941` → `_try_main_agent_model_fallback:4321–4362` | After an injected quota classification and empty task chain, the actual bodies read the disk main-provider dependency and attempt `resolve_provider_client(provider="openai")` despite `route.main_runtime.provider="synthetic"`. Spy catches the attempt before credentials/client/request. Classification, health and backend-identity peripherals are fake; the foreign-provider fixture is deliberately not skipped. A session pin/empty task chain alone is insufficient. |
+
+No fallback/validation function body was rewritten to obtain these results.
+No guard transport or optional-helper disable is claimed as implemented. Aligning
+disk and session settings may avoid the demonstrated mismatch, but is not proven
+all-path isolation. Async callers, vision auto rescue, discovery/auto construction,
+init without explicit route, refresh/restore, main error classification/retry,
+streaming, helper inventory and live effective selection remain unproven. The
+selected extracted gates are not a complete safe-to-infer runtime.
+
+### Evidence, receipts and final capability decision
+
+Focused command (includes all five unchanged generation1 tests):
+
+```sh
+python3 -m unittest discover -s spikes/claude-subscription-feasibility -p 'test_*.py' -v
+```
+
+Initial mechanism RED: exit1, 18 tests, 16 assertion failures including subtests;
+no import errors. First GREEN: exit0, 18 tests. A subsequent deadline/death oracle
+first failed with three assertions (19 tests, exit1), then GREEN passed all
+**19 tests: five retained plus fourteen new** (exit0, 7.715s). Both REDs and green
+outputs remain ignored in `private/feasibility/generation2-*.txt`. The final
+syntax/scope/scanner/staged-diff receipts accompany the same-card review.
+Generation1 `probe.py`, `test_probe.py`, `fixtures.json`, source snapshots and
+original receipts are unchanged. Only a new explicit rendezvous branch and a
+stdlib hash import were added to its inert child; original modes/oracles remain.
+
+Six new anonymous GETs, all HTTP200, timeout30s each, zero retries/redirects/
+pagination; the envelope is exhausted. Diagnostic accounting is **16 attempts**:
+generation1 ten (8×200,2×429) plus generation2 six (6×200), not a reset. The three
+earlier native inputs remain separately retained. No unchanged source/docs/terms
+were refetched. Exact response hashes, decoded hashes, Git blob checks and UTC
+timestamps are in ignored `generation2-manifest.json`. All six URLs use the exact
+Hermes revision `9cf7960f274ea2bdfe672d64d26389e9954dfeb6`:
+
+| Source URL (GitHub contents, exact ref) | UTC on 2026-10-16 | Decoded source SHA256 |
+| --- | --- | --- |
+| https://api.github.com/repos/NousResearch/hermes-agent/contents/agent/client_lifecycle.py?ref=9cf7960f274ea2bdfe672d64d26389e9954dfeb6 | 09:58:14.891830 | `5333b2dd5c96427996f060e9c01f6ca86d882cb89a59f60482e2281de8b66d5f` |
+| https://api.github.com/repos/NousResearch/hermes-agent/contents/agent/agent_init.py?ref=9cf7960f274ea2bdfe672d64d26389e9954dfeb6 | 09:58:15.768899 | `5befa4177caab596804f185379cbd86e3c91507693f12e20057aae122907cf0d` |
+| https://api.github.com/repos/NousResearch/hermes-agent/contents/agent/chat_completion_helpers.py?ref=9cf7960f274ea2bdfe672d64d26389e9954dfeb6 | 09:58:29.884151 | `15c2aa0e7863495546ad1bbaf8ad9c67de12fdbc65f10b91c7f51a210d0a5214` |
+| https://api.github.com/repos/NousResearch/hermes-agent/contents/agent/tool_executor.py?ref=9cf7960f274ea2bdfe672d64d26389e9954dfeb6 | 09:58:30.871485 | `c2c65ba2d5d0847f968321e0438f2dd3c87973cb2680acb5cd52192f48b602ab` |
+| https://api.github.com/repos/NousResearch/hermes-agent/contents/agent/conversation_loop.py?ref=9cf7960f274ea2bdfe672d64d26389e9954dfeb6 | 09:59:04.452417 | `8b8768c965579121d836d736134661433b1e672f352971fe72b950986d9baca7` |
+| https://api.github.com/repos/NousResearch/hermes-agent/contents/agent/turn_tool_round.py?ref=9cf7960f274ea2bdfe672d64d26389e9954dfeb6 | 09:59:32.276092 | `8afef412460a4a6a0d3df0ec219919a736ba376f4add81864fd49c0e758c531f` |
+
+Tool-executor/conversation snapshots were inspected for caller context, not
+executed wholesale or counted as exercised executor/loop behavior. SDK snapshots
+remain unversioned retrieval observations, never a tested release/range.
+
+Decision: **do not accept the transparent-provider architecture for M3 now**.
+Reconsideration needs concrete official-runtime evidence that a real structured
+tool-use ID is available and uniquely matchable while MCP is parked, that the
+same pending invocation accepts Hermes's result on continuation with built-ins
+off, and that cancellation/parallel ambiguity do not invoke another executor.
+It also needs actual supported all-caller fail-closed configuration, including
+disk/session helper recovery and factory failure. Another echo or synthetic
+generation cannot supply either missing capability; do not schedule one. This is
+a technical capability stop, not a generic provider-permission/Support-letter
+gate or proof that every possible MCP design is impossible. Any future official
+process/account trial remains separately scoped and subject to the existing
+attended-auth, applicable-use and no-paid-route prerequisites.
+
+Zero official Claude/SDK processes, account/auth/model/billing calls, credential
+reads, paid/cloud/provider requests, core patches, installs, live settings/policy
+changes, pushes or PRs. Native pre-inference NATIVE_FAILURE and M1 UNRUN remain;
+Claude Opus 5.5, actual billing, permissions and version readiness remain UNRUN.
