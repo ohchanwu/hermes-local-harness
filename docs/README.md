@@ -12,7 +12,7 @@ This index is the entry point for durable harness documentation tracked in Git. 
 ## Current entries
 
 - [Switching Hermes profiles between Claude, GPT and GLM](../procedures/switching-hermes-models.md) — where the retired GPT profiles and config backups are, and `scripts/switch-profile-model`.
-- [Claude subscription helper support](specs/261017-claude-subscription-helper-support.md) — implemented and live; Hermes helper jobs (compression, titles, approval, vision, …) run on the provider.
+- [Claude subscription helper support](specs/261017-claude-subscription-helper-support.md) — implemented and live; Hermes helper jobs (compression, titles, approval, vision, …) run on the provider. Title generation was rejected until the 2026-10-17 fix ([bug record](bugs/261017-claude-subscription-cli-retries-and-title-helper-rejected.md)).
 - [Claude subscription transcript rebuild](specs/261017-claude-subscription-transcript-rebuild.md) — implemented; review approved; live smoke (with rebuild) and a harness-worker Kanban pilot passed on CLI 2.1.302 with the headless login token. Rolled out as the default model of the worker, reviewer and orchestrator profiles in all three projects; see the provider README.
 - [Claude subscription provider hardening](specs/261017-claude-subscription-provider-hardening.md) — implemented; independent review approved; live smoke test passed (CLI 2.1.283); not installed in live Hermes.
 - [Claude Max 20x inside Hermes and model portability](specs/261016-claude-max20x-model-portability.md) — execution specification; native billing verification first; implementation/live testing not yet authorized.
@@ -32,6 +32,7 @@ This index is the entry point for durable harness documentation tracked in Git. 
 
 ## Bugs
 
+- [Claude subscription provider rejected CLI retries and title-helper requests](bugs/261017-claude-subscription-cli-retries-and-title-helper-rejected.md) — fixed and deployed: mid-reply CLI retries restart cleanly before any text reaches Hermes; `extra_body.reasoning` on helper calls is accepted and ignored.
 - [Repair-history formatting blocked approved autonomous completion](bugs/261017-repair-history-formatting-blocked-approved-completion.md) — task-local bookkeeping gate removed; systemic prevention not implemented.
 - [Jobcron upgrade orchestration: repeated first-launch ceremony](bugs/261007-jobcron-upgrade-orchestration-repeated-first-launch-ceremony.md)
 - [Jobcron test-boundary incident incorrectly halted autonomous implementation](bugs/261007-jobcron-test-boundary-incident-overblocked-autonomous-implementation.md)
