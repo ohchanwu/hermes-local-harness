@@ -40,13 +40,15 @@ class History:
         body = canonical[1:] if canonical[0]["role"] == "system" else canonical
         if not body or body[0]["role"] != "user" or body[-1]["role"] not in ("user", "tool"):
             raise ProviderError("a transcript must start with a user message and end with a user or tool message")
-        calls, answered = set(), set()
+        # Track outstanding calls, as Hermes does: some models reuse one id for
+        # every call, so a later call re-arms its id for one more result.
+        outstanding = set()
         for message in body:
-            calls.update(call["id"] for call in message.get("tool_calls", []))
+            outstanding.update(call["id"] for call in message.get("tool_calls", []))
             if message["role"] == "tool":
-                if message["tool_call_id"] not in calls or message["tool_call_id"] in answered:
-                    raise ProviderError("tool result for a call not in the transcript, or answered twice")
-                answered.add(message["tool_call_id"])
+                if message["tool_call_id"] not in outstanding:
+                    raise ProviderError("tool result without an outstanding call")
+                outstanding.discard(message["tool_call_id"])
         if body[-1]["role"] == "tool":
             # A final result must answer the latest assistant message, with only its results in between.
             latest = next(i for i in range(len(body) - 1, -1, -1) if body[i]["role"] != "tool")

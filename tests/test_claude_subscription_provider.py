@@ -357,6 +357,17 @@ class HistoryTests(unittest.TestCase):
             with self.subTest(messages=messages), self.assertRaises(client.ProviderError):
                 client.History().accept(messages)
 
+    def test_reused_tool_call_id_answered_once_per_call_is_accepted(self):
+        # llama.cpp emits one constant id for every call; Hermes keeps each result.
+        def call():
+            return {"role": "assistant", "content": "", "tool_calls": [{"id": "0", "type": "function",
+                    "function": {"name": "read_file", "arguments": "{}"}}]}
+        result = {"role": "tool", "tool_call_id": "0", "content": "R"}
+        base = [{"role": "user", "content": "Read"}, call(), result, {"role": "user", "content": "again"}, call(), result]
+        for messages in (base + [{"role": "user", "content": "next"}], base[:-1] + [result]):
+            with self.subTest(last=messages[-1]["role"]):
+                client.History().accept(messages)
+
     def test_note_claims_only_answered_calls_ran(self):
         h = client.History()
         tail = h.accept(self.transcript())

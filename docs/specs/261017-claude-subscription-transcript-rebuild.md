@@ -25,7 +25,7 @@ Native resume (`--resume <id> --fork-session` with on-disk sessions) was conside
 **Accepted transcripts for a new client:**
 - optional leading `system` message, then a `user` message, then any sequence of `user`, `assistant` and `tool` messages;
 - the final message must be `user` or `tool`;
-- a `tool` message's `tool_call_id` must name a call in an earlier assistant message, and each call is answered at most once;
+- a `tool` message's `tool_call_id` must answer an outstanding call: each assistant call opens its id (a reused id is re-opened, as some models emit one id for every call) and each result closes it;
 - a final `tool` message must answer a call in the latest assistant message, with only that message's results in between.
 
 Rejected as before: unknown roles, image or multipart content, malformed tool calls, an empty transcript, a transcript ending in `assistant`.
