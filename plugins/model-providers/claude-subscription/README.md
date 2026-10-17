@@ -25,11 +25,22 @@ local candidate is still required. Design: [hardening specification](../../../do
 The official, unmodified Claude Code binary owns subscription authentication.
 The plugin never signs in, stores or logs credentials, uses an Anthropic API
 key, or constructs an HTTP model client. The CLI runs with the OS account's
-real `HOME`, `USER` and `LOGNAME`, so it finds the ordinary Keychain login. For
-background Hermes processes, which cannot read a locked Keychain, the owner can
-create the CLI's official headless login with `claude setup-token` and set it as
-`CLAUDE_CODE_OAUTH_TOKEN` in the profile's `.env`; the plugin forwards that one
-variable to the CLI only (never to the MCP server, errors or the audit). This is personal/local runtime mediation,
+real `HOME`, `USER` and `LOGNAME`, so it finds the ordinary Keychain login.
+
+Background Hermes processes cannot read a locked Keychain. For them the owner
+can create the CLI's official headless login with `claude setup-token`, save it
+in an owner-only file (mode 0600), and set `HERMES_CLAUDE_SUBSCRIPTION_TOKEN_FILE`
+to that file's absolute path. The client checks the file is an owner-only
+regular file, opens it, and hands the open descriptor to the CLI process only
+(`CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR`). The plugin never reads the token,
+and the token is never put in any environment variable. Do **not** put the
+token in a profile `.env` as `CLAUDE_CODE_OAUTH_TOKEN`: Hermes deliberately
+passes that variable to every tool subprocess, where commands the model runs
+could read it. A `CLAUDE_CODE_OAUTH_TOKEN` variable is never forwarded by this
+plugin. Remaining exposure: Hermes tools run as the same OS user and can read
+the file if they look for it, comparable to the user's other credentials; use
+the provider in profiles whose tools you trust, and revoke and regenerate the
+token if it may have leaked. This is personal/local runtime mediation,
 not a terms exemption or provider endorsement.
 
 Hermes `v0.21.5+6751.g9cf7960` (public contracts at
@@ -149,10 +160,12 @@ Only after separate attended authorization and exact-candidate review:
    `HERMES_CLAUDE_SUBSCRIPTION_CLI` in the Hermes environment to the absolute
    path of that install's `claude` binary (a bare name is rejected). Sign-in is
    the ordinary attended subscription login. For Kanban workers or other
-   background processes, run `claude setup-token` yourself in a separate terminal
-   and add the printed token to the profile's `.env` as
-   `CLAUDE_CODE_OAUTH_TOKEN=...`; never paste it into a chat or commit it, and
-   never configure an API-key substitute for this provider.
+   background processes, run `claude setup-token` yourself in a separate
+   terminal, save the printed token in an owner-only file (for example
+   `$HERMES_HOME/runtimes/claude-code/oauth-token`, mode 0600), and set
+   `HERMES_CLAUDE_SUBSCRIPTION_TOKEN_FILE` to its absolute path in the profile's
+   `.env`. Never paste the token into a chat, a `.env` or a commit, and never
+   configure an API-key substitute for this provider.
 2. Copy this whole directory to
    `$HERMES_HOME/plugins/model-providers/claude-subscription/` for the explicitly
    authorized target. No edits to installed Hermes or Claude are needed.

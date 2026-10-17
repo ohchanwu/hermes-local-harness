@@ -398,6 +398,7 @@ class ClientTests(unittest.TestCase):
         self.launches = []
         self.children = []
         self.child_envs = []
+        self.child_kwargs = []
         self.version_mode = 'normal'
         self.sleep_before_input = False
         self.runtime_args = []
@@ -416,6 +417,7 @@ class ClientTests(unittest.TestCase):
             elif argv[0] != "/bin/ps":
                 raise AssertionError("unit test attempted non-synthetic process: " + str(argv[0]))
             self.child_envs.append(kwargs.get("env"))
+            self.child_kwargs.append(kwargs)
             process = popen(argv, *args, **kwargs)
             if '--synthetic-runtime' in argv:
                 self.children.append(process)
@@ -843,23 +845,52 @@ class ClientTests(unittest.TestCase):
         envs = [env for env in self.child_envs if env is not None]
         self.assertTrue(envs and all(env.get('HOME') == real for env in envs))
 
-    def test_headless_login_token_reaches_only_the_cli(self):
-        # `claude setup-token` is the CLI's official login for headless use (no Keychain).
-        token = 'synthetic-oauth-token-value'
-        with patch.dict(os.environ, {'CLAUDE_CODE_OAUTH_TOKEN': token}):
+    def token_file(self, mode=0o600, value='synthetic-oauth-token-value'):
+        path = self.directory / 'oauth-token'
+        path.write_text(value)
+        path.chmod(mode)
+        return path
+
+    def test_headless_login_token_reaches_only_the_cli_through_a_descriptor(self):
+        # `claude setup-token` is the CLI's official headless login. Hermes passes the
+        # CLAUDE_CODE_OAUTH_TOKEN variable to every tool subprocess, so the token is
+        # handed to the CLI as an open file descriptor instead, never as a variable.
+        path = self.token_file()
+        with patch.dict(os.environ, {'HERMES_CLAUDE_SUBSCRIPTION_TOKEN_FILE': str(path)}):
             self.c = client.ClaudeSubscriptionClient(command=SYNTHETIC_CLI)
             self.addCleanup(self.c.close)
-            response = self.request('__tool__', tools=[TOOL])
-            mcp_env = json.loads((self.c._runtime.directory / 'mcp.json').read_text())['mcpServers']['hermes']['env']
-            self.continuation(response)
-        envs = [env for env in self.child_envs if env is not None]
-        self.assertTrue(envs and all(env.get('CLAUDE_CODE_OAUTH_TOKEN') == token for env in envs))
-        self.assertNotIn('CLAUDE_CODE_OAUTH_TOKEN', mcp_env)
-        self.assertNotIn(token, json.dumps(self.c.audit))
+            response = self.request('__token_check__')
+        self.assertEqual(response.choices[0].message.content, 'TOKEN synthetic-oauth-token-value')
+        version_kwargs, runtime_kwargs = self.child_kwargs[0], self.child_kwargs[1]
+        self.assertNotIn('CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR', version_kwargs['env'])
+        self.assertEqual(tuple(version_kwargs.get('pass_fds', ())), ())
+        fd = int(runtime_kwargs['env']['CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR'])
+        self.assertEqual(tuple(runtime_kwargs['pass_fds']), (fd,))
+        for env in self.child_envs:
+            self.assertNotIn('CLAUDE_CODE_OAUTH_TOKEN', env or {})
+        self.assertNotIn('synthetic-oauth-token-value', json.dumps(self.c.audit))
+        with self.assertRaises(OSError):
+            os.fstat(fd)  # the parent closed its copy after launch
 
-    def test_no_login_token_is_forwarded_when_unset(self):
+    def test_token_variable_in_the_environment_is_never_forwarded(self):
+        with patch.dict(os.environ, {'CLAUDE_CODE_OAUTH_TOKEN': 'must-not-forward'}):
+            self.c = client.ClaudeSubscriptionClient(command=SYNTHETIC_CLI)
+            self.addCleanup(self.c.close)
+            self.request()
+        self.assertTrue(all('CLAUDE_CODE_OAUTH_TOKEN' not in (env or {}) for env in self.child_envs))
+
+    def test_token_file_readable_by_others_is_rejected_before_effects(self):
+        path = self.token_file(mode=0o644)
+        with patch.dict(os.environ, {'HERMES_CLAUDE_SUBSCRIPTION_TOKEN_FILE': str(path)}):
+            self.c = client.ClaudeSubscriptionClient(command=SYNTHETIC_CLI)
+            self.addCleanup(self.c.close)
+            with self.assertRaisesRegex(client.ProviderError, 'owner-only'):
+                self.request()
+        self.assertEqual(self.launches, [])
+
+    def test_no_descriptor_without_a_token_file(self):
         self.request()
-        self.assertTrue(all('CLAUDE_CODE_OAUTH_TOKEN' not in env for env in self.child_envs if env is not None))
+        self.assertTrue(all('pass_fds' not in kwargs or not kwargs['pass_fds'] for kwargs in self.child_kwargs))
 
     def test_unknown_login_user_fails_before_effects(self):
         with patch('pwd.getpwuid', side_effect=KeyError('uid not found')), \
@@ -1266,6 +1297,12 @@ def synthetic_runtime(argv):
             ev("message_start", message={"id": "msg_err", "model": model, "usage": {"input_tokens": 1}})
             emit({"type": "assistant", "error": "rate_limit", "message": {"id": "msg_err", "model": "<synthetic>",
                   "content": [{"type": "text", "text": "API Error"}]}})
+            continue
+        if text == '__token_check__':
+            with os.fdopen(int(os.environ['CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR'])) as handle:
+                message(f"msg_{ordinal}_final", text="TOKEN " + handle.read())
+            emit({"type": "result", "subtype": "success", "is_error": False, "num_turns": 1,
+                  "modelUsage": {model: {"canonicalModel": model, "provider": "firstParty"}}})
             continue
         if text == '__rich_tool__':
             message(f"msg_{ordinal}_1", tool_ids=[f"toolu_synthetic_{ordinal}_1"], preamble="Checking.", thinking=True)

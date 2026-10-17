@@ -14,12 +14,12 @@ LINE_BOUND = 8_000_000  # bytes per runtime JSON line
 
 class Runtime:
     """Owned child process group; the client bounds startup and parked time."""
-    def __init__(self, argv, env, directory):
+    def __init__(self, argv, env, directory, pass_fds=()):
         self.directory = directory
         self.lock = threading.Lock()
         self.cleanup = None
         self.started = time.monotonic()
-        self.process = subprocess.Popen(argv, cwd=directory, env=env, stdin=subprocess.PIPE,
+        self.process = subprocess.Popen(argv, cwd=directory, env=env, pass_fds=pass_fds, stdin=subprocess.PIPE,
                                         stdout=subprocess.PIPE, stderr=subprocess.PIPE, start_new_session=True)
         assert self.process.stdin is not None
         os.set_blocking(self.process.stdin.fileno(), False)

@@ -9,6 +9,7 @@ from pathlib import Path
 import pwd
 import re
 import selectors
+import stat
 import subprocess
 import sys
 import tempfile
@@ -18,7 +19,7 @@ from types import SimpleNamespace
 
 from .bridge import LINE_BOUND, Bridge, save
 from . import compat
-from .compat import CHILD_ENV, CLI_FLAGS, CLI_SETTING, TOKEN_SETTING, DEFAULT_EFFORT, EFFORT_SETTING, EFFORTS, CLI_MINIMUM, CLI_TESTED, PREFIX, SETTINGS, served_names, version_text
+from .compat import CHILD_ENV, CLI_FLAGS, CLI_SETTING, TOKEN_FD_VARIABLE, TOKEN_FILE_SETTING, DEFAULT_EFFORT, EFFORT_SETTING, EFFORTS, CLI_MINIMUM, CLI_TESTED, PREFIX, SETTINGS, served_names, version_text
 from .errors import ProviderError
 from .history import History
 from .runtime import Runtime
@@ -100,6 +101,7 @@ class ClaudeSubscriptionClient:
         self._temporary = None
         self._cli_version = None
         self._model = None
+        self._token_file = None
         self._request_deadline = None
         self._max_output = self._effort = None
         self._initialized = False
@@ -206,6 +208,16 @@ class ClaudeSubscriptionClient:
                     account = pwd.getpwuid(os.getuid())
                 except KeyError:
                     raise ProviderError("cannot determine the login user for the Claude CLI's Keychain lookup") from None
+            if self._process_env is None and os.environ.get(TOKEN_FILE_SETTING):
+                # Background Hermes processes cannot read a locked Keychain; see compat.
+                token_file = os.environ[TOKEN_FILE_SETTING]
+                try:
+                    info = os.stat(token_file)
+                except OSError:
+                    raise ProviderError(f"{TOKEN_FILE_SETTING} does not name a readable file") from None
+                if not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid() or info.st_mode & 0o077:
+                    raise ProviderError(f"{TOKEN_FILE_SETTING} must name an owner-only (0600) regular file")
+                self._token_file = token_file
             tail = self._history.accept(kwargs.get("messages"))
             self._model, self._scope, self._tools = model, scope, tools
             if self._effort is None:
@@ -213,9 +225,6 @@ class ClaudeSubscriptionClient:
             if self._process_env is None:
                 self._process_env = {k: os.environ[k] for k in ("PATH", "LANG", "TMPDIR") if os.environ.get(k)}
                 self._process_env.update(HOME=account.pw_dir, USER=account.pw_name, LOGNAME=account.pw_name)
-                if os.environ.get(TOKEN_SETTING):
-                    # Background Hermes processes cannot read a locked Keychain.
-                    self._process_env[TOKEN_SETTING] = os.environ[TOKEN_SETTING]
                 self._home = Path(scope[1] or Path(scope[4] or Path.home()) / ".hermes").absolute()
             stream = Stream(self, self._drive(tail, response_seconds(kwargs.get("timeout", self.timeout))))
         except BaseException:
@@ -282,7 +291,16 @@ class ClaudeSubscriptionClient:
             save(directory / "settings.json", settings)
             save(directory / "mcp.json", config)
             self._check_active()
-            self._runtime = Runtime(argv, env, directory)
+            pass_fds = ()
+            if self._token_file is not None:
+                # The plugin never reads the token: the CLI reads it from this descriptor.
+                fd = os.open(self._token_file, os.O_RDONLY)
+                pass_fds, env = (fd,), {**env, TOKEN_FD_VARIABLE: str(fd)}
+            try:
+                self._runtime = Runtime(argv, env, directory, pass_fds=pass_fds)
+            finally:
+                for fd in pass_fds:
+                    os.close(fd)
             self.audit.append({"stage": "launch", "pid": self._runtime.process.pid, "model": self._model})
 
     def _drive(self, tail, seconds):
