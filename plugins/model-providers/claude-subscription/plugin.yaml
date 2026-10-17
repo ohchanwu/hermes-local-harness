@@ -1,0 +1,5 @@
+name: claude-subscription
+kind: model-provider
+version: 0.1.0
+description: Bounded serial Claude subscription CLI provider; Hermes owns tool execution
+author: Hermes local harness
