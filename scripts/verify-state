@@ -444,10 +444,57 @@ REPAIR_APPROACH_ID = re.compile(r"^[a-z0-9][a-z0-9-]{0,63}$")
 REPAIR_SHA256 = re.compile(r"^[0-9a-f]{64}$")
 REPAIR_COMMIT = re.compile(r"^[0-9a-f]{40}$")
 REPAIR_OUTCOMES = {"pending", "revise", "pivot", "approve", "blocked", "infrastructure_failed"}
+# Explicit outcome alias map: serialized typos accepted and normalized to the
+# canonical enum value. Adding an alias here is a policy decision; nothing else
+# about the enum is loosened.
+REPAIR_OUTCOME_ALIASES = {"approved": "approve"}
+
+
+def normalized_repair_history(history):
+    """Return history with outcome aliases canonicalized, or None if malformed.
+
+    Pure data rewrite: only attempt outcome strings present in
+    REPAIR_OUTCOME_ALIASES are replaced by their canonical value. Structural
+    validation is left to valid_project_repair_history.
+    """
+    if not isinstance(history, list):
+        return None
+    normalized = []
+    for approach in history:
+        if not isinstance(approach, dict) or not isinstance(approach.get("attempts"), list):
+            return None
+        attempts = []
+        for attempt in approach["attempts"]:
+            if not isinstance(attempt, dict):
+                return None
+            attempt = dict(attempt)
+            outcome = attempt.get("outcome")
+            if isinstance(outcome, str) and outcome in REPAIR_OUTCOME_ALIASES:
+                attempt["outcome"] = REPAIR_OUTCOME_ALIASES[outcome]
+            attempts.append(attempt)
+        approach = dict(approach)
+        approach["attempts"] = attempts
+        normalized.append(approach)
+    return normalized
+
+
+def repair_history_alias_correction(previous, current):
+    """True when current only canonicalizes outcome aliases of previous.
+
+    The narrow append-only correction shape from the 261017 incident: the raw
+    malformed snapshot is retained and the successor differs ONLY by rewriting
+    alias outcome values to their canonical enum value. Counters, attempts,
+    candidate/review identities, and every other field must be identical.
+    """
+    normalized_previous = normalized_repair_history(previous)
+    if normalized_previous is None or not isinstance(current, list):
+        return False
+    return current != previous and current == normalized_previous
 
 
 def valid_project_repair_history(history):
-    if not isinstance(history, list) or not 1 <= len(history) <= PROJECT_REPAIR_POLICY["max_approaches"]:
+    history = normalized_repair_history(history)
+    if history is None or not isinstance(history, list) or not 1 <= len(history) <= PROJECT_REPAIR_POLICY["max_approaches"]:
         return False
     approach_ids, strategies, candidates, implementation_runs, review_runs = set(), set(), set(), set(), set()
     for approach_index, approach in enumerate(history):
@@ -527,6 +574,10 @@ def valid_project_repair_history(history):
 
 def project_repair_transition_valid(previous, current):
     """Only the final pending attempt may advance, or one bounded item may append."""
+    previous = normalized_repair_history(previous)
+    current = normalized_repair_history(current)
+    if previous is None or current is None:
+        return False
     if not valid_project_repair_history(previous) or not valid_project_repair_history(current):
         return False
     if previous == current:
@@ -582,8 +633,14 @@ def project_repair_transition_valid(previous, current):
             and current_attempt["infrastructure_retries"] == 0)
 
 
-def check_project_repair_cards(errors, cards):
-    """Fail closed on opt-in project cards with malformed or exhausted repair history."""
+def check_project_repair_cards(errors, cards, warnings=None):
+    """Fail closed on opt-in project cards with malformed or exhausted repair history.
+
+    Superseded malformed snapshots are warned, not failed (append-only recovery);
+    a trailing malformed snapshot without a valid successor still fails.
+    """
+    if warnings is None:
+        warnings = []
     if not isinstance(cards, list):
         fail(errors, "project repair card observation malformed")
         return
@@ -610,18 +667,37 @@ def check_project_repair_cards(errors, cards):
         if len(REPAIR_POLICY_LINE.findall(body)) != 1:
             fail(errors, f"project repair contract drift {card_id}: exact policy declaration missing")
             continue
-        histories = []
+        parsed = []
         for line in history_lines:
             try:
-                histories.append(json.loads(line))
+                parsed.append(json.loads(line))
             except json.JSONDecodeError:
-                histories.append(None)
-        if (batched_history or not histories or not valid_project_repair_history(histories[0])
-                or len(histories[0]) != 1 or len(histories[0][0]["attempts"]) != 1
-                or histories[0][0]["attempts"][0]["outcome"] != "pending"
-                or histories[0][0]["attempts"][0]["infrastructure_retries"] != 0
-                or any(not project_repair_transition_valid(previous, current)
-                       for previous, current in zip(histories, histories[1:]))):
+                parsed.append(None)
+        # Append-only recovery: a malformed snapshot superseded by a later valid
+        # snapshot is retained raw evidence, not a card error. Build the chain
+        # from valid snapshots only; each superseded malformed one is reported
+        # as a warning. A malformed snapshot with no valid successor (including
+        # a trailing one) still fails, and the first valid snapshot keeps the
+        # first-snapshot rules.
+        snapshot_valid = [valid_project_repair_history(snapshot) for snapshot in parsed]
+        valid = [snapshot for snapshot, is_valid in zip(parsed, snapshot_valid) if is_valid]
+        last_valid = max((index for index, is_valid in enumerate(snapshot_valid) if is_valid),
+                         default=-1)
+        for index, is_valid in enumerate(snapshot_valid):
+            if not is_valid and index < last_valid:
+                warnings.append(f"project repair contract drift {card_id}: "
+                                f"skipped malformed repair history snapshot #{index + 1} "
+                                "superseded by a later valid snapshot")
+        unresolved = any(index > last_valid for index, is_valid in enumerate(snapshot_valid)
+                         if not is_valid)
+        if (batched_history or not valid or unresolved
+                or not valid_project_repair_history(valid[0])
+                or len(valid[0]) != 1 or len(valid[0][0]["attempts"]) != 1
+                or valid[0][0]["attempts"][0]["outcome"] != "pending"
+                or valid[0][0]["attempts"][0]["infrastructure_retries"] != 0
+                or any(not (project_repair_transition_valid(previous, current)
+                            or repair_history_alias_correction(previous, current))
+                       for previous, current in zip(valid, valid[1:]))):
             fail(errors, f"project repair contract drift {card_id}: invalid repair history")
 
 
@@ -1219,7 +1295,7 @@ def main():
         check_project_repair_policy(errors, project_repair_policy, observed.get("project_repair_policy"))
         project_cards = observed.get("project_repair_cards")
         check_harness_card_contract(errors, project_cards)
-        check_project_repair_cards(errors, project_cards)
+        check_project_repair_cards(errors, project_cards, warnings)
         check_profile_souls(errors, profile_souls, observed.get("profile_soul_hashes"))
         check_repository_policies(errors, repository_policies,
                                   observed.get("repository_policy_hashes"), live=False)
@@ -1343,7 +1419,7 @@ def main():
         check_chapt_card_contract(errors, observe_open_chapt_cards(errors))
         project_cards = observe_open_project_cards(errors)
         check_harness_card_contract(errors, project_cards)
-        check_project_repair_cards(errors, project_cards)
+        check_project_repair_cards(errors, project_cards, warnings)
         deployed_hashes = {}
         for entry in snapshot["skill"]["shared_skills"]:
             deployed_hashes[entry["name"]] = {}

@@ -1,0 +1,70 @@
+#!/usr/bin/env python3
+"""Pure offline pre-post repair-history checker (no board, network, or live state).
+
+Reads one proposed repair-history snapshot JSON (file argument or stdin) and an
+optional --previous snapshot file. Exit 0 when the snapshot is a valid history
+(and a valid successor of --previous when given); exit 1 with a one-line reason
+otherwise. Validation logic is imported from scripts/verify-state, never
+duplicated.
+"""
+import argparse
+import importlib.util
+import json
+import sys
+from importlib.machinery import SourceFileLoader
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+def load_validator():
+    source = ROOT / "scripts/verify-state"
+    loader = SourceFileLoader("verify_state_validator", str(source))
+    spec = importlib.util.spec_from_loader(loader.name, loader)
+    module = importlib.util.module_from_spec(spec)
+    loader.exec_module(module)
+    return module
+
+
+def read_json(label, path, stdin_text=None):
+    try:
+        text = sys.stdin.read() if stdin_text else Path(path).read_text()
+        return json.loads(text), None
+    except (OSError, json.JSONDecodeError) as exc:
+        return None, f"{label} unreadable or not JSON: {exc}"
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("snapshot", nargs="?", help="proposed snapshot JSON file (default: stdin)")
+    parser.add_argument("--previous", help="previous published snapshot JSON file")
+    args = parser.parse_args(argv)
+
+    validator = load_validator()
+    proposed, reason = (read_json("snapshot", None, stdin_text=True) if args.snapshot is None
+                        else read_json("snapshot", args.snapshot))
+    if reason:
+        print(reason)
+        return 1
+    if not validator.valid_project_repair_history(proposed):
+        print("proposed snapshot is not a valid repair history")
+        return 1
+    if args.previous is not None:
+        previous, reason = read_json("previous", args.previous)
+        if reason:
+            print(reason)
+            return 1
+        if not validator.valid_project_repair_history(previous):
+            print("previous snapshot is not a valid repair history")
+            return 1
+        if not (validator.project_repair_transition_valid(previous, proposed)
+                or validator.repair_history_alias_correction(previous, proposed)):
+            print("proposed snapshot is not a valid successor of the previous snapshot")
+            return 1
+    print("OK: valid repair history"
+          + (" and valid successor" if args.previous is not None else ""))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
