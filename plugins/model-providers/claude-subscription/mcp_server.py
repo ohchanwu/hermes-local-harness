@@ -35,6 +35,16 @@ class Bridge:
         return json.loads(line)
 
 
+def close_inherited():
+    """Close descriptors beyond stdio that the CLI may pass on, such as its login-token file."""
+    for fd in sorted(int(name) for name in os.listdir("/dev/fd")):
+        if fd > 2:
+            try:
+                os.close(fd)
+            except OSError:
+                pass
+
+
 def serve(bridge, source=None, sink=None):
     source, sink = source or sys.stdin, sink or sys.stdout
     hello = bridge.receive()
@@ -86,4 +96,5 @@ def serve(bridge, source=None, sink=None):
 
 
 if __name__ == "__main__":
+    close_inherited()
     serve(Bridge(sys.argv[1], os.environ["HERMES_BRIDGE_TOKEN"]))

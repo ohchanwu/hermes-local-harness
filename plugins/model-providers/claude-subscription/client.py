@@ -33,6 +33,10 @@ __all__ = ["ClaudeSubscriptionClient", "Bridge", "ProviderError", "History", "Me
 log = logging.getLogger(__name__)
 
 
+def owner_only(info):
+    return stat.S_ISREG(info.st_mode) and info.st_uid == os.getuid() and not info.st_mode & 0o077
+
+
 def parse_version(output):
     match = re.fullmatch(rb"(\d+)\.(\d+)\.(\d+) \(Claude Code\)", output.strip())
     if match is None:
@@ -215,7 +219,7 @@ class ClaudeSubscriptionClient:
                     info = os.stat(token_file)
                 except OSError:
                     raise ProviderError(f"{TOKEN_FILE_SETTING} does not name a readable file") from None
-                if not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid() or info.st_mode & 0o077:
+                if not owner_only(info):
                     raise ProviderError(f"{TOKEN_FILE_SETTING} must name an owner-only (0600) regular file")
                 self._token_file = token_file
             tail = self._history.accept(kwargs.get("messages"))
@@ -295,6 +299,9 @@ class ClaudeSubscriptionClient:
             if self._token_file is not None:
                 # The plugin never reads the token: the CLI reads it from this descriptor.
                 fd = os.open(self._token_file, os.O_RDONLY)
+                if not owner_only(os.fstat(fd)):  # re-check what was actually opened
+                    os.close(fd)
+                    raise ProviderError(f"{TOKEN_FILE_SETTING} must name an owner-only (0600) regular file")
                 pass_fds, env = (fd,), {**env, TOKEN_FD_VARIABLE: str(fd)}
             try:
                 self._runtime = Runtime(argv, env, directory, pass_fds=pass_fds)

@@ -31,8 +31,9 @@ Background Hermes processes cannot read a locked Keychain. For them the owner
 can create the CLI's official headless login with `claude setup-token`, save it
 in an owner-only file (mode 0600), and set `HERMES_CLAUDE_SUBSCRIPTION_TOKEN_FILE`
 to that file's absolute path. The client checks the file is an owner-only
-regular file, opens it, and hands the open descriptor to the CLI process only
-(`CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR`). The plugin never reads the token,
+regular file, opens it, checks the opened file again, and hands the open
+descriptor to the CLI process only (`CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR`);
+the MCP server closes any descriptors it inherits from the CLI. The plugin never reads the token,
 and the token is never put in any environment variable. Do **not** put the
 token in a profile `.env` as `CLAUDE_CODE_OAUTH_TOKEN`: Hermes deliberately
 passes that variable to every tool subprocess, where commands the model runs

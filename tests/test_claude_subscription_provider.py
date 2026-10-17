@@ -120,6 +120,16 @@ class MCPTests(unittest.TestCase):
                          "result": {"content": [{"type": "text", "text": "OWNER ONLY\n"}]}})
         self.assertEqual(self.bridge.returns, [{"returned": 0, "rpc_id": 7, "tool_use_id": "toolu_synthetic"}])
 
+    def test_server_closes_inherited_descriptors_at_start(self):
+        leaked = os.open(os.devnull, os.O_RDONLY)
+        os.set_inheritable(leaked, True)
+        self.addCleanup(lambda: os.path.exists(f"/dev/fd/{leaked}") and os.close(leaked))
+        script = (f"import os, importlib.util as u; s=u.spec_from_file_location('m', {str(PLUGIN / 'mcp_server.py')!r}); "
+                  f"m=u.module_from_spec(s); s.loader.exec_module(m); m.close_inherited(); "
+                  f"print(os.path.exists('/dev/fd/{leaked}'))")
+        out = subprocess.run([sys.executable, "-I", "-S", "-c", script], pass_fds=(leaked,), capture_output=True, text=True)
+        self.assertEqual(out.stdout.strip(), "False", out.stderr)
+
     def test_cancelled_bridge_cannot_return_result(self):
         thread = self.serve([self.call()])
         self.pump_until(lambda: self.bridge.calls)
@@ -887,6 +897,17 @@ class ClientTests(unittest.TestCase):
             with self.assertRaisesRegex(client.ProviderError, 'owner-only'):
                 self.request()
         self.assertEqual(self.launches, [])
+
+    def test_token_file_loosened_after_create_is_rejected_at_launch(self):
+        path = self.token_file()
+        with patch.dict(os.environ, {'HERMES_CLAUDE_SUBSCRIPTION_TOKEN_FILE': str(path)}):
+            self.c = client.ClaudeSubscriptionClient(command=SYNTHETIC_CLI)
+            self.addCleanup(self.c.close)
+            stream = self.request(stream=True)
+            path.chmod(0o644)
+            with self.assertRaisesRegex(client.ProviderError, 'owner-only'):
+                list(stream)
+        self.assertEqual(len(self.launches), 1)  # the version check only; no model process
 
     def test_no_descriptor_without_a_token_file(self):
         self.request()
