@@ -831,6 +831,10 @@ class ClientTests(unittest.TestCase):
         self.assertEqual(len(envs), 2)  # version check + runtime
         self.assertTrue(all(env.get('DISABLE_AUTOUPDATER') == '1' for env in envs))
 
+    def test_runtime_assistant_error_names_the_error_and_model(self):
+        with self.assertRaisesRegex(client.ProviderError, r"runtime assistant error: rate_limit \(model <synthetic>\)"):
+            self.request('__assistant_error__')
+
     def test_rejected_rate_limit_stops_instead_of_accepting_later_success(self):
         with self.assertRaises(client.ProviderError):
             self.request('__ratelimit__')
@@ -1213,6 +1217,11 @@ def synthetic_runtime(argv):
             message(f"msg_{ordinal}_final", text="RESTORED " + restored[-1])
             emit({"type": "result", "subtype": "success", "is_error": False, "num_turns": 1,
                   "modelUsage": {model: {"canonicalModel": model, "provider": "firstParty"}}})
+            continue
+        if text == '__assistant_error__':
+            ev("message_start", message={"id": "msg_err", "model": model, "usage": {"input_tokens": 1}})
+            emit({"type": "assistant", "error": "rate_limit", "message": {"id": "msg_err", "model": "<synthetic>",
+                  "content": [{"type": "text", "text": "API Error"}]}})
             continue
         if text == '__rich_tool__':
             message(f"msg_{ordinal}_1", tool_ids=[f"toolu_synthetic_{ordinal}_1"], preamble="Checking.", thinking=True)

@@ -24,7 +24,9 @@ class Message:
             msg = obj.get("message", {})
             # The CLI sends one snapshot per content block, each carrying only that block.
             if obj.get("error") or msg.get("model") not in self.served:
-                raise ProviderError("runtime assistant error or unexpected model")
+                # Short runtime codes only (e.g. rate_limit, invalid_request), never message text.
+                code = str(obj.get("error") or "unexpected model")[:80]
+                raise ProviderError(f"runtime assistant error: {code} (model {str(msg.get('model'))[:80]})")
             if self.id is None or self.done or msg.get("id") != self.id or not isinstance(msg.get("content"), list):
                 raise ProviderError("assistant snapshot outside its streamed message")
             self.snapshot.extend(msg["content"])
