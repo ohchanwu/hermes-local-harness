@@ -36,6 +36,7 @@ mcp = importlib.util.module_from_spec(mcp_spec)
 mcp_spec.loader.exec_module(mcp)
 
 MODEL = "claude-opus-5-5"
+SYNTHETIC_CLI = "/synthetic/claude"  # absolute, like a real dedicated install
 TOOL = {"type": "function", "function": {"name": "read_file", "description": "Native read",
         "parameters": {"type": "object", "properties": {"path": {"type": "string"}},
                        "required": ["path"], "additionalProperties": False}}}
@@ -61,8 +62,7 @@ class SchemaTests(unittest.TestCase):
 
 class CompatTests(unittest.TestCase):
     def test_version_and_model_literals_live_only_in_compat(self):
-        # CLI versions (multi-digit patch) and model names; not e.g. MCP serverInfo "0.1.0".
-        literal = re.compile(r"\b\d+\.\d+\.\d{2,}\b|claude-(opus|sonnet|haiku)")
+        literal = re.compile(r"\b\d+\.\d+\.\d+\b|\(\d+, *\d+, *\d+\)|claude-(opus|sonnet|haiku)")
         for path in PLUGIN.glob("*.py"):
             if path.name != "compat.py":
                 with self.subTest(path=path.name):
@@ -104,6 +104,7 @@ class MCPTests(unittest.TestCase):
         requests = [{"id": 1, "method": "initialize", "params": {"protocolVersion": "2024-11-05"}},
                     {"id": 2, "method": "tools/list"}, self.call()]
         with patch("io.open", side_effect=AssertionError("bridge opened a file")), \
+                patch("builtins.open", side_effect=AssertionError("bridge opened a file")), \
                 patch("subprocess.Popen", side_effect=AssertionError("MCP executed")):
             thread = self.serve(requests)
             self.pump_until(lambda: self.bridge.calls)
@@ -169,6 +170,37 @@ class MCPTests(unittest.TestCase):
         self.pump_until(lambda: self.bridge.closed_by_server)
         with self.assertRaisesRegex(client.ProviderError, "closed"):
             self.bridge.require_open()
+
+    def test_bridge_works_with_descriptors_above_select_limit(self):
+        import resource
+        soft, hard = resource.getrlimit(resource.RLIMIT_NOFILE)
+        if hard != resource.RLIM_INFINITY and hard < 1100:
+            self.skipTest("descriptor limit too low")
+        resource.setrlimit(resource.RLIMIT_NOFILE, (max(soft, 1100), hard))
+        self.addCleanup(resource.setrlimit, resource.RLIMIT_NOFILE, (soft, hard))
+        filler = []
+        self.addCleanup(lambda: [os.close(fd) for fd in filler])
+        while not filler or filler[-1] < 1030:
+            filler.append(os.dup(0))
+        big_tool = {"type": "function", "function": {"name": "read_file", "description": "x" * 20000,
+                    "parameters": TOOL["function"]["parameters"]}}
+        self.bridge = client.Bridge(client.convert_tools([big_tool]))
+        self.addCleanup(self.bridge.close)
+        thread = self.serve([self.call()])
+        self.pump_until(lambda: self.bridge.calls)
+        self.assertGreater(self.bridge.connection.fileno(), 1024)
+        self.bridge.send({"result": 0, "rpc_id": 7, "tool_use_id": "toolu_synthetic", "text": "y" * 100000}, lambda: None)
+        self.pump_until(lambda: self.bridge.returns)
+        thread.join(3)
+        self.assertEqual(self.errors, [])
+
+    def test_bridge_directory_is_removed_when_unclosed_bridge_is_collected(self):
+        orphan = client.Bridge([])
+        directory = orphan.directory
+        del orphan
+        import gc
+        gc.collect()
+        self.assertFalse(directory.exists())
 
     def test_socket_path_length_is_checked_before_binding(self):
         root = Path(tempfile.mkdtemp(dir="/tmp"))
@@ -282,7 +314,7 @@ class ClientTests(unittest.TestCase):
         self.after_version_launch = None
         popen = subprocess.Popen
         def inert_only(argv, *args, **kwargs):
-            if argv[0] == "synthetic-claude":
+            if argv[0] == SYNTHETIC_CLI:
                 self.launches.append(argv)
                 argv = [sys.executable, "-I", "-S", str(Path(__file__).resolve()), "--synthetic-runtime"] + argv[1:]
                 if '--version' in argv:
@@ -311,7 +343,7 @@ class ClientTests(unittest.TestCase):
         self.network_guard = patch("socket.socket", no_network)
         self.network_guard.start()
         self.addCleanup(self.network_guard.stop)
-        self.c = client.ClaudeSubscriptionClient(command="synthetic-claude")
+        self.c = client.ClaudeSubscriptionClient(command=SYNTHETIC_CLI)
         self.addCleanup(self.c.close)
 
     def request(self, text="Hello", **kwargs):
@@ -434,7 +466,7 @@ class ClientTests(unittest.TestCase):
     def test_quota_death_malformed_and_wrong_model_are_not_success(self):
         for prompt in ("__quota__", "__death__", "__malformed__", "__wrongmodel__"):
             with self.subTest(prompt=prompt):
-                c = client.ClaudeSubscriptionClient(command="synthetic-claude")
+                c = client.ClaudeSubscriptionClient(command=SYNTHETIC_CLI)
                 with self.assertRaises((client.ProviderError, ValueError)):
                     c.create(model=MODEL, messages=[{"role": "user", "content": prompt}], timeout=1)
                 self.assertTrue(c.is_closed())
@@ -457,7 +489,7 @@ class ClientTests(unittest.TestCase):
         self.assertFalse(socket_dir.exists())
         with self.assertRaises(client.ProviderError):
             self.continuation(response)
-        other = client.ClaudeSubscriptionClient(command='synthetic-claude')
+        other = client.ClaudeSubscriptionClient(command=SYNTHETIC_CLI)
         self.addCleanup(other.close)
         stream = other.create(model=MODEL, messages=[{'role':'user','content':'__sleep__'}], stream=True)
         errors = []
@@ -498,6 +530,39 @@ class ClientTests(unittest.TestCase):
         self.assertTrue(self.c._runtime.cleanup['group_absent'])
         self.assertFalse(self.c._bridge.directory.exists())
 
+    def test_mcp_server_death_while_parked_fails_continuation_without_delivery(self):
+        self.runtime_args = ['--kill-bridge-after-park']
+        response = self.request('__tool__', tools=[TOOL], timeout=5)
+        time.sleep(1)  # the synthetic runtime kills the parked server .3 s after its call
+        with self.assertRaises(client.ProviderError):
+            self.continuation(response)
+        self.assertFalse(any(a['stage'] == 'result_returned' for a in self.c.audit))
+        self.assertTrue(self.c.is_closed())
+
+    def test_oversized_tool_result_is_rejected_before_delivery(self):
+        response = self.request('__tool__', tools=[TOOL])
+        with patch.object(client.Bridge, 'send', side_effect=AssertionError('oversized result sent')), \
+                self.assertRaisesRegex(client.ProviderError, 'tool result exceeds'):
+            self.continuation(response, 'z' * 2_100_000)
+        self.assertFalse(any(a['stage'] == 'result_delivered' for a in self.c.audit))
+
+    def test_relative_cli_setting_is_rejected_before_effects(self):
+        with patch.dict(os.environ, {'HERMES_CLAUDE_SUBSCRIPTION_CLI': 'claude'}):
+            c = client.ClaudeSubscriptionClient(command='/resolved/by/hermes/claude')
+            self.addCleanup(c.close)
+            with self.assertRaisesRegex(client.ProviderError, 'absolute path'):
+                c.create(model=MODEL, messages=[{'role': 'user', 'content': 'unused'}])
+        c = client.ClaudeSubscriptionClient(command='claude')
+        self.addCleanup(c.close)
+        with self.assertRaisesRegex(client.ProviderError, 'absolute path'):
+            c.create(model=MODEL, messages=[{'role': 'user', 'content': 'unused'}])
+        self.assertEqual(self.launches, [])
+
+    def test_runtime_exit_before_first_input_points_to_smoke_test(self):
+        self.runtime_args = ['--exit-immediately']
+        with self.assertRaisesRegex(client.ProviderError, 'smoke'):
+            self.request('x' * 1_000_000)
+
     def test_malformed_stream_arguments_are_provider_errors(self):
         with self.assertRaises(client.ProviderError):
             self.request('__badargs__', tools=[TOOL])
@@ -523,7 +588,7 @@ class ClientTests(unittest.TestCase):
         with patch('subprocess.Popen', side_effect=FileNotFoundError('synthetic missing binary')):
             with self.assertRaises(client.ProviderError):
                 c.create(model=MODEL,messages=[{'role':'user','content':'unused'}])
-        other=client.ClaudeSubscriptionClient(command='synthetic-claude')
+        other=client.ClaudeSubscriptionClient(command=SYNTHETIC_CLI)
         self.addCleanup(other.close)
         self.version_mode = 'wrong'
         with self.assertRaisesRegex(client.ProviderError,'unrecognized Claude CLI version'):
@@ -591,7 +656,7 @@ class ClientTests(unittest.TestCase):
         self.assertEqual(response.model, MODEL)
 
     def test_cli_path_comes_from_dedicated_setting(self):
-        with patch.dict(os.environ, {'HERMES_CLAUDE_SUBSCRIPTION_CLI': 'synthetic-claude'}):
+        with patch.dict(os.environ, {'HERMES_CLAUDE_SUBSCRIPTION_CLI': SYNTHETIC_CLI}):
             c = client.ClaudeSubscriptionClient()
             self.addCleanup(c.close)
             response = c.create(model=MODEL, messages=[{'role': 'user', 'content': 'Hello'}])
@@ -785,7 +850,7 @@ class ClientTests(unittest.TestCase):
         for name in ('HERMES_HOME', 'HERMES_PROFILE', 'HERMES_KANBAN_TASK',
                      'HERMES_KANBAN_WORKSPACE', 'HOME', 'cwd'):
             with self.subTest(scope=name), ExitStack() as stack:
-                c = client.ClaudeSubscriptionClient(command='synthetic-claude')
+                c = client.ClaudeSubscriptionClient(command=SYNTHETIC_CLI)
                 stack.callback(c.close)
                 stream = c.create(model=MODEL, messages=[{'role':'user','content':'unused'}], stream=True)
                 before = len(self.launches)
@@ -919,6 +984,9 @@ def synthetic_runtime(argv):
     ordinal = 0
     model = argv[argv.index('--serve-model')+1] if '--serve-model' in argv else argv[argv.index('--model')+1]
     init_version = argv[argv.index('--init-version')+1] if '--init-version' in argv else "2.1.283"
+    if '--exit-immediately' in argv:
+        sys.stdin.close()
+        return
     if '--exit-before-init' in argv:
         return
     if '--sleep-before-input' in argv:
@@ -984,6 +1052,14 @@ def synthetic_runtime(argv):
                     bridge.stdin.flush()
                     return json.loads(bridge.stdout.readline())
                 rpc({"id": 1, "method": "initialize", "params": {"protocolVersion": "2024-11-05"}})
+            if '--kill-bridge-after-park' in argv:
+                bridge.stdin.write(json.dumps({"id": turn + 1, "method": "tools/call",
+                                               "params": {"name": "read_file", "arguments": {"path": fixture}}}) + "\n")
+                bridge.stdin.flush()
+                time.sleep(.3)
+                bridge.kill()
+                bridge.wait(timeout=2)
+                time.sleep(30)
             if '--kill-bridge-before-call' in argv:
                 bridge.kill()
                 bridge.wait(timeout=2)

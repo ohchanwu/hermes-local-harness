@@ -54,7 +54,7 @@ def serve(bridge, source=None, sink=None):
         result = None
         if method == "initialize":
             result = {"protocolVersion": request["params"]["protocolVersion"], "capabilities": {"tools": {}},
-                      "serverInfo": {"name": "hermes", "version": "0.1.0"}}
+                      "serverInfo": {"name": "hermes", "version": "1"}}
         elif method == "tools/list":
             result = {"tools": tools}
         elif method == "ping":

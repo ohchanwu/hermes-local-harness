@@ -85,7 +85,7 @@ every acknowledgement. The server never opens the requested tool path and
 contains no filesystem/shell/tool implementation. Duplicate/replayed IDs,
 missing/mismatched results and changed prefixes are errors. Multiple/parallel
 model calls are rejected before any native tool call is exposed. Serial
-multi-step tool use is supported within the bounded session budget.
+multi-step tool use is supported without a step cap.
 
 Streaming text comes from actual runtime deltas. Tool-call name/identity and
 argument fragments are emitted only after the whole message and MCP invocation
@@ -129,8 +129,8 @@ Only after separate attended authorization and exact-candidate review:
    interactive one, for example
    `npm install --prefix "$HERMES_HOME/runtimes/claude-code/2.1.283" @anthropic-ai/claude-code@2.1.283`
    (confirm the currently supported pinned-install method first). Set
-   `HERMES_CLAUDE_SUBSCRIPTION_CLI` in the Hermes environment to that install's
-   `claude` binary. Sign-in is the ordinary attended subscription login shared
+   `HERMES_CLAUDE_SUBSCRIPTION_CLI` in the Hermes environment to the absolute
+   path of that install's `claude` binary (a bare name is rejected). Sign-in is the ordinary attended subscription login shared
    through the same `HOME`; never export tokens or configure an API-key
    substitute for this provider.
 2. Copy this whole directory to
@@ -226,7 +226,7 @@ entry-points metadata read; the genuine Python-backed native read still passed.
 These validation-only guards are not plugin deployment features or a fake
 bootstrap. No live profile/plugin/config/model selection was changed.
 
-Offline tests currently cover 67 provider mechanisms (including both bridge
+Offline tests currently cover 73 provider mechanisms (including both bridge
 ends over a real socket and the smoke script against an inert runtime), five
 registration/scope contracts and the original ten prototype regressions. Default test imports do
 not load installed Hermes or contact providers. Inert Python children exercise

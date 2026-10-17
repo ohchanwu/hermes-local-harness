@@ -10,10 +10,11 @@ import json
 import os
 from pathlib import Path
 import secrets
-import select
+import selectors
 import shutil
 import socket
 import tempfile
+import weakref
 
 from .errors import ProviderError
 
@@ -37,16 +38,23 @@ class Bridge:
     def __init__(self, tools, root="/tmp"):
         # A short private directory: the session cache path is too long for a socket.
         self.directory = Path(tempfile.mkdtemp(prefix="hcs-", dir=root))
+        # Removes the directory even if the owner is collected without close().
+        self._remove_directory = weakref.finalize(self, shutil.rmtree, self.directory, True)
         self.path = self.directory / "bridge.sock"
         if len(os.fsencode(self.path)) > SOCKET_PATH_BOUND:
-            shutil.rmtree(self.directory, ignore_errors=True)
+            self._remove_directory()
             raise ProviderError("MCP bridge socket path is too long")
         self.tools = tools
         self.token = secrets.token_hex(32)
         self.listener = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        self.listener.bind(str(self.path))
-        self.listener.listen(1)
-        self.listener.setblocking(False)
+        try:
+            self.listener.bind(str(self.path))
+            self.listener.listen(1)
+            self.listener.setblocking(False)
+        except OSError:
+            self.listener.close()
+            self._remove_directory()
+            raise
         self.connection = None
         self.authenticated = False
         self.buffer = b""
@@ -107,7 +115,16 @@ class Bridge:
             try:
                 remaining = remaining[self.connection.send(remaining):]
             except BlockingIOError:
-                select.select([], [self.connection], [], 0.01)
+                self.wait(selectors.EVENT_WRITE)
+
+    def wait(self, event, seconds=0.01):
+        """Wait briefly for the connection to become readable or writable.
+
+        selectors, not select.select, which fails on descriptors >= 1024.
+        """
+        with selectors.DefaultSelector() as selector:
+            selector.register(self.connection, event)
+            selector.select(seconds)
 
     def shutdown(self):
         """Cancel: the server sees end-of-file and exits without answering a parked call."""
@@ -123,4 +140,4 @@ class Bridge:
         for sock in (self.connection, self.listener):
             if sock is not None:
                 sock.close()
-        shutil.rmtree(self.directory, ignore_errors=True)
+        self._remove_directory()

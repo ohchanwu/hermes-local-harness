@@ -111,7 +111,9 @@ class Runtime:
                 except PermissionError:
                     # macOS may report EPERM for a just-reaped group. Establish
                     # absence via the same exact-PGID check, never ignore a denial
-                    # while an owned group is actually still present.
+                    # while an owned group is actually still present. An exited,
+                    # unreaped leader (zombie) also gives EPERM, so reap first.
+                    self.process.poll()
                     if self.group_exists():
                         raise
                 end = time.monotonic() + seconds

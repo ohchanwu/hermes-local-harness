@@ -7,7 +7,7 @@ import math
 import os
 from pathlib import Path
 import re
-import select
+import selectors
 import subprocess
 import sys
 import tempfile
@@ -15,7 +15,7 @@ import threading
 import time
 from types import SimpleNamespace
 
-from .bridge import Bridge, save
+from .bridge import LINE_BOUND, Bridge, save
 from . import compat
 from .compat import CHILD_ENV, CLI_FLAGS, CLI_SETTING, DEFAULT_EFFORT, EFFORT_SETTING, EFFORTS, CLI_MINIMUM, CLI_TESTED, PREFIX, SETTINGS, served_names, version_text
 from .errors import ProviderError
@@ -185,9 +185,12 @@ class ClaudeSubscriptionClient:
             if self.is_closed():
                 raise ProviderError("client closed or cancelled; no retry/resume")
             model, scope, tools, max_output, effort = self._validate(kwargs)
+            # Never fall back to the interactive `claude` on PATH: it updates itself.
+            # A bare name would be resolved through PATH, so only absolute paths count.
             if not self.command:
-                # Never fall back to the interactive `claude` on PATH: it updates itself.
                 raise ProviderError(f"no Claude CLI configured; set {CLI_SETTING} to the provider's dedicated install")
+            if not os.path.isabs(self.command) or not os.path.isabs(os.environ.get(CLI_SETTING) or self.command):
+                raise ProviderError(f"{CLI_SETTING} must be an absolute path to the provider's dedicated install")
             tail = self._history.accept(kwargs.get("messages"))
             self._model, self._scope, self._tools = model, scope, tools
             if self._effort is None:
@@ -278,6 +281,8 @@ class ClaudeSubscriptionClient:
                     if self._pending is None or tail["tool_call_id"] != self._pending["tool_use_id"] or self._bridge is None:
                         raise ProviderError("missing/mismatched parked invocation")
                     delivery = {"result": self._sequence, **self._pending, "text": tail["content"]}
+                    if len(json.dumps(delivery)) >= LINE_BOUND:
+                        raise ProviderError("tool result exceeds the MCP bridge line bound; nothing was delivered")
                     self._pending = None
                 else:
                     self._inputs += 1
@@ -293,7 +298,13 @@ class ClaudeSubscriptionClient:
                 self._check_active()
                 # A full pipe must not hold the ownership lock and prevent
                 # cancel() from killing/reaping the reader to unblock this write.
-                runtime.send(tail["content"], self._check_active, idle=self._pump_bridge)
+                try:
+                    runtime.send(tail["content"], self._check_active, idle=self._pump_bridge)
+                except OSError:
+                    if self._initialized:
+                        raise
+                    raise ProviderError(f"runtime exited before reading input (before initialization; an upgraded "
+                                        f"Claude CLI {version_text(self._cli_version)} may reject a flag: run smoke.py)") from None
                 self.audit.append({"stage": "user_input", "number": self._inputs})
             served = served_names(self._model)
             message = Message(served)
@@ -405,7 +416,7 @@ class ClaudeSubscriptionClient:
             self._pump_bridge()
             if self._delivered:
                 self._bridge.require_open()
-                select.select([self._bridge.connection], [], [], 0.01)
+                self._bridge.wait(selectors.EVENT_READ)
 
     def cancel(self):
         with self._lifecycle:
