@@ -11,6 +11,7 @@ This index is the entry point for durable harness documentation tracked in Git. 
 
 ## Current entries
 
+- [Claude subscription helper support](specs/261017-claude-subscription-helper-support.md) — implemented and live; Hermes helper jobs (compression, titles, approval, vision, …) run on the provider.
 - [Claude subscription transcript rebuild](specs/261017-claude-subscription-transcript-rebuild.md) — implemented; review approved; live smoke (with rebuild) and a harness-worker Kanban pilot passed on CLI 2.1.302 with the headless login token. Rolled out as the default model of the worker, reviewer and orchestrator profiles in all three projects; see the provider README.
 - [Claude subscription provider hardening](specs/261017-claude-subscription-provider-hardening.md) — implemented; independent review approved; live smoke test passed (CLI 2.1.283); not installed in live Hermes.
 - [Claude Max 20x inside Hermes and model portability](specs/261016-claude-max20x-model-portability.md) — execution specification; native billing verification first; implementation/live testing not yet authorized.

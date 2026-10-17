@@ -1,6 +1,6 @@
 # Claude subscription provider: serve Hermes helper jobs
 
-Status: approved 2026-10-17 by the owner, who chose "Claude provider" for helper jobs after deciding to stop using GPT from 2026-10-18. Autonomous execution up to the live-check gate.
+Status: implemented and live (2026-10-17). Independent review approved after fixes; live smoke with helper checks passed; helpers in all eleven Claude homes moved to this provider; Hermes' real sync and async helper paths verified.
 Builds on the [hardening](261017-claude-subscription-provider-hardening.md) and [transcript rebuild](261017-claude-subscription-transcript-rebuild.md) specifications.
 
 ## 1. Problem

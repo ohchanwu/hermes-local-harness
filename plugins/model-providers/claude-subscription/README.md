@@ -172,17 +172,33 @@ analysis and the rest) can run on this provider
 
 ## Rollout status (2026-10-17 KST)
 
-Owner-approved and live. `claude-opus-5-5` through this provider is the default
-model of `harness-`, `chapt-` and `jobcron-` `worker`, `reviewer` and
-`orchestrator` (CLI 2.1.302, headless login token file). Each profile pins all
-sixteen `auxiliary.<task>` helpers (compression, title generation, approval,
-vision, …) to its previous OpenAI Codex model. Those helpers would otherwise
-inherit this provider, which cannot serve async calls, a shared cached client
-or options such as `temperature`. Verified with default-model pilots: a worker
-task and a reviewer task completed on Kanban, and a one-shot orchestrator chat
-completed a tool round trip. Orchestrators are not Kanban-dispatched
-(`kanban.dispatch_profiles`). Each profile's previous config is saved as
-`config.yaml.pre-claude-261017`; restoring that file rolls the profile back.
+Owner-approved and live; GPT is retired from 2026-10-18.
+
+| Home | Main model | Effort |
+| --- | --- | --- |
+| default (`~/.hermes`, main orchestrator) | `claude-opus-5-5` | high |
+| `harness-`, `chapt-`, `jobcron-` `worker` and `orchestrator` | `claude-opus-5-5` | high |
+| `harness-`, `chapt-`, `jobcron-` `reviewer`, `advisor` | `claude-fable-5-1` | high |
+
+In all eleven homes, the sixteen `auxiliary.<task>` helpers run on this
+provider with `claude-opus-5-5`. Pinning Opus keeps Fable homes off Fable's
+weekly cap. All run CLI 2.1.302 with the headless login token file.
+
+Remaining OpenAI profiles (`reviewer-sol`, `worker-*` GPT variants) are out of
+every `kanban.dispatch_profiles` list; the project orchestrators' own lists are
+`[]` (claim nothing).
+
+Verification:
+- live smoke passes for Opus 5.5 and Fable 5.1, including the rebuild and helper
+  checks;
+- Kanban pilots completed for a worker and a reviewer;
+- one-shot chats completed for an orchestrator, the Advisor and the default
+  profile;
+- Hermes' own `call_llm` (sync) and `async_call_llm` helper paths returned
+  through this provider.
+
+Rollback copies: `config.yaml.pre-claude-261017` (before any Claude change) and
+`config.yaml.pre-helpers-261017` (before helpers moved off GPT) in each home.
 
 ## Manual setup and rollback reference
 
