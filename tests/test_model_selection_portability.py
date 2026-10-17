@@ -74,10 +74,10 @@ class RegistrationTests(unittest.TestCase):
         self.addCleanup(c.close)
         kwargs = {'model':'claude-opus-5-5', 'messages':[{'role':'user','content':'unused'}],
                   'extra_body': self.profile.build_extra_body(session_id='worker-session')}
-        scope, tools = c._validate(kwargs)
+        model, scope, tools = c._validate(kwargs)
         self.assertEqual(scope[-1], 'worker-session')
         self.assertEqual(tools, [])
-        c._scope, c._tools = scope, tools
+        c._model, c._scope, c._tools = model, scope, tools
         kwargs['extra_body'] = self.profile.build_extra_body(session_id='reviewer-session')
         with self.assertRaisesRegex(RuntimeError, 'session/worktree/profile'):
             c._validate(kwargs)

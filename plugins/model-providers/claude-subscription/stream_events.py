@@ -1,13 +1,13 @@
 """Parser for one streamed runtime assistant message."""
 import json
 
-from .compat import MODEL
 from .errors import ProviderError
 
 
 class Message:
     """One real streamed assistant message, not a canned completion rechunked."""
-    def __init__(self):
+    def __init__(self, served):
+        self.served = served
         self.id = None
         self.blocks = {}
         self.text = ""
@@ -22,7 +22,7 @@ class Message:
         kind = obj.get("type")
         if kind == "assistant":
             msg = obj.get("message", {})
-            if obj.get("error") or msg.get("model") != MODEL or self.snapshot is not None:
+            if obj.get("error") or msg.get("model") not in self.served or self.snapshot is not None:
                 raise ProviderError("runtime assistant error, duplicate snapshot or unexpected model")
             self.snapshot = msg
             self.usage.update(msg.get("usage") or {})
@@ -33,7 +33,7 @@ class Message:
         event = ev.get("type")
         if event == "message_start":
             msg = ev.get("message", {})
-            if self.id is not None or msg.get("model") != MODEL or not isinstance(msg.get("id"), str) or not msg["id"]:
+            if self.id is not None or msg.get("model") not in self.served or not isinstance(msg.get("id"), str) or not msg["id"]:
                 raise ProviderError("unexpected/duplicate streamed message or model")
             self.id = msg["id"]
             self.usage.update(msg.get("usage") or {})

@@ -35,6 +35,7 @@ assert mcp_spec is not None and mcp_spec.loader is not None
 mcp = importlib.util.module_from_spec(mcp_spec)
 mcp_spec.loader.exec_module(mcp)
 
+MODEL = "claude-opus-5-5"
 TOOL = {"type": "function", "function": {"name": "read_file", "description": "Native read",
         "parameters": {"type": "object", "properties": {"path": {"type": "string"}},
                        "required": ["path"], "additionalProperties": False}}}
@@ -226,19 +227,19 @@ class ClientTests(unittest.TestCase):
         self.addCleanup(self.c.close)
 
     def request(self, text="Hello", **kwargs):
-        return self.c.chat.completions.create(model=client.MODEL,
+        return self.c.chat.completions.create(model=MODEL,
                 messages=[{"role": "system", "content": "Synthetic system"}, {"role": "user", "content": text}], **kwargs)
 
     def continuation(self, response, result="OWNER RESULT\n", *, stream=False):
         messages = copy.deepcopy(self.c._history.messages)
         messages.append({"role": "tool", "tool_call_id": response.choices[0].message.tool_calls[0].id, "content": result})
-        return self.c.create(model=client.MODEL, messages=messages, tools=[TOOL], stream=stream)
+        return self.c.create(model=MODEL, messages=messages, tools=[TOOL], stream=stream)
 
     def test_lazy_constructor_and_invalid_configuration_have_no_runtime_effects(self):
         self.assertEqual(self.launches, [])
         for extras in ({"model": "opus"}, {"parallel_tool_calls": True}, {"temperature": 0.5},
                        {"max_tokens": 2048}, {"extra_body": {"unknown": True}}):
-            kwargs = {"model": client.MODEL, "messages": [{"role": "user", "content": "unused"}], **extras}
+            kwargs = {"model": MODEL, "messages": [{"role": "user", "content": "unused"}], **extras}
             with self.subTest(extras=extras), self.assertRaises(client.ProviderError):
                 self.c.create(**kwargs)
         self.assertEqual(self.launches, [])
@@ -247,11 +248,11 @@ class ClientTests(unittest.TestCase):
         response = self.request()
         self.assertEqual(response.choices[0].message.content, "YES")
         self.assertEqual(response.choices[0].finish_reason, "stop")
-        self.assertEqual(response.model, client.MODEL)
+        self.assertEqual(response.model, MODEL)
         self.assertEqual(response.usage.prompt_tokens, 9)
         self.assertEqual(response.usage.completion_tokens, 2)
         messages = copy.deepcopy(self.c._history.messages) + [{"role": "user", "content": "Followup"}]
-        second = self.c.create(model=client.MODEL, messages=messages)
+        second = self.c.create(model=MODEL, messages=messages)
         self.assertEqual(second.choices[0].message.content, "FOLLOWUP")
         self.assertNotEqual(second.id, response.id)
         self.assertEqual(len([a for a in self.c.audit if a["stage"] == "launch"]), 1)
@@ -263,7 +264,7 @@ class ClientTests(unittest.TestCase):
         self.assertEqual([c.choices[0].delta.content for c in chunks if hasattr(c.choices[0].delta, "content")], ["Y", "ES"])
         self.assertEqual(chunks[-1].choices[0].finish_reason, "stop")
         self.assertEqual(chunks[-1].usage.total_tokens, 11)
-        self.assertTrue(all(c.id == chunks[0].id and c.model == client.MODEL for c in chunks))
+        self.assertTrue(all(c.id == chunks[0].id and c.model == MODEL for c in chunks))
         stream.close()  # clean stream close must not cancel the persistent runtime
         self.assertFalse(self.c.is_closed())
 
@@ -346,7 +347,7 @@ class ClientTests(unittest.TestCase):
             with self.subTest(prompt=prompt):
                 c = client.ClaudeSubscriptionClient(command="synthetic-claude")
                 with self.assertRaises((client.ProviderError, ValueError)):
-                    c.create(model=client.MODEL, messages=[{"role": "user", "content": prompt}], timeout=1)
+                    c.create(model=MODEL, messages=[{"role": "user", "content": prompt}], timeout=1)
                 self.assertTrue(c.is_closed())
                 self.assertTrue(c._runtime.cleanup["group_absent"])
                 c.close()
@@ -368,7 +369,7 @@ class ClientTests(unittest.TestCase):
             self.continuation(response)
         other = client.ClaudeSubscriptionClient(command='synthetic-claude')
         self.addCleanup(other.close)
-        stream = other.create(model=client.MODEL, messages=[{'role':'user','content':'__sleep__'}], stream=True)
+        stream = other.create(model=MODEL, messages=[{'role':'user','content':'__sleep__'}], stream=True)
         errors = []
         def consume():
             try:
@@ -392,13 +393,13 @@ class ClientTests(unittest.TestCase):
         messages = copy.deepcopy(self.c._history.messages) + [{'role':'user','content':'next'}]
         before = copy.deepcopy(self.c._history.messages)
         with patch.dict(os.environ, {'HERMES_PROFILE':'different-reviewer'}), self.assertRaises(client.ProviderError):
-            self.c.create(model=client.MODEL, messages=messages)
+            self.c.create(model=MODEL, messages=messages)
         self.assertEqual(before, self.c._history.messages)
-        self.c.create(model=client.MODEL, messages=messages)
+        self.c.create(model=MODEL, messages=messages)
         messages = copy.deepcopy(self.c._history.messages) + [{'role':'user','content':'third'}]
         before = copy.deepcopy(self.c._history.messages)
         with self.assertRaises(client.ProviderError):
-            self.c.create(model=client.MODEL, messages=messages)
+            self.c.create(model=MODEL, messages=messages)
         self.assertEqual(before, self.c._history.messages)
 
     def test_malformed_stream_arguments_are_provider_errors(self):
@@ -425,12 +426,12 @@ class ClientTests(unittest.TestCase):
         self.addCleanup(c.close)
         with patch('subprocess.Popen', side_effect=FileNotFoundError('synthetic missing binary')):
             with self.assertRaises(client.ProviderError):
-                c.create(model=client.MODEL,messages=[{'role':'user','content':'unused'}])
+                c.create(model=MODEL,messages=[{'role':'user','content':'unused'}])
         other=client.ClaudeSubscriptionClient(command='synthetic-claude')
         self.addCleanup(other.close)
         self.version_mode = 'wrong'
         with self.assertRaisesRegex(client.ProviderError,'unrecognized Claude CLI version'):
-            other.create(model=client.MODEL,messages=[{'role':'user','content':'unused'}])
+            other.create(model=MODEL,messages=[{'role':'user','content':'unused'}])
         self.assertEqual(len(self.launches), 1)
         self.assertIsNotNone(self.children[0].poll())
 
@@ -460,6 +461,38 @@ class ClientTests(unittest.TestCase):
         self.runtime_args = ['--exit-before-init']
         with self.assertRaisesRegex(client.ProviderError, 'smoke'):
             self.request()
+
+    def test_allowlisted_second_model_is_requested_and_served(self):
+        with patch.dict(client.compat.MODELS, {'claude-test-model': {'context_length': 1000}}):
+            response = self.c.create(model='claude-test-model', messages=[{'role': 'user', 'content': 'Hello'}])
+        self.assertEqual(response.model, 'claude-test-model')
+        self.assertEqual(self.launches[-1][self.launches[-1].index('--model') + 1], 'claude-test-model')
+
+    def test_unlisted_model_is_rejected_before_effects(self):
+        with self.assertRaisesRegex(client.ProviderError, 'exact model'):
+            self.c.create(model='claude-unlisted', messages=[{'role': 'user', 'content': 'unused'}])
+        self.assertEqual(self.launches, [])
+
+    def test_model_change_on_same_client_is_rejected(self):
+        self.request()
+        messages = copy.deepcopy(self.c._history.messages) + [{'role': 'user', 'content': 'next'}]
+        with patch.dict(client.compat.MODELS, {'claude-test-model': {'context_length': 1000}}), \
+                self.assertRaisesRegex(client.ProviderError, 'separate client'):
+            self.c.create(model='claude-test-model', messages=messages)
+
+    def test_served_model_must_equal_requested_model(self):
+        self.runtime_args = ['--serve-model', 'claude-test-model']
+        with patch.dict(client.compat.MODELS, {'claude-test-model': {'context_length': 1000}}), \
+                self.assertRaises(client.ProviderError):
+            self.request()
+        self.assertTrue(self.c._runtime.cleanup['group_absent'])
+
+    def test_declared_served_alias_is_accepted_and_reported_as_requested(self):
+        self.runtime_args = ['--serve-model', 'claude-opus-5-5-20261001']
+        aliased = {MODEL: {'context_length': 1000000, 'served_aliases': ['claude-opus-5-5-20261001']}}
+        with patch.dict(client.compat.MODELS, aliased):
+            response = self.request()
+        self.assertEqual(response.model, MODEL)
 
     def test_rejected_rate_limit_stops_instead_of_accepting_later_success(self):
         with self.assertRaises(client.ProviderError):
@@ -602,7 +635,7 @@ class ClientTests(unittest.TestCase):
             with self.subTest(scope=name), ExitStack() as stack:
                 c = client.ClaudeSubscriptionClient(command='synthetic-claude')
                 stack.callback(c.close)
-                stream = c.create(model=client.MODEL, messages=[{'role':'user','content':'unused'}], stream=True)
+                stream = c.create(model=MODEL, messages=[{'role':'user','content':'unused'}], stream=True)
                 before = len(self.launches)
                 if name == 'cwd':
                     previous = os.getcwd()
@@ -654,7 +687,7 @@ class ClientTests(unittest.TestCase):
         self.assertEqual(self.c._scope[-1], 'original-session')
         messages = copy.deepcopy(self.c._history.messages) + [{'role':'user','content':'next'}]
         with self.assertRaisesRegex(client.ProviderError, 'session/worktree/profile'):
-            self.c.create(model=client.MODEL, messages=messages, extra_body=body)
+            self.c.create(model=MODEL, messages=messages, extra_body=body)
 
 
 def synthetic_runtime(argv):
@@ -676,7 +709,7 @@ def synthetic_runtime(argv):
     def ev(kind, **kwargs):
         emit({"type": "stream_event", "event": {"type": kind, **kwargs}})
     def message(message_id, text=None, tool_ids=None):
-        ev("message_start", message={"id": message_id, "model": client.MODEL,
+        ev("message_start", message={"id": message_id, "model": model,
                                     "usage": {"input_tokens": 1, "output_tokens": 0}})
         content = []
         if tool_ids:
@@ -694,7 +727,7 @@ def synthetic_runtime(argv):
             for fragment in (text[:1], text[1:]):
                 ev("content_block_delta", index=0, delta={"type": "text_delta", "text": fragment})
             content = [{"type": "text", "text": text}]
-        emit({"type": "assistant", "message": {"id": message_id, "model": client.MODEL, "content": content,
+        emit({"type": "assistant", "message": {"id": message_id, "model": model, "content": content,
               "usage": {"input_tokens": 1, "cache_read_input_tokens": 5, "cache_creation_input_tokens": 3, "output_tokens": 2}}})
         for index in range(len(content)):
             ev("content_block_stop", index=index)
@@ -706,6 +739,7 @@ def synthetic_runtime(argv):
     fixture = argv[argv.index('--native-fixture')+1] if '--native-fixture' in argv else '/nonexistent/synthetic'
     badargs = False
     ordinal = 0
+    model = argv[argv.index('--serve-model')+1] if '--serve-model' in argv else argv[argv.index('--model')+1]
     init_version = argv[argv.index('--init-version')+1] if '--init-version' in argv else "2.1.283"
     if '--exit-before-init' in argv:
         return
@@ -719,7 +753,7 @@ def synthetic_runtime(argv):
             text = '__tool__' if ordinal == 1 else 'Followup'
         badargs = text == '__badargs__'
         if ordinal == 1:
-            emit({"type": "system", "subtype": "init", "model": "wrong" if text == "__wrongmodel__" else client.MODEL,
+            emit({"type": "system", "subtype": "init", "model": "wrong" if text == "__wrongmodel__" else model,
                   "tools": tools, "apiKeySource": "none", "claude_code_version": init_version})
         if text == "__sleep__":
             time.sleep(30)
@@ -761,7 +795,7 @@ def synthetic_runtime(argv):
             results.append(reply["result"]["content"][0]["text"])
         message(f"msg_{ordinal}_final", text="|".join(results) if results else "YES" if ordinal == 1 else "FOLLOWUP")
         emit({"type": "result", "subtype": "success", "is_error": False, "num_turns": count + 1,
-              "modelUsage": {client.MODEL: {"canonicalModel": client.MODEL, "provider": "firstParty"}}, "usage": {"input_tokens": 1, "output_tokens": 2}})
+              "modelUsage": {model: {"canonicalModel": model, "provider": "firstParty"}}, "usage": {"input_tokens": 1, "output_tokens": 2}})
     if bridge:
         bridge.terminate()
         bridge.wait(timeout=2)

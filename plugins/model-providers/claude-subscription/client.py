@@ -15,7 +15,8 @@ import time
 from types import SimpleNamespace
 
 from .bridge import save
-from .compat import CHILD_ENV, CLI_FLAGS, CLI_MINIMUM, CLI_TESTED, MODEL, PREFIX, SETTINGS, version_text
+from . import compat
+from .compat import CHILD_ENV, CLI_FLAGS, CLI_MINIMUM, CLI_TESTED, PREFIX, SETTINGS, served_names, version_text
 from .errors import ProviderError
 from .history import History
 from .runtime import Runtime
@@ -23,7 +24,7 @@ from .stream_events import Message
 from .translate import convert_tools, record, usage
 
 __all__ = ["ClaudeSubscriptionClient", "ProviderError", "History", "Message", "Runtime", "convert_tools",
-           "record", "usage", "save", "MODEL", "PREFIX"]
+           "record", "usage", "save", "PREFIX"]
 
 log = logging.getLogger(__name__)
 
@@ -95,6 +96,7 @@ class ClaudeSubscriptionClient:
         self._temporary = None
         self._timer = None
         self._cli_version = None
+        self._model = None
         self._session_deadline = self._request_deadline = None
         self._process_env = None
         self._home = None
@@ -130,8 +132,12 @@ class ClaudeSubscriptionClient:
             raise ProviderError("runtime response timed out")
 
     def _validate(self, kwargs):
-        if kwargs.get("model") != MODEL:
-            raise ProviderError("claude-subscription requires exact model " + MODEL)
+        model = kwargs.get("model")
+        if not isinstance(model, str) or model not in compat.MODELS:
+            raise ProviderError("claude-subscription requires an exact model id from its allowlist: "
+                                + ", ".join(sorted(compat.MODELS)))
+        if self._model is not None and model != self._model:
+            raise ProviderError("model changed; use a separate client")
         allowed = {"model", "messages", "tools", "stream", "stream_options", "timeout", "max_tokens",
                    "max_completion_tokens", "parallel_tool_calls", "tool_choice", "extra_body"}
         if set(kwargs) - allowed:
@@ -159,7 +165,7 @@ class ClaudeSubscriptionClient:
         tools = convert_tools(kwargs.get("tools"))
         if self._scope is not None and (scope != self._scope or tools != self._tools):
             raise ProviderError("session/worktree/profile or tool schema changed; use a separate client")
-        return scope, tools
+        return model, scope, tools
 
     def create(self, **kwargs):
         try:
@@ -173,9 +179,9 @@ class ClaudeSubscriptionClient:
         try:
             if self.is_closed():
                 raise ProviderError("client closed or cancelled; no retry/resume")
-            scope, tools = self._validate(kwargs)
+            model, scope, tools = self._validate(kwargs)
             tail = self._history.accept(kwargs.get("messages"))
-            self._scope, self._tools = scope, tools
+            self._model, self._scope, self._tools = model, scope, tools
             if self._process_env is None:
                 self._process_env = {k: os.environ[k] for k in ("HOME", "PATH", "LANG", "TMPDIR") if k in os.environ}
                 self._home = Path(scope[1] or Path(scope[4] or Path.home()) / ".hermes").absolute()
@@ -230,7 +236,7 @@ class ClaudeSubscriptionClient:
                   "args": ["-I", "-S", str(Path(__file__).with_name("mcp_server.py")), str(directory)],
                   "env": {"HOME": str(directory), "PATH": "/usr/bin:/bin"}}}} if self._tools else {"mcpServers": {}}
         system = self._history.messages[0]["content"] if self._history.messages[0]["role"] == "system" else ""
-        argv = [self.command, *CLI_FLAGS, "--model", MODEL, "--settings", str(directory / "settings.json"),
+        argv = [self.command, *CLI_FLAGS, "--model", self._model, "--settings", str(directory / "settings.json"),
                 "--mcp-config", str(directory / "mcp.json"), "--allowedTools", ",".join(PREFIX + t["name"] for t in self._tools),
                 "--system-prompt", system]
         with self._lifecycle:
@@ -241,7 +247,7 @@ class ClaudeSubscriptionClient:
             save(directory / "mcp.json", config)
             self._check_active()
             self._runtime = Runtime(argv, env, directory)
-            self.audit.append({"stage": "launch", "pid": self._runtime.process.pid, "model": MODEL})
+            self.audit.append({"stage": "launch", "pid": self._runtime.process.pid, "model": self._model})
 
     def _drive(self, tail, seconds):
         try:
@@ -278,7 +284,8 @@ class ClaudeSubscriptionClient:
                 # cancel() from killing/reaping the reader to unblock this write.
                 runtime.send(tail["content"], self._check_active)
                 self.audit.append({"stage": "user_input", "number": self._inputs})
-            message = Message()
+            served = served_names(self._model)
+            message = Message(served)
             initialized = bool(self._turns)
             while True:
                 self._check_active()
@@ -301,9 +308,9 @@ class ClaudeSubscriptionClient:
                         assistant = {"role": "assistant", "content": message.text, "tool_calls": [native_call]}
                         self._history.assistant(assistant)
                         self._last_response = record({"id": message.id, "object": "chat.completion", "created": int(time.time()),
-                            "model": MODEL, "choices": [{"index": 0, "message": assistant, "finish_reason": "tool_calls"}], "usage": usage(message.usage)})
+                            "model": self._model, "choices": [{"index": 0, "message": assistant, "finish_reason": "tool_calls"}], "usage": usage(message.usage)})
                         self.audit.append({"stage": "tool_parked", "tool_use_id": call["id"], "rpc_id": pending["rpc_id"],
-                                           "name": pending["name"], "arguments": call["arguments"], "model": MODEL})
+                                           "name": pending["name"], "arguments": call["arguments"], "model": self._model})
                         yield self._chunk(message, {"tool_calls": [{"index": 0, "id": call["id"], "type": "function",
                                                       "function": {"name": pending["name"], "arguments": ""}}]})
                         for fragment in message.argument_fragments or [json.dumps(call["arguments"])]:
@@ -324,7 +331,7 @@ class ClaudeSubscriptionClient:
                 kind = obj.get("type")
                 if kind == "system" and obj.get("subtype") == "init":
                     expected = {PREFIX + t["name"] for t in self._tools}
-                    if obj.get("model") != MODEL or set(obj.get("tools", [])) != expected or obj.get("apiKeySource") != "none":
+                    if obj.get("model") not in served or set(obj.get("tools", [])) != expected or obj.get("apiKeySource") != "none":
                         raise ProviderError("unexpected runtime model/auth source/executor")
                     if obj.get("claude_code_version") != version_text(self._cli_version):
                         raise ProviderError("unexpected runtime version")
@@ -342,14 +349,14 @@ class ClaudeSubscriptionClient:
                     if self._turns > 4 or type(obj.get("num_turns")) is not int or obj["num_turns"] > 3:
                         raise ProviderError("runtime model-turn bound exceeded")
                     meta = obj.get("modelUsage") or {}
-                    if any(k != MODEL or v.get("canonicalModel", MODEL) != MODEL or v.get("provider") != "firstParty" for k, v in meta.items()):
+                    if any(k not in served or v.get("canonicalModel", k) not in served or v.get("provider") != "firstParty" for k, v in meta.items()):
                         raise ProviderError("unexpected result model/provider")
                     self.audit.append({"stage": "result", "num_turns": obj["num_turns"], "modelUsage": meta, "usage": obj.get("usage")})
                     finish = "length" if message.stop == "max_tokens" else "stop"
                     assistant = {"role": "assistant", "content": message.text}
                     self._history.assistant(assistant)
                     self._last_response = record({"id": message.id, "object": "chat.completion", "created": int(time.time()),
-                        "model": MODEL, "choices": [{"index": 0, "message": {**assistant, "tool_calls": None}, "finish_reason": finish}],
+                        "model": self._model, "choices": [{"index": 0, "message": {**assistant, "tool_calls": None}, "finish_reason": finish}],
                         "usage": usage(message.usage), "runtime_metadata": {"usage": obj.get("usage"), "modelUsage": meta}})
                     yield self._chunk(message, {}, finish=finish, token_usage=usage(message.usage))
                     return
@@ -367,7 +374,7 @@ class ClaudeSubscriptionClient:
 
     def _chunk(self, message, delta, *, finish=None, token_usage=None):
         self._check_active()  # recheck even between deferred tool-argument chunks
-        return record({"id": message.id, "object": "chat.completion.chunk", "created": int(time.time()), "model": MODEL,
+        return record({"id": message.id, "object": "chat.completion.chunk", "created": int(time.time()), "model": self._model,
                        "choices": [{"index": 0, "delta": delta, "finish_reason": finish}], "usage": token_usage})
 
     def cancel(self):

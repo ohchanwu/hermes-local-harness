@@ -10,7 +10,6 @@ CLI_TESTED = {(2, 1, 283)}
 # Allowlisted models and their Hermes capabilities. The served model must equal
 # the requested one; a provider-side variant name goes in "served_aliases".
 MODELS = {"claude-opus-5-5": {"context_length": 1000000}}
-MODEL = "claude-opus-5-5"
 
 # Fixed runtime flags. Per-session values (model, paths, tools, system prompt)
 # are appended by the client.
@@ -33,3 +32,7 @@ SETTINGS = {"disableAllHooks": True, "autoMemoryEnabled": False, "syncClaudeAiPl
 
 def version_text(version):
     return ".".join(map(str, version))
+
+
+def served_names(model):
+    return {model, *MODELS[model].get("served_aliases", ())}
