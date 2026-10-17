@@ -181,7 +181,7 @@ class MCPTests(unittest.TestCase):
         filler = []
         self.addCleanup(lambda: [os.close(fd) for fd in filler])
         while not filler or filler[-1] < 1030:
-            filler.append(os.dup(0))
+            filler.append(os.open(os.devnull, os.O_RDONLY))
         big_tool = {"type": "function", "function": {"name": "read_file", "description": "x" * 20000,
                     "parameters": TOOL["function"]["parameters"]}}
         self.bridge = client.Bridge(client.convert_tools([big_tool]))
@@ -533,9 +533,14 @@ class ClientTests(unittest.TestCase):
     def test_mcp_server_death_while_parked_fails_continuation_without_delivery(self):
         self.runtime_args = ['--kill-bridge-after-park']
         response = self.request('__tool__', tools=[TOOL], timeout=5)
-        time.sleep(1)  # the synthetic runtime kills the parked server .3 s after its call
+        end = time.monotonic() + 5  # the synthetic runtime kills the parked server after its call
+        while not self.c._bridge.closed_by_server and time.monotonic() < end:
+            self.c._bridge.pump()
+            time.sleep(.01)
+        self.assertTrue(self.c._bridge.closed_by_server)
         with self.assertRaises(client.ProviderError):
             self.continuation(response)
+        self.assertFalse(any(a['stage'] == 'result_delivered' for a in self.c.audit))
         self.assertFalse(any(a['stage'] == 'result_returned' for a in self.c.audit))
         self.assertTrue(self.c.is_closed())
 
