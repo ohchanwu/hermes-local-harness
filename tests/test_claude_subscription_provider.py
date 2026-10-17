@@ -70,47 +70,133 @@ class CompatTests(unittest.TestCase):
 
 
 class MCPTests(unittest.TestCase):
+    """Both real bridge ends over a real Unix socket; the MCP side runs in a thread."""
     def setUp(self):
-        private = ROOT / "private/provider/unit"
-        private.mkdir(parents=True, exist_ok=True)
-        self.tmp = tempfile.TemporaryDirectory(dir=private)
-        self.addCleanup(self.tmp.cleanup)
-        self.directory = Path(self.tmp.name)
-        mcp.save(self.directory / "bridge.json", {"tools": client.convert_tools([TOOL]), "deadline": time.time() + 5})
+        self.bridge = client.Bridge(client.convert_tools([TOOL]))
+        self.addCleanup(self.bridge.close)
+        self.out = io.StringIO()
+        self.errors = []
+
+    def serve(self, requests, token=None):
+        source = io.StringIO("\n".join(map(json.dumps, requests)))
+        def run():
+            try:
+                mcp.serve(mcp.Bridge(str(self.bridge.path), token or self.bridge.token), source, self.out)
+            except BaseException as exc:
+                self.errors.append(exc)
+        thread = threading.Thread(target=run, daemon=True)
+        thread.start()
+        self.addCleanup(thread.join, 3)
+        return thread
+
+    def pump_until(self, condition, seconds=3):
+        end = time.monotonic() + seconds
+        while not condition():
+            self.assertLess(time.monotonic(), end, "bridge condition not reached")
+            self.bridge.pump()
+            time.sleep(.005)
+
+    def call(self, rpc=7):
+        return {"id": rpc, "method": "tools/call",
+                "params": {"name": "read_file", "arguments": {"path": "/nonexistent/not-read-by-MCP"}}}
 
     def test_actual_mcp_returns_only_matching_owner_result_and_never_reads_tool_path(self):
-        mcp.save(self.directory / "result-0.json", {"rpc_id": 7, "tool_use_id": "toolu_synthetic", "text": "OWNER ONLY\n"})
         requests = [{"id": 1, "method": "initialize", "params": {"protocolVersion": "2024-11-05"}},
-                    {"id": 2, "method": "tools/list"}, {"id": 7, "method": "tools/call",
-                     "params": {"name": "read_file", "arguments": {"path": "/nonexistent/not-read-by-MCP"}}}]
-        out = io.StringIO()
-        original = io.open
-        def owned_open(path, *args, **kwargs):
-            if not isinstance(path, int):
-                self.assertEqual(Path(path).parent, self.directory)
-            return original(path, *args, **kwargs)
-        with patch("io.open", owned_open), patch("subprocess.Popen", side_effect=AssertionError("MCP executed")):
-            mcp.serve(self.directory, io.StringIO("\n".join(map(json.dumps, requests))), out)
-        replies = list(map(json.loads, out.getvalue().splitlines()))
+                    {"id": 2, "method": "tools/list"}, self.call()]
+        with patch("io.open", side_effect=AssertionError("bridge opened a file")), \
+                patch("subprocess.Popen", side_effect=AssertionError("MCP executed")):
+            thread = self.serve(requests)
+            self.pump_until(lambda: self.bridge.calls)
+            self.assertEqual(self.bridge.calls.pop(0), {"call": 0, "rpc_id": 7, "name": "read_file",
+                             "arguments": {"path": "/nonexistent/not-read-by-MCP"}})
+            self.bridge.send({"result": 0, "rpc_id": 7, "tool_use_id": "toolu_synthetic", "text": "OWNER ONLY\n"}, lambda: None)
+            self.pump_until(lambda: self.bridge.returns)
+            thread.join(3)
+        self.assertEqual(self.errors, [])
+        replies = list(map(json.loads, self.out.getvalue().splitlines()))
+        self.assertEqual(replies[1]["result"]["tools"][0]["name"], "read_file")
         self.assertEqual(replies[-1], {"jsonrpc": "2.0", "id": 7,
                          "result": {"content": [{"type": "text", "text": "OWNER ONLY\n"}]}})
-        self.assertEqual(json.loads((self.directory / "call-0.json").read_text()),
-                         {"rpc_id": 7, "name": "read_file", "arguments": {"path": "/nonexistent/not-read-by-MCP"}})
-        self.assertTrue((self.directory / "returned-0.json").exists())
+        self.assertEqual(self.bridge.returns, [{"returned": 0, "rpc_id": 7, "tool_use_id": "toolu_synthetic"}])
 
-    def test_cancelled_or_expired_mcp_cannot_return_result(self):
-        (self.directory / "cancel").touch()
-        out = io.StringIO()
-        request = {"id": 7, "method": "tools/call", "params": {"name": "read_file", "arguments": {}}}
-        mcp.serve(self.directory, io.StringIO(json.dumps(request)), out)
-        self.assertEqual(out.getvalue(), "")
-        self.assertFalse((self.directory / "returned-0.json").exists())
+    def test_cancelled_bridge_cannot_return_result(self):
+        thread = self.serve([self.call()])
+        self.pump_until(lambda: self.bridge.calls)
+        self.bridge.shutdown()
+        thread.join(3)
+        self.assertFalse(thread.is_alive())
+        self.assertEqual(self.errors, [])
+        self.assertEqual(self.out.getvalue(), "")
 
-    def test_mcp_mismatched_delivery_and_duplicate_rpc_rejected(self):
-        request = {"id": 7, "method": "tools/call", "params": {"name": "read_file", "arguments": {}}}
-        mcp.save(self.directory / "result-0.json", {"rpc_id": 8, "tool_use_id": "toolu_synthetic", "text": "wrong"})
-        with self.assertRaises(ValueError):
-            mcp.serve(self.directory, io.StringIO(json.dumps(request)), io.StringIO())
+    def test_mcp_mismatched_delivery_is_rejected(self):
+        thread = self.serve([self.call()])
+        self.pump_until(lambda: self.bridge.calls)
+        self.bridge.send({"result": 0, "rpc_id": 8, "tool_use_id": "toolu_synthetic", "text": "wrong"}, lambda: None)
+        thread.join(3)
+        self.assertEqual(len(self.errors), 1)
+        self.assertIsInstance(self.errors[0], ValueError)
+        self.assertEqual(self.out.getvalue(), "")
+
+    def test_duplicate_rpc_id_is_rejected(self):
+        thread = self.serve([{"id": 1, "method": "ping"}, {"id": 1, "method": "ping"}])
+        self.pump_until(lambda: self.bridge.authenticated)
+        thread.join(3)
+        self.assertIsInstance(self.errors[0], ValueError)
+
+    def test_wrong_token_is_rejected_and_server_sees_closed_bridge(self):
+        thread = self.serve([self.call()], token="0" * 64)
+        with self.assertRaisesRegex(client.ProviderError, "authentication"):
+            self.pump_until(lambda: False)
+        self.bridge.shutdown()
+        thread.join(3)
+        self.assertFalse(thread.is_alive())
+        self.assertEqual(self.out.getvalue(), "")
+
+    def test_only_one_connection_is_accepted(self):
+        self.serve([])
+        self.pump_until(lambda: self.bridge.authenticated)
+        self.assertFalse(self.bridge.path.exists())
+        second = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        self.addCleanup(second.close)
+        with self.assertRaises(OSError):
+            second.connect(str(self.bridge.path))
+
+    def test_server_death_while_parked_is_a_provider_error(self):
+        peer = self.raw_peer()
+        peer.sendall(json.dumps({"call": 0, "rpc_id": 7, "name": "read_file", "arguments": {}}).encode() + b"\n")
+        self.pump_until(lambda: self.bridge.calls)
+        peer.close()  # the server process died while its call was parked
+        self.pump_until(lambda: self.bridge.closed_by_server)
+        with self.assertRaisesRegex(client.ProviderError, "closed"):
+            self.bridge.require_open()
+
+    def test_socket_path_length_is_checked_before_binding(self):
+        root = Path(tempfile.mkdtemp(dir="/tmp"))
+        self.addCleanup(lambda: __import__("shutil").rmtree(root, ignore_errors=True))
+        deep = root / ("d" * 100)
+        deep.mkdir()
+        with self.assertRaisesRegex(client.ProviderError, "socket path"):
+            client.Bridge([], root=str(deep))
+        self.assertEqual(list(deep.iterdir()), [])
+
+    def raw_peer(self):
+        peer = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        self.addCleanup(peer.close)
+        peer.connect(str(self.bridge.path))
+        peer.sendall(json.dumps({"hello": self.bridge.token}).encode() + b"\n")
+        self.pump_until(lambda: self.bridge.authenticated)
+        return peer
+
+    def test_oversized_bridge_line_is_rejected(self):
+        peer = self.raw_peer()
+        def flood():
+            try:
+                peer.sendall(b"x" * 2_100_000)
+            except OSError:
+                pass
+        threading.Thread(target=flood, daemon=True).start()
+        with self.assertRaisesRegex(client.ProviderError, "line bound"):
+            self.pump_until(lambda: False)
 
 
 class HistoryTests(unittest.TestCase):
@@ -278,16 +364,17 @@ class ClientTests(unittest.TestCase):
         self.assertEqual(json.loads(call.function.arguments), {"path": "/nonexistent/synthetic"})
         self.assertEqual(response.choices[0].finish_reason, "tool_calls")
         directory = self.c._runtime.directory
-        self.assertTrue((directory / "call-0.json").exists())
-        self.assertFalse((directory / "returned-0.json").exists())
+        self.assertEqual([a["stage"] for a in self.c.audit if a["stage"].startswith(("tool_", "result_"))], ["tool_parked"])
         answer = self.continuation(response)
         self.assertEqual(answer.choices[0].message.content, "OWNER RESULT\n")
-        self.assertEqual(json.loads((directory / "result-0.json").read_text())["text"], "OWNER RESULT\n")
-        returned = json.loads((directory / "returned-0.json").read_text())
-        self.assertEqual(returned, {"rpc_id": 2, "tool_use_id": call.id})
+        delivered = [a for a in self.c.audit if a["stage"] == "result_delivered"]
+        returned = [a for a in self.c.audit if a["stage"] == "result_returned"]
+        self.assertEqual([(a["rpc_id"], a["tool_use_id"]) for a in delivered], [(2, call.id)])
+        self.assertEqual([(a["rpc_id"], a["tool_use_id"]) for a in returned], [(2, call.id)])
         with self.assertRaises(client.ProviderError):
             self.continuation(response)
-        self.assertEqual(len(list(directory.glob("result-*.json"))), 1)
+        self.assertEqual(len([a for a in self.c.audit if a["stage"] == "result_delivered"]), 1)
+        self.assertEqual(sorted(p.name for p in directory.iterdir()), ["empty-plugins", "mcp.json", "settings.json"])
 
     def test_serial_multistep_and_streamed_tool_identity_arguments(self):
         chunks = list(self.request("__multi__", tools=[TOOL], stream=True))
@@ -363,10 +450,11 @@ class ClientTests(unittest.TestCase):
 
     def test_close_parked_and_during_active_stream_reaps_once(self):
         response = self.request('__tool__', tools=[TOOL])
-        directory = self.c._runtime.directory
+        socket_dir = self.c._bridge.directory
         self.c.close()
         self.assertTrue(self.c._runtime.cleanup['group_absent'])
-        self.assertFalse((directory / 'returned-0.json').exists())
+        self.assertFalse(any(a['stage'] == 'result_returned' for a in self.c.audit))
+        self.assertFalse(socket_dir.exists())
         with self.assertRaises(client.ProviderError):
             self.continuation(response)
         other = client.ClaudeSubscriptionClient(command='synthetic-claude')
@@ -402,6 +490,13 @@ class ClientTests(unittest.TestCase):
             messages = copy.deepcopy(self.c._history.messages) + [{'role':'user','content':turn}]
             self.assertEqual(self.c.create(model=MODEL, messages=messages).choices[0].message.content, 'FOLLOWUP')
         self.assertEqual(len([a for a in self.c.audit if a['stage'] == 'user_input']), 5)
+
+    def test_mcp_server_death_while_awaiting_call_is_a_provider_error(self):
+        self.runtime_args = ['--kill-bridge-before-call']
+        with self.assertRaisesRegex(client.ProviderError, 'closed'):
+            self.request('__tool__', tools=[TOOL], timeout=5)
+        self.assertTrue(self.c._runtime.cleanup['group_absent'])
+        self.assertFalse(self.c._bridge.directory.exists())
 
     def test_malformed_stream_arguments_are_provider_errors(self):
         with self.assertRaises(client.ProviderError):
@@ -719,10 +814,9 @@ class ClientTests(unittest.TestCase):
         stream = self.continuation(response, stream=True)
         before = len(self.launches)
         with patch.dict(os.environ, {'HERMES_PROFILE':'changed-while-parked'}), \
-                patch.object(client, 'save', wraps=client.save) as saves:
+                patch.object(client.Bridge, 'send', side_effect=AssertionError('result delivered')):
             with self.assertRaisesRegex(client.ProviderError, 'session/worktree/profile'):
                 list(stream)
-        self.assertFalse(any(call.args[0].name.startswith('result-') for call in saves.call_args_list))
         self.assertFalse(any(a['stage'] == 'result_delivered' for a in self.c.audit))
         self.assertEqual(len(self.launches), before)
         self.assertTrue(self.c._runtime.cleanup['group_absent'])
@@ -853,13 +947,18 @@ def synthetic_runtime(argv):
             message(f"msg_{ordinal}_{turn}", tool_ids=[f"toolu_synthetic_{ordinal}_{turn}"])
             if bridge is None:
                 cfg = config["mcpServers"]["hermes"]
-                bridge = subprocess.Popen([cfg["command"]] + cfg["args"], stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
+                bridge = subprocess.Popen([cfg["command"]] + cfg["args"], env=cfg["env"], stdin=subprocess.PIPE,
+                                          stdout=subprocess.PIPE, text=True)
                 def rpc(value):
                     assert bridge is not None and bridge.stdin is not None and bridge.stdout is not None
                     bridge.stdin.write(json.dumps(value) + "\n")
                     bridge.stdin.flush()
                     return json.loads(bridge.stdout.readline())
                 rpc({"id": 1, "method": "initialize", "params": {"protocolVersion": "2024-11-05"}})
+            if '--kill-bridge-before-call' in argv:
+                bridge.kill()
+                bridge.wait(timeout=2)
+                time.sleep(30)
             reply = rpc({"id": turn + 1, "method": "tools/call", "params": {"name": "read_file", "arguments": {"path": fixture}}})
             results.append(reply["result"]["content"][0]["text"])
         message(f"msg_{ordinal}_final", text="|".join(results) if results else "YES" if ordinal == 1 else "FOLLOWUP")

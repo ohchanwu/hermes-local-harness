@@ -14,9 +14,8 @@ LINE_BOUND = 8_000_000  # bytes per runtime JSON line
 
 class Runtime:
     """Owned child process group; the client bounds startup and parked time."""
-    def __init__(self, argv, env, directory, *, cancel_mailbox=True):
+    def __init__(self, argv, env, directory):
         self.directory = directory
-        self.cancel_mailbox = cancel_mailbox
         self.lock = threading.Lock()
         self.cleanup = None
         self.started = time.monotonic()
@@ -32,7 +31,7 @@ class Runtime:
             os.set_blocking(pipe.fileno(), False)
             self.selector.register(pipe, selectors.EVENT_READ)
 
-    def send(self, text, check_active):
+    def send(self, text, check_active, idle=None):
         data = json.dumps({"type": "user", "message": {"role": "user", "content": text}}) + "\n"
         assert self.process.stdin is not None
         remaining = memoryview(data.encode())
@@ -42,6 +41,8 @@ class Runtime:
                 sent = os.write(self.process.stdin.fileno(), remaining)
                 remaining = remaining[sent:]
             except BlockingIOError:
+                if idle is not None:
+                    idle()
                 time.sleep(0.01)
 
     def version_output(self, deadline, check_active):
@@ -102,8 +103,6 @@ class Runtime:
         with self.lock:
             if self.cleanup is not None:
                 return self.cleanup
-            if self.cancel_mailbox:
-                (self.directory / "cancel").touch(mode=0o600, exist_ok=True)
             for sig, seconds in ((signal.SIGTERM, 4), (signal.SIGKILL, 0.5)):
                 try:
                     os.killpg(self.process.pid, sig)

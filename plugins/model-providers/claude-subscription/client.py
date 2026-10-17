@@ -7,6 +7,7 @@ import math
 import os
 from pathlib import Path
 import re
+import select
 import subprocess
 import sys
 import tempfile
@@ -14,7 +15,7 @@ import threading
 import time
 from types import SimpleNamespace
 
-from .bridge import save
+from .bridge import Bridge, save
 from . import compat
 from .compat import CHILD_ENV, CLI_FLAGS, CLI_SETTING, DEFAULT_EFFORT, EFFORT_SETTING, EFFORTS, CLI_MINIMUM, CLI_TESTED, PREFIX, SETTINGS, served_names, version_text
 from .errors import ProviderError
@@ -23,7 +24,7 @@ from .runtime import Runtime
 from .stream_events import Message
 from .translate import convert_tools, record, usage
 
-__all__ = ["ClaudeSubscriptionClient", "ProviderError", "History", "Message", "Runtime", "convert_tools",
+__all__ = ["ClaudeSubscriptionClient", "Bridge", "ProviderError", "History", "Message", "Runtime", "convert_tools",
            "record", "usage", "save", "PREFIX"]
 
 log = logging.getLogger(__name__)
@@ -93,6 +94,7 @@ class ClaudeSubscriptionClient:
         self._closed = threading.Event()
         self._startup = None
         self._runtime = None
+        self._bridge = None
         self._temporary = None
         self._cli_version = None
         self._model = None
@@ -107,6 +109,7 @@ class ClaudeSubscriptionClient:
         self._inputs = 0
         self._pending = None
         self._sequence = 0
+        self._delivered = []
         self._seen_ids = set()
         self._last_response = None
         self.audit = []
@@ -225,7 +228,7 @@ class ClaudeSubscriptionClient:
             (directory / "empty-plugins").mkdir(mode=0o700)
             env = self._environment(directory)
             self._check_active()
-            self._startup = Runtime([self.command, "--version"], env, directory, cancel_mailbox=False)
+            self._startup = Runtime([self.command, "--version"], env, directory)
         try:
             code, output = self._startup.version_output(time.monotonic() + 10, self._check_active)
         finally:
@@ -241,18 +244,20 @@ class ClaudeSubscriptionClient:
             self.audit.append({"stage": "untested_cli", "version": version_text(self._cli_version)})
             log.warning("untested Claude CLI %s; run smoke.py against it", version_text(self._cli_version))
         settings = SETTINGS
-        config = {"mcpServers": {"hermes": {"type": "stdio", "command": sys.executable,
-                  "args": ["-I", "-S", str(Path(__file__).with_name("mcp_server.py")), str(directory)],
-                  "env": {"HOME": str(directory), "PATH": "/usr/bin:/bin"}}}} if self._tools else {"mcpServers": {}}
         system = self._history.messages[0]["content"] if self._history.messages[0]["role"] == "system" else ""
         argv = [self.command, *CLI_FLAGS, "--model", self._model, "--effort", self._effort, "--settings", str(directory / "settings.json"),
                 "--mcp-config", str(directory / "mcp.json"), "--allowedTools", ",".join(PREFIX + t["name"] for t in self._tools),
                 "--system-prompt", system]
         with self._lifecycle:
             self._check_active()
+            config = {"mcpServers": {}}
+            if self._tools:
+                self._bridge = Bridge(self._tools)
+                # The token travels in the owner-only config file, never on a visible command line.
+                config["mcpServers"]["hermes"] = {"type": "stdio", "command": sys.executable,
+                    "args": ["-I", "-S", str(Path(__file__).with_name("mcp_server.py")), str(self._bridge.path)],
+                    "env": {"HOME": str(directory), "PATH": "/usr/bin:/bin", "HERMES_BRIDGE_TOKEN": self._bridge.token}}
             save(directory / "settings.json", settings)
-            save(directory / "bridge.json", {"tools": self._tools,
-                 "deadline": None})
             save(directory / "mcp.json", config)
             self._check_active()
             self._runtime = Runtime(argv, env, directory)
@@ -270,32 +275,38 @@ class ClaudeSubscriptionClient:
             with self._lifecycle:
                 self._check_active()
                 if tail["role"] == "tool":
-                    if self._pending is None or tail["tool_call_id"] != self._pending["tool_use_id"]:
+                    if self._pending is None or tail["tool_call_id"] != self._pending["tool_use_id"] or self._bridge is None:
                         raise ProviderError("missing/mismatched parked invocation")
-                    delivery = {**self._pending, "text": tail["content"]}
-                    save(runtime.directory / f"result-{self._sequence}.json", delivery)
-                    self.audit.append({"stage": "result_delivered", "tool_use_id": tail["tool_call_id"],
-                                       "rpc_id": delivery["rpc_id"], "text_sha256": hashlib.sha256(tail["content"].encode()).hexdigest()})
-                    self._sequence += 1
+                    delivery = {"result": self._sequence, **self._pending, "text": tail["content"]}
                     self._pending = None
                 else:
                     self._inputs += 1
+            if tail["role"] == "tool":
+                # Outside the lock: a full socket must not keep cancel() from running.
+                self._bridge.send(delivery, self._check_active)
+                self._delivered.append({"returned": delivery["result"], "rpc_id": delivery["rpc_id"],
+                                        "tool_use_id": delivery["tool_use_id"]})
+                self.audit.append({"stage": "result_delivered", "tool_use_id": tail["tool_call_id"],
+                                   "rpc_id": delivery["rpc_id"], "text_sha256": hashlib.sha256(tail["content"].encode()).hexdigest()})
+                self._sequence += 1
             if tail["role"] != "tool":
                 self._check_active()
                 # A full pipe must not hold the ownership lock and prevent
                 # cancel() from killing/reaping the reader to unblock this write.
-                runtime.send(tail["content"], self._check_active)
+                runtime.send(tail["content"], self._check_active, idle=self._pump_bridge)
                 self.audit.append({"stage": "user_input", "number": self._inputs})
             served = served_names(self._model)
             message = Message(served)
             while True:
                 self._check_active()
+                self._pump_bridge()
                 if message.done and message.call:
-                    pending_path = runtime.directory / f"call-{self._sequence}.json"
-                    if pending_path.exists():
-                        pending = json.loads(pending_path.read_text())
+                    if self._bridge is not None and not self._bridge.calls:
+                        self._bridge.require_open()
+                    if self._bridge is not None and self._bridge.calls:
+                        pending = self._bridge.calls.pop(0)
                         call = message.call
-                        if (call["id"] in self._seen_ids or call["name"] != PREFIX + pending.get("name", "")
+                        if (pending.get("call") != self._sequence or self._delivered or call["id"] in self._seen_ids or call["name"] != PREFIX + pending.get("name", "")
                                 or pending.get("name") not in {t["name"] for t in self._tools}
                                 or call["arguments"] != pending.get("arguments") or type(pending.get("rpc_id")) not in (str, int)):
                             raise ProviderError("unmatched/replayed/unadvertised model and MCP invocation")
@@ -349,6 +360,7 @@ class ClaudeSubscriptionClient:
                     meta = obj.get("modelUsage") or {}
                     if any(k not in served or v.get("canonicalModel", k) not in served or v.get("provider") != "firstParty" for k, v in meta.items()):
                         raise ProviderError("unexpected result model/provider")
+                    self._await_returns()
                     self.audit.append({"stage": "result", "num_turns": obj["num_turns"], "modelUsage": meta, "usage": obj.get("usage")})
                     finish = "length" if message.stop == "max_tokens" else "stop"
                     assistant = {"role": "assistant", "content": message.text}
@@ -375,10 +387,33 @@ class ClaudeSubscriptionClient:
         return record({"id": message.id, "object": "chat.completion.chunk", "created": int(time.time()), "model": self._model,
                        "choices": [{"index": 0, "delta": delta, "finish_reason": finish}], "usage": token_usage})
 
+    def _pump_bridge(self):
+        """Queue bridge messages and match each acknowledgement to its delivered result."""
+        if self._bridge is None:
+            return
+        self._bridge.pump()
+        while self._bridge.returns:
+            returned = self._bridge.returns.pop(0)
+            if not self._delivered or returned != self._delivered.pop(0):
+                raise ProviderError("unmatched MCP result acknowledgement")
+            self.audit.append({"stage": "result_returned", "rpc_id": returned["rpc_id"], "tool_use_id": returned["tool_use_id"]})
+
+    def _await_returns(self):
+        """The server acknowledges right after answering the CLI, so this wait is brief."""
+        while self._delivered:
+            self._check_active()
+            self._pump_bridge()
+            if self._delivered:
+                self._bridge.require_open()
+                select.select([self._bridge.connection], [], [], 0.01)
+
     def cancel(self):
         with self._lifecycle:
             self._closed.set()
             children = (self._startup, self._runtime)
+            bridge = self._bridge
+        if bridge is not None:
+            bridge.shutdown()
         for child in children:
             if child is not None:
                 child.close()
@@ -389,6 +424,8 @@ class ClaudeSubscriptionClient:
                 self._startup.dispose()
             if self._runtime is not None:
                 self._runtime.dispose()
+            if self._bridge is not None:
+                self._bridge.close()
             if self._temporary is not None:
                 self._temporary.cleanup()
 
