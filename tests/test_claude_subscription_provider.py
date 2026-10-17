@@ -754,8 +754,24 @@ class ClientTests(unittest.TestCase):
         self.assertEqual(sum(1 for d in deltas if getattr(d, 'role', None)), 1)
         self.assertEqual(''.join(getattr(d, 'content', None) or '' for d in deltas), 'RETRIED')
         self.assertEqual(chunks[-1].choices[0].finish_reason, 'stop')
+        self.assertEqual({c.id for c in chunks}, {'msg_aborted'})
 
-    def test_cli_retry_after_reply_text_streamed_fails_retryably(self):
+    def test_cli_retry_twice_and_without_error_event_and_after_whitespace(self):
+        response = self.request('__cli_retry_twice__')
+        self.assertEqual(response.choices[0].message.content, 'RETRIED')
+        self.assertEqual([a['number'] for a in self.c.audit if a['stage'] == 'runtime_retry'], [1, 2])
+
+    def test_cli_retry_discards_a_partial_tool_call(self):
+        chunks = list(self.request('__cli_retry_tool__', tools=[TOOL], stream=True))
+        self.assertFalse(any(getattr(c.choices[0].delta, 'tool_calls', None) for c in chunks))
+        self.assertEqual(chunks[-1].choices[0].finish_reason, 'stop')
+        self.assertIsNone(self.c._pending)
+
+    def test_cli_retry_rejects_a_late_snapshot_of_the_aborted_message(self):
+        with self.assertRaisesRegex(client.ProviderError, 'snapshot outside its streamed message'):
+            self.request('__cli_retry_late_snapshot__')
+
+    def test_cli_retry_after_reply_text_streamed_fails(self):
         with self.assertRaisesRegex(client.ProviderError, 'after part of it had streamed'):
             list(self.request('__cli_retry_after_text__', stream=True))
         self.assertTrue(self.c._runtime.cleanup['group_absent'])
@@ -1479,18 +1495,34 @@ def synthetic_runtime(argv):
             emit({"type": "result", "subtype": "success", "is_error": False, "num_turns": 1,
                   "modelUsage": {model: {"canonicalModel": model, "provider": "firstParty"}}})
             continue
-        if text in ('__cli_retry__', '__cli_retry_after_text__'):
+        if text in ('__cli_retry__', '__cli_retry_after_text__', '__cli_retry_twice__', '__cli_retry_tool__',
+                    '__cli_retry_late_snapshot__'):
             # The real CLI retries a failed API call and streams the reply again from message_start.
             ev("ping")
             ev("message_start", message={"id": "msg_aborted", "model": model, "usage": {"input_tokens": 1}})
             ev("content_block_start", index=0, content_block={"type": "thinking", "thinking": ""})
             ev("content_block_delta", index=0, delta={"type": "thinking_delta", "thinking": "Partial."})
+            if text == '__cli_retry_twice__':
+                # A restart without a preceding error event, then a second one.
+                ev("message_start", message={"id": "msg_aborted_2", "model": model, "usage": {"input_tokens": 1}})
+                ev("content_block_start", index=0, content_block={"type": "text", "text": ""})
+                ev("content_block_delta", index=0, delta={"type": "text_delta", "text": "\n"})
+            if text == '__cli_retry_tool__':
+                ev("content_block_stop", index=0)
+                ev("content_block_start", index=1, content_block={"type": "tool_use", "id": "toolu_aborted",
+                    "name": client.PREFIX + "read_file", "input": {}})
+                ev("content_block_delta", index=1, delta={"type": "input_json_delta", "partial_json": '{"path": "/et'})
             if text == '__cli_retry_after_text__':
                 ev("content_block_stop", index=0)
                 ev("content_block_start", index=1, content_block={"type": "text", "text": ""})
                 ev("content_block_delta", index=1, delta={"type": "text_delta", "text": "Half a rep"})
             ev("error", error={"type": "overloaded_error", "message": "Overloaded"})
             emit({"type": "system", "subtype": "api_retry", "attempt": 1})
+            if text == '__cli_retry_late_snapshot__':
+                ev("message_start", message={"id": f"msg_{ordinal}_final", "model": model, "usage": {"input_tokens": 1}})
+                emit({"type": "assistant", "message": {"id": "msg_aborted", "model": model,
+                      "content": [{"type": "thinking", "thinking": "Partial.", "signature": "sig"}]}})
+                continue
             message(f"msg_{ordinal}_final", text="RETRIED", thinking=True)
             emit({"type": "result", "subtype": "success", "is_error": False, "num_turns": 1,
                   "modelUsage": {model: {"canonicalModel": model, "provider": "firstParty"}}})

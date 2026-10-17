@@ -123,8 +123,9 @@ reasons are `tool_calls`, `stop` or `length`, with available per-message usage.
 When an API call fails mid-reply (a stream `error` event, such as overload),
 the CLI retries it and streams the reply again from `message_start`. Before any
 reply text has reached Hermes, the provider discards the partial message and
-continues (audit stage `runtime_retry`). After text has streamed, Hermes already
-holds that text, so the request fails and Hermes retries it.
+continues (audit stage `runtime_retry`). After visible text has streamed, Hermes
+already holds that text, so the request fails; Hermes keeps the partial reply and
+does not retry it.
 Snapshot/stream mismatch, malformed protocol, quota/refusal, rejected rate limit,
 process death and unsupported model/executor selection terminate the client.
 An unmatched tool cannot become a text-success result. Unknown usage is absent,

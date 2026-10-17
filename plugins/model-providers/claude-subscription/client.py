@@ -487,7 +487,7 @@ class ClaudeSubscriptionClient:
 
     def _chunk(self, message, delta, *, finish=None, token_usage=None):
         self._check_active()  # recheck even between deferred tool-argument chunks
-        return record({"id": message.id, "object": "chat.completion.chunk", "created": int(time.time()), "model": self._model,
+        return record({"id": message.stream_id, "object": "chat.completion.chunk", "created": int(time.time()), "model": self._model,
                        "choices": [{"index": 0, "delta": delta, "finish_reason": finish}], "usage": token_usage})
 
     def _pump_bridge(self):

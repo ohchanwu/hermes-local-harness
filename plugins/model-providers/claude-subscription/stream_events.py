@@ -17,7 +17,8 @@ class Message:
         self.usage = {}
         self.call = None
         self.argument_fragments = []
-        self.streamed_text = False  # text already handed to Hermes, which keeps it
+        self.streamed_text = False  # visible text already handed to Hermes, which keeps it
+        self.stream_id = None       # the first message id, kept for every chunk across restarts
         self.interrupted = None     # error type of a mid-stream API failure
         self.restarts = 0
 
@@ -52,11 +53,12 @@ class Message:
                 if self.done:
                     raise ProviderError("duplicate streamed message")
                 if self.streamed_text:
-                    raise ProviderError("runtime retried a reply after part of it had streamed; retry the request")
-                restarts = self.restarts + 1
+                    raise ProviderError("runtime retried a reply after part of it had streamed")
+                restarts, stream_id = self.restarts + 1, self.stream_id
                 self.__init__(self.served)
-                self.restarts = restarts
+                self.restarts, self.stream_id = restarts, stream_id
             self.id = msg["id"]
+            self.stream_id = self.stream_id or self.id
             self.usage.update(msg.get("usage") or {})
             return [] if restart else [{"role": "assistant"}]
         if not self.id or self.done or self.interrupted:
@@ -80,7 +82,7 @@ class Message:
                 raise ProviderError("unsupported runtime content block")
             if block.get("type") == "text" and block.get("text"):
                 self.text += block["text"]
-                self.streamed_text = True
+                self.streamed_text = self.streamed_text or bool(block["text"].strip())
                 return [{"content": block["text"]}]
         elif event == "content_block_delta":
             block = self.blocks.get(index)
@@ -96,7 +98,7 @@ class Message:
                 if delta.get("type") != "text_delta" or not isinstance(delta.get("text"), str):
                     raise ProviderError("invalid text delta")
                 self.text += delta["text"]
-                self.streamed_text = self.streamed_text or bool(delta["text"])
+                self.streamed_text = self.streamed_text or bool(delta["text"].strip())
                 return [{"content": delta["text"]}]
             if delta.get("type") not in ("thinking_delta", "signature_delta"):
                 raise ProviderError("unsupported thinking delta")
