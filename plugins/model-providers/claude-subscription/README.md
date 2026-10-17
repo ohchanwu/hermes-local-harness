@@ -150,7 +150,21 @@ Only MCP tools advertised by Hermes are allowed. Runtime init verifies the exact
 model, CLI version, auth-source indication and tool list. These controls do not
 replace Hermes permissions or globally forbid Hermes' own permitted tools.
 
-## Future manual setup and rollback — NOT executed here
+## Rollout status (2026-10-17 KST)
+
+Owner-approved and live. `claude-opus-5-5` through this provider is the default
+model of `harness-`, `chapt-` and `jobcron-` `worker`, `reviewer` and
+`orchestrator` (CLI 2.1.302, headless login token file). Each profile pins all
+sixteen `auxiliary.<task>` helpers (compression, title generation, approval,
+vision, …) to its previous OpenAI Codex model. Those helpers would otherwise
+inherit this provider, which cannot serve async calls, a shared cached client
+or options such as `temperature`. Verified with default-model pilots: a worker
+task and a reviewer task completed on Kanban, and a one-shot orchestrator chat
+completed a tool round trip. Orchestrators are not Kanban-dispatched
+(`kanban.dispatch_profiles`). Each profile's previous config is saved as
+`config.yaml.pre-claude-261017`; restoring that file rolls the profile back.
+
+## Manual setup and rollback reference
 
 Only after separate attended authorization and exact-candidate review:
 
