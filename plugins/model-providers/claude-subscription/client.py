@@ -213,6 +213,9 @@ class ClaudeSubscriptionClient:
             if self._process_env is None:
                 self._process_env = {k: os.environ[k] for k in ("PATH", "LANG", "TMPDIR") if os.environ.get(k)}
                 self._process_env.update(HOME=account.pw_dir, USER=account.pw_name, LOGNAME=account.pw_name)
+                # It reads the Keychain through /usr/bin/security, so system dirs must be on PATH.
+                path = [d for d in self._process_env.get("PATH", "").split(":") if d]
+                self._process_env["PATH"] = ":".join(path + [d for d in ("/usr/bin", "/bin") if d not in path])
                 self._home = Path(scope[1] or Path(scope[4] or Path.home()) / ".hermes").absolute()
             stream = Stream(self, self._drive(tail, response_seconds(kwargs.get("timeout", self.timeout))))
         except BaseException:
