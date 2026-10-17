@@ -262,6 +262,7 @@ class ClaudeSubscriptionClient:
             stream = Stream(self, self._drive(tail, response_seconds(kwargs.get("timeout", self.timeout))))
         except BaseException:
             self._release_busy()
+            self._dispose_if_closed()  # e.g. after a failed reset closed the client
             raise
         if kwargs.get("stream", False):
             return stream
