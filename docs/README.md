@@ -11,6 +11,7 @@ This index is the entry point for durable harness documentation tracked in Git. 
 
 ## Current entries
 
+- [Claude subscription provider hardening](specs/261017-claude-subscription-provider-hardening.md) — awaiting approval; upgrade-tolerant CLI/model compatibility, removed session limits, Unix-socket bridge, modular client; no implementation or live call.
 - [Claude Max 20x inside Hermes and model portability](specs/261016-claude-max20x-model-portability.md) — execution specification; native billing verification first; implementation/live testing not yet authorized.
 - [Claude Max 20x implementation plan](plans/261016-claude-max20x-implementation-plan.md) — native-first M0–M5 execution plan; execution unexecuted/unapproved.
 - [Claude Max 20x native pre-inference gate](operations/261016-claude-max20x-native-preflight.md) — bounded execution update superseding the historical unexecuted labels above: documented NATIVE_FAILURE; M1 UNRUN, no account/billing proof or rollout.
