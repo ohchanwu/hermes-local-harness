@@ -202,7 +202,9 @@ class ClaudeSubscriptionClient:
             if self._effort is None:
                 self._max_output, self._effort = max_output, effort
             if self._process_env is None:
-                self._process_env = {k: os.environ[k] for k in ("HOME", "PATH", "LANG", "TMPDIR") if k in os.environ}
+                # USER/LOGNAME let the CLI find the subscription login in the macOS Keychain.
+                self._process_env = {k: os.environ[k] for k in ("HOME", "PATH", "LANG", "TMPDIR", "USER", "LOGNAME")
+                                     if os.environ.get(k)}
                 self._home = Path(scope[1] or Path(scope[4] or Path.home()) / ".hermes").absolute()
             stream = Stream(self, self._drive(tail, response_seconds(kwargs.get("timeout", self.timeout))))
         except BaseException:

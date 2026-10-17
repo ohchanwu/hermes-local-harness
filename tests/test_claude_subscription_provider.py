@@ -825,6 +825,16 @@ class ClientTests(unittest.TestCase):
         self.assertEqual(self.launches, [])
         self.assertEqual(c._history.messages, [])
 
+    def test_runtime_children_receive_the_login_user(self):
+        # The CLI needs USER to find the subscription login in the macOS Keychain.
+        with patch.dict(os.environ, {'USER': 'synthetic-user', 'LOGNAME': 'synthetic-user'}):
+            self.c = client.ClaudeSubscriptionClient(command=SYNTHETIC_CLI)
+            self.addCleanup(self.c.close)
+            self.request()
+        envs = [env for env in self.child_envs if env is not None]
+        self.assertTrue(envs and all(env.get('USER') == 'synthetic-user' and env.get('LOGNAME') == 'synthetic-user'
+                                     for env in envs))
+
     def test_runtime_children_disable_cli_self_update(self):
         self.request()
         envs = [env for env in self.child_envs if env is not None]
