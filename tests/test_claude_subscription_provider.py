@@ -834,6 +834,14 @@ class ClientTests(unittest.TestCase):
         envs = [env for env in self.child_envs if env is not None]
         self.assertTrue(envs and all(env.get('USER') == name and env.get('LOGNAME') == name for env in envs))
 
+    def test_unknown_login_user_fails_before_effects(self):
+        with patch('pwd.getpwuid', side_effect=KeyError('uid not found')), \
+                self.assertRaisesRegex(client.ProviderError, 'login user'):
+            self.request()
+        self.assertEqual(self.c._history.messages, [])
+        self.assertIsNone(self.c._process_env)
+        self.assertEqual(self.launches, [])
+
     def test_runtime_children_disable_cli_self_update(self):
         self.request()
         envs = [env for env in self.child_envs if env is not None]
