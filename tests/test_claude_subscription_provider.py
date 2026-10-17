@@ -190,6 +190,7 @@ class ClientTests(unittest.TestCase):
         self.children = []
         self.version_mode = 'normal'
         self.sleep_before_input = False
+        self.runtime_args = []
         self.after_version_launch = None
         popen = subprocess.Popen
         def inert_only(argv, *args, **kwargs):
@@ -200,6 +201,8 @@ class ClientTests(unittest.TestCase):
                     argv += ['--version-mode', self.version_mode, '--version-ready', str(self.directory/'version-ready')]
                 elif self.sleep_before_input:
                     argv += ['--sleep-before-input', str(self.directory/'runtime-ready')]
+                if '--version' not in argv:
+                    argv += self.runtime_args
             elif argv[0] != "/bin/ps":
                 raise AssertionError("unit test attempted non-synthetic process: " + str(argv[0]))
             process = popen(argv, *args, **kwargs)
@@ -426,10 +429,37 @@ class ClientTests(unittest.TestCase):
         other=client.ClaudeSubscriptionClient(command='synthetic-claude')
         self.addCleanup(other.close)
         self.version_mode = 'wrong'
-        with self.assertRaisesRegex(client.ProviderError,'untested Claude CLI version'):
+        with self.assertRaisesRegex(client.ProviderError,'unrecognized Claude CLI version'):
             other.create(model=client.MODEL,messages=[{'role':'user','content':'unused'}])
         self.assertEqual(len(self.launches), 1)
         self.assertIsNotNone(self.children[0].poll())
+
+    def test_cli_older_than_minimum_fails_before_model_launch(self):
+        self.version_mode = 'old'
+        with self.assertRaisesRegex(client.ProviderError, 'older than the minimum'):
+            self.request()
+        self.assertEqual(len(self.launches), 1)
+
+    def test_untested_newer_cli_runs_with_one_recorded_warning(self):
+        self.version_mode = 'newer'
+        self.runtime_args = ['--init-version', '2.1.999']
+        with self.assertLogs('subscription_plugin.client', 'WARNING') as logs:
+            response = self.request()
+        self.assertEqual(response.choices[0].message.content, 'YES')
+        warnings = [a for a in self.c.audit if a['stage'] == 'untested_cli']
+        self.assertEqual(warnings, [{'stage': 'untested_cli', 'version': '2.1.999'}])
+        self.assertIn('smoke', logs.output[0])
+
+    def test_init_version_must_match_version_check(self):
+        self.runtime_args = ['--init-version', '2.1.284']
+        with self.assertRaisesRegex(client.ProviderError, 'unexpected runtime version'):
+            self.request()
+        self.assertTrue(self.c._runtime.cleanup['group_absent'])
+
+    def test_runtime_exit_before_init_points_to_smoke_test(self):
+        self.runtime_args = ['--exit-before-init']
+        with self.assertRaisesRegex(client.ProviderError, 'smoke'):
+            self.request()
 
     def test_rejected_rate_limit_stops_instead_of_accepting_later_success(self):
         with self.assertRaises(client.ProviderError):
@@ -638,7 +668,8 @@ def synthetic_runtime(argv):
             Path(argv[argv.index('--version-ready')+1]).write_text('ready')
         if mode in ('sleep', 'stubborn'):
             time.sleep(30)
-        print("wrong-version" if mode == 'wrong' else "2.1.283 (Claude Code)", flush=True)
+        versions = {'wrong': 'wrong-version', 'old': '2.1.200 (Claude Code)', 'newer': '2.1.999 (Claude Code)'}
+        print(versions.get(mode, "2.1.283 (Claude Code)"), flush=True)
         return
     def emit(obj):
         print(json.dumps(obj), flush=True)
@@ -675,6 +706,9 @@ def synthetic_runtime(argv):
     fixture = argv[argv.index('--native-fixture')+1] if '--native-fixture' in argv else '/nonexistent/synthetic'
     badargs = False
     ordinal = 0
+    init_version = argv[argv.index('--init-version')+1] if '--init-version' in argv else "2.1.283"
+    if '--exit-before-init' in argv:
+        return
     if '--sleep-before-input' in argv:
         Path(argv[argv.index('--sleep-before-input')+1]).write_text('ready')
         time.sleep(30)
@@ -686,7 +720,7 @@ def synthetic_runtime(argv):
         badargs = text == '__badargs__'
         if ordinal == 1:
             emit({"type": "system", "subtype": "init", "model": "wrong" if text == "__wrongmodel__" else client.MODEL,
-                  "tools": tools, "apiKeySource": "none", "claude_code_version": "2.1.283"})
+                  "tools": tools, "apiKeySource": "none", "claude_code_version": init_version})
         if text == "__sleep__":
             time.sleep(30)
         if text == '__stubborn__':

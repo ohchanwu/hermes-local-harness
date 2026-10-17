@@ -2,9 +2,11 @@
 import asyncio
 import hashlib
 import json
+import logging
 import math
 import os
 from pathlib import Path
+import re
 import subprocess
 import sys
 import tempfile
@@ -13,7 +15,7 @@ import time
 from types import SimpleNamespace
 
 from .bridge import save
-from .compat import CHILD_ENV, CLI_FLAGS, CLI_TESTED, MODEL, PREFIX, SETTINGS, version_text
+from .compat import CHILD_ENV, CLI_FLAGS, CLI_MINIMUM, CLI_TESTED, MODEL, PREFIX, SETTINGS, version_text
 from .errors import ProviderError
 from .history import History
 from .runtime import Runtime
@@ -22,6 +24,15 @@ from .translate import convert_tools, record, usage
 
 __all__ = ["ClaudeSubscriptionClient", "ProviderError", "History", "Message", "Runtime", "convert_tools",
            "record", "usage", "save", "MODEL", "PREFIX"]
+
+log = logging.getLogger(__name__)
+
+
+def parse_version(output):
+    match = re.fullmatch(rb"(\d+)\.(\d+)\.(\d+) \(Claude Code\)", output.strip())
+    if match is None:
+        raise ProviderError("unrecognized Claude CLI version output")
+    return tuple(int(part) for part in match.groups())
 
 
 def response_seconds(value):
@@ -83,6 +94,7 @@ class ClaudeSubscriptionClient:
         self._runtime = None
         self._temporary = None
         self._timer = None
+        self._cli_version = None
         self._session_deadline = self._request_deadline = None
         self._process_env = None
         self._home = None
@@ -204,9 +216,15 @@ class ClaudeSubscriptionClient:
         finally:
             self._startup.close()
             self._startup.dispose()
-        tested = version_text(min(CLI_TESTED))
-        if code != 0 or output.strip() != f"{tested} (Claude Code)".encode():
-            raise ProviderError("untested Claude CLI version; required " + tested)
+        if code != 0:
+            raise ProviderError("Claude CLI version check failed")
+        self._cli_version = parse_version(output)
+        if self._cli_version < CLI_MINIMUM:
+            raise ProviderError(f"Claude CLI {version_text(self._cli_version)} is older than the minimum "
+                                + version_text(CLI_MINIMUM))
+        if self._cli_version not in CLI_TESTED:
+            self.audit.append({"stage": "untested_cli", "version": version_text(self._cli_version)})
+            log.warning("untested Claude CLI %s; run smoke.py against it", version_text(self._cli_version))
         settings = SETTINGS
         config = {"mcpServers": {"hermes": {"type": "stdio", "command": sys.executable,
                   "args": ["-I", "-S", str(Path(__file__).with_name("mcp_server.py")), str(directory)],
@@ -292,7 +310,13 @@ class ClaudeSubscriptionClient:
                             yield self._chunk(message, {"tool_calls": [{"index": 0, "function": {"arguments": fragment}}]})
                         yield self._chunk(message, {}, finish="tool_calls", token_usage=usage(message.usage))
                         return
-                obj = runtime.read()
+                try:
+                    obj = runtime.read()
+                except ProviderError as exc:
+                    if initialized:
+                        raise
+                    raise ProviderError(f"{exc} (before initialization; an upgraded Claude CLI "
+                                        f"{version_text(self._cli_version)} may reject a flag: run smoke.py)") from None
                 if obj is None:
                     continue
                 if not isinstance(obj, dict) or obj.get("parent_tool_use_id"):
@@ -302,7 +326,7 @@ class ClaudeSubscriptionClient:
                     expected = {PREFIX + t["name"] for t in self._tools}
                     if obj.get("model") != MODEL or set(obj.get("tools", [])) != expected or obj.get("apiKeySource") != "none":
                         raise ProviderError("unexpected runtime model/auth source/executor")
-                    if obj.get("claude_code_version") != version_text(min(CLI_TESTED)):
+                    if obj.get("claude_code_version") != version_text(self._cli_version):
                         raise ProviderError("unexpected runtime version")
                     initialized = True
                     self.audit.append({"stage": "init", "model": obj["model"], "tools": obj["tools"]})
