@@ -17,16 +17,18 @@ import socket
 import tempfile
 import threading
 import time
+import types
 import unittest
 from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 PLUGIN = ROOT / "plugins/model-providers/claude-subscription"
-spec = importlib.util.spec_from_file_location("subscription_client", PLUGIN / "client.py")
-assert spec is not None and spec.loader is not None
-client = importlib.util.module_from_spec(spec)
-sys.modules[spec.name] = client
-spec.loader.exec_module(client)
+# A bare package object loads the plugin's modules without running __init__.py,
+# which imports installed Hermes registration APIs.
+package = types.ModuleType("subscription_plugin")
+package.__path__ = [str(PLUGIN)]
+sys.modules[package.__name__] = package
+client = importlib.import_module("subscription_plugin.client")
 mcp_spec = importlib.util.spec_from_file_location("subscription_mcp", PLUGIN / "mcp_server.py")
 assert mcp_spec is not None and mcp_spec.loader is not None
 mcp = importlib.util.module_from_spec(mcp_spec)
