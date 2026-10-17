@@ -78,3 +78,8 @@ Blocked dependency: merging to main, reinstalling the plugin into harness-worker
 Independent work: none required
 Resume evidence: SMOKE PASS/FAIL output and the pilot task result
 ```
+
+## 6. Live findings
+
+- **The CLI's login depends on the OS account.** The CLI finds the subscription login through `USER`/`LOGNAME` (macOS Keychain) and the real `HOME` (its config). Hermes Kanban workers drop `USER` and run with `HOME` set to the profile's `home/` folder. Live probes: without `USER`, 3/3 calls failed with `authentication_failed`; with the profile `HOME`, the call failed; with the real values, the calls succeeded. The client therefore sets `HOME`, `USER` and `LOGNAME` for CLI children from the OS account (`pwd.getpwuid(os.getuid())`), resolved before any history is accepted. This matches how Hermes' own adapters for external CLIs reset `HOME` to the real home.
+

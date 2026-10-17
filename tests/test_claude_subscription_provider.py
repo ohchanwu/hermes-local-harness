@@ -834,6 +834,15 @@ class ClientTests(unittest.TestCase):
         envs = [env for env in self.child_envs if env is not None]
         self.assertTrue(envs and all(env.get('USER') == name and env.get('LOGNAME') == name for env in envs))
 
+    def test_cli_children_use_the_real_home_not_the_profile_home(self):
+        # Kanban workers run with HOME set to the profile's home; the CLI's login lives in the real one.
+        import pwd
+        self.assertEqual(os.environ['HOME'], str(self.directory))
+        self.request()
+        real = pwd.getpwuid(os.getuid()).pw_dir
+        envs = [env for env in self.child_envs if env is not None]
+        self.assertTrue(envs and all(env.get('HOME') == real for env in envs))
+
     def test_unknown_login_user_fails_before_effects(self):
         with patch('pwd.getpwuid', side_effect=KeyError('uid not found')), \
                 self.assertRaisesRegex(client.ProviderError, 'login user'):

@@ -199,10 +199,11 @@ class ClaudeSubscriptionClient:
             if not os.path.isabs(self.command) or not os.path.isabs(os.environ.get(CLI_SETTING) or self.command):
                 raise ProviderError(f"{CLI_SETTING} must be an absolute path to the provider's dedicated install")
             if self._process_env is None:
-                # The CLI needs USER/LOGNAME to find the subscription login in the macOS
-                # Keychain; Hermes' Kanban worker environment drops them, so ask the OS.
+                # The CLI finds the subscription login through the OS account: USER/LOGNAME
+                # for the macOS Keychain and the real HOME for its config. Kanban workers
+                # drop USER and run with HOME set to the profile's home, so ask the OS.
                 try:
-                    login = pwd.getpwuid(os.getuid()).pw_name
+                    account = pwd.getpwuid(os.getuid())
                 except KeyError:
                     raise ProviderError("cannot determine the login user for the Claude CLI's Keychain lookup") from None
             tail = self._history.accept(kwargs.get("messages"))
@@ -210,8 +211,8 @@ class ClaudeSubscriptionClient:
             if self._effort is None:
                 self._max_output, self._effort = max_output, effort
             if self._process_env is None:
-                self._process_env = {k: os.environ[k] for k in ("HOME", "PATH", "LANG", "TMPDIR") if os.environ.get(k)}
-                self._process_env.update(USER=login, LOGNAME=login)
+                self._process_env = {k: os.environ[k] for k in ("PATH", "LANG", "TMPDIR") if os.environ.get(k)}
+                self._process_env.update(HOME=account.pw_dir, USER=account.pw_name, LOGNAME=account.pw_name)
                 self._home = Path(scope[1] or Path(scope[4] or Path.home()) / ".hermes").absolute()
             stream = Stream(self, self._drive(tail, response_seconds(kwargs.get("timeout", self.timeout))))
         except BaseException:
