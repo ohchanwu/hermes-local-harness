@@ -10,6 +10,7 @@ import importlib.util
 import io
 import json
 import os
+import re
 from pathlib import Path
 import sys
 import subprocess
@@ -55,6 +56,16 @@ class SchemaTests(unittest.TestCase):
                       [{"type": "function", "function": {"name": "read", "parameters": {"type": "array"}}}]):
             with self.subTest(tools=tools), self.assertRaises(client.ProviderError):
                 client.convert_tools(tools)
+
+
+class CompatTests(unittest.TestCase):
+    def test_version_and_model_literals_live_only_in_compat(self):
+        # CLI versions (multi-digit patch) and model names; not e.g. MCP serverInfo "0.1.0".
+        literal = re.compile(r"\b\d+\.\d+\.\d{2,}\b|claude-(opus|sonnet|haiku)")
+        for path in PLUGIN.glob("*.py"):
+            if path.name != "compat.py":
+                with self.subTest(path=path.name):
+                    self.assertIsNone(literal.search(path.read_text()))
 
 
 class MCPTests(unittest.TestCase):

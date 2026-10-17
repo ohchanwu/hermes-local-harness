@@ -13,7 +13,7 @@ import time
 from types import SimpleNamespace
 
 from .bridge import save
-from .compat import MODEL, PREFIX
+from .compat import CHILD_ENV, CLI_FLAGS, CLI_TESTED, MODEL, PREFIX, SETTINGS, version_text
 from .errors import ProviderError
 from .history import History
 from .runtime import Runtime
@@ -119,7 +119,7 @@ class ClaudeSubscriptionClient:
 
     def _validate(self, kwargs):
         if kwargs.get("model") != MODEL:
-            raise ProviderError("claude-subscription requires exact model claude-opus-5-5")
+            raise ProviderError("claude-subscription requires exact model " + MODEL)
         allowed = {"model", "messages", "tools", "stream", "stream_options", "timeout", "max_tokens",
                    "max_completion_tokens", "parallel_tool_calls", "tool_choice", "extra_body"}
         if set(kwargs) - allowed:
@@ -180,12 +180,8 @@ class ClaudeSubscriptionClient:
     def _environment(self, directory):
         assert self._process_env is not None
         env = dict(self._process_env)
-        env.update({"CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1", "CLAUDE_CODE_DISABLE_OFFICIAL_MARKETPLACE_AUTOINSTALL": "1",
-                    "CLAUDE_CODE_PLUGIN_CACHE_DIR": str(directory / "empty-plugins"), "CLAUDE_CODE_DISABLE_CLAUDE_MDS": "1",
-                    "CLAUDE_CODE_DISABLE_AUTO_MEMORY": "1", "CLAUDE_CODE_DISABLE_BACKGROUND_TASKS": "1", "CLAUDE_CODE_DISABLE_CRON": "1",
-                    "CLAUDE_CODE_DISABLE_NONSTREAMING_FALLBACK": "1", "CLAUDE_CODE_MAX_RETRIES": "0",
-                    "CLAUDE_CODE_MAX_OUTPUT_TOKENS": "1024", "DISABLE_AUTO_COMPACT": "1",
-                    "ENABLE_CLAUDEAI_MCP_SERVERS": "false", "ENABLE_TOOL_SEARCH": "false"})
+        env.update(CHILD_ENV)
+        env["CLAUDE_CODE_PLUGIN_CACHE_DIR"] = str(directory / "empty-plugins")
         return env
 
     def _start(self):
@@ -208,20 +204,17 @@ class ClaudeSubscriptionClient:
         finally:
             self._startup.close()
             self._startup.dispose()
-        if code != 0 or output.strip() != b"2.1.283 (Claude Code)":
-            raise ProviderError("untested Claude CLI version; required 2.1.283")
-        settings = {"disableAllHooks": True, "autoMemoryEnabled": False, "syncClaudeAiPlugins": False,
-                    "claudeMdExcludes": ["**"], "enabledPlugins": {}}
+        tested = version_text(min(CLI_TESTED))
+        if code != 0 or output.strip() != f"{tested} (Claude Code)".encode():
+            raise ProviderError("untested Claude CLI version; required " + tested)
+        settings = SETTINGS
         config = {"mcpServers": {"hermes": {"type": "stdio", "command": sys.executable,
                   "args": ["-I", "-S", str(Path(__file__).with_name("mcp_server.py")), str(directory)],
                   "env": {"HOME": str(directory), "PATH": "/usr/bin:/bin"}}}} if self._tools else {"mcpServers": {}}
         system = self._history.messages[0]["content"] if self._history.messages[0]["role"] == "system" else ""
-        argv = [self.command, "--print", "--model", MODEL, "--effort", "low", "--max-turns", "3",
-                "--input-format", "stream-json", "--output-format", "stream-json", "--verbose", "--include-partial-messages",
-                "--no-session-persistence", "--restricted", "--setting-sources", "", "--settings", str(directory / "settings.json"),
-                "--disable-slash-commands", "--no-chrome", "--tools", "", "--strict-mcp-config", "--mcp-config", str(directory / "mcp.json"),
-                "--allowedTools", ",".join(PREFIX + t["name"] for t in self._tools), "--permission-mode", "dontAsk",
-                "--permission-prompts", "none", "--system-prompt", system]
+        argv = [self.command, *CLI_FLAGS, "--model", MODEL, "--settings", str(directory / "settings.json"),
+                "--mcp-config", str(directory / "mcp.json"), "--allowedTools", ",".join(PREFIX + t["name"] for t in self._tools),
+                "--system-prompt", system]
         with self._lifecycle:
             self._check_active()
             save(directory / "settings.json", settings)
@@ -309,7 +302,7 @@ class ClaudeSubscriptionClient:
                     expected = {PREFIX + t["name"] for t in self._tools}
                     if obj.get("model") != MODEL or set(obj.get("tools", [])) != expected or obj.get("apiKeySource") != "none":
                         raise ProviderError("unexpected runtime model/auth source/executor")
-                    if obj.get("claude_code_version") != "2.1.283":
+                    if obj.get("claude_code_version") != version_text(min(CLI_TESTED)):
                         raise ProviderError("unexpected runtime version")
                     initialized = True
                     self.audit.append({"stage": "init", "model": obj["model"], "tools": obj["tools"]})
