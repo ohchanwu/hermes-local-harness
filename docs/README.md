@@ -28,6 +28,7 @@ This index is the entry point for durable harness documentation tracked in Git. 
 
 ## Bugs
 
+- [Repair-history formatting blocked approved autonomous completion](bugs/261017-repair-history-formatting-blocked-approved-completion.md) — task-local bookkeeping gate removed; systemic prevention not implemented.
 - [Jobcron upgrade orchestration: repeated first-launch ceremony](bugs/261007-jobcron-upgrade-orchestration-repeated-first-launch-ceremony.md)
 - [Jobcron test-boundary incident incorrectly halted autonomous implementation](bugs/261007-jobcron-test-boundary-incident-overblocked-autonomous-implementation.md)
 - [Jobcron over-gating read-only incident assessment stalls autonomous work](bugs/261013-jobcron-over-gating-readonly-incident-assessment.md) — recurrence focused on unnecessary authorization gates and campaign-wide dependency invention.
