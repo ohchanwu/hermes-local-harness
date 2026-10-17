@@ -841,6 +841,33 @@ class ClientTests(unittest.TestCase):
             self.c.create(model=MODEL, messages=messages, extra_body=body)
 
 
+class SmokeTests(unittest.TestCase):
+    def test_smoke_passes_against_inert_runtime_and_prints_version(self):
+        private = ROOT / "private/provider/unit"
+        private.mkdir(parents=True, exist_ok=True)
+        tmp = tempfile.TemporaryDirectory(dir=private)
+        self.addCleanup(tmp.cleanup)
+        wrapper = Path(tmp.name) / "synthetic-claude"
+        wrapper.write_text(f'#!/bin/sh\nexec "{sys.executable}" -I -S "{Path(__file__).resolve()}" '
+                           '--synthetic-runtime "$@" --native-fixture from-prompt\n')
+        wrapper.chmod(0o700)
+        smoke = importlib.import_module("subscription_plugin.smoke")
+        out = io.StringIO()
+        with patch.dict(os.environ), patch("sys.stdout", out):
+            code = smoke.main(["--cli", str(wrapper), "--model", MODEL])
+        self.assertEqual(code, 0, out.getvalue())
+        self.assertIn(f"SMOKE PASS cli=2.1.283 model={MODEL}", out.getvalue())
+        self.assertNotIn("Add to compat.CLI_TESTED", out.getvalue())
+
+    def test_smoke_reports_one_failure_without_retry(self):
+        smoke = importlib.import_module("subscription_plugin.smoke")
+        out = io.StringIO()
+        with patch.dict(os.environ), patch("sys.stdout", out):
+            code = smoke.main(["--cli", "/nonexistent/claude", "--model", MODEL])
+        self.assertEqual(code, 1)
+        self.assertTrue(out.getvalue().startswith("SMOKE FAIL"))
+
+
 def synthetic_runtime(argv):
     """Inert event producer, never an installed runtime, service or tool executor."""
     if "--version" in argv:
@@ -900,6 +927,8 @@ def synthetic_runtime(argv):
     for line in sys.stdin:
         ordinal += 1
         text = json.loads(line)["message"]["content"]
+        if fixture == 'from-prompt':
+            fixture = re.search(r"path (\S+) and", text).group(1)
         if '--native-fixture' in argv:
             text = '__tool__' if ordinal == 1 else 'Followup'
         badargs = text == '__badargs__'

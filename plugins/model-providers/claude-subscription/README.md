@@ -1,9 +1,24 @@
 # Claude subscription — bounded serial Hermes provider
 
 Repository source only. No live installation, profile/model change or rollout
-has been performed. Provider name: `claude-subscription`; exact model:
-`claude-opus-5-5`. It does not replace `anthropic` or the native `claude-code`
-alias. Independent review of the local candidate is still required.
+has been performed. Provider name: `claude-subscription`; models: the exact ids
+allowlisted in `compat.MODELS` (currently `claude-opus-5-5`). It does not
+replace `anthropic` or the native `claude-code` alias. Independent review of the
+local candidate is still required. Design: [hardening specification](../../../docs/specs/261017-claude-subscription-provider-hardening.md).
+
+## Modules
+
+| Module | Job |
+| --- | --- |
+| `compat.py` | Every model/CLI literal: allowlist, versions, CLI flags, child env |
+| `history.py` | Transcript validation and canonicalization |
+| `translate.py` | Tool schemas, chat-completion records, usage |
+| `stream_events.py` | Parser for one streamed assistant message |
+| `runtime.py` | Owned CLI process group, nonblocking I/O, cleanup |
+| `bridge.py` | Owner end of the Unix-socket MCP bridge |
+| `client.py` | `ClaudeSubscriptionClient` orchestration |
+| `mcp_server.py` | Standalone MCP server and server end of the bridge |
+| `smoke.py` | Owner-run live smoke test |
 
 ## Supported and tested surface
 
@@ -12,10 +27,18 @@ The plugin never reads/copies OAuth tokens, signs in, uses an Anthropic API key,
 or constructs an HTTP model client. This is personal/local runtime mediation,
 not a terms exemption or provider endorsement.
 
-Tested pair only: Hermes `v0.21.5+6751.g9cf7960`, public contracts at
-`9cf7960f274ea2bdfe672d64d26389e9954dfeb6`, and Claude Code `2.1.283`.
-Other versions are untested; the client rejects a different CLI version before
-inference. No Hermes/Claude update or production dependency was added.
+Hermes `v0.21.5+6751.g9cf7960` (public contracts at
+`9cf7960f274ea2bdfe672d64d26389e9954dfeb6`). The provider runs only its own
+dedicated Claude Code install, named by `HERMES_CLAUDE_SUBSCRIPTION_CLI`
+(Hermes' `process_command_env_vars` route); it never falls back to the
+interactive, self-updating `claude` on `PATH`, and its children run with
+`DISABLE_AUTOUPDATER=1`. A CLI older than `compat.CLI_MINIMUM` or with
+unparseable `--version` output fails before inference. A newer version not in
+`compat.CLI_TESTED` runs and records one `untested_cli` audit entry and log
+warning. The hard checks are behavioral: the init event's version must equal
+`--version`, and served model, tool list, `apiKeySource` and `modelUsage`
+provider are verified as before. No Hermes/Claude update or production
+dependency was added.
 
 Supported APIs are native provider discovery, `ProviderProfile.create_client`,
 `external_process` resolution and synchronous `chat.completions.create`.
@@ -28,7 +51,10 @@ original run49 candidate (see evidence limits below); both
 stream/nonstream return shapes are exercised offline. Native nonstream main-loop
 execution was not separately measured live.
 
-A client owns one fresh, in-memory official CLI session. Initial history must be
+A client owns one fresh, in-memory official CLI session. Its model, output
+token cap (`max_tokens`/`max_completion_tokens`, otherwise the CLI default) and
+effort (`HERMES_CLAUDE_SUBSCRIPTION_EFFORT`, default `medium`) are fixed by its
+first request; changing any of them requires a separate client. Initial history must be
 one user message, optionally preceded by one system message. The system is passed
 as the runtime system prompt, user input through stream-json; assistant/tool
 history remains in the same process. Subsequent requests must preserve the exact
@@ -49,8 +75,14 @@ Function schemas become MCP declarations. A complete, single real model
 model tool-use ID and MCP JSON-RPC ID remain distinct. Hermes gets a native
 `tool_calls` response and alone authorizes/executes the tool. Its recorded tool
 result on the next create call is returned exactly once to that invocation.
-The MCP server opens only its owned IPC files, never the requested tool path,
-and contains no filesystem/shell/tool implementation. Duplicate/replayed IDs,
+The MCP server reaches the client only over a Unix socket in a private
+`/tmp/hcs-*` directory (0700). It authenticates with a per-session token passed
+in the owner-only `mcp.json` env, the client accepts exactly one connection and
+then removes the socket path, and messages are newline-delimited JSON with a
+2 MB line bound. A parked call blocks on the socket; closing it cancels the
+call. The server acknowledges each delivered result, and the client matches
+every acknowledgement. The server never opens the requested tool path and
+contains no filesystem/shell/tool implementation. Duplicate/replayed IDs,
 missing/mismatched results and changed prefixes are errors. Multiple/parallel
 model calls are rejected before any native tool call is exposed. Serial
 multi-step tool use is supported within the bounded session budget.
@@ -65,18 +97,18 @@ An unmatched tool cannot become a text-success result. Unknown usage is absent,
 not fabricated zero. Raw runtime usage/modelUsage is available on nonstream
 response metadata and the client audit; runtime list-price cost is not a bill.
 
-Limits are intentionally small: at most two explicit user inputs and four
-observed assistant messages per client, runtime max-turns three per input,
-150-second session ceiling from first iterator execution, including the owned
-version-check child and parked time, and cleanup within a five-second budget
-(TERM, then KILL/reap). Per-response timeout starts before startup, also bounds
-backpressured input writes, and is bounded by the session ceiling. The version
-check has an additional ten-second ceiling. Closing before first iteration does
-not create IPC files or launch a child; startup cancellation owns and reaps the
-version child, not merely the model child. Requested output cap is 1024 and effort
-is low. Other output caps,
-sampling/options, arbitrary CLI arguments and concurrent create calls are
-unsupported. CLI retries/nonstream fallback are disabled; the plugin never
+There is no session-level cap on user inputs, assistant messages, tool steps
+or session duration; the subscription's own rate limits are the usage bound,
+and a rejected rate limit still terminates the client. Hang protection remains:
+the per-response timeout (default 300 s) is an idle timeout that resets on every
+runtime event, and it also bounds startup and backpressured input writes; the
+version check has a ten-second ceiling; cleanup stays within a five-second
+budget (TERM, then KILL/reap); runtime JSON lines are bounded at 8 MB. Because
+CLI compaction stays disabled, a very long session can fill the context window
+and end the client with an error; start a new client. Closing before first
+iteration creates no session files and launches no child; startup cancellation
+owns and reaps the version child, not merely the model child. Sampling/options,
+arbitrary CLI arguments and concurrent create calls are unsupported. CLI retries/nonstream fallback are disabled; the plugin never
 relaunches a failed runtime. Use a separate client for a new role/task/session.
 Cancellation is terminal, not resumable. Always close the client/agent, including
 parked streams; partial output is not successful completion.
@@ -93,29 +125,34 @@ replace Hermes permissions or globally forbid Hermes' own permitted tools.
 
 Only after separate attended authorization and exact-candidate review:
 
-1. Copy this directory's five files together to
+1. Install the provider's dedicated CLI at an exact version, separate from the
+   interactive one, for example
+   `npm install --prefix "$HERMES_HOME/runtimes/claude-code/2.1.283" @anthropic-ai/claude-code@2.1.283`
+   (confirm the currently supported pinned-install method first). Set
+   `HERMES_CLAUDE_SUBSCRIPTION_CLI` in the Hermes environment to that install's
+   `claude` binary. Sign-in is the ordinary attended subscription login shared
+   through the same `HOME`; never export tokens or configure an API-key
+   substitute for this provider.
+2. Copy this whole directory to
    `$HERMES_HOME/plugins/model-providers/claude-subscription/` for the explicitly
-   authorized target. Preserve relative `client.py`/`mcp_server.py` layout. No
-   edits to installed Hermes or Claude are needed. Authentication remains the
-   official runtime's ordinary attended subscription login; never export tokens
-   or configure an API-key substitute for this provider.
-2. Select provider `claude-subscription` and model `claude-opus-5-5` through the
+   authorized target. No edits to installed Hermes or Claude are needed.
+3. Select provider `claude-subscription` and an allowlisted model through the
    native picker or supported `hermes config set model.provider` and
    `hermes config set model.default` interfaces. Start a new session, not imported
    history. Do not install/select it in an existing fleet as an automatic action.
-3. For a bounded Claude-only workflow, explicitly configure its request-routing
+4. For a bounded Claude-only workflow, explicitly configure its request-routing
    fallback chain empty and single-attempt/no-auto-recovery behavior. The actual
    validation used native `AIAgent(fallback_model=[])`, task-local
    `agent.api_max_retries=1`, `agent.auto_recovery_cycles=0`, compression disabled,
    memory/background review skipped and a runtime-only read-file toolset.
    This is not a change to global fallback functionality. The profile's
    `fallback_models` tuple is a **picker catalog**, not a routing fallback chain.
-4. Inventory required helpers/roles before any broader use. Vision, async calls,
+5. Inventory required helpers/roles before any broader use. Vision, async calls,
    arbitrary helper transcripts, compression/context compaction, imported history,
    persistent resume and full orchestrator/worker/reviewer operation are unproven
    or explicitly unsupported. Do not advertise full-fleet readiness or assume a
    helper selects this provider. A required missing path blocks that rollout.
-5. Roll back by stopping/closing this client and explicitly selecting the prior
+6. Roll back by stopping/closing this client and explicitly selecting the prior
    approved provider/model in a new native session. `openai-codex`/`chatgpt`,
    the registry-only `openai-api` route, and `zai`/`z.ai` remain ordinary native
    selections; they need no plugin guard teardown. No real OpenAI/Zai request was
@@ -123,7 +160,24 @@ Only after separate attended authorization and exact-candidate review:
    silently substituting a provider. Removing this directory later is an
    attended installation action; preserve task history/evidence first.
 
+## Upgrading the dedicated CLI
+
+1. Install the new version beside the old one (step 1 above, new directory).
+2. With owner approval, run one live smoke test against it:
+   `python3 plugins/model-providers/claude-subscription/smoke.py --cli <new claude> --model claude-opus-5-5`.
+   It runs one session (one tool round trip, one follow-up) under a throwaway
+   `HERMES_HOME`, never retries, and prints `SMOKE PASS cli=<version> model=<model>`
+   or `SMOKE FAIL: <reason>`.
+3. On PASS, add the printed version to `compat.CLI_TESTED` and commit.
+4. Point `HERMES_CLAUDE_SUBSCRIPTION_CLI` at the new install. Roll back by
+   pointing it at the previous directory. Adding a model is the same: add it to
+   `compat.MODELS`, then smoke-test it.
+
 ## Actual verification and retained recovery history
+
+The live evidence below predates the hardening changes (modules, version
+policy, model allowlist, dedicated CLI, removed session caps, socket bridge).
+Those changes are verified offline only; no live run has attested them yet.
 
 Card `kanban://harness/t_51cbb4e0`, run49, baseline
 `92f0300eeb7f23d32dff38d9f7ecaef2c3caf698`. All new model slots are consumed:
@@ -172,8 +226,9 @@ entry-points metadata read; the genuine Python-backed native read still passed.
 These validation-only guards are not plugin deployment features or a fake
 bootstrap. No live profile/plugin/config/model selection was changed.
 
-Offline tests currently cover 39 provider mechanisms, four registration/scope
-contracts and the original ten prototype regressions. Default test imports do
+Offline tests currently cover 67 provider mechanisms (including both bridge
+ends over a real socket and the smoke script against an inert runtime), five
+registration/scope contracts and the original ten prototype regressions. Default test imports do
 not load installed Hermes or contact providers. Inert Python children exercise
 actual client/MCP/process code; registration tests label peripheral fake
 provider dependencies. Separate `--native-api` mode exercised real isolated
