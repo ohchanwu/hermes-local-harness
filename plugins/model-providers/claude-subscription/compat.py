@@ -5,7 +5,7 @@ PREFIX = "mcp__hermes__"
 # Oldest CLI with every flag/event this client relies on, and the versions that
 # passed the live smoke test (smoke.py). Newer untested versions only warn.
 CLI_MINIMUM = (2, 1, 283)
-CLI_TESTED = {(2, 1, 283)}
+CLI_TESTED = {(2, 1, 283), (2, 1, 302)}
 
 # Allowlisted models and their Hermes capabilities. The served model must equal
 # the requested one; a provider-side variant name goes in "served_aliases".

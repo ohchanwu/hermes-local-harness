@@ -168,7 +168,7 @@ Only after separate attended authorization and exact-candidate review:
    It runs one session (one tool round trip, one follow-up) under a throwaway
    `HERMES_HOME`, never retries, and prints `SMOKE PASS cli=<version> model=<model>`
    or `SMOKE FAIL: <reason>`.
-3. On PASS, add the printed version to `compat.CLI_TESTED` and commit.
+3. On PASS, add the printed version to `compat.CLI_TESTED` and commit. Tested so far: 2.1.283 and 2.1.302 (both SMOKE PASS, 2026-10-17).
 4. Point `HERMES_CLAUDE_SUBSCRIPTION_CLI` at the new install. Roll back by
    pointing it at the previous directory. Adding a model is the same: add it to
    `compat.MODELS`, then smoke-test it.
