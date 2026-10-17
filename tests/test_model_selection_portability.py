@@ -50,6 +50,10 @@ class RegistrationTests(unittest.TestCase):
         self.assertEqual(self.profile.base_url, 'acp://claude-subscription')
         self.assertIs(self.profile.fixed_temperature, self.sentinel)
 
+    def test_cli_command_comes_only_from_dedicated_setting(self):
+        self.assertEqual(self.profile.process_command, '')
+        self.assertEqual(self.profile.process_command_env_vars, ('HERMES_CLAUDE_SUBSCRIPTION_CLI',))
+
     def test_model_catalog_is_not_a_request_fallback_chain(self):
         self.assertEqual(self.profile.fallback_models, ('claude-opus-5-5',))
         self.assertEqual(self.profile.model_aliases, {})

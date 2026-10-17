@@ -189,6 +189,7 @@ class ClientTests(unittest.TestCase):
         self.addCleanup(self.environment.stop)
         self.launches = []
         self.children = []
+        self.child_envs = []
         self.version_mode = 'normal'
         self.sleep_before_input = False
         self.runtime_args = []
@@ -206,6 +207,7 @@ class ClientTests(unittest.TestCase):
                     argv += self.runtime_args
             elif argv[0] != "/bin/ps":
                 raise AssertionError("unit test attempted non-synthetic process: " + str(argv[0]))
+            self.child_envs.append(kwargs.get("env"))
             process = popen(argv, *args, **kwargs)
             if '--synthetic-runtime' in argv:
                 self.children.append(process)
@@ -493,6 +495,32 @@ class ClientTests(unittest.TestCase):
         with patch.dict(client.compat.MODELS, aliased):
             response = self.request()
         self.assertEqual(response.model, MODEL)
+
+    def test_cli_path_comes_from_dedicated_setting(self):
+        with patch.dict(os.environ, {'HERMES_CLAUDE_SUBSCRIPTION_CLI': 'synthetic-claude'}):
+            c = client.ClaudeSubscriptionClient()
+            self.addCleanup(c.close)
+            response = c.create(model=MODEL, messages=[{'role': 'user', 'content': 'Hello'}])
+        self.assertEqual(response.choices[0].message.content, 'YES')
+
+    def test_missing_cli_setting_fails_before_effects_without_path_fallback(self):
+        bin_dir = self.directory / 'bin'
+        bin_dir.mkdir()
+        (bin_dir / 'claude').write_text('#!/bin/sh\nexit 99\n')
+        (bin_dir / 'claude').chmod(0o700)
+        with patch.dict(os.environ, {'PATH': f'{bin_dir}:/usr/bin:/bin'}):
+            c = client.ClaudeSubscriptionClient()
+            self.addCleanup(c.close)
+            with self.assertRaisesRegex(client.ProviderError, 'HERMES_CLAUDE_SUBSCRIPTION_CLI'):
+                c.create(model=MODEL, messages=[{'role': 'user', 'content': 'unused'}])
+        self.assertEqual(self.launches, [])
+        self.assertEqual(c._history.messages, [])
+
+    def test_runtime_children_disable_cli_self_update(self):
+        self.request()
+        envs = [env for env in self.child_envs if env is not None]
+        self.assertEqual(len(envs), 2)  # version check + runtime
+        self.assertTrue(all(env.get('DISABLE_AUTOUPDATER') == '1' for env in envs))
 
     def test_rejected_rate_limit_stops_instead_of_accepting_later_success(self):
         with self.assertRaises(client.ProviderError):

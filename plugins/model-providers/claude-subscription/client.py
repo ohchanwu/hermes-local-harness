@@ -16,7 +16,7 @@ from types import SimpleNamespace
 
 from .bridge import save
 from . import compat
-from .compat import CHILD_ENV, CLI_FLAGS, CLI_MINIMUM, CLI_TESTED, PREFIX, SETTINGS, served_names, version_text
+from .compat import CHILD_ENV, CLI_FLAGS, CLI_SETTING, CLI_MINIMUM, CLI_TESTED, PREFIX, SETTINGS, served_names, version_text
 from .errors import ProviderError
 from .history import History
 from .runtime import Runtime
@@ -87,7 +87,7 @@ class ClaudeSubscriptionClient:
     def __init__(self, *, command=None, args=None, timeout=None, **kwargs):
         self.api_key = "claude-subscription"  # routing placeholder, never a credential
         self.base_url = "acp://claude-subscription"
-        self.command, self.args, self.timeout = command or "claude", args or [], timeout
+        self.command, self.args, self.timeout = command or os.environ.get(CLI_SETTING), args or [], timeout
         self._busy = threading.Lock()
         self._lifecycle = threading.RLock()
         self._closed = threading.Event()
@@ -180,6 +180,9 @@ class ClaudeSubscriptionClient:
             if self.is_closed():
                 raise ProviderError("client closed or cancelled; no retry/resume")
             model, scope, tools = self._validate(kwargs)
+            if not self.command:
+                # Never fall back to the interactive `claude` on PATH: it updates itself.
+                raise ProviderError(f"no Claude CLI configured; set {CLI_SETTING} to the provider's dedicated install")
             tail = self._history.accept(kwargs.get("messages"))
             self._model, self._scope, self._tools = model, scope, tools
             if self._process_env is None:

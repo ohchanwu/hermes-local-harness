@@ -19,7 +19,10 @@ CLI_FLAGS = ["--print", "--effort", "low", "--max-turns", "3",
              "--disable-slash-commands", "--no-chrome", "--tools", "", "--strict-mcp-config",
              "--permission-mode", "dontAsk", "--permission-prompts", "none"]
 
-CHILD_ENV = {"CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1", "CLAUDE_CODE_DISABLE_OFFICIAL_MARKETPLACE_AUTOINSTALL": "1",
+# Hermes resolves the provider's dedicated, version-locked CLI from this setting.
+CLI_SETTING = "HERMES_CLAUDE_SUBSCRIPTION_CLI"
+
+CHILD_ENV = {"DISABLE_AUTOUPDATER": "1", "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1", "CLAUDE_CODE_DISABLE_OFFICIAL_MARKETPLACE_AUTOINSTALL": "1",
              "CLAUDE_CODE_DISABLE_CLAUDE_MDS": "1", "CLAUDE_CODE_DISABLE_AUTO_MEMORY": "1",
              "CLAUDE_CODE_DISABLE_BACKGROUND_TASKS": "1", "CLAUDE_CODE_DISABLE_CRON": "1",
              "CLAUDE_CODE_DISABLE_NONSTREAMING_FALLBACK": "1", "CLAUDE_CODE_MAX_RETRIES": "0",
