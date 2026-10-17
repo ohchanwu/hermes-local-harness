@@ -5,6 +5,7 @@ code. Native discovery/integration is separate, explicit isolated-home evidence.
 """
 import copy
 import asyncio
+import base64
 from contextlib import ExitStack
 import importlib.util
 import io
@@ -384,6 +385,17 @@ class HistoryTests(unittest.TestCase):
         text, _ = client.render_restored(h.restored, tail)
         self.assertIn("Tool calls shown with a result already ran", text)
 
+    def test_rebuilt_images_become_a_note(self):
+        url = 'data:image/jpeg;base64,' + base64.b64encode(b'jpeg').decode()
+        messages = [{"role": "user", "content": [{"type": "text", "text": "Look"},
+                                                 {"type": "image_url", "image_url": {"url": url}}]},
+                    {"role": "assistant", "content": "A cat"}, {"role": "user", "content": "Next"}]
+        h = client.History()
+        tail = h.accept(messages)
+        text, _ = client.render_restored(h.restored, tail)
+        self.assertIn("Look\n[image not carried over]", text)
+        self.assertNotIn(base64.b64encode(b'jpeg').decode(), text)
+
     def test_prefix_edits_and_compaction_are_not_silently_discarded(self):
         h, messages = self.start()
         h.assistant({"role": "assistant", "content": "done"})
@@ -590,7 +602,7 @@ class ClientTests(unittest.TestCase):
 
     def test_concurrent_create_and_close_before_iteration(self):
         stream = self.request(stream=True)
-        with self.assertRaisesRegex(client.ProviderError, "concurrent"):
+        with self.assertRaisesRegex(client.ProviderError, "same thread"):
             self.request()
         self.assertEqual(self.launches, [])
         stream.close()
@@ -600,12 +612,17 @@ class ClientTests(unittest.TestCase):
             self.request()
         self.assertEqual(self.launches, [])
 
-    def test_running_async_helper_rejected_before_effects(self):
+    def test_async_callers_get_an_awaitable_served_from_a_worker_thread(self):
+        # Hermes' async_call_llm awaits create() on the event-loop thread.
         async def attempt():
-            with self.assertRaisesRegex(client.ProviderError, "async"):
-                self.request()
-        asyncio.run(attempt())
-        self.assertEqual(self.launches, [])
+            plain = await self.request()
+            messages = copy.deepcopy(self.c._history.messages) + [{'role': 'user', 'content': 'Followup'}]
+            streamed = await self.c.create(model=MODEL, messages=messages, stream=True,
+                                           stream_options={'include_usage': True})
+            return plain, streamed
+        plain, streamed = asyncio.run(attempt())
+        self.assertEqual(plain.choices[0].message.content, 'YES')
+        self.assertEqual(streamed.choices[0].message.content, 'FOLLOWUP')  # complete, not a stream
 
     def test_real_sleeping_child_timeout_cleanup_and_no_relaunch(self):
         started = time.monotonic()
@@ -794,6 +811,75 @@ class ClientTests(unittest.TestCase):
     def test_unlisted_model_is_rejected_before_effects(self):
         with self.assertRaisesRegex(client.ProviderError, 'exact model'):
             self.c.create(model='claude-unlisted', messages=[{'role': 'user', 'content': 'unused'}])
+        self.assertEqual(self.launches, [])
+
+    def test_concurrent_callers_on_one_client_are_queued(self):
+        results, errors = [], []
+        def call(text):
+            try:
+                c_messages = [{'role': 'user', 'content': text}]
+                results.append(self.c.create(model=MODEL, messages=c_messages).choices[0].message.content)
+            except BaseException as exc:
+                errors.append(exc)
+        first = threading.Thread(target=call, args=('__slow__',))
+        first.start()
+        end = time.monotonic() + 3
+        while not self.c._busy.locked() and time.monotonic() < end:
+            time.sleep(.01)
+        second = threading.Thread(target=call, args=('Hello',))
+        second.start()
+        first.join(10)
+        second.join(10)
+        self.assertEqual(errors, [])
+        self.assertEqual(sorted(results), ['SLOW', 'YES'])
+
+    def test_unrelated_conversation_on_same_client_starts_a_new_session(self):
+        self.request()
+        response = self.c.create(model=MODEL, messages=[{'role': 'user', 'content': 'Hello'}])
+        self.assertEqual(response.choices[0].message.content, 'YES')
+        self.assertEqual([a['stage'] for a in self.c.audit].count('session_reset'), 1)
+        self.assertEqual(len([a for a in self.c.audit if a['stage'] == 'launch']), 2)
+
+    def test_tool_list_change_starts_a_new_session(self):
+        self.request()
+        response = self.c.create(model=MODEL, messages=[{'role': 'user', 'content': '__tool__'}], tools=[TOOL])
+        self.assertEqual(response.choices[0].finish_reason, 'tool_calls')
+        self.assertEqual([a['stage'] for a in self.c.audit].count('session_reset'), 1)
+
+    def test_reset_cancels_a_parked_tool_call(self):
+        self.request('__tool__', tools=[TOOL])
+        old_runtime = self.c._runtime
+        response = self.c.create(model=MODEL, messages=[{'role': 'user', 'content': 'Hello'}], tools=[TOOL])
+        self.assertEqual(response.choices[0].message.content, 'YES')
+        self.assertTrue(old_runtime.cleanup['group_absent'])
+        self.assertFalse(any(a['stage'] == 'result_returned' for a in self.c.audit))
+        self.assertIsNone(self.c._pending)
+
+    def test_scope_change_still_rejected_rather_than_reset(self):
+        self.request()
+        with patch.dict(os.environ, {'HERMES_PROFILE': 'other'}), \
+                self.assertRaisesRegex(client.ProviderError, 'session/worktree/profile'):
+            self.c.create(model=MODEL, messages=[{'role': 'user', 'content': 'Hello'}])
+
+    def test_response_format_is_accepted_and_small_caps_are_raised(self):
+        response = self.request(max_tokens=16, extra_body={'response_format': {'type': 'json_object'}})
+        self.assertEqual(response.choices[0].message.content, 'YES')
+        self.assertEqual(self.child_envs[-1]['CLAUDE_CODE_MAX_OUTPUT_TOKENS'], '4096')
+
+    def image_message(self, url=None):
+        url = url or 'data:image/png;base64,' + base64.b64encode(b'\x89PNG\r\n\x1a\nfake').decode()
+        return {'role': 'user', 'content': [{'type': 'text', 'text': '__image__'},
+                                            {'type': 'image_url', 'image_url': {'url': url}}]}
+
+    def test_data_url_images_reach_the_cli_as_image_blocks(self):
+        response = self.c.create(model=MODEL, messages=[self.image_message()])
+        self.assertEqual(response.choices[0].message.content, 'IMAGES 1 image/png')
+
+    def test_remote_and_tool_result_images_are_rejected_before_effects(self):
+        for messages in ([self.image_message('https://example.invalid/a.png')],
+                         [{'role': 'user', 'content': [{'type': 'input_audio', 'input_audio': {}}]}]):
+            with self.subTest(messages=messages), self.assertRaises(client.ProviderError):
+                self.c.create(model=MODEL, messages=messages)
         self.assertEqual(self.launches, [])
 
     def test_model_change_on_same_client_is_rejected(self):
@@ -1023,8 +1109,9 @@ class ClientTests(unittest.TestCase):
         self.assertEqual(argv[argv.index('--effort') + 1], 'high')
         self.assertNotIn('--max-turns', argv)
         messages = copy.deepcopy(self.c._history.messages) + [{'role': 'user', 'content': 'next'}]
-        with self.assertRaisesRegex(client.ProviderError, 'separate client'):
-            self.c.create(model=MODEL, messages=messages, max_tokens=8000)
+        self.c.create(model=MODEL, messages=messages, max_tokens=8000)
+        self.assertEqual(self.child_envs[-1]['CLAUDE_CODE_MAX_OUTPUT_TOKENS'], '8000')
+        self.assertEqual([a['stage'] for a in self.c.audit].count('session_reset'), 1)
 
     def test_default_effort_is_medium_and_output_cap_is_left_to_the_cli(self):
         self.request()
@@ -1268,10 +1355,26 @@ def synthetic_runtime(argv):
     for line in sys.stdin:
         ordinal += 1
         text = json.loads(line)["message"]["content"]
-        if fixture == 'from-prompt':
-            fixture = re.search(r"path (\S+) and", text).group(1)
-        if '--native-fixture' in argv and '<restored-transcript-' not in text:
-            text = '__tool__' if ordinal == 1 else 'Followup'
+        if isinstance(text, list):
+            images = [b for b in text if b.get("type") == "image"]
+            text = "".join(b.get("text", "") for b in text if b.get("type") == "text")
+            if images and 'color' in text:
+                text = 'Reply with exactly: red'
+            if text == '__image__':
+                if ordinal == 1:
+                    emit({"type": "system", "subtype": "init", "model": model, "tools": tools,
+                          "apiKeySource": "none", "claude_code_version": init_version})
+                message(f"msg_{ordinal}_final", text=f"IMAGES {len(images)} " + " ".join(i["source"]["media_type"] for i in images))
+                emit({"type": "result", "subtype": "success", "is_error": False, "num_turns": 1,
+                      "modelUsage": {model: {"canonicalModel": model, "provider": "firstParty"}}})
+                continue
+        found = re.search(r"path (\S+) and", text) if fixture == 'from-prompt' else None
+        if found:
+            fixture = found.group(1)
+        if '--native-fixture' in argv and text.startswith("Call read_file"):
+            text = '__tool__'
+        elif '--native-fixture' in argv and text.startswith("Reply with exactly the word FOLLOWUP"):
+            text = 'Followup'
         badargs = text == '__badargs__'
         if ordinal == 1:
             emit({"type": "system", "subtype": "init", "model": "wrong" if text == "__wrongmodel__" else model,
@@ -1308,9 +1411,15 @@ def synthetic_runtime(argv):
             emit({"type": "result", "subtype": "success", "is_error": False, "num_turns": 1,
                   "modelUsage": {model: {"canonicalModel": model, "provider": "firstParty"}}})
             continue
+        exact = re.fullmatch(r"Reply with exactly: (\w+)", text)
+        if exact:
+            message(f"msg_{ordinal}_final", text=exact.group(1))
+            emit({"type": "result", "subtype": "success", "is_error": False, "num_turns": 1,
+                  "modelUsage": {model: {"canonicalModel": model, "provider": "firstParty"}}})
+            continue
         if '<restored-transcript-' in text:
             restored = re.findall(r"\[tool result [0-9a-f]+ id=[^\]]*\]\n(.*)", text)
-            message(f"msg_{ordinal}_final", text="RESTORED " + restored[-1])
+            message(f"msg_{ordinal}_final", text="RESTORED " + restored[-1] if restored else "RESTORED")
             emit({"type": "result", "subtype": "success", "is_error": False, "num_turns": 1,
                   "modelUsage": {model: {"canonicalModel": model, "provider": "firstParty"}}})
             continue

@@ -31,6 +31,7 @@ __all__ = ["ClaudeSubscriptionClient", "Bridge", "ProviderError", "History", "Me
            "record", "usage", "save", "PREFIX"]
 
 log = logging.getLogger(__name__)
+OUTPUT_FLOOR = 4096
 
 
 def owner_only(info):
@@ -67,7 +68,7 @@ class Stream:
             return next(self.iterator)
         except BaseException:
             self.finished = True
-            self.client._busy.release()
+            self.client._release_busy()
             self.client._dispose_if_closed()
             raise
 
@@ -76,7 +77,7 @@ class Stream:
             self.client.cancel()
             self.iterator.close()
             self.finished = True
-            self.client._busy.release()
+            self.client._release_busy()
             self.client._dispose_if_closed()
 
     def __enter__(self):
@@ -97,6 +98,7 @@ class ClaudeSubscriptionClient:
         self.base_url = "acp://claude-subscription"
         self.command, self.args, self.timeout = command or os.environ.get(CLI_SETTING), args or [], timeout
         self._busy = threading.Lock()
+        self._busy_owner = None  # thread whose request (possibly an open stream) holds _busy
         self._lifecycle = threading.RLock()
         self._closed = threading.Event()
         self._startup = None
@@ -165,8 +167,6 @@ class ClaudeSubscriptionClient:
         if len(caps) > 1 or any(type(cap) is not int or cap <= 0 for cap in caps):
             raise ProviderError("invalid output token cap")
         max_output = caps.pop() if caps else None
-        if self._model is not None and max_output != self._max_output:
-            raise ProviderError("output token cap changed; use a separate client")
         effort = os.environ.get(EFFORT_SETTING) or DEFAULT_EFFORT
         if effort not in EFFORTS:
             raise ProviderError(f"invalid effort setting {EFFORT_SETTING}; use one of: " + ", ".join(EFFORTS))
@@ -174,26 +174,39 @@ class ClaudeSubscriptionClient:
             raise ProviderError("arbitrary runtime arguments are unsupported")
         response_seconds(kwargs.get("timeout", self.timeout))
         body = kwargs.get("extra_body") or {}
-        if not isinstance(body, dict) or set(body) - {"subscription_session_id"}:
+        # response_format is ignored: the prompt already asks for the format.
+        if not isinstance(body, dict) or set(body) - {"subscription_session_id", "response_format"}:
             raise ProviderError("unsupported extra_body configuration")
         session_id = body.get("subscription_session_id")
         if session_id is not None and (not isinstance(session_id, str) or not session_id):
             raise ProviderError("subscription session id must be nonempty text")
         scope = self._current_scope(session_id)
         tools = convert_tools(kwargs.get("tools"))
-        if self._scope is not None and (scope != self._scope or tools != self._tools):
-            raise ProviderError("session/worktree/profile or tool schema changed; use a separate client")
+        if self._scope is not None and scope != self._scope:
+            raise ProviderError("session/worktree/profile changed; use a separate client")
         return model, scope, tools, max_output, effort
 
     def create(self, **kwargs):
         try:
             asyncio.get_running_loop()
         except RuntimeError:
-            pass
-        else:
-            raise ProviderError("synchronous claude-subscription client does not support async helpers")
-        if not self._busy.acquire(blocking=False):
-            raise ProviderError("concurrent create on a serial client")
+            return self._create(**kwargs)
+        # Hermes' async helpers await create() on the event-loop thread. Run the same request
+        # in a worker thread; they accept a complete response even when they asked for a stream.
+        kwargs = {**{k: v for k, v in kwargs.items() if k != "stream_options"}, "stream": False}
+        return asyncio.to_thread(self._create, **kwargs)
+
+    def _release_busy(self):
+        self._busy_owner = None
+        self._busy.release()
+
+    def _create(self, **kwargs):
+        if self._busy_owner == threading.get_ident():
+            raise ProviderError("create on the same thread while a stream from this client is still open")
+        # Hermes shares one helper client across callers: queue rather than fail.
+        if not self._busy.acquire(timeout=response_seconds(kwargs.get("timeout", self.timeout))):
+            raise ProviderError("timed out waiting for another request on this client")
+        self._busy_owner = threading.get_ident()
         try:
             if self.is_closed():
                 raise ProviderError("client closed or cancelled; no retry/resume")
@@ -222,17 +235,31 @@ class ClaudeSubscriptionClient:
                 if not owner_only(info):
                     raise ProviderError(f"{TOKEN_FILE_SETTING} must name an owner-only (0600) regular file")
                 self._token_file = token_file
-            tail = self._history.accept(kwargs.get("messages"))
-            self._model, self._scope, self._tools = model, scope, tools
+            messages = kwargs.get("messages")
+            new_session = bool(self._history.messages) and (tools != self._tools or max_output != self._max_output)
+            if not new_session:
+                try:
+                    tail = self._history.accept(messages)
+                except ProviderError:
+                    if not self._history.messages:
+                        raise
+                    new_session = True  # not a continuation of this client's own conversation
+            if new_session:
+                fresh = History()
+                tail = fresh.accept(messages)  # still validated: fresh start or rebuild
+                self._reset_session()
+                self._history = fresh
+                self.audit.append({"stage": "session_reset"})
+            self._model, self._scope, self._tools, self._max_output = model, scope, tools, max_output
             if self._effort is None:
-                self._max_output, self._effort = max_output, effort
+                self._effort = effort
             if self._process_env is None:
                 self._process_env = {k: os.environ[k] for k in ("PATH", "LANG", "TMPDIR") if os.environ.get(k)}
                 self._process_env.update(HOME=account.pw_dir, USER=account.pw_name, LOGNAME=account.pw_name)
                 self._home = Path(scope[1] or Path(scope[4] or Path.home()) / ".hermes").absolute()
             stream = Stream(self, self._drive(tail, response_seconds(kwargs.get("timeout", self.timeout))))
         except BaseException:
-            self._busy.release()
+            self._release_busy()
             raise
         if kwargs.get("stream", False):
             return stream
@@ -246,7 +273,8 @@ class ClaudeSubscriptionClient:
         env.update(CHILD_ENV)
         env["CLAUDE_CODE_PLUGIN_CACHE_DIR"] = str(directory / "empty-plugins")
         if self._max_output is not None:
-            env["CLAUDE_CODE_MAX_OUTPUT_TOKENS"] = str(self._max_output)
+            # Thinking counts toward the cap, so tiny helper caps (e.g. 16) are raised.
+            env["CLAUDE_CODE_MAX_OUTPUT_TOKENS"] = str(max(self._max_output, OUTPUT_FLOOR))
         return env
 
     def _start(self):
@@ -473,6 +501,23 @@ class ClaudeSubscriptionClient:
             if self._delivered:
                 self._bridge.require_open()
                 self._bridge.wait(selectors.EVENT_READ)
+
+    def _reset_session(self):
+        """End the current CLI session (cancelling any parked tool call) without closing the client."""
+        with self._lifecycle:
+            runtime, bridge, temporary = self._runtime, self._bridge, self._temporary
+            self._runtime = self._bridge = self._temporary = self._startup = None
+        if bridge is not None:
+            bridge.shutdown()
+        if runtime is not None:
+            runtime.close()
+            runtime.dispose()
+        if bridge is not None:
+            bridge.close()
+        if temporary is not None:
+            temporary.cleanup()
+        self._pending, self._sequence, self._delivered = None, 0, []
+        self._initialized, self._request_deadline = False, None
 
     def cancel(self):
         with self._lifecycle:

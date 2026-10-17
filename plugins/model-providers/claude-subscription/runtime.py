@@ -8,6 +8,7 @@ import threading
 import time
 
 from .errors import ProviderError
+from .history import content_blocks
 
 LINE_BOUND = 8_000_000  # bytes per runtime JSON line
 
@@ -32,7 +33,7 @@ class Runtime:
             self.selector.register(pipe, selectors.EVENT_READ)
 
     def send(self, text, check_active, idle=None):
-        data = json.dumps({"type": "user", "message": {"role": "user", "content": text}}) + "\n"
+        data = json.dumps({"type": "user", "message": {"role": "user", "content": content_blocks(text)}}) + "\n"
         assert self.process.stdin is not None
         remaining = memoryview(data.encode())
         while remaining:

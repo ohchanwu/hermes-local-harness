@@ -1,8 +1,29 @@
 """In-memory transcript validation and canonicalization."""
+import base64
+import binascii
 import copy
 import json
+import re
 
 from .errors import ProviderError
+
+
+DATA_URL = re.compile(r"data:(image/(?:png|jpeg|gif|webp));base64,([A-Za-z0-9+/=\s]+)")
+
+
+def content_blocks(content):
+    """CLI stream-json user content: a plain string, or text and base64 image blocks."""
+    if isinstance(content, str):
+        return content
+    blocks = []
+    for part in content:
+        if part["type"] == "text":
+            blocks.append({"type": "text", "text": part["text"]})
+        else:
+            media_type, data = DATA_URL.fullmatch(part["image_url"]["url"]).groups()
+            blocks.append({"type": "image", "source": {"type": "base64", "media_type": media_type,
+                                                       "data": "".join(data.split())}})
+    return blocks
 
 
 class History:
@@ -75,8 +96,10 @@ class History:
         text = message.get("content")
         if text is None and role == "assistant":
             text = ""
-        if not isinstance(text, str):
-            raise ProviderError("only plain text message content is supported; no images or multipart content")
+        if role == "user" and isinstance(text, list):
+            text = History.canonical_parts(text)
+        elif not isinstance(text, str):
+            raise ProviderError("only plain text content, or user text and data-URL images, are supported")
         out: dict = {"role": role, "content": text}
         if role == "tool":
             if not isinstance(message.get("tool_call_id"), str) or not message["tool_call_id"]:
@@ -89,6 +112,29 @@ class History:
             if not isinstance(calls, list):
                 raise ProviderError("invalid tool calls")
             out["tool_calls"] = [History.canonical_call(call) for call in calls]
+        return out
+
+    @staticmethod
+    def canonical_parts(parts):
+        """User text and base64 data-URL images; remote URLs and other part types are rejected."""
+        out = []
+        for part in parts:
+            if isinstance(part, dict) and part.get("type") == "text" and isinstance(part.get("text"), str):
+                out.append({"type": "text", "text": part["text"]})
+            elif isinstance(part, dict) and part.get("type") == "image_url" and isinstance(part.get("image_url"), dict):
+                url = part["image_url"].get("url")
+                match = DATA_URL.fullmatch(url) if isinstance(url, str) else None
+                if match is None:
+                    raise ProviderError("images must be base64 data URLs of PNG, JPEG, GIF or WebP")
+                try:
+                    base64.b64decode(match.group(2), validate=True)
+                except (binascii.Error, ValueError):
+                    raise ProviderError("invalid base64 image data") from None
+                out.append({"type": "image_url", "image_url": {"url": url}})
+            else:
+                raise ProviderError("unsupported user content part")
+        if not out:
+            raise ProviderError("empty user content")
         return out
 
     @staticmethod

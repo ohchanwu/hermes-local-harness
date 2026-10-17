@@ -59,7 +59,7 @@ class RegistrationTests(unittest.TestCase):
         self.assertEqual(self.profile.model_aliases, {})
         self.assertFalse(self.profile.supports_model_listing)
         self.assertFalse(self.profile.supports_health_check)
-        self.assertFalse(self.profile.supports_vision)
+        self.assertTrue(self.profile.supports_vision)
         self.assertFalse(self.profile.supports_vision_tool_messages)
 
     def test_lazy_client_rejects_wrong_model_in_owned_path_not_factory(self):

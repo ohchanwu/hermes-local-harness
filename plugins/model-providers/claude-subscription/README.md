@@ -150,6 +150,26 @@ Only MCP tools advertised by Hermes are allowed. Runtime init verifies the exact
 model, CLI version, auth-source indication and tool list. These controls do not
 replace Hermes permissions or globally forbid Hermes' own permitted tools.
 
+## Hermes helper jobs
+
+Hermes helper jobs (compression summaries, titles, approval checks, image
+analysis and the rest) can run on this provider
+([helper support specification](../../../docs/specs/261017-claude-subscription-helper-support.md)):
+
+- **Async callers:** when `create` is called on a running event loop it returns
+  an awaitable served from a worker thread.
+- **Concurrent callers:** callers sharing one client queue for it. An open
+  stream plus a second call from the same thread is an immediate error.
+- **New conversations on the same client:** a request that does not continue
+  the client's own conversation, or changes its tool list or output cap, ends
+  the CLI session (cancelling any parked tool call) and starts a new one, fresh
+  or rebuilt.
+- **Options:** `extra_body.response_format` is ignored, and output caps below
+  4096 tokens are raised to 4096 because thinking counts toward the cap.
+- **Images:** base64 `data:` images (PNG, JPEG, GIF, WebP) in user messages are
+  sent as image blocks. Remote image URLs and images in tool results are
+  rejected. When a conversation is rebuilt, earlier images become a note.
+
 ## Rollout status (2026-10-17 KST)
 
 Owner-approved and live. `claude-opus-5-5` through this provider is the default

@@ -4,10 +4,13 @@
 
 Two sessions through the real client. The first does one synthetic read-only
 tool round trip and one follow-up turn. The second is a new client handed that
-whole transcript, so it must rebuild the session and recall the tool result. This is a live model call on the subscription; run it only
+whole transcript, so it must rebuild the session and recall the tool result.
+Then helper-job checks: an async call, two queued concurrent calls and an image
+on one shared client, each an unrelated conversation that starts a new session. This is a live model call on the subscription; run it only
 deliberately. It uses a throwaway HERMES_HOME, so no live Hermes state is touched.
 """
 import argparse
+import asyncio
 import importlib
 import json
 import os
@@ -15,12 +18,17 @@ from pathlib import Path
 import secrets
 import sys
 import tempfile
+import threading
 import types
 
 PLUGIN = Path(__file__).resolve().parent
 TOOL = {"type": "function", "function": {"name": "read_file", "description": "Read a text file",
         "parameters": {"type": "object", "properties": {"path": {"type": "string"}},
                        "required": ["path"], "additionalProperties": False}}}
+
+
+# A 1x1 red PNG for the image check.
+RED_PIXEL = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGP4z8AAAAMBAQDJ/pLvAAAAAElFTkSuQmCC"
 
 
 def load():
@@ -83,7 +91,38 @@ def run(command, model, workdir):
     finally:
         rebuilt.close()
     check(rebuilt._runtime is not None and rebuilt._runtime.cleanup["group_absent"], "rebuilt process group not reaped")
+    try:
+        helpers(client, command, model)
+    except Exception as exc:
+        raise RuntimeError(f"helpers: {type(exc).__name__}: {exc}") from None
     return compat.version_text(version), version in compat.CLI_TESTED, version
+
+
+def helpers(client, command, model):
+    """What Hermes' helper jobs do: async calls, a shared client, unrelated conversations, images."""
+    c = client.ClaudeSubscriptionClient(command=command)
+    try:
+        async def ask():
+            return await c.create(model=model, messages=[{"role": "user", "content": "Reply with exactly: ASYNC_OK"}])
+        check("ASYNC_OK" in asyncio.run(ask()).choices[0].message.content, "async call failed")
+        answers = []
+        def call(word):
+            response = c.create(model=model, messages=[{"role": "user", "content": f"Reply with exactly: {word}"}])
+            answers.append(response.choices[0].message.content)
+        threads = [threading.Thread(target=call, args=(word,)) for word in ("QUEUE_A", "QUEUE_B")]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join(300)
+        check(len(answers) == 2 and any("QUEUE_A" in a for a in answers) and any("QUEUE_B" in a for a in answers),
+              "queued concurrent calls failed")
+        image = c.create(model=model, messages=[{"role": "user", "content": [
+            {"type": "text", "text": "What single color fills this image? Reply with one lowercase word."},
+            {"type": "image_url", "image_url": {"url": RED_PIXEL}}]}])
+        check("red" in image.choices[0].message.content.lower(), "image not understood")
+        check([a["stage"] for a in c.audit].count("session_reset") >= 3, "unrelated conversations did not reset")
+    finally:
+        c.close()
 
 
 def main(argv=None):
