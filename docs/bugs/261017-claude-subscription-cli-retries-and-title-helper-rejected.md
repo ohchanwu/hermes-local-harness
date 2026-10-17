@@ -1,11 +1,14 @@
-# Claude subscription provider rejected CLI retries and title-helper requests
+# Claude subscription provider rejected CLI retries, title-helper requests and parallel tool calls
 
 - Incident date: 2026-10-17 (KST).
-- Severity: two failures, both in the provider plugin `plugins/model-providers/claude-subscription/`.
+- Severity: three failures, all in the provider plugin `plugins/model-providers/claude-subscription/`.
   - A user-visible turn failure in one orchestrator's Telegram chat.
   - Session-title generation failing silently on every profile.
+  - Repeated turn failures in the Advisor's Telegram chat (parallel tool calls).
   - No data loss and no tool execution from a partial message.
-- Status: fixed, deployed to all 11 Claude homes, gateway restarted. Commits `4a5d856`, `d0664df` and `e69274e`.
+- Status: fixed, deployed to all 11 Claude homes, gateway restarted.
+  - Sections 1–2: commits `4a5d856`, `d0664df` and `e69274e`.
+  - Section 3: commits `9faa92c`, `c5f30ce`, `dfe069a` and `a8f8893`.
 
 ## 1. Mid-reply API retries by the Claude CLI
 
@@ -78,6 +81,46 @@ After the helper rollout, Hermes logged `Title generation failed: unsupported ex
 - **Unit test:** the exact title-generator shape, an effort shape, and a non-object `reasoning` value, which is still rejected.
 - **Live check:** a direct `generate_title` call in the `harness-worker` home returned a title.
 - **Not independently reviewed** (small change).
+
+## 3. Parallel tool calls rejected
+
+### Symptom
+
+The Advisor's Telegram chat failed several turns (19:48–19:50 and 20:24–20:25) with:
+
+> Provider said: parallel, duplicate or invalid runtime tool calls
+
+All 16 logged attempts across those turns failed the same way, so retries could not help. `harness-worker` hit it twice.
+
+### Cause
+
+Hermes's system prompt tells every model to batch independent tool calls into one response (`agent/prompt_builder.py`, `PARALLEL_TOOL_CALL_GUIDANCE`). The provider accepted only one `tool_use` per assistant message, by design: the Claude CLI requests MCP tools one at a time, and the provider relayed exactly one parked call to Hermes. Fable 5.1 batched more readily than Opus 5.5.
+
+### Fix
+
+The provider now supports parallel tool calls:
+- **One batch to Hermes.** All calls of a complete, verified message go to Hermes once the CLI's first MCP request matches one of them by name and arguments.
+- **Results back to the CLI.** Hermes returns one result per call. The parked request gets its result first. Each later MCP request, in any order, is matched to a remaining call and answered from Hermes's results, exactly once.
+- **Calls Hermes drops.** Hermes removes duplicate calls and `delegate_task` calls over its concurrency limit before running a batch. The provider accepts Hermes's trimmed message. A removed duplicate gets its twin's result; any other removed call gets an error result saying Hermes did not run it.
+- **Errors.** A model event before the CLI has requested every call is an error, and so is a request for a call outside the batch. A rebuild requires every call of the final assistant message to have a result.
+
+Trade-off: only the first call of a batch is confirmed by an MCP request before Hermes runs them all. If the CLI later skipped one, Hermes would already have run it and the request would fail.
+
+The 2026-10-17 [provider-hardening](../specs/261017-claude-subscription-provider-hardening.md) and [transcript-rebuild](../specs/261017-claude-subscription-transcript-rebuild.md) specs say parallel calls are unsupported. That was true when they were written; the provider README is current.
+
+### Verification
+
+- **Unit tests:** 123 pass. New ones cover:
+  - batches the CLI requests in reverse order;
+  - identical calls;
+  - missing, duplicate and wrong results;
+  - Hermes dropping a duplicate and a distinct call;
+  - the CLI skipping a call or requesting one outside the batch;
+  - an oversized queued result;
+  - a rebuild with an unanswered call.
+- **Independent review:** approved twice, and its findings were fixed in `a8f8893`.
+- **Live, real CLI:** `smoke.py --parallel-only` passed on Fable 5.1 and Opus 5.5. Each model made two calls in one message, and both results were delivered.
+- **Live, through Hermes:** after deploy, a `harness-worker` chat asked for two file reads in one response. It completed in two API calls and returned both contents.
 
 ## Remaining limits
 
