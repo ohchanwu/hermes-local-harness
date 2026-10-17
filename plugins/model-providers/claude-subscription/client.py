@@ -18,7 +18,7 @@ from types import SimpleNamespace
 
 from .bridge import LINE_BOUND, Bridge, save
 from . import compat
-from .compat import CHILD_ENV, CLI_FLAGS, CLI_SETTING, DEFAULT_EFFORT, EFFORT_SETTING, EFFORTS, CLI_MINIMUM, CLI_TESTED, PREFIX, SETTINGS, served_names, version_text
+from .compat import CHILD_ENV, CLI_FLAGS, CLI_SETTING, TOKEN_SETTING, DEFAULT_EFFORT, EFFORT_SETTING, EFFORTS, CLI_MINIMUM, CLI_TESTED, PREFIX, SETTINGS, served_names, version_text
 from .errors import ProviderError
 from .history import History
 from .runtime import Runtime
@@ -213,6 +213,9 @@ class ClaudeSubscriptionClient:
             if self._process_env is None:
                 self._process_env = {k: os.environ[k] for k in ("PATH", "LANG", "TMPDIR") if os.environ.get(k)}
                 self._process_env.update(HOME=account.pw_dir, USER=account.pw_name, LOGNAME=account.pw_name)
+                if os.environ.get(TOKEN_SETTING):
+                    # Background Hermes processes cannot read a locked Keychain.
+                    self._process_env[TOKEN_SETTING] = os.environ[TOKEN_SETTING]
                 self._home = Path(scope[1] or Path(scope[4] or Path.home()) / ".hermes").absolute()
             stream = Stream(self, self._drive(tail, response_seconds(kwargs.get("timeout", self.timeout))))
         except BaseException:

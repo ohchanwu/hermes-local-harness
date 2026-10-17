@@ -23,8 +23,13 @@ local candidate is still required. Design: [hardening specification](../../../do
 ## Supported and tested surface
 
 The official, unmodified Claude Code binary owns subscription authentication.
-The plugin never reads/copies OAuth tokens, signs in, uses an Anthropic API key,
-or constructs an HTTP model client. This is personal/local runtime mediation,
+The plugin never signs in, stores or logs credentials, uses an Anthropic API
+key, or constructs an HTTP model client. The CLI runs with the OS account's
+real `HOME`, `USER` and `LOGNAME`, so it finds the ordinary Keychain login. For
+background Hermes processes, which cannot read a locked Keychain, the owner can
+create the CLI's official headless login with `claude setup-token` and set it as
+`CLAUDE_CODE_OAUTH_TOKEN` in the profile's `.env`; the plugin forwards that one
+variable to the CLI only (never to the MCP server, errors or the audit). This is personal/local runtime mediation,
 not a terms exemption or provider endorsement.
 
 Hermes `v0.21.5+6751.g9cf7960` (public contracts at
@@ -142,9 +147,12 @@ Only after separate attended authorization and exact-candidate review:
    `npm install --prefix "$HERMES_HOME/runtimes/claude-code/2.1.283" @anthropic-ai/claude-code@2.1.283`
    (confirm the currently supported pinned-install method first). Set
    `HERMES_CLAUDE_SUBSCRIPTION_CLI` in the Hermes environment to the absolute
-   path of that install's `claude` binary (a bare name is rejected). Sign-in is the ordinary attended subscription login shared
-   through the same `HOME`; never export tokens or configure an API-key
-   substitute for this provider.
+   path of that install's `claude` binary (a bare name is rejected). Sign-in is
+   the ordinary attended subscription login. For Kanban workers or other
+   background processes, run `claude setup-token` yourself in a separate terminal
+   and add the printed token to the profile's `.env` as
+   `CLAUDE_CODE_OAUTH_TOKEN=...`; never paste it into a chat or commit it, and
+   never configure an API-key substitute for this provider.
 2. Copy this whole directory to
    `$HERMES_HOME/plugins/model-providers/claude-subscription/` for the explicitly
    authorized target. No edits to installed Hermes or Claude are needed.

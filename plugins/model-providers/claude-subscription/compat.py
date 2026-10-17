@@ -22,6 +22,10 @@ EFFORT_SETTING = "HERMES_CLAUDE_SUBSCRIPTION_EFFORT"
 EFFORTS = ("low", "medium", "high", "xhigh", "max")
 DEFAULT_EFFORT = "medium"
 
+# Official headless login from `claude setup-token`. Forwarded only to the CLI,
+# never to the MCP server, logs or audit; unset means the Keychain login is used.
+TOKEN_SETTING = "CLAUDE_CODE_OAUTH_TOKEN"
+
 # Hermes resolves the provider's dedicated, version-locked CLI from this setting.
 CLI_SETTING = "HERMES_CLAUDE_SUBSCRIPTION_CLI"
 

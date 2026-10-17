@@ -843,6 +843,24 @@ class ClientTests(unittest.TestCase):
         envs = [env for env in self.child_envs if env is not None]
         self.assertTrue(envs and all(env.get('HOME') == real for env in envs))
 
+    def test_headless_login_token_reaches_only_the_cli(self):
+        # `claude setup-token` is the CLI's official login for headless use (no Keychain).
+        token = 'synthetic-oauth-token-value'
+        with patch.dict(os.environ, {'CLAUDE_CODE_OAUTH_TOKEN': token}):
+            self.c = client.ClaudeSubscriptionClient(command=SYNTHETIC_CLI)
+            self.addCleanup(self.c.close)
+            response = self.request('__tool__', tools=[TOOL])
+            mcp_env = json.loads((self.c._runtime.directory / 'mcp.json').read_text())['mcpServers']['hermes']['env']
+            self.continuation(response)
+        envs = [env for env in self.child_envs if env is not None]
+        self.assertTrue(envs and all(env.get('CLAUDE_CODE_OAUTH_TOKEN') == token for env in envs))
+        self.assertNotIn('CLAUDE_CODE_OAUTH_TOKEN', mcp_env)
+        self.assertNotIn(token, json.dumps(self.c.audit))
+
+    def test_no_login_token_is_forwarded_when_unset(self):
+        self.request()
+        self.assertTrue(all('CLAUDE_CODE_OAUTH_TOKEN' not in env for env in self.child_envs if env is not None))
+
     def test_unknown_login_user_fails_before_effects(self):
         with patch('pwd.getpwuid', side_effect=KeyError('uid not found')), \
                 self.assertRaisesRegex(client.ProviderError, 'login user'):
