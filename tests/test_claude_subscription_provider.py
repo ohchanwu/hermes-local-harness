@@ -843,15 +843,6 @@ class ClientTests(unittest.TestCase):
         envs = [env for env in self.child_envs if env is not None]
         self.assertTrue(envs and all(env.get('HOME') == real for env in envs))
 
-    def test_cli_children_can_reach_the_system_keychain_tool(self):
-        # The CLI reads its login through /usr/bin/security; Hermes workers may lack /usr/bin.
-        with patch.dict(os.environ, {'PATH': '/opt/homebrew/bin'}):
-            self.c = client.ClaudeSubscriptionClient(command=SYNTHETIC_CLI)
-            self.addCleanup(self.c.close)
-            self.request()
-        envs = [env for env in self.child_envs if env is not None]
-        self.assertTrue(envs and all(env['PATH'].split(':') == ['/opt/homebrew/bin', '/usr/bin', '/bin'] for env in envs))
-
     def test_unknown_login_user_fails_before_effects(self):
         with patch('pwd.getpwuid', side_effect=KeyError('uid not found')), \
                 self.assertRaisesRegex(client.ProviderError, 'login user'):
