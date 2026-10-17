@@ -89,8 +89,8 @@ class Stream:
 
 class ClaudeSubscriptionClient:
     HERMES_SKIP_TRANSPORT_WRAP = True
-    # Prevent an HTTP AsyncOpenAI rebuild. create() rejects running-event-loop
-    # callers before effects; this flag does NOT advertise async support.
+    # Prevent an HTTP AsyncOpenAI rebuild. Async callers are served instead by
+    # create() returning an awaitable that runs the request in a worker thread.
     HERMES_SKIP_ASYNC_WRAP = True
 
     def __init__(self, *, command=None, args=None, timeout=None, **kwargs):
@@ -247,8 +247,10 @@ class ClaudeSubscriptionClient:
             if new_session:
                 fresh = History()
                 tail = fresh.accept(messages)  # still validated: fresh start or rebuild
-                self._reset_session()
+                # All or nothing: the new conversation replaces the old before teardown, and a
+                # failed teardown closes the client rather than continuing without context.
                 self._history = fresh
+                self._reset_session()
                 self.audit.append({"stage": "session_reset"})
             self._model, self._scope, self._tools, self._max_output = model, scope, tools, max_output
             if self._effort is None:
@@ -386,7 +388,7 @@ class ClaudeSubscriptionClient:
                                         f"Claude CLI {version_text(self._cli_version)} may reject a flag: run smoke.py)") from None
                 if restored is not None:
                     self.audit.append({"stage": "rebuild", "messages": len(restored), "tail": tail["role"],
-                                       "sha256": hashlib.sha256(text.encode()).hexdigest()})
+                                       "sha256": hashlib.sha256(json.dumps(text).encode()).hexdigest()})
                     log.warning("claude-subscription rebuilt a session from a %d-message transcript", len(restored))
                 else:
                     self.audit.append({"stage": "user_input", "number": self._inputs})
@@ -507,17 +509,26 @@ class ClaudeSubscriptionClient:
         with self._lifecycle:
             runtime, bridge, temporary = self._runtime, self._bridge, self._temporary
             self._runtime = self._bridge = self._temporary = self._startup = None
-        if bridge is not None:
-            bridge.shutdown()
-        if runtime is not None:
-            runtime.close()
-            runtime.dispose()
-        if bridge is not None:
-            bridge.close()
-        if temporary is not None:
-            temporary.cleanup()
         self._pending, self._sequence, self._delivered = None, 0, []
         self._initialized, self._request_deadline = False, None
+        try:
+            if bridge is not None:
+                bridge.shutdown()
+            if runtime is not None:
+                runtime.close()
+                runtime.dispose()
+            if bridge is not None:
+                bridge.close()
+            if temporary is not None:
+                temporary.cleanup()
+        except BaseException as exc:
+            with self._lifecycle:  # put the remains back so close() can still reap them
+                self._runtime, self._bridge, self._temporary = runtime, bridge, temporary
+            try:
+                self.cancel()  # marks the client closed first, then retries the cleanup
+            except BaseException:
+                pass
+            raise ProviderError(f"session reset failed ({type(exc).__name__}); client closed") from None
 
     def cancel(self):
         with self._lifecycle:

@@ -35,4 +35,9 @@ def render_restored(restored, tail):
     text = "\n\n".join([f"<restored-transcript-{nonce}>", note(nonce), *entries, f"</restored-transcript-{nonce}>"])
     if tail["role"] == "tool":
         return text + "\n\nThe last tool result above is new. Continue the task using it.", nonce
-    return text + "\n\nNew message from the user:\n" + text_of(tail["content"]), nonce
+    if isinstance(tail["content"], str):
+        return text + "\n\nNew message from the user:\n" + tail["content"], nonce
+    # The newest message keeps its images: one text block, then its image parts.
+    words = "\n".join(part["text"] for part in tail["content"] if part["type"] == "text")
+    images = [part for part in tail["content"] if part["type"] != "text"]
+    return [{"type": "text", "text": text + "\n\nNew message from the user:\n" + words}, *images], nonce

@@ -831,7 +831,7 @@ class ClientTests(unittest.TestCase):
         first.join(10)
         second.join(10)
         self.assertEqual(errors, [])
-        self.assertEqual(sorted(results), ['SLOW', 'YES'])
+        self.assertEqual(results, ['SLOW', 'YES'])  # completion order: the quick call waited for the slow one
 
     def test_unrelated_conversation_on_same_client_starts_a_new_session(self):
         self.request()
@@ -881,6 +881,33 @@ class ClientTests(unittest.TestCase):
             with self.subTest(messages=messages), self.assertRaises(client.ProviderError):
                 self.c.create(model=MODEL, messages=messages)
         self.assertEqual(self.launches, [])
+
+    def test_rebuild_keeps_the_newest_messages_images(self):
+        messages = [{'role': 'user', 'content': 'Earlier'}, {'role': 'assistant', 'content': 'Ok'}, self.image_message()]
+        response = self.c.create(model=MODEL, messages=messages)
+        self.assertEqual(response.choices[0].message.content, 'IMAGES 1 image/png')
+        self.assertEqual([a['stage'] for a in self.c.audit].count('rebuild'), 1)
+
+    def test_failed_reset_closes_the_client_instead_of_dropping_context(self):
+        self.request()
+        with patch.object(client.Runtime, 'close', side_effect=PermissionError('group still present')):
+            with self.assertRaisesRegex(client.ProviderError, 'reset'):
+                self.c.create(model=MODEL, messages=[{'role': 'user', 'content': 'Hello'}])
+        self.assertTrue(self.c.is_closed())
+        messages = copy.deepcopy(self.c._history.messages) + [{'role': 'user', 'content': 'next'}]
+        with self.assertRaises(client.ProviderError):
+            self.c.create(model=MODEL, messages=messages)
+
+    def test_wrapped_base64_is_accepted_and_oversized_images_rejected(self):
+        data = base64.b64encode(b'\x89PNG' + b'x' * 300).decode()
+        wrapped = 'data:image/png;base64,' + '\n'.join(data[i:i + 76] for i in range(0, len(data), 76))
+        self.assertEqual(self.c.create(model=MODEL, messages=[self.image_message(wrapped)]).choices[0].message.content,
+                         'IMAGES 1 image/png')
+        big = 'data:image/png;base64,' + base64.b64encode(b'x' * (5 * 1024 * 1024 + 1)).decode()
+        other = client.ClaudeSubscriptionClient(command=SYNTHETIC_CLI)
+        self.addCleanup(other.close)
+        with self.assertRaisesRegex(client.ProviderError, '5 MB'):
+            other.create(model=MODEL, messages=[self.image_message(big)])
 
     def test_model_change_on_same_client_is_rejected(self):
         self.request()
@@ -1358,6 +1385,8 @@ def synthetic_runtime(argv):
         if isinstance(text, list):
             images = [b for b in text if b.get("type") == "image"]
             text = "".join(b.get("text", "") for b in text if b.get("type") == "text")
+            if images and '<restored-transcript-' in text and text.rstrip().endswith('__image__'):
+                text = '__image__'
             if images and 'color' in text:
                 text = 'Reply with exactly: red'
             if text == '__image__':

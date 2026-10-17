@@ -8,6 +8,7 @@ import re
 from .errors import ProviderError
 
 
+IMAGE_BOUND = 5 * 1024 * 1024  # decoded bytes per image, the API's limit
 DATA_URL = re.compile(r"data:(image/(?:png|jpeg|gif|webp));base64,([A-Za-z0-9+/=\s]+)")
 
 
@@ -127,9 +128,11 @@ class History:
                 if match is None:
                     raise ProviderError("images must be base64 data URLs of PNG, JPEG, GIF or WebP")
                 try:
-                    base64.b64decode(match.group(2), validate=True)
+                    size = len(base64.b64decode("".join(match.group(2).split()), validate=True))
                 except (binascii.Error, ValueError):
                     raise ProviderError("invalid base64 image data") from None
+                if size > IMAGE_BOUND:
+                    raise ProviderError("images are limited to 5 MB each")
                 out.append({"type": "image_url", "image_url": {"url": url}})
             else:
                 raise ProviderError("unsupported user content part")
