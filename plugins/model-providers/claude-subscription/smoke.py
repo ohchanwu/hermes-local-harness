@@ -5,6 +5,7 @@
 Two sessions through the real client. The first does one synthetic read-only
 tool round trip and one follow-up turn. The second is a new client handed that
 whole transcript, so it must rebuild the session and recall the tool result.
+Then a parallel tool-call check: one message with two calls, both answered.
 Then helper-job checks: an async call, two queued concurrent calls and an image
 on one shared client, each an unrelated conversation that starts a new session. This is a live model call on the subscription; run it only
 deliberately. It uses a throwaway HERMES_HOME, so no live Hermes state is touched.
@@ -92,10 +93,43 @@ def run(command, model, workdir):
         rebuilt.close()
     check(rebuilt._runtime is not None and rebuilt._runtime.cleanup["group_absent"], "rebuilt process group not reaped")
     try:
+        parallel(client, command, model, workdir)
+    except Exception as exc:
+        raise RuntimeError(f"parallel: {type(exc).__name__}: {exc}") from None
+    try:
         helpers(client, command, model)
     except Exception as exc:
         raise RuntimeError(f"helpers: {type(exc).__name__}: {exc}") from None
     return compat.version_text(version), version in compat.CLI_TESTED, version
+
+
+def parallel(client, command, model, workdir):
+    """One assistant message with two tool calls; the CLI asks for them one at a time."""
+    nonces = {}
+    for name in ("left", "right"):
+        path = Path(workdir) / f"{name}.txt"
+        nonces[str(path)] = f"{name.upper()}-" + secrets.token_hex(6)
+        path.write_text(nonces[str(path)])
+    c = client.ClaudeSubscriptionClient(command=command)
+    try:
+        left, right = sorted(nonces)
+        messages = [{"role": "system", "content": "You are a test harness. Use the provided tool when asked."},
+                    {"role": "user", "content": f"In a single response, call read_file twice in parallel: once with path "
+                                                f"{left} and once with path {right}. Then reply with both contents "
+                                                f"separated by a space."}]
+        first = c.create(model=model, messages=messages, tools=[TOOL])
+        calls = first.choices[0].message.tool_calls or []
+        check(first.choices[0].finish_reason == "tool_calls" and len(calls) == 2, f"model made {len(calls)} calls, not 2 in one message")
+        messages.append(first.choices[0].message.model_dump(exclude_none=True))
+        for call in calls:
+            path = json.loads(call.function.arguments).get("path")
+            messages.append({"role": "tool", "tool_call_id": call.id, "content": nonces.get(path, "error: unexpected path")})
+        second = c.create(model=model, messages=messages, tools=[TOOL])
+        text = second.choices[0].message.content
+        check(second.choices[0].finish_reason == "stop" and all(n in text for n in nonces.values()), "results not both used")
+        check([a["stage"] for a in c.audit].count("result_returned") == 2, "both results not returned to the CLI")
+    finally:
+        c.close()
 
 
 def helpers(client, command, model):
@@ -129,9 +163,18 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     parser.add_argument("--cli", required=True, help="path to the provider's dedicated Claude CLI")
     parser.add_argument("--model", required=True)
+    parser.add_argument("--parallel-only", action="store_true", help="run only the parallel tool-call check")
     args = parser.parse_args(argv)
     with tempfile.TemporaryDirectory(prefix="claude-subscription-smoke-") as workdir:
         os.environ["HERMES_HOME"] = workdir  # throwaway cache home
+        if args.parallel_only:
+            try:
+                parallel(load()[0], args.cli, args.model, workdir)
+            except Exception as exc:
+                print(f"SMOKE FAIL: parallel: {type(exc).__name__}: {exc}")
+                return 1
+            print(f"SMOKE PASS parallel model={args.model}")
+            return 0
         try:
             text, tested, version = run(args.cli, args.model, workdir)
         except Exception as exc:  # one attempt; report, never retry
