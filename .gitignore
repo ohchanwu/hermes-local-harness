@@ -13,3 +13,5 @@ private/
 __pycache__/
 *.py[cod]
 .DS_Store
+media/
+.worktrees/
