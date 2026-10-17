@@ -1,6 +1,6 @@
 # Claude subscription provider: rebuild a session from a transcript
 
-Status: approved 2026-10-17 for autonomous execution up to the live-check gate.
+Status: implemented; independent review approved; owner-gated live smoke test passed on 2026-10-17 with CLI 2.1.302, including the rebuild phase. That run also found that the CLI needs `USER` to find the subscription login, now passed through to the child environment.
 Prepared: 2026-10-17 KST. Baseline: `491bfd6` (`main`). Builds on the [provider hardening specification](261017-claude-subscription-provider-hardening.md).
 
 ## 1. Problem
