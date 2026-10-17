@@ -903,6 +903,13 @@ class ClientTests(unittest.TestCase):
         self.assertEqual(len(self.launches), before)
         self.assertTrue(self.c._runtime.cleanup['group_absent'])
 
+    def test_removed_working_directory_is_a_scope_error(self):
+        self.request()
+        messages = copy.deepcopy(self.c._history.messages) + [{'role': 'user', 'content': 'next'}]
+        with patch('os.getcwd', side_effect=FileNotFoundError('workspace removed')), \
+                self.assertRaisesRegex(client.ProviderError, 'working directory was removed'):
+            self.c.create(model=MODEL, messages=messages)
+
     def test_scope_change_during_stream_rejects_remaining_chunks(self):
         stream = self.request(stream=True)
         next(stream)

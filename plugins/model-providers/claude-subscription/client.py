@@ -120,7 +120,12 @@ class ClaudeSubscriptionClient:
 
     @staticmethod
     def _current_scope(session_id):
-        return (os.getcwd(), os.environ.get("HERMES_HOME"), os.environ.get("HERMES_PROFILE"),
+        try:
+            cwd = os.getcwd()
+        except FileNotFoundError:
+            # e.g. Kanban removes a finished task's scratch workspace under its worker
+            raise ProviderError("working directory was removed; the task scope has ended") from None
+        return (cwd, os.environ.get("HERMES_HOME"), os.environ.get("HERMES_PROFILE"),
                 os.environ.get("HERMES_KANBAN_TASK"), os.environ.get("HOME"),
                 os.environ.get("HERMES_KANBAN_WORKSPACE"), session_id)
 
