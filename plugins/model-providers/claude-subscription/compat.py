@@ -9,7 +9,8 @@ CLI_TESTED = {(2, 1, 283), (2, 1, 302)}
 
 # Allowlisted models and their Hermes capabilities. The served model must equal
 # the requested one; a provider-side variant name goes in "served_aliases".
-MODELS = {"claude-opus-5-5": {"context_length": 1000000}}
+MODELS = {"claude-opus-5-5": {"context_length": 1000000},
+          "claude-fable-5-1": {"context_length": 1000000}}
 
 # Fixed runtime flags. Per-session values (model, paths, tools, system prompt)
 # are appended by the client.

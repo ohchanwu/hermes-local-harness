@@ -55,7 +55,7 @@ class RegistrationTests(unittest.TestCase):
         self.assertEqual(self.profile.process_command_env_vars, ('HERMES_CLAUDE_SUBSCRIPTION_CLI',))
 
     def test_model_catalog_is_not_a_request_fallback_chain(self):
-        self.assertEqual(self.profile.fallback_models, ('claude-opus-5-5',))
+        self.assertEqual(self.profile.fallback_models, ('claude-opus-5-5', 'claude-fable-5-1'))
         self.assertEqual(self.profile.model_aliases, {})
         self.assertFalse(self.profile.supports_model_listing)
         self.assertFalse(self.profile.supports_health_check)
