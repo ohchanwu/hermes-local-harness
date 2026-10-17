@@ -328,6 +328,8 @@ class HistoryTests(unittest.TestCase):
         h = client.History()
         self.assertEqual(h.accept(messages)[-1]["role"], "tool")
         self.assertEqual(len(h.restored), 3)
+        with self.assertRaisesRegex(client.ProviderError, "every call"):
+            client.History().accept(messages[:-1])  # call b was never answered
 
     def test_fresh_start_is_not_a_rebuild(self):
         h, _ = self.start()
@@ -638,6 +640,41 @@ class ClientTests(unittest.TestCase):
                 with self.assertRaises(client.ProviderError):
                     c._history.accept(messages)
                 self.assertEqual(c._history.pending_ids, ['toolu_p_1_a', 'toolu_p_1_b'])
+
+    def trimmed(self, response, keep, results):
+        """What Hermes sends after removing calls from the batch: its own copy keeps only `keep`."""
+        messages = copy.deepcopy(self.c._history.messages)
+        messages[-1]["tool_calls"] = [c for c in messages[-1]["tool_calls"] if c["id"] in keep]
+        return messages + [{"role": "tool", "tool_call_id": i, "content": results[i]} for i in keep]
+
+    def test_hermes_dropped_duplicate_gets_its_twins_result_without_a_rebuild(self):
+        response = self.request('__parallel_same__', tools=[TOOL])
+        answer = self.c.create(model=MODEL, messages=self.trimmed(response, ['toolu_p_1_a'], {'toolu_p_1_a': 'A'}), tools=[TOOL])
+        self.assertEqual(answer.choices[0].message.content, 'A|A')
+        self.assertFalse(any(a['stage'] in ('session_reset', 'rebuild') for a in self.c.audit))
+
+    def test_hermes_dropped_distinct_call_gets_a_not_run_error(self):
+        response = self.request('__parallel__', tools=[TOOL])
+        answer = self.c.create(model=MODEL, messages=self.trimmed(response, ['toolu_p_1_a'], {'toolu_p_1_a': 'A'}), tools=[TOOL])
+        first, second = answer.choices[0].message.content.split('|')
+        self.assertIn('Hermes did not run this tool call', first)  # the CLI asked for b first
+        self.assertEqual(second, 'A')
+        followup = copy.deepcopy(self.c._history.messages) + [{"role": "user", "content": "next"}]
+        self.c._history.accept(followup)  # Hermes' trimmed copy is now the history prefix
+
+    def test_oversized_queued_result_is_rejected_before_any_delivery(self):
+        response = self.request('__parallel__', tools=[TOOL])
+        results = {'toolu_p_1_a': 'x' * (client.LINE_BOUND - 100), 'toolu_p_1_b': 'B'}
+        with self.assertRaisesRegex(client.ProviderError, 'line bound'):
+            self.c.create(model=MODEL, messages=self.parallel_results(response, results), tools=[TOOL])
+        self.assertFalse(any(a['stage'] == 'result_delivered' for a in self.c.audit))
+
+    def test_cli_request_for_a_call_outside_the_batch_is_an_error(self):
+        response = self.request('__parallel_wrong__', tools=[TOOL])
+        with self.assertRaisesRegex(client.ProviderError, 'unmatched'):
+            self.c.create(model=MODEL, messages=self.parallel_results(
+                response, {'toolu_p_1_a': 'A', 'toolu_p_1_b': 'B'}), tools=[TOOL])
+        self.assertEqual(len([a for a in self.c.audit if a['stage'] == 'result_delivered']), 1)
 
     def test_runtime_that_skips_a_parallel_call_is_an_error(self):
         response = self.request('__parallel_skip__', tools=[TOOL])
@@ -1625,7 +1662,7 @@ def synthetic_runtime(argv):
             message(f"msg_{ordinal}_final", text="X", snapshot_id="msg_other")
             continue
         count = 2 if text == "__multi__" else 6 if text == "__multi6__" else 1 if text in ('__tool__', '__badargs__') else 0
-        if text in ('__parallel__', '__parallel_same__', '__parallel_skip__'):
+        if text in ('__parallel__', '__parallel_same__', '__parallel_skip__', '__parallel_wrong__'):
             # One message with two calls; the CLI then requests them over MCP one at a time.
             paths = parallel_paths or ([fixture, fixture] if text == '__parallel_same__' else [fixture, fixture + '-b'])
             message(f"msg_{ordinal}_1", tool_ids=[f"toolu_p_{ordinal}_a", f"toolu_p_{ordinal}_b"], paths=paths)
@@ -1637,7 +1674,8 @@ def synthetic_runtime(argv):
                 bridge.stdin.flush()
                 return json.loads(bridge.stdout.readline())
             rpc({"id": 1, "method": "initialize", "params": {"protocolVersion": "2024-11-05"}})
-            order = [paths[0]] if text == '__parallel_skip__' else list(reversed(paths))  # any order
+            order = ([paths[0]] if text == '__parallel_skip__' else [paths[1], fixture + '-unrequested']
+                     if text == '__parallel_wrong__' else list(reversed(paths)))  # any order
             results = [rpc({"id": 2 + n, "method": "tools/call", "params": {"name": "read_file", "arguments": {"path": path}}})
                        ["result"]["content"][0]["text"] for n, path in enumerate(order)]
             message(f"msg_{ordinal}_final", text="|".join(results))

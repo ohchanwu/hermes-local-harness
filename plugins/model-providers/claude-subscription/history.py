@@ -32,6 +32,7 @@ class History:
     def __init__(self):
         self.messages = []
         self.pending_ids = []  # the last assistant message's tool calls, each owed one result
+        self.dropped = []  # calls Hermes removed from that message's batch (duplicates, over-limit delegations)
         self.restored = None  # prior messages a new client must replay, until its first send
 
     def accept(self, messages):
@@ -40,25 +41,42 @@ class History:
             raise ProviderError("messages must be a nonempty transcript")
         canonical = [self.canonical(m) for m in messages]
         self.restored = None
+        self.dropped = []
         tail = canonical[-1:]  # a fresh start or a rebuild continues from the last message
         if not self.messages:
             roles = [m["role"] for m in canonical]
             if roles not in (["user"], ["system", "user"]):
                 self.restored = self.rebuild(canonical)
-        else:
-            count = len(self.pending_ids) or 1
-            if len(canonical) != len(self.messages) + count or canonical[:len(self.messages)] != self.messages:
+        elif self.pending_ids:
+            # Hermes may drop calls from the batch (duplicates, delegations over its limit)
+            # before recording the assistant message; it answers only the calls it kept.
+            count, mine = len(self.messages), self.messages[-1]
+            kept = canonical[count - 1] if len(canonical) >= count else {}
+            if (canonical[:count - 1] != self.messages[:count - 1] or kept.get("role") != "assistant"
+                    or kept.get("content") != mine["content"] or not kept.get("tool_calls")
+                    or not self.subsequence(kept["tool_calls"], mine["tool_calls"])):
                 raise ProviderError("history prefix changed, missing, replayed or compacted; use a new client")
-            tail = canonical[len(self.messages):]
-            if self.pending_ids:
-                if (any(m["role"] != "tool" for m in tail)
-                        or sorted(m["tool_call_id"] for m in tail) != sorted(self.pending_ids)):
-                    raise ProviderError("exactly one matching result per tool call is required before continuation")
-            elif tail[0]["role"] != "user":
+            tail = canonical[count:]
+            if (any(m["role"] != "tool" for m in tail)
+                    or sorted(m["tool_call_id"] for m in tail) != sorted(c["id"] for c in kept["tool_calls"])):
+                raise ProviderError("exactly one matching result per tool call is required before continuation")
+            dropped = [c for c in mine["tool_calls"] if c not in kept["tool_calls"]]
+            self.dropped = dropped
+        else:
+            if len(canonical) != len(self.messages) + 1 or canonical[:-1] != self.messages:
+                raise ProviderError("history prefix changed, missing, replayed or compacted; use a new client")
+            tail = canonical[-1:]
+            if tail[0]["role"] != "user":
                 raise ProviderError("expected one new user turn, not a stale tool result")
         self.messages = canonical
         self.pending_ids = []
         return copy.deepcopy(tail)
+
+    @staticmethod
+    def subsequence(kept, calls):
+        """Whether kept is calls with some entries removed, order preserved."""
+        remaining = iter(calls)
+        return all(any(call == candidate for candidate in remaining) for call in kept)
 
     @staticmethod
     def rebuild(canonical):
@@ -76,11 +94,11 @@ class History:
                     raise ProviderError("tool result without an outstanding call")
                 outstanding.discard(message["tool_call_id"])
         if body[-1]["role"] == "tool":
-            # A final result must answer the latest assistant message, with only its results in between.
+            # Final results must answer every call of the latest assistant message, and nothing else.
             latest = next(i for i in range(len(body) - 1, -1, -1) if body[i]["role"] != "tool")
-            ids = {call["id"] for call in body[latest].get("tool_calls", [])}
-            if body[latest]["role"] != "assistant" or body[-1]["tool_call_id"] not in ids:
-                raise ProviderError("a final tool result must answer the latest assistant tool call")
+            ids = sorted(call["id"] for call in body[latest].get("tool_calls", []))
+            if body[latest]["role"] != "assistant" or sorted(m["tool_call_id"] for m in body[latest + 1:]) != ids:
+                raise ProviderError("final tool results must answer every call of the latest assistant message")
         return copy.deepcopy(body[:-1])
 
     @staticmethod

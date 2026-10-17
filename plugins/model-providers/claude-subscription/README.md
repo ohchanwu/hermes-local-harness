@@ -109,6 +109,13 @@ per call. The parked request gets its result first; each later MCP request is
 matched to a remaining call (in any order; identical calls are answered in
 message order) and gets that call's result, exactly once. If the model continues
 before the CLI has requested every call, the request fails.
+Hermes may remove calls from a batch before running it: a duplicate (same name
+and arguments) or `delegate_task` calls over its concurrency limit. Its recorded
+assistant message then holds only the kept calls, and the provider accepts that.
+When the CLI requests a removed call, a duplicate gets its twin's result and any
+other gets an error result saying Hermes did not run it. Only the first call of
+a batch is confirmed by an MCP request before Hermes runs them all; if the CLI
+then skips one, Hermes has already run it and the request fails.
 The MCP server reaches the client only over a Unix socket in a private
 `/tmp/hcs-*` directory (0700). It authenticates with a per-session token passed
 in the owner-only `mcp.json` env, the client accepts exactly one connection and

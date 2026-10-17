@@ -369,10 +369,19 @@ class ClaudeSubscriptionClient:
                     text, _ = render_restored(restored, last)
                 elif last["role"] == "tool":
                     results = {m["tool_call_id"]: m["content"] for m in tail}
+                    for call in self._history.dropped:
+                        # The CLI still asks for a call Hermes dropped: a duplicate gets its twin's result.
+                        twin = next((k for k in self._history.messages[-len(tail) - 1]["tool_calls"]
+                                     if k["function"] == call["function"]), None)
+                        results[call["id"]] = results[twin["id"]] if twin else (
+                            "error: Hermes did not run this tool call (it removed it from the batch, "
+                            "for example over its delegation limit)")
                     owed = {c["id"] for c in self._awaiting} | ({self._pending["tool_use_id"]} if self._pending else set())
-                    if self._pending is None or set(results) != owed or len(results) != len(tail) or self._bridge is None:
+                    if self._pending is None or set(results) != owed or self._bridge is None:
                         raise ProviderError("missing/mismatched parked invocation")
-                    if any(len(json.dumps({"result": 0, **self._pending, "text": r})) >= LINE_BOUND for r in results.values()):
+                    # Margin for the real sequence number and each call's own RPC id.
+                    if any(len(json.dumps({"result": self._sequence, **self._pending, "text": r})) >= LINE_BOUND - 256
+                           for r in results.values()):
                         raise ProviderError("tool result exceeds the MCP bridge line bound; nothing was delivered")
                     parked, self._pending = self._pending, None
                     self._queued = {c["id"]: results[c["id"]] for c in self._awaiting}
