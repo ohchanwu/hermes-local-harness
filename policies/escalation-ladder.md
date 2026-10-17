@@ -1,3 +1,5 @@
+> Legacy: describes the retired GPT-era fleet (Flash/Luna/Terra/Sol/Astra, retired 2026-10-18). Retained for history; does not govern current Harness routing.
+
 # Escalation ladder vglm-review-v2
 
 Flash → Luna → Terra → GLM-full → Sol → Astra → human.

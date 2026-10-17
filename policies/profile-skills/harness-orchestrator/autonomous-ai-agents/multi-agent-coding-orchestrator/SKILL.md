@@ -1,7 +1,7 @@
 ---
 name: multi-agent-coding-orchestrator
 description: "Use when orchestrating Harness repository work."
-version: 0.6.6-harness.1
+version: 0.6.7-harness.1
 author: chanbla11mit, Hermes Agent
 license: MIT
 platforms: [macos]
@@ -55,7 +55,21 @@ Every implementation card must contain:
 11. Explicit prohibitions on push, PR creation, deployment, live policy changes, credentials, production/cloud mutations, and other external writes without separate human authorization.
 12. Skill-policy metadata stating whether `minimal-implementation` is enabled and that requirements and risk outrank simplification.
 
-Use `kanban_create(..., board: harness)` only after validating the complete contract. Immediately read the card with `kanban_show(..., board: harness)` and verify the stored fields before allowing dispatch.
+Use `kanban_create(..., board: harness)` only after validating the complete contract. Immediately read the card with `kanban_show(..., board: harness)` and verify the stored fields before allowing dispatch. Fields that depend on the new ID are completed under Card Setup while the card is still blocked.
+
+## Card Setup
+
+Set up a card without a setup-only hold:
+
+1. Create it with `hermes kanban --board harness create ... --initial-status blocked` before any notification subscription exists.
+2. Read the new ID and write the exact ID, worktree path, and branch into the body.
+3. Pin `refs/harness/baselines/<ID>` to the baseline.
+4. Subscribe the callback with `hermes kanban --board harness notify-subscribe`.
+5. Unblock the card so it becomes `ready`.
+
+Never claim a card and `kanban_block` it as a setup hold. The worker's first action verifies `$HERMES_KANBAN_TASK`, worktree path, branch, and baseline, and it blocks only on a real mismatch.
+
+At creation Hermes records `workspace_path` as the repository root; the dispatcher's claim materializes `.worktrees/<ID>` (observed on `t_7d9c0343` events). A root value before claim is expected, not a mismatch; rely on the worker's start check.
 
 ## Worker Selection
 
@@ -110,6 +124,43 @@ Limits:
 
 User stop, product decisions, credentials or MFA, prohibited writes, unsafe state, capability boundaries, and policy, legal, or security decisions block immediately. Infrastructure failure is not reviewer approval or rejection.
 
+## Autonomy
+
+Bookkeeping never gates. Fix malformed `repair_history`, ledger, receipt, or handoff formatting by appending a valid successor that preserves the original. Such a correction is never a completion or integration prerequisite and never an owner question. Semantic gates are unchanged and still block: required tests, exact-candidate independent review, candidate drift, real budgets, and authority/external-write limits.
+
+Never ask the owner about:
+
+- bookkeeping corrections
+- historical test-order disclosures
+- retry or budget accounting
+- infrastructure retries
+- read-only local diagnosis
+- routine same-card rework
+- local integration after approval
+
+Ask only for:
+
+- external writes (push, PR, deploy)
+- credentials or MFA
+- live profile, skill, policy, board, or gateway changes
+- product decisions
+- money or billing
+- genuine capability limits
+- a user stop or resume
+
+Stale callbacks: run one `kanban_show(..., board: harness)`. If the card has already moved past the notified status, reply in at most one line (or say it is already handled) and do nothing else. `notify-subscribe` has no per-event filter (verified from CLI help on 2026-10-17). Filtering would need a Hermes patch, which the upgrade-safety rule forbids.
+
+Proportional handoff checks:
+
+- Trust successful tool results, and do not read back your own comments.
+- Do not re-hash what the reviewer already verified; one exact-candidate/diff check at integration is enough.
+- Keep controller comments to about 5 lines or fewer.
+- Batch independent checks in one response; serialize only when a call depends on an earlier result.
+
+No numeric caps on harmless actions: local reads, local tests, and anonymous public reads already in scope. Keep caps only where a real cost, rate, mutation, or ambiguity risk exists (for example, live model calls and the repair budgets above).
+
+Legacy policies: `policies/concurrency.md`, `policies/escalation-ladder.md`, and `procedures/hermes-terminal-outcome-notifications.md` describe the retired GPT-era fleet (Flash/Luna/Terra/Sol/Astra). They do not govern Harness board routing.
+
 ## Incident recovery
 
 An incident neither grants new authority nor automatically revokes unrelated authority. Worker-specific restrictions do not automatically restrict the controller; a higher-priority profile prohibition still wins over permissive card prose. Local/read-only intent alone grants no access. Harness may not probe another project, even read-only; synthetic scenario authority is data, not permission for the real session. Keep all existing external-read/write, credential/MFA, product, security/legal/policy, capability and unsafe-state gates.
@@ -151,7 +202,7 @@ Prefer fast-forward; otherwise merge or cherry-pick while preserving the reviewe
 
 ## Completion Gate
 
-Before reporting a Harness card complete:
+Before reporting a Harness card complete, check semantic validity, not bookkeeping-format validity:
 
 - The board, repository, worktree, baseline, assignee, reviewer, and test contract match the card.
 - Required focused and broader tests pass.

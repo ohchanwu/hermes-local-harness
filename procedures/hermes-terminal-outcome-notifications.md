@@ -1,3 +1,5 @@
+> Legacy: describes the retired GPT-era fleet (Flash/Luna/Terra/Sol/Astra, retired 2026-10-18). Retained for history; does not govern current Harness routing.
+
 # Hermes terminal outcome notifications: deployment and rollback
 
 Deployment is separately approval-gated. This matrix is authorized desired state, not proof that runtime rollout happened: `./scripts/verify-state --fixture tests/fixtures/clean.yaml` is the deployed shape; `terminal-deployment-pending.yaml` and `terminal-notification-rollback.yaml` must stay red.
