@@ -2,8 +2,9 @@
 
     python3 plugins/model-providers/claude-subscription/smoke.py --cli <path> --model <model>
 
-One session through the real client: one synthetic read-only tool round trip and
-one follow-up turn. This is a live model call on the subscription; run it only
+Two sessions through the real client. The first does one synthetic read-only
+tool round trip and one follow-up turn. The second is a new client handed that
+whole transcript, so it must rebuild the session and recall the tool result. This is a live model call on the subscription; run it only
 deliberately. It uses a throwaway HERMES_HOME, so no live Hermes state is touched.
 """
 import argparse
@@ -63,9 +64,20 @@ def run(command, model, workdir):
         stages = [a["stage"] for a in c.audit]
         check(stages.count("result_returned") == 1 and stages.count("launch") == 1, "unexpected bridge/launch audit")
         version = c._cli_version
+        messages += [{"role": "assistant", "content": third.choices[0].message.content},
+                     {"role": "user", "content": "What was the exact content of the file you read earlier? "
+                                                 "Reply with only that content."}]
     finally:
         c.close()
     check(c._runtime is not None and c._runtime.cleanup["group_absent"], "runtime process group not reaped")
+    rebuilt = client.ClaudeSubscriptionClient(command=command)
+    try:
+        fourth = rebuilt.create(model=model, messages=messages, tools=[TOOL])
+        check(nonce in fourth.choices[0].message.content, "rebuilt session did not recall the tool result")
+        check([a["stage"] for a in rebuilt.audit].count("rebuild") == 1, "no recorded rebuild")
+    finally:
+        rebuilt.close()
+    check(rebuilt._runtime is not None and rebuilt._runtime.cleanup["group_absent"], "rebuilt process group not reaped")
     return compat.version_text(version), version in compat.CLI_TESTED, version
 
 

@@ -22,9 +22,10 @@ from .errors import ProviderError
 from .history import History
 from .runtime import Runtime
 from .stream_events import Message
+from .transcript import render_restored
 from .translate import convert_tools, record, usage
 
-__all__ = ["ClaudeSubscriptionClient", "Bridge", "ProviderError", "History", "Message", "Runtime", "convert_tools",
+__all__ = ["ClaudeSubscriptionClient", "Bridge", "ProviderError", "History", "Message", "Runtime", "convert_tools", "render_restored",
            "record", "usage", "save", "PREFIX"]
 
 log = logging.getLogger(__name__)
@@ -280,9 +281,15 @@ class ClaudeSubscriptionClient:
                 self._start()
             runtime = self._runtime
             assert runtime is not None and self._tools is not None
+            restored, text = self._history.restored, None
             with self._lifecycle:
                 self._check_active()
-                if tail["role"] == "tool":
+                if restored is not None:
+                    # A new client handed an existing transcript replays it as its first input.
+                    self._history.restored = None
+                    self._inputs += 1
+                    text, _ = render_restored(restored, tail)
+                elif tail["role"] == "tool":
                     if self._pending is None or tail["tool_call_id"] != self._pending["tool_use_id"] or self._bridge is None:
                         raise ProviderError("missing/mismatched parked invocation")
                     delivery = {"result": self._sequence, **self._pending, "text": tail["content"]}
@@ -291,7 +298,8 @@ class ClaudeSubscriptionClient:
                     self._pending = None
                 else:
                     self._inputs += 1
-            if tail["role"] == "tool":
+                    text = tail["content"]
+            if text is None:
                 # Outside the lock: a full socket must not keep cancel() from running.
                 self._bridge.send(delivery, self._check_active)
                 self._delivered.append({"returned": delivery["result"], "rpc_id": delivery["rpc_id"],
@@ -299,18 +307,23 @@ class ClaudeSubscriptionClient:
                 self.audit.append({"stage": "result_delivered", "tool_use_id": tail["tool_call_id"],
                                    "rpc_id": delivery["rpc_id"], "text_sha256": hashlib.sha256(tail["content"].encode()).hexdigest()})
                 self._sequence += 1
-            if tail["role"] != "tool":
+            else:
                 self._check_active()
                 # A full pipe must not hold the ownership lock and prevent
                 # cancel() from killing/reaping the reader to unblock this write.
                 try:
-                    runtime.send(tail["content"], self._check_active, idle=self._pump_bridge)
+                    runtime.send(text, self._check_active, idle=self._pump_bridge)
                 except OSError:
                     if self._initialized:
                         raise
                     raise ProviderError(f"runtime exited before reading input (before initialization; an upgraded "
                                         f"Claude CLI {version_text(self._cli_version)} may reject a flag: run smoke.py)") from None
-                self.audit.append({"stage": "user_input", "number": self._inputs})
+                if restored is not None:
+                    self.audit.append({"stage": "rebuild", "messages": len(restored), "tail": tail["role"],
+                                       "sha256": hashlib.sha256(text.encode()).hexdigest()})
+                    log.warning("claude-subscription rebuilt a session from a %d-message transcript", len(restored))
+                else:
+                    self.audit.append({"stage": "user_input", "number": self._inputs})
             served = served_names(self._model)
             message = Message(served)
             while True:

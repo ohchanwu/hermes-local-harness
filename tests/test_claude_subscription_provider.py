@@ -260,7 +260,9 @@ class HistoryTests(unittest.TestCase):
         invalid = [[], [{"role": "assistant", "content": "imported"}, {"role": "user", "content": "next"}],
                    [{"role": "user", "content": [{"type": "image_url", "image_url": {"url": "unused"}}]}],
                    [{"role": "developer", "content": "unsupported"}, {"role": "user", "content": "next"}],
-                   [{"role": "user", "content": "one"}, {"role": "user", "content": "two"}]]
+                   [{"role": "system", "content": "S"}, {"role": "assistant", "content": "starts with assistant"}],
+                   [{"role": "user", "content": "one"}, {"role": "assistant", "content": "ends with assistant"}],
+                   [{"role": "user", "content": "one"}, {"role": "tool", "tool_call_id": "unknown", "content": "orphan"}]]
         for messages in invalid:
             with self.subTest(messages=messages), self.assertRaises(client.ProviderError):
                 client.History().accept(messages)
@@ -283,6 +285,56 @@ class HistoryTests(unittest.TestCase):
         h.accept(messages)
         with self.assertRaises(client.ProviderError):
             h.accept(messages)
+
+    def transcript(self):
+        call = self.call()
+        return [{"role": "system", "content": "SYSTEM"}, {"role": "user", "content": "Read"}, call,
+                {"role": "tool", "tool_call_id": "toolu_synthetic", "content": "RESULT"},
+                {"role": "assistant", "content": "It says RESULT", "reasoning_content": "private"},
+                {"role": "user", "content": "[System: the previous turn ended UNFINISHED]"},
+                {"role": "user", "content": "Follow up"}]
+
+    def test_new_client_accepts_existing_transcript_for_rebuild(self):
+        h = client.History()
+        messages = self.transcript()
+        self.assertEqual(h.accept(messages), {"role": "user", "content": "Follow up"})
+        self.assertEqual([m["role"] for m in h.restored], ["user", "assistant", "tool", "assistant", "user"])
+        self.assertNotIn("reasoning_content", h.messages[4])
+        self.assertEqual(h.messages[4]["content"], "It says RESULT")
+        # The rebuilt client then accepts only exact extensions, like any other.
+        h.assistant({"role": "assistant", "content": "done"})
+        h.accept(messages + [{"role": "assistant", "content": "done"}, {"role": "user", "content": "next"}])
+        self.assertIsNone(h.restored)
+        with self.assertRaises(client.ProviderError):
+            h.accept(messages + [{"role": "user", "content": "skipped the assistant turn"}])
+
+    def test_rebuild_accepts_parked_tool_result_tail_and_multiple_historic_calls(self):
+        two = {"role": "assistant", "content": "", "tool_calls": [
+            {"id": "a", "type": "function", "function": {"name": "read_file", "arguments": "{}"}},
+            {"id": "b", "type": "function", "function": {"name": "read_file", "arguments": "{}"}}]}
+        messages = [{"role": "user", "content": "Read"}, two, {"role": "tool", "tool_call_id": "a", "content": "A"},
+                    {"role": "tool", "tool_call_id": "b", "content": "B"}]
+        h = client.History()
+        self.assertEqual(h.accept(messages)["role"], "tool")
+        self.assertEqual(len(h.restored), 3)
+
+    def test_fresh_start_is_not_a_rebuild(self):
+        h, _ = self.start()
+        self.assertIsNone(h.restored)
+
+    def test_rendered_transcript_is_nonce_delimited_and_complete(self):
+        h = client.History()
+        tail = h.accept(self.transcript())
+        text, nonce = client.render_restored(h.restored, tail)
+        self.assertEqual(len(nonce), 32)
+        self.assertEqual(text.count(f"</restored-transcript-{nonce}>"), 1)
+        for fragment in ("[user]\nRead", "[assistant tool call read_file id=toolu_synthetic]\n{\"path\":\"/synthetic\"}",
+                         "[tool result id=toolu_synthetic]\nRESULT", "[assistant]\nIt says RESULT"):
+            self.assertIn(fragment, text)
+        self.assertNotIn("private", text)
+        self.assertNotIn("SYSTEM", text)  # the system message stays the runtime system prompt
+        self.assertTrue(text.endswith("New message from the user:\nFollow up"))
+        self.assertNotEqual(client.render_restored(h.restored, tail)[1], nonce)
 
     def test_prefix_edits_and_compaction_are_not_silently_discarded(self):
         h, messages = self.start()
@@ -433,6 +485,38 @@ class ClientTests(unittest.TestCase):
         with self.assertRaises(client.ProviderError):
             self.request('__snapshot_mismatch__')
         self.assertTrue(self.c._runtime.cleanup['group_absent'])
+
+    def rebuild_transcript(self):
+        call = {"role": "assistant", "content": "", "tool_calls": [{"id": "toolu_old", "type": "function",
+                "function": {"name": "read_file", "arguments": '{"path":"/nonexistent/synthetic"}'}}]}
+        return [{"role": "system", "content": "Synthetic system"}, {"role": "user", "content": "Read it"}, call,
+                {"role": "tool", "tool_call_id": "toolu_old", "content": "OLD RESULT"}]
+
+    def test_new_client_rebuilds_with_user_tail_and_continues_strictly(self):
+        messages = self.rebuild_transcript() + [{"role": "assistant", "content": "It says OLD RESULT"},
+                                                {"role": "user", "content": "What did it say?"}]
+        sent = []
+        original = client.Runtime.send
+        def record(runtime, text, *args, **kwargs):
+            sent.append(text)
+            return original(runtime, text, *args, **kwargs)
+        with patch.object(client.Runtime, 'send', record):
+            response = self.c.create(model=MODEL, messages=messages, tools=[TOOL])
+            self.assertEqual(response.choices[0].message.content, 'RESTORED OLD RESULT')
+            followup = copy.deepcopy(self.c._history.messages) + [{"role": "user", "content": "Followup"}]
+            self.assertEqual(self.c.create(model=MODEL, messages=followup, tools=[TOOL]).choices[0].message.content, 'FOLLOWUP')
+        self.assertIn('<restored-transcript-', sent[0])
+        self.assertTrue(sent[0].endswith('New message from the user:\nWhat did it say?'))
+        self.assertEqual(sent[1], 'Followup')
+        rebuilds = [a for a in self.c.audit if a['stage'] == 'rebuild']
+        self.assertEqual(len(rebuilds), 1)
+        self.assertEqual((rebuilds[0]['messages'], rebuilds[0]['tail']), (4, 'user'))
+
+    def test_new_client_rebuilds_with_parked_tool_result_tail(self):
+        response = self.c.create(model=MODEL, messages=self.rebuild_transcript(), tools=[TOOL])
+        self.assertEqual(response.choices[0].message.content, 'RESTORED OLD RESULT')
+        self.assertFalse(any(a['stage'] == 'result_delivered' for a in self.c.audit))
+        self.assertEqual([a['tail'] for a in self.c.audit if a['stage'] == 'rebuild'], ['tool'])
 
     def test_parallel_model_calls_rejected_before_exposing_any_tool(self):
         stream = self.request("__two_tools__", tools=[TOOL], stream=True)
@@ -1037,7 +1121,7 @@ def synthetic_runtime(argv):
         text = json.loads(line)["message"]["content"]
         if fixture == 'from-prompt':
             fixture = re.search(r"path (\S+) and", text).group(1)
-        if '--native-fixture' in argv:
+        if '--native-fixture' in argv and '<restored-transcript-' not in text:
             text = '__tool__' if ordinal == 1 else 'Followup'
         badargs = text == '__badargs__'
         if ordinal == 1:
@@ -1072,6 +1156,12 @@ def synthetic_runtime(argv):
                 emit({"type": "system", "subtype": "status"})
                 time.sleep(.1)
             message(f"msg_{ordinal}_final", text="SLOW")
+            emit({"type": "result", "subtype": "success", "is_error": False, "num_turns": 1,
+                  "modelUsage": {model: {"canonicalModel": model, "provider": "firstParty"}}})
+            continue
+        if '<restored-transcript-' in text:
+            restored = re.findall(r"\[tool result id=[^\]]*\]\n(.*)", text)
+            message(f"msg_{ordinal}_final", text="RESTORED " + restored[-1])
             emit({"type": "result", "subtype": "success", "is_error": False, "num_turns": 1,
                   "modelUsage": {model: {"canonicalModel": model, "provider": "firstParty"}}})
             continue

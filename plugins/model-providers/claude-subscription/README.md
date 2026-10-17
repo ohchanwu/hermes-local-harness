@@ -54,16 +54,28 @@ execution was not separately measured live.
 A client owns one fresh, in-memory official CLI session. Its model, output
 token cap (`max_tokens`/`max_completion_tokens`, otherwise the CLI default) and
 effort (`HERMES_CLAUDE_SUBSCRIPTION_EFFORT`, default `medium`) are fixed by its
-first request; changing any of them requires a separate client. Initial history must be
-one user message, optionally preceded by one system message. The system is passed
-as the runtime system prompt, user input through stream-json; assistant/tool
-history remains in the same process. Subsequent requests must preserve the exact
-canonical prefix and append either the one matching tool result or one new user
-turn. Canonicalization accepts harmless native empty/null assistant content and
-JSON argument key/whitespace differences, not changed semantics. Unknown imported
-history, compaction, changed system/tools/session/profile/worktree/task identity,
-unsupported roles, images and multipart content are rejected, not flattened or
-silently forgotten. No session persistence/resume/token-file copying is used.
+first request; changing any of them requires a separate client. A new client
+normally starts from one user message, optionally preceded by one system message.
+The system is passed as the runtime system prompt, user input through
+stream-json; assistant/tool history remains in the same process. Subsequent
+requests must preserve the exact canonical prefix and append either the one
+matching tool result or one new user turn. Canonicalization accepts harmless
+native empty/null assistant content and JSON argument key/whitespace
+differences, not changed semantics, and drops assistant reasoning fields.
+
+When a **new** client is handed an existing transcript, as Hermes does after a
+failed request, after compression, on a `/model` switch or in gateway sessions,
+it rebuilds the session: it starts a fresh CLI session and sends the earlier
+conversation as a nonce-delimited block in the first input, followed by the new
+user message or tool result
+([rebuild specification](../../../docs/specs/261017-claude-subscription-transcript-rebuild.md)).
+The transcript must start with a user message (after an optional system
+message), end with a user or tool message, and every tool result must name an
+earlier call. Each rebuild records a `rebuild` audit entry and logs a warning.
+A rebuild never delivers a result into an MCP call, so it cannot run a tool
+twice. Changed system/tools/session/profile/worktree/task identity on the same
+client, unsupported roles, images and multipart content are still rejected. No
+session persistence/resume/token-file copying is used.
 The accepted execution home and minimal child environment are bound at create;
 home/profile/task/worktree identity is checked again before deferred startup,
 input/result delivery and subsequent streamed chunks. A changed scope terminates

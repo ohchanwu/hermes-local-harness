@@ -25,7 +25,7 @@ Goals:
 - Event-driven bridge with no polling files.
 - Smaller modules with one job each; behavior unchanged except where this spec says otherwise.
 
-Non-goals (unchanged from the current candidate): async helpers, vision/multipart content, parallel tool calls, imported or compacted history, session resume, Agent SDK adoption, Hermes core patches, installation or rollout. Each remains separately authorized work.
+Non-goals (unchanged from the current candidate): async helpers, vision/multipart content, parallel tool calls, imported or compacted history (later added by the [transcript rebuild specification](261017-claude-subscription-transcript-rebuild.md)), session resume, Agent SDK adoption, Hermes core patches, installation or rollout. Each remains separately authorized work.
 
 Invariants that must survive every change: the plugin never reads, copies or exports subscription credentials and never uses an API key; Claude built-in tools stay disabled; only Hermes-advertised tools are allowed; Hermes alone executes tools; a mismatched, replayed or partial tool call never reaches Hermes; any protocol failure terminates the client rather than becoming a success; cancellation reaps the whole process group.
 
