@@ -17,7 +17,7 @@ class ClaudeSubscriptionProfile(ProviderProfile):
 
 
 claude_subscription = ClaudeSubscriptionProfile(
-    name="claude-subscription", aliases=(), display_name="Claude subscription (serial CLI)",
+    name="claude-subscription", aliases=(), display_name="Claude subscription (CLI)",
     description="Bounded synchronous text/tool session; official CLI owns subscription authentication",
     api_mode="chat_completions", auth_type="external_process", base_url="acp://claude-subscription",
     env_vars=(), process_command="", process_command_env_vars=(CLI_SETTING,), process_args=(),

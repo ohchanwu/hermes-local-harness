@@ -31,30 +31,34 @@ class History:
     """In-memory transcript owned by exactly one synchronous client."""
     def __init__(self):
         self.messages = []
-        self.pending_id = None
+        self.pending_ids = []  # the last assistant message's tool calls, each owed one result
         self.restored = None  # prior messages a new client must replay, until its first send
 
     def accept(self, messages):
+        """Validate the next request's transcript; return its new messages (the tail)."""
         if not isinstance(messages, list) or not messages:
             raise ProviderError("messages must be a nonempty transcript")
         canonical = [self.canonical(m) for m in messages]
         self.restored = None
+        tail = canonical[-1:]  # a fresh start or a rebuild continues from the last message
         if not self.messages:
             roles = [m["role"] for m in canonical]
             if roles not in (["user"], ["system", "user"]):
                 self.restored = self.rebuild(canonical)
         else:
-            if len(canonical) != len(self.messages) + 1 or canonical[:-1] != self.messages:
+            count = len(self.pending_ids) or 1
+            if len(canonical) != len(self.messages) + count or canonical[:len(self.messages)] != self.messages:
                 raise ProviderError("history prefix changed, missing, replayed or compacted; use a new client")
-            tail = canonical[-1]
-            if self.pending_id:
-                if tail["role"] != "tool" or tail.get("tool_call_id") != self.pending_id:
-                    raise ProviderError("one matching tool result is required before continuation")
-            elif tail["role"] != "user":
+            tail = canonical[len(self.messages):]
+            if self.pending_ids:
+                if (any(m["role"] != "tool" for m in tail)
+                        or sorted(m["tool_call_id"] for m in tail) != sorted(self.pending_ids)):
+                    raise ProviderError("exactly one matching result per tool call is required before continuation")
+            elif tail[0]["role"] != "user":
                 raise ProviderError("expected one new user turn, not a stale tool result")
         self.messages = canonical
-        self.pending_id = None
-        return copy.deepcopy(canonical[-1])
+        self.pending_ids = []
+        return copy.deepcopy(tail)
 
     @staticmethod
     def rebuild(canonical):
@@ -108,8 +112,7 @@ class History:
             out["tool_call_id"] = message["tool_call_id"]
         calls = message.get("tool_calls")
         if calls:
-            # Several calls may appear in replayed history; the live session itself
-            # still produces and continues exactly one at a time.
+            # Several calls per message: Hermes returns one result for each.
             if not isinstance(calls, list):
                 raise ProviderError("invalid tool calls")
             out["tool_calls"] = [History.canonical_call(call) for call in calls]
@@ -160,5 +163,4 @@ class History:
 
     def assistant(self, message):
         self.messages.append(self.canonical(message))
-        calls = message.get("tool_calls") or []
-        self.pending_id = calls[0]["id"] if calls else None
+        self.pending_ids = [call["id"] for call in message.get("tool_calls") or []]

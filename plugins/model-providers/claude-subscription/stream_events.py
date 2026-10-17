@@ -15,8 +15,7 @@ class Message:
         self.done = False
         self.snapshot = []  # content blocks from the runtime's per-block assistant snapshots
         self.usage = {}
-        self.call = None
-        self.argument_fragments = []
+        self.calls = []  # every tool call in this message, in order; Hermes runs them as one batch
         self.streamed_text = False  # visible text already handed to Hermes, which keeps it
         self.stream_id = None       # the first message id, kept for every chunk across restarts
         self.interrupted = None     # error type of a mid-stream API failure
@@ -75,9 +74,11 @@ class Message:
                 raise ProviderError("invalid/duplicate content block")
             self.blocks[index] = {"kind": block.get("type"), "closed": False}
             if block.get("type") == "tool_use":
-                if self.call is not None or not isinstance(block.get("id"), str) or not block["id"] or not isinstance(block.get("name"), str):
-                    raise ProviderError("parallel, duplicate or invalid runtime tool calls")
-                self.call = {"id": block["id"], "name": block["name"], "arguments": block.get("input", {})}
+                if (not isinstance(block.get("id"), str) or not block["id"] or not isinstance(block.get("name"), str)
+                        or block["id"] in {c["id"] for c in self.calls}):
+                    raise ProviderError("duplicate or invalid runtime tool call")
+                self.blocks[index]["call"] = len(self.calls)
+                self.calls.append({"id": block["id"], "name": block["name"], "arguments": block.get("input", {}), "fragments": []})
             elif block.get("type") not in ("text", "thinking", "redacted_thinking"):
                 raise ProviderError("unsupported runtime content block")
             if block.get("type") == "text" and block.get("text"):
@@ -92,7 +93,7 @@ class Message:
             if block["kind"] == "tool_use":
                 if delta.get("type") != "input_json_delta" or not isinstance(delta.get("partial_json"), str):
                     raise ProviderError("invalid tool argument delta")
-                self.argument_fragments.append(delta["partial_json"])
+                self.calls[block["call"]]["fragments"].append(delta["partial_json"])
                 return []  # serial validation fence: no tool escapes a partial message
             if block["kind"] == "text":
                 if delta.get("type") != "text_delta" or not isinstance(delta.get("text"), str):
@@ -107,9 +108,10 @@ class Message:
             if block is None or block["closed"]:
                 raise ProviderError("duplicate/missing block stop")
             block["closed"] = True
-            if block["kind"] == "tool_use" and self.argument_fragments:
-                self.call["arguments"] = json.loads("".join(self.argument_fragments))
-                if not isinstance(self.call["arguments"], dict):
+            call = self.calls[block["call"]] if block["kind"] == "tool_use" else None
+            if call is not None and call["fragments"]:
+                call["arguments"] = json.loads("".join(call["fragments"]))
+                if not isinstance(call["arguments"], dict):
                     raise ProviderError("tool arguments must be an object")
         elif event == "message_delta":
             self.stop = ev.get("delta", {}).get("stop_reason")
@@ -117,7 +119,7 @@ class Message:
         elif event == "message_stop":
             if any(not b["closed"] for b in self.blocks.values()) or not self.snapshot:
                 raise ProviderError("incomplete assistant message")
-            if self.stop not in ("end_turn", "max_tokens", "tool_use") or bool(self.call) != (self.stop == "tool_use"):
+            if self.stop not in ("end_turn", "max_tokens", "tool_use") or bool(self.calls) != (self.stop == "tool_use"):
                 raise ProviderError("runtime refusal or unsupported stop reason")
             if [b.get("type") for b in self.snapshot] != [b["kind"] for _, b in sorted(self.blocks.items())]:
                 raise ProviderError("stream/snapshot block mismatch")
@@ -125,7 +127,7 @@ class Message:
             if text != self.text:
                 raise ProviderError("stream/snapshot content mismatch")
             tools = [b for b in self.snapshot if b.get("type") == "tool_use"]
-            expected = [{"type": "tool_use", "id": self.call["id"], "name": self.call["name"], "input": self.call["arguments"]}] if self.call else []
+            expected = [{"type": "tool_use", "id": c["id"], "name": c["name"], "input": c["arguments"]} for c in self.calls]
             if [{k: b.get(k) for k in ("type", "id", "name", "input")} for b in tools] != expected:
                 raise ProviderError("stream/snapshot tool identity or arguments mismatch")
             self.done = True

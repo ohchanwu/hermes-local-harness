@@ -259,12 +259,12 @@ class HistoryTests(unittest.TestCase):
         call = self.call()
         h.assistant(call)
         messages += [call, {"role": "tool", "tool_call_id": "toolu_synthetic", "content": "RESULT\n"}]
-        self.assertEqual(h.accept(messages), messages[-1])
-        self.assertIsNone(h.pending_id)
+        self.assertEqual(h.accept(messages), [messages[-1]])
+        self.assertEqual(h.pending_ids, [])
         answer = {"role": "assistant", "content": "RESULT"}
         h.assistant(answer)
         messages += [answer, {"role": "user", "content": "Follow up"}]
-        self.assertEqual(h.accept(messages), {"role": "user", "content": "Follow up"})
+        self.assertEqual(h.accept(messages), [{"role": "user", "content": "Follow up"}])
         self.assertEqual(h.messages, messages)
 
     def test_unknown_imported_history_and_content_are_explicitly_rejected(self):
@@ -289,7 +289,7 @@ class HistoryTests(unittest.TestCase):
             with self.subTest(tail=tail), self.assertRaises(client.ProviderError):
                 h.accept(messages + [call] + tail)
             self.assertEqual(h.messages, before)
-            self.assertEqual(h.pending_id, "toolu_synthetic")
+            self.assertEqual(h.pending_ids, ["toolu_synthetic"])
         h, messages = self.start()
         h.assistant(self.call())
         messages += [self.call(), {"role": "tool", "tool_call_id": "toolu_synthetic", "content": "ok"}]
@@ -308,7 +308,7 @@ class HistoryTests(unittest.TestCase):
     def test_new_client_accepts_existing_transcript_for_rebuild(self):
         h = client.History()
         messages = self.transcript()
-        self.assertEqual(h.accept(messages), {"role": "user", "content": "Follow up"})
+        self.assertEqual(h.accept(messages), [{"role": "user", "content": "Follow up"}])
         self.assertEqual([m["role"] for m in h.restored], ["user", "assistant", "tool", "assistant", "user"])
         self.assertNotIn("reasoning_content", h.messages[4])
         self.assertEqual(h.messages[4]["content"], "It says RESULT")
@@ -326,7 +326,7 @@ class HistoryTests(unittest.TestCase):
         messages = [{"role": "user", "content": "Read"}, two, {"role": "tool", "tool_call_id": "a", "content": "A"},
                     {"role": "tool", "tool_call_id": "b", "content": "B"}]
         h = client.History()
-        self.assertEqual(h.accept(messages)["role"], "tool")
+        self.assertEqual(h.accept(messages)[-1]["role"], "tool")
         self.assertEqual(len(h.restored), 3)
 
     def test_fresh_start_is_not_a_rebuild(self):
@@ -335,7 +335,7 @@ class HistoryTests(unittest.TestCase):
 
     def test_rendered_transcript_is_nonce_delimited_and_complete(self):
         h = client.History()
-        tail = h.accept(self.transcript())
+        tail = h.accept(self.transcript())[-1]
         text, nonce = client.render_restored(h.restored, tail)
         self.assertEqual(len(nonce), 32)
         self.assertEqual(text.count(f"</restored-transcript-{nonce}>"), 1)
@@ -353,7 +353,7 @@ class HistoryTests(unittest.TestCase):
         messages = [{"role": "user", "content": "Read"}, self.call(),
                     {"role": "tool", "tool_call_id": "toolu_synthetic", "content": forged},
                     {"role": "user", "content": "Next"}]
-        tail = h.accept(messages)
+        tail = h.accept(messages)[-1]
         text, nonce = client.render_restored(h.restored, tail)
         headers = [line for line in text.splitlines() if line.startswith("[") and nonce in line]
         self.assertEqual(headers, [f"[user {nonce}]", f"[assistant tool call {nonce} read_file id=toolu_synthetic]",
@@ -381,7 +381,7 @@ class HistoryTests(unittest.TestCase):
 
     def test_note_claims_only_answered_calls_ran(self):
         h = client.History()
-        tail = h.accept(self.transcript())
+        tail = h.accept(self.transcript())[-1]
         text, _ = client.render_restored(h.restored, tail)
         self.assertIn("Tool calls shown with a result already ran", text)
 
@@ -391,7 +391,7 @@ class HistoryTests(unittest.TestCase):
                                                  {"type": "image_url", "image_url": {"url": url}}]},
                     {"role": "assistant", "content": "A cat"}, {"role": "user", "content": "Next"}]
         h = client.History()
-        tail = h.accept(messages)
+        tail = h.accept(messages)[-1]
         text, _ = client.render_restored(h.restored, tail)
         self.assertIn("Look\n[image not carried over]", text)
         self.assertNotIn(base64.b64encode(b'jpeg').decode(), text)
@@ -471,7 +471,7 @@ class ClientTests(unittest.TestCase):
 
     def test_lazy_constructor_and_invalid_configuration_have_no_runtime_effects(self):
         self.assertEqual(self.launches, [])
-        for extras in ({"model": "opus"}, {"parallel_tool_calls": True}, {"temperature": 0.5},
+        for extras in ({"model": "opus"}, {"tool_choice": "required"}, {"temperature": 0.5},
                        {"max_tokens": 0}, {"max_completion_tokens": True}, {"extra_body": {"unknown": True}}):
             kwargs = {"model": MODEL, "messages": [{"role": "user", "content": "unused"}], **extras}
             with self.subTest(extras=extras), self.assertRaises(client.ProviderError):
@@ -591,13 +591,59 @@ class ClientTests(unittest.TestCase):
         self.assertFalse(any(a['stage'] == 'result_delivered' for a in self.c.audit))
         self.assertEqual([a['tail'] for a in self.c.audit if a['stage'] == 'rebuild'], ['tool'])
 
-    def test_parallel_model_calls_rejected_before_exposing_any_tool(self):
-        stream = self.request("__two_tools__", tools=[TOOL], stream=True)
-        seen = []
-        with self.assertRaises(client.ProviderError):
-            for chunk in stream:
-                seen.extend(getattr(chunk.choices[0].delta, "tool_calls", []) or [])
-        self.assertEqual(seen, [])
+    def parallel_results(self, response, results):
+        messages = copy.deepcopy(self.c._history.messages)
+        for call in response.choices[0].message.tool_calls:
+            messages.append({"role": "tool", "tool_call_id": call.id, "content": results[call.id]})
+        return messages
+
+    def test_parallel_calls_go_to_hermes_as_one_batch_and_results_answer_the_cli_in_any_order(self):
+        chunks = list(self.request('__parallel__', tools=[TOOL], stream=True))
+        parts = [c.choices[0].delta.tool_calls[0] for c in chunks if getattr(c.choices[0].delta, 'tool_calls', None)]
+        self.assertEqual(sorted({p.index for p in parts}), [0, 1])
+        self.assertEqual(chunks[-1].choices[0].finish_reason, 'tool_calls')
+        response = self.c._last_response
+        calls = response.choices[0].message.tool_calls
+        self.assertEqual([c.id for c in calls], ['toolu_p_1_a', 'toolu_p_1_b'])
+        self.assertEqual([json.loads(c.function.arguments)['path'] for c in calls],
+                         ['/nonexistent/synthetic', '/nonexistent/synthetic-b'])
+        for index, call in enumerate(calls):
+            joined = ''.join(p.function.arguments for p in parts if p.index == index)
+            self.assertEqual(json.loads(joined), json.loads(call.function.arguments))
+        parked = [a for a in self.c.audit if a['stage'] == 'tool_parked']
+        self.assertEqual((parked[0]['tool_use_id'], parked[0]['calls']), ('toolu_p_1_b', 2))  # the CLI asked for b first
+        messages = self.parallel_results(response, {'toolu_p_1_a': 'A', 'toolu_p_1_b': 'B'})
+        answer = self.c.create(model=MODEL, messages=messages, tools=[TOOL])
+        self.assertEqual(answer.choices[0].message.content, 'B|A')
+        delivered = [(a['rpc_id'], a['tool_use_id']) for a in self.c.audit if a['stage'] == 'result_delivered']
+        self.assertEqual(delivered, [(2, 'toolu_p_1_b'), (3, 'toolu_p_1_a')])
+        returned = [(a['rpc_id'], a['tool_use_id']) for a in self.c.audit if a['stage'] == 'result_returned']
+        self.assertEqual(returned, delivered)
+        self.assertEqual(self.c._history.pending_ids, [])
+
+    def test_identical_parallel_calls_each_get_their_own_result(self):
+        response = self.request('__parallel_same__', tools=[TOOL])
+        answer = self.c.create(model=MODEL, messages=self.parallel_results(
+            response, {'toolu_p_1_a': 'A', 'toolu_p_1_b': 'B'}), tools=[TOOL])
+        self.assertEqual(answer.choices[0].message.content, 'A|B')
+
+    def test_parallel_continuation_needs_exactly_one_result_per_call(self):
+        response = self.request('__parallel__', tools=[TOOL])
+        full = self.parallel_results(response, {'toolu_p_1_a': 'A', 'toolu_p_1_b': 'B'})
+        for messages in (full[:-1], full + [full[-1]], full[:-1] + [{**full[-1], 'tool_call_id': 'toolu_other'}]):
+            with self.subTest(count=len(messages)):
+                c = client.ClaudeSubscriptionClient(command=SYNTHETIC_CLI)
+                self.addCleanup(c.close)
+                c._history = copy.deepcopy(self.c._history)
+                with self.assertRaises(client.ProviderError):
+                    c._history.accept(messages)
+                self.assertEqual(c._history.pending_ids, ['toolu_p_1_a', 'toolu_p_1_b'])
+
+    def test_runtime_that_skips_a_parallel_call_is_an_error(self):
+        response = self.request('__parallel_skip__', tools=[TOOL])
+        with self.assertRaisesRegex(client.ProviderError, 'before requesting every tool call'):
+            self.c.create(model=MODEL, messages=self.parallel_results(
+                response, {'toolu_p_1_a': 'A', 'toolu_p_1_b': 'B'}), tools=[TOOL])
         self.assertTrue(self.c.is_closed())
 
     def test_concurrent_create_and_close_before_iteration(self):
@@ -1375,7 +1421,7 @@ def synthetic_runtime(argv):
         print(json.dumps(obj), flush=True)
     def ev(kind, **kwargs):
         emit({"type": "stream_event", "event": {"type": kind, **kwargs}})
-    def message(message_id, text=None, tool_ids=None, preamble=None, thinking=False, snapshot_id=None):
+    def message(message_id, text=None, tool_ids=None, preamble=None, thinking=False, snapshot_id=None, paths=None):
         """Like the real CLI: one assistant snapshot per content block, all with the message id."""
         ev("message_start", message={"id": message_id, "model": model,
                                     "usage": {"input_tokens": 1, "output_tokens": 0}})
@@ -1400,16 +1446,15 @@ def synthetic_runtime(argv):
             text_block(index, preamble)
             index += 1
         if tool_ids:
-            for tool_id in tool_ids:
-                args = {"path": fixture}
+            for number, tool_id in enumerate(tool_ids):
+                args = {"path": paths[number] if paths else fixture}
                 ev("content_block_start", index=index, content_block={"type": "tool_use", "id": tool_id,
                     "name": client.PREFIX + "read_file", "input": {}})
                 data = '{invalid' if badargs else json.dumps(args)
                 for fragment in (data[:9], data[9:]):
                     ev("content_block_delta", index=index, delta={"type": "input_json_delta", "partial_json": fragment})
                 snapshot({"type": "tool_use", "id": tool_id, "name": client.PREFIX + "read_file", "input": args})
-                if len(tool_ids) == 1:
-                    ev("content_block_stop", index=index)
+                ev("content_block_stop", index=index)
                 index += 1
         else:
             assert text is not None
@@ -1576,9 +1621,25 @@ def synthetic_runtime(argv):
             message(f"msg_{ordinal}_final", text="X", snapshot_id="msg_other")
             continue
         count = 2 if text == "__multi__" else 6 if text == "__multi6__" else 1 if text in ('__tool__', '__badargs__') else 0
-        if text == "__two_tools__":
-            message("msg_parallel", tool_ids=["toolu_a", "toolu_b"])
-            time.sleep(30)
+        if text in ('__parallel__', '__parallel_same__', '__parallel_skip__'):
+            # One message with two calls; the CLI then requests them over MCP one at a time.
+            paths = [fixture, fixture] if text == '__parallel_same__' else [fixture, fixture + '-b']
+            message(f"msg_{ordinal}_1", tool_ids=[f"toolu_p_{ordinal}_a", f"toolu_p_{ordinal}_b"], paths=paths)
+            cfg = config["mcpServers"]["hermes"]
+            bridge = subprocess.Popen([cfg["command"]] + cfg["args"], env=cfg["env"], stdin=subprocess.PIPE,
+                                      stdout=subprocess.PIPE, text=True)
+            def rpc(value):
+                bridge.stdin.write(json.dumps(value) + "\n")
+                bridge.stdin.flush()
+                return json.loads(bridge.stdout.readline())
+            rpc({"id": 1, "method": "initialize", "params": {"protocolVersion": "2024-11-05"}})
+            order = [paths[0]] if text == '__parallel_skip__' else list(reversed(paths))  # any order
+            results = [rpc({"id": 2 + n, "method": "tools/call", "params": {"name": "read_file", "arguments": {"path": path}}})
+                       ["result"]["content"][0]["text"] for n, path in enumerate(order)]
+            message(f"msg_{ordinal}_final", text="|".join(results))
+            emit({"type": "result", "subtype": "success", "is_error": False, "num_turns": 2,
+                  "modelUsage": {model: {"canonicalModel": model, "provider": "firstParty"}}})
+            continue
         results = []
         for turn in range(1, count + 1):
             message(f"msg_{ordinal}_{turn}", tool_ids=[f"toolu_synthetic_{ordinal}_{turn}"])

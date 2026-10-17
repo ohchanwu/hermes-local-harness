@@ -1,4 +1,4 @@
-# Claude subscription — bounded serial Hermes provider
+# Claude subscription — bounded Hermes provider
 
 Repository source only. No live installation, profile/model change or rollout
 has been performed. Provider name: `claude-subscription`; models: the exact ids
@@ -99,11 +99,16 @@ input/result delivery and subsequent streamed chunks. A changed scope terminates
 deferred execution, rather than moving the accepted transcript to another home.
 The optional session ID must be nonempty text and is immutable for that client.
 
-Function schemas become MCP declarations. A complete, single real model
-`tool_use` is correlated by name/JSON arguments with the one parked MCP request;
-model tool-use ID and MCP JSON-RPC ID remain distinct. Hermes gets a native
-`tool_calls` response and alone authorizes/executes the tool. Its recorded tool
-result on the next create call is returned exactly once to that invocation.
+Function schemas become MCP declarations. A complete real model message may
+hold several `tool_use` blocks (parallel tool calls). The CLI requests them over
+MCP one at a time. Its first request must match one of the message's calls by
+name/JSON arguments; Hermes then gets every call as one native `tool_calls`
+response and alone authorizes/executes them. Model tool-use IDs and MCP
+JSON-RPC IDs remain distinct. The next create call must carry exactly one result
+per call. The parked request gets its result first; each later MCP request is
+matched to a remaining call (in any order; identical calls are answered in
+message order) and gets that call's result, exactly once. If the model continues
+before the CLI has requested every call, the request fails.
 The MCP server reaches the client only over a Unix socket in a private
 `/tmp/hcs-*` directory (0700). It authenticates with a per-session token passed
 in the owner-only `mcp.json` env, the client accepts exactly one connection and
@@ -112,13 +117,12 @@ then removes the socket path, and messages are newline-delimited JSON with a
 call. The server acknowledges each delivered result, and the client matches
 every acknowledgement. The server never opens the requested tool path and
 contains no filesystem/shell/tool implementation. Duplicate/replayed IDs,
-missing/mismatched results and changed prefixes are errors. Multiple/parallel
-model calls are rejected before any native tool call is exposed. Serial
-multi-step tool use is supported without a step cap.
+missing/mismatched results and changed prefixes are errors. Multi-step tool use
+is supported without a step cap.
 
 Streaming text comes from actual runtime deltas. Tool-call name/identity and
 argument fragments are emitted only after the whole message and MCP invocation
-match, so Hermes cannot act on a partial/parallel tool message. Terminal finish
+match, so Hermes cannot act on a partial tool message. Terminal finish
 reasons are `tool_calls`, `stop` or `length`, with available per-message usage.
 When an API call fails mid-reply (a stream `error` event, such as overload),
 the CLI retries it and streams the reply again from `message_start`. Before any
@@ -151,7 +155,7 @@ parked streams; partial output is not successful completion.
 Claude built-in tools are disabled with `--tools ''`; strict owned MCP config,
 restricted/empty setting sources, explicit settings, no hooks, no skills,
 empty plugin cache, no memory/background tasks/cron/compaction/connectors/tool
-search and minimal child environment preserve the serial transport boundary.
+search and minimal child environment preserve the owned transport boundary.
 Only MCP tools advertised by Hermes are allowed. Runtime init verifies the exact
 model, CLI version, auth-source indication and tool list. These controls do not
 replace Hermes permissions or globally forbid Hermes' own permitted tools.

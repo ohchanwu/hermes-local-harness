@@ -1,4 +1,9 @@
-"""Serial subscription CLI client. No runtime or Hermes I/O on import."""
+"""Subscription CLI client. No runtime or Hermes I/O on import.
+
+The CLI asks for tools one MCP call at a time. A message with several tool calls
+goes to Hermes as one batch once the CLI's first request matches one of them;
+Hermes' results then answer the CLI's remaining requests as they arrive.
+"""
 import asyncio
 import hashlib
 import json
@@ -117,7 +122,9 @@ class ClaudeSubscriptionClient:
         self._scope = None
         self._tools = None
         self._inputs = 0
-        self._pending = None
+        self._pending = None  # the parked MCP call: its RPC id and tool_use id
+        self._awaiting = []   # other calls of that message the CLI has not requested yet
+        self._queued = {}     # Hermes' results for those calls, by tool_use id
         self._sequence = 0
         self._delivered = []
         self._seen_ids = set()
@@ -159,8 +166,8 @@ class ClaudeSubscriptionClient:
                    "max_completion_tokens", "parallel_tool_calls", "tool_choice", "extra_body"}
         if set(kwargs) - allowed:
             raise ProviderError("unsupported completion options: " + ", ".join(sorted(set(kwargs) - allowed)))
-        if kwargs.get("parallel_tool_calls") not in (None, False) or kwargs.get("tool_choice", "auto") != "auto":
-            raise ProviderError("only automatic serial tool calls are supported")
+        if kwargs.get("parallel_tool_calls") not in (None, False, True) or kwargs.get("tool_choice", "auto") != "auto":
+            raise ProviderError("only automatic tool choice is supported")
         if kwargs.get("stream_options", {"include_usage": True}) != {"include_usage": True}:
             raise ProviderError("unsupported stream options")
         caps = {kwargs[key] for key in ("max_tokens", "max_completion_tokens") if kwargs.get(key) is not None}
@@ -352,32 +359,29 @@ class ClaudeSubscriptionClient:
                 self._start()
             runtime = self._runtime
             assert runtime is not None and self._tools is not None
-            restored, text = self._history.restored, None
+            restored, text, last = self._history.restored, None, tail[-1]
             with self._lifecycle:
                 self._check_active()
                 if restored is not None:
                     # A new client handed an existing transcript replays it as its first input.
                     self._history.restored = None
                     self._inputs += 1
-                    text, _ = render_restored(restored, tail)
-                elif tail["role"] == "tool":
-                    if self._pending is None or tail["tool_call_id"] != self._pending["tool_use_id"] or self._bridge is None:
+                    text, _ = render_restored(restored, last)
+                elif last["role"] == "tool":
+                    results = {m["tool_call_id"]: m["content"] for m in tail}
+                    owed = {c["id"] for c in self._awaiting} | ({self._pending["tool_use_id"]} if self._pending else set())
+                    if self._pending is None or set(results) != owed or len(results) != len(tail) or self._bridge is None:
                         raise ProviderError("missing/mismatched parked invocation")
-                    delivery = {"result": self._sequence, **self._pending, "text": tail["content"]}
-                    if len(json.dumps(delivery)) >= LINE_BOUND:
+                    if any(len(json.dumps({"result": 0, **self._pending, "text": r})) >= LINE_BOUND for r in results.values()):
                         raise ProviderError("tool result exceeds the MCP bridge line bound; nothing was delivered")
-                    self._pending = None
+                    parked, self._pending = self._pending, None
+                    self._queued = {c["id"]: results[c["id"]] for c in self._awaiting}
                 else:
                     self._inputs += 1
-                    text = tail["content"]
+                    text = last["content"]
             if text is None:
                 # Outside the lock: a full socket must not keep cancel() from running.
-                self._bridge.send(delivery, self._check_active)
-                self._delivered.append({"returned": delivery["result"], "rpc_id": delivery["rpc_id"],
-                                        "tool_use_id": delivery["tool_use_id"]})
-                self.audit.append({"stage": "result_delivered", "tool_use_id": tail["tool_call_id"],
-                                   "rpc_id": delivery["rpc_id"], "text_sha256": hashlib.sha256(tail["content"].encode()).hexdigest()})
-                self._sequence += 1
+                self._deliver(parked["rpc_id"], parked["tool_use_id"], results[parked["tool_use_id"]])
             else:
                 self._check_active()
                 # A full pipe must not hold the ownership lock and prevent
@@ -390,7 +394,7 @@ class ClaudeSubscriptionClient:
                     raise ProviderError(f"runtime exited before reading input (before initialization; an upgraded "
                                         f"Claude CLI {version_text(self._cli_version)} may reject a flag: run smoke.py)") from None
                 if restored is not None:
-                    self.audit.append({"stage": "rebuild", "messages": len(restored), "tail": tail["role"],
+                    self.audit.append({"stage": "rebuild", "messages": len(restored), "tail": last["role"],
                                        "sha256": hashlib.sha256(json.dumps(text).encode()).hexdigest()})
                     log.warning("claude-subscription rebuilt a session from a %d-message transcript", len(restored))
                 else:
@@ -401,30 +405,44 @@ class ClaudeSubscriptionClient:
             while True:
                 self._check_active()
                 self._pump_bridge()
-                if message.done and message.call:
+                if self._queued:
+                    # Hermes answered every call; the CLI asks for the rest one at a time.
+                    if not self._bridge.calls:
+                        self._bridge.require_open()
+                    else:
+                        pending = self._bridge.calls.pop(0)
+                        call = self._match(pending, self._awaiting)
+                        self._awaiting.remove(call)
+                        self._deliver(pending["rpc_id"], call["id"], self._queued.pop(call["id"]))
+                        continue
+                if message.done and message.calls:
                     if self._bridge is not None and not self._bridge.calls:
                         self._bridge.require_open()
                     if self._bridge is not None and self._bridge.calls:
                         pending = self._bridge.calls.pop(0)
-                        call = message.call
-                        if (pending.get("call") != self._sequence or self._delivered or call["id"] in self._seen_ids or call["name"] != PREFIX + pending.get("name", "")
-                                or pending.get("name") not in {t["name"] for t in self._tools}
-                                or call["arguments"] != pending.get("arguments") or type(pending.get("rpc_id")) not in (str, int)):
-                            raise ProviderError("unmatched/replayed/unadvertised model and MCP invocation")
-                        self._seen_ids.add(call["id"])
-                        self._pending = {"rpc_id": pending["rpc_id"], "tool_use_id": call["id"]}
-                        native_call = {"id": call["id"], "type": "function", "function": {
-                            "name": pending["name"], "arguments": json.dumps(call["arguments"], sort_keys=True, separators=(",", ":"))}}
-                        assistant = {"role": "assistant", "content": message.text, "tool_calls": [native_call]}
+                        calls = message.calls
+                        if any(c["id"] in self._seen_ids or not c["name"].startswith(PREFIX)
+                               or c["name"][len(PREFIX):] not in {t["name"] for t in self._tools} for c in calls):
+                            raise ProviderError("replayed or unadvertised model tool call")
+                        bare = [{"id": c["id"], "name": c["name"][len(PREFIX):], "arguments": c["arguments"]} for c in calls]
+                        first = self._match(pending, bare)
+                        self._seen_ids.update(c["id"] for c in calls)
+                        self._pending = {"rpc_id": pending["rpc_id"], "tool_use_id": first["id"]}
+                        self._awaiting = [c for c in bare if c is not first]
+                        native_calls = [{"id": c["id"], "type": "function", "function": {
+                            "name": c["name"], "arguments": json.dumps(c["arguments"], sort_keys=True, separators=(",", ":"))}} for c in bare]
+                        assistant = {"role": "assistant", "content": message.text, "tool_calls": native_calls}
                         self._history.assistant(assistant)
                         self._last_response = record({"id": message.id, "object": "chat.completion", "created": int(time.time()),
                             "model": self._model, "choices": [{"index": 0, "message": assistant, "finish_reason": "tool_calls"}], "usage": usage(message.usage)})
-                        self.audit.append({"stage": "tool_parked", "tool_use_id": call["id"], "rpc_id": pending["rpc_id"],
-                                           "name": pending["name"], "arguments": call["arguments"], "model": self._model})
-                        yield self._chunk(message, {"tool_calls": [{"index": 0, "id": call["id"], "type": "function",
-                                                      "function": {"name": pending["name"], "arguments": ""}}]})
-                        for fragment in message.argument_fragments or [json.dumps(call["arguments"])]:
-                            yield self._chunk(message, {"tool_calls": [{"index": 0, "function": {"arguments": fragment}}]})
+                        self.audit.append({"stage": "tool_parked", "tool_use_id": first["id"], "rpc_id": pending["rpc_id"],
+                                           "name": first["name"], "arguments": first["arguments"], "model": self._model,
+                                           "calls": len(calls)})
+                        for index, (call, plain) in enumerate(zip(calls, bare)):
+                            yield self._chunk(message, {"tool_calls": [{"index": index, "id": call["id"], "type": "function",
+                                                          "function": {"name": plain["name"], "arguments": ""}}]})
+                            for fragment in call["fragments"] or [json.dumps(call["arguments"])]:
+                                yield self._chunk(message, {"tool_calls": [{"index": index, "function": {"arguments": fragment}}]})
                         yield self._chunk(message, {}, finish="tool_calls", token_usage=usage(message.usage))
                         return
                 try:
@@ -448,6 +466,8 @@ class ClaudeSubscriptionClient:
                         raise ProviderError("unexpected runtime version")
                     self._initialized = True
                     self.audit.append({"stage": "init", "model": obj["model"], "tools": obj["tools"]})
+                elif kind in ("assistant", "stream_event", "result") and self._awaiting:
+                    raise ProviderError("runtime continued before requesting every tool call of its message")
                 elif kind in ("assistant", "stream_event"):
                     if not self._initialized:
                         raise ProviderError("model event before verified initialization")
@@ -458,7 +478,7 @@ class ClaudeSubscriptionClient:
                         self.audit.append({"stage": "runtime_retry", "number": restarts})
                         log.warning("claude-subscription: the Claude CLI retried a failed API call before any reply text")
                 elif kind == "result":
-                    if not message.done or message.call or obj.get("is_error") or obj.get("subtype") != "success" or obj.get("permission_denials"):
+                    if not message.done or message.calls or obj.get("is_error") or obj.get("subtype") != "success" or obj.get("permission_denials"):
                         raise ProviderError("runtime quota/refusal/permission/turn error or incomplete result")
                     if type(obj.get("num_turns")) is not int or obj["num_turns"] < 0:
                         raise ProviderError("invalid runtime turn count")
@@ -486,6 +506,25 @@ class ClaudeSubscriptionClient:
         except BaseException:
             self.cancel()
             raise
+
+    def _match(self, pending, calls):
+        """The first of the message's calls that this MCP request is for; the CLI may request them in any order."""
+        if (pending.get("call") != self._sequence or self._delivered or type(pending.get("rpc_id")) not in (str, int)
+                or pending.get("name") not in {t["name"] for t in self._tools}):
+            raise ProviderError("unmatched/replayed/unadvertised model and MCP invocation")
+        for call in calls:
+            if call["name"] == pending["name"] and call["arguments"] == pending.get("arguments"):
+                return call
+        raise ProviderError("unmatched/replayed/unadvertised model and MCP invocation")
+
+    def _deliver(self, rpc_id, tool_use_id, text):
+        """Answer one parked MCP call; outside the lock, so a full socket cannot block cancel()."""
+        delivery = {"result": self._sequence, "rpc_id": rpc_id, "tool_use_id": tool_use_id, "text": text}
+        self._bridge.send(delivery, self._check_active)
+        self._delivered.append({"returned": delivery["result"], "rpc_id": rpc_id, "tool_use_id": tool_use_id})
+        self.audit.append({"stage": "result_delivered", "tool_use_id": tool_use_id, "rpc_id": rpc_id,
+                           "text_sha256": hashlib.sha256(text.encode()).hexdigest()})
+        self._sequence += 1
 
     def _chunk(self, message, delta, *, finish=None, token_usage=None):
         self._check_active()  # recheck even between deferred tool-argument chunks
@@ -517,7 +556,7 @@ class ClaudeSubscriptionClient:
         with self._lifecycle:
             runtime, bridge, temporary = self._runtime, self._bridge, self._temporary
             self._runtime = self._bridge = self._temporary = self._startup = None
-        self._pending, self._sequence, self._delivered = None, 0, []
+        self._pending, self._sequence, self._delivered, self._awaiting, self._queued = None, 0, [], [], {}
         self._initialized, self._request_deadline = False, None
         try:
             if bridge is not None:
