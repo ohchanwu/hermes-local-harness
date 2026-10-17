@@ -1,6 +1,6 @@
 # Claude subscription provider: upgrade-tolerant compatibility, unbounded sessions, socket bridge and modular client
 
-Status: approved 2026-10-17 for autonomous execution up to the smoke-test gate. Steps 1–8 implemented locally on branch `wt/provider-hardening` and verified offline; see §14. No installation, configuration change or live call has been made.
+Status: implemented and verified. Steps 1–8 done, independent review approved, owner-approved live smoke test passed on 2026-10-17 (`SMOKE PASS cli=2.1.283 model=claude-opus-5-5`); see §14. Attended installation into live Hermes and provider selection remain separate owner actions.
 Prepared: 2026-10-17 KST. Baseline: `f031b4e` (`main`), carrying the run51 provider candidate from `7127e61`.
 Subject: [`plugins/model-providers/claude-subscription/`](../../plugins/model-providers/claude-subscription/README.md). Parent specification: [Claude Max 20x inside Hermes](261016-claude-max20x-model-portability.md).
 
@@ -208,3 +208,4 @@ Resume evidence: a SMOKE PASS or SMOKE FAIL line from smoke.py
 - **Test order.** Steps 3–7 and the review fixes recorded a failing run before each implementation. The smoke script (step 8) was written just before its offline tests.
 - **Review fixes.** The independent review requested changes: `selectors` instead of `select.select` (which fails on descriptors ≥ 1024), absolute-path-only CLI setting, oversized tool results rejected before delivery, a finalizer for the socket directory, the smoke-test hint when the CLI exits before reading input, and stronger tests. The new early-exit test also exposed an existing cleanup bug on `main`: an exited but unreaped CLI made `Runtime.close` raise `PermissionError`. It now reaps the process first.
 - **Pre-existing failure.** `spikes/claude-subscription-feasibility` tests fail identically on `main` (they read ignored `private/feasibility/` evidence files absent from fresh worktrees). They are not in this spec's acceptance set.
+- **Live smoke test.** Owner-approved, 2026-10-17 KST, against a dedicated copy of CLI 2.1.283 at `~/.hermes/runtimes/claude-code/2.1.283/claude` (the native-installer binary, copied): `SMOKE PASS cli=2.1.283 model=claude-opus-5-5`. One run, no retry.

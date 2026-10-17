@@ -177,7 +177,9 @@ Only after separate attended authorization and exact-candidate review:
 
 The live evidence below predates the hardening changes (modules, version
 policy, model allowlist, dedicated CLI, removed session caps, socket bridge).
-Those changes are verified offline only; no live run has attested them yet.
+Those changes passed the offline suites, an independent review and one
+owner-approved live smoke test on 2026-10-17 KST:
+`SMOKE PASS cli=2.1.283 model=claude-opus-5-5`.
 
 Card `kanban://harness/t_51cbb4e0`, run49, baseline
 `92f0300eeb7f23d32dff38d9f7ecaef2c3caf698`. All new model slots are consumed:
