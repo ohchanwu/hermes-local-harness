@@ -422,6 +422,18 @@ class ClientTests(unittest.TestCase):
         self.assertEqual(final.choices[0].message.content, "FIRST|SECOND")
         self.assertEqual(len([a for a in self.c.audit if a["stage"] == "user_input"]), 1)
 
+    def test_per_block_snapshots_with_thinking_text_and_tool_roundtrip(self):
+        response = self.request('__rich_tool__', tools=[TOOL])
+        self.assertEqual(response.choices[0].finish_reason, 'tool_calls')
+        self.assertEqual(response.choices[0].message.content, 'Checking.')
+        answer = self.continuation(response, 'RESULT')
+        self.assertEqual(answer.choices[0].message.content, 'Got RESULT')
+
+    def test_snapshot_for_a_different_message_is_rejected(self):
+        with self.assertRaises(client.ProviderError):
+            self.request('__snapshot_mismatch__')
+        self.assertTrue(self.c._runtime.cleanup['group_absent'])
+
     def test_parallel_model_calls_rejected_before_exposing_any_tool(self):
         stream = self.request("__two_tools__", tools=[TOOL], stream=True)
         seen = []
@@ -956,29 +968,45 @@ def synthetic_runtime(argv):
         print(json.dumps(obj), flush=True)
     def ev(kind, **kwargs):
         emit({"type": "stream_event", "event": {"type": kind, **kwargs}})
-    def message(message_id, text=None, tool_ids=None):
+    def message(message_id, text=None, tool_ids=None, preamble=None, thinking=False, snapshot_id=None):
+        """Like the real CLI: one assistant snapshot per content block, all with the message id."""
         ev("message_start", message={"id": message_id, "model": model,
                                     "usage": {"input_tokens": 1, "output_tokens": 0}})
-        content = []
+        def snapshot(block):
+            emit({"type": "assistant", "message": {"id": snapshot_id or message_id, "model": model, "content": [block],
+                  "usage": {"input_tokens": 1, "cache_read_input_tokens": 5, "cache_creation_input_tokens": 3, "output_tokens": 2}}})
+        def text_block(index, value):
+            ev("content_block_start", index=index, content_block={"type": "text", "text": ""})
+            for fragment in (value[:1], value[1:]):
+                ev("content_block_delta", index=index, delta={"type": "text_delta", "text": fragment})
+            snapshot({"type": "text", "text": value})
+            ev("content_block_stop", index=index)
+        index = 0
+        if thinking:
+            ev("content_block_start", index=index, content_block={"type": "thinking", "thinking": ""})
+            ev("content_block_delta", index=index, delta={"type": "thinking_delta", "thinking": "Considering."})
+            ev("content_block_delta", index=index, delta={"type": "signature_delta", "signature": "sig"})
+            snapshot({"type": "thinking", "thinking": "Considering.", "signature": "sig"})
+            ev("content_block_stop", index=index)
+            index += 1
+        if preamble:
+            text_block(index, preamble)
+            index += 1
         if tool_ids:
-            for index, tool_id in enumerate(tool_ids):
+            for tool_id in tool_ids:
                 args = {"path": fixture}
                 ev("content_block_start", index=index, content_block={"type": "tool_use", "id": tool_id,
                     "name": client.PREFIX + "read_file", "input": {}})
                 data = '{invalid' if badargs else json.dumps(args)
                 for fragment in (data[:9], data[9:]):
                     ev("content_block_delta", index=index, delta={"type": "input_json_delta", "partial_json": fragment})
-                content.append({"type": "tool_use", "id": tool_id, "name": client.PREFIX + "read_file", "input": args})
+                snapshot({"type": "tool_use", "id": tool_id, "name": client.PREFIX + "read_file", "input": args})
+                if len(tool_ids) == 1:
+                    ev("content_block_stop", index=index)
+                index += 1
         else:
-            ev("content_block_start", index=0, content_block={"type": "text", "text": ""})
             assert text is not None
-            for fragment in (text[:1], text[1:]):
-                ev("content_block_delta", index=0, delta={"type": "text_delta", "text": fragment})
-            content = [{"type": "text", "text": text}]
-        emit({"type": "assistant", "message": {"id": message_id, "model": model, "content": content,
-              "usage": {"input_tokens": 1, "cache_read_input_tokens": 5, "cache_creation_input_tokens": 3, "output_tokens": 2}}})
-        for index in range(len(content)):
-            ev("content_block_stop", index=index)
+            text_block(index, text)
         ev("message_delta", delta={"stop_reason": "tool_use" if tool_ids else "end_turn"}, usage={"output_tokens": 2})
         ev("message_stop")
     config = json.loads(Path(argv[argv.index("--mcp-config") + 1]).read_text())
@@ -1039,6 +1067,24 @@ def synthetic_runtime(argv):
             message(f"msg_{ordinal}_final", text="SLOW")
             emit({"type": "result", "subtype": "success", "is_error": False, "num_turns": 1,
                   "modelUsage": {model: {"canonicalModel": model, "provider": "firstParty"}}})
+            continue
+        if text == '__rich_tool__':
+            message(f"msg_{ordinal}_1", tool_ids=[f"toolu_synthetic_{ordinal}_1"], preamble="Checking.", thinking=True)
+            cfg = config["mcpServers"]["hermes"]
+            bridge = subprocess.Popen([cfg["command"]] + cfg["args"], env=cfg["env"], stdin=subprocess.PIPE,
+                                      stdout=subprocess.PIPE, text=True)
+            def rpc(value):
+                bridge.stdin.write(json.dumps(value) + "\n")
+                bridge.stdin.flush()
+                return json.loads(bridge.stdout.readline())
+            rpc({"id": 1, "method": "initialize", "params": {"protocolVersion": "2024-11-05"}})
+            reply = rpc({"id": 2, "method": "tools/call", "params": {"name": "read_file", "arguments": {"path": fixture}}})
+            message(f"msg_{ordinal}_final", text="Got " + reply["result"]["content"][0]["text"], thinking=True)
+            emit({"type": "result", "subtype": "success", "is_error": False, "num_turns": 2,
+                  "modelUsage": {model: {"canonicalModel": model, "provider": "firstParty"}}})
+            continue
+        if text == '__snapshot_mismatch__':
+            message(f"msg_{ordinal}_final", text="X", snapshot_id="msg_other")
             continue
         count = 2 if text == "__multi__" else 6 if text == "__multi6__" else 1 if text in ('__tool__', '__badargs__') else 0
         if text == "__two_tools__":

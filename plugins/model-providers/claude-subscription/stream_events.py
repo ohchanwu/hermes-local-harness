@@ -13,7 +13,7 @@ class Message:
         self.text = ""
         self.stop = None
         self.done = False
-        self.snapshot = None
+        self.snapshot = []  # content blocks from the runtime's per-block assistant snapshots
         self.usage = {}
         self.call = None
         self.argument_fragments = []
@@ -22,9 +22,12 @@ class Message:
         kind = obj.get("type")
         if kind == "assistant":
             msg = obj.get("message", {})
-            if obj.get("error") or msg.get("model") not in self.served or self.snapshot is not None:
-                raise ProviderError("runtime assistant error, duplicate snapshot or unexpected model")
-            self.snapshot = msg
+            # The CLI sends one snapshot per content block, each carrying only that block.
+            if obj.get("error") or msg.get("model") not in self.served:
+                raise ProviderError("runtime assistant error or unexpected model")
+            if self.id is None or self.done or msg.get("id") != self.id or not isinstance(msg.get("content"), list):
+                raise ProviderError("assistant snapshot outside its streamed message")
+            self.snapshot.extend(msg["content"])
             self.usage.update(msg.get("usage") or {})
             return []
         if kind != "stream_event":
@@ -85,14 +88,16 @@ class Message:
             self.stop = ev.get("delta", {}).get("stop_reason")
             self.usage.update(ev.get("usage") or {})
         elif event == "message_stop":
-            if any(not b["closed"] for b in self.blocks.values()) or self.snapshot is None:
+            if any(not b["closed"] for b in self.blocks.values()) or not self.snapshot:
                 raise ProviderError("incomplete assistant message")
             if self.stop not in ("end_turn", "max_tokens", "tool_use") or bool(self.call) != (self.stop == "tool_use"):
                 raise ProviderError("runtime refusal or unsupported stop reason")
-            text = "".join(b.get("text", "") for b in self.snapshot.get("content", []) if b.get("type") == "text")
-            if text != self.text or self.snapshot.get("id") != self.id:
-                raise ProviderError("stream/snapshot content or identity mismatch")
-            tools = [b for b in self.snapshot.get("content", []) if b.get("type") == "tool_use"]
+            if [b.get("type") for b in self.snapshot] != [b["kind"] for _, b in sorted(self.blocks.items())]:
+                raise ProviderError("stream/snapshot block mismatch")
+            text = "".join(b.get("text", "") for b in self.snapshot if b.get("type") == "text")
+            if text != self.text:
+                raise ProviderError("stream/snapshot content mismatch")
+            tools = [b for b in self.snapshot if b.get("type") == "tool_use"]
             expected = [{"type": "tool_use", "id": self.call["id"], "name": self.call["name"], "input": self.call["arguments"]}] if self.call else []
             if [{k: b.get(k) for k in ("type", "id", "name", "input")} for b in tools] != expected:
                 raise ProviderError("stream/snapshot tool identity or arguments mismatch")
