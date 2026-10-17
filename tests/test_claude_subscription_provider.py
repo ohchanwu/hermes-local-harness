@@ -1498,7 +1498,11 @@ def synthetic_runtime(argv):
         found = re.search(r"path (\S+) and", text) if fixture == 'from-prompt' else None
         if found:
             fixture = found.group(1)
-        if '--native-fixture' in argv and text.startswith("Call read_file"):
+        both = re.search(r"once with path (\S+) and once with path (\S+)\.", text) if '--native-fixture' in argv else None
+        parallel_paths = [both.group(1), both.group(2)] if both else None
+        if both:
+            text = '__parallel__'
+        elif '--native-fixture' in argv and text.startswith("Call read_file"):
             text = '__tool__'
         elif '--native-fixture' in argv and text.startswith("Reply with exactly the word FOLLOWUP"):
             text = 'Followup'
@@ -1623,7 +1627,7 @@ def synthetic_runtime(argv):
         count = 2 if text == "__multi__" else 6 if text == "__multi6__" else 1 if text in ('__tool__', '__badargs__') else 0
         if text in ('__parallel__', '__parallel_same__', '__parallel_skip__'):
             # One message with two calls; the CLI then requests them over MCP one at a time.
-            paths = [fixture, fixture] if text == '__parallel_same__' else [fixture, fixture + '-b']
+            paths = parallel_paths or ([fixture, fixture] if text == '__parallel_same__' else [fixture, fixture + '-b'])
             message(f"msg_{ordinal}_1", tool_ids=[f"toolu_p_{ordinal}_a", f"toolu_p_{ordinal}_b"], paths=paths)
             cfg = config["mcpServers"]["hermes"]
             bridge = subprocess.Popen([cfg["command"]] + cfg["args"], env=cfg["env"], stdin=subprocess.PIPE,
