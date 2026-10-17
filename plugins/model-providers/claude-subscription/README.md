@@ -23,7 +23,8 @@ Construction is lazy, so startup failures occur in the owned request path rather
 than throwing into Hermes' legacy HTTP-construction fallback. The transport and
 async-wrapper opt-outs are deliberate; **async helpers are not supported**.
 `close`, `is_closed`, context-manager use and streaming iterator `close` are
-provided. Native Hermes' main streaming path was exercised end to end; both
+provided. Native Hermes' main streaming path was exercised end to end on the
+original run49 candidate (see evidence limits below); both
 stream/nonstream return shapes are exercised offline. Native nonstream main-loop
 execution was not separately measured live.
 
@@ -37,6 +38,11 @@ JSON argument key/whitespace differences, not changed semantics. Unknown importe
 history, compaction, changed system/tools/session/profile/worktree/task identity,
 unsupported roles, images and multipart content are rejected, not flattened or
 silently forgotten. No session persistence/resume/token-file copying is used.
+The accepted execution home and minimal child environment are bound at create;
+home/profile/task/worktree identity is checked again before deferred startup,
+input/result delivery and subsequent streamed chunks. A changed scope terminates
+deferred execution, rather than moving the accepted transcript to another home.
+The optional session ID must be nonempty text and is immutable for that client.
 
 Function schemas become MCP declarations. A complete, single real model
 `tool_use` is correlated by name/JSON arguments with the one parked MCP request;
@@ -61,9 +67,14 @@ response metadata and the client audit; runtime list-price cost is not a bill.
 
 Limits are intentionally small: at most two explicit user inputs and four
 observed assistant messages per client, runtime max-turns three per input,
-150-second owned-process session ceiling, and cleanup within a five-second
-budget (TERM, then KILL/reap). Per-response timeout is bounded by the session
-ceiling. Requested output cap is 1024 and effort is low. Other output caps,
+150-second session ceiling from first iterator execution, including the owned
+version-check child and parked time, and cleanup within a five-second budget
+(TERM, then KILL/reap). Per-response timeout starts before startup, also bounds
+backpressured input writes, and is bounded by the session ceiling. The version
+check has an additional ten-second ceiling. Closing before first iteration does
+not create IPC files or launch a child; startup cancellation owns and reaps the
+version child, not merely the model child. Requested output cap is 1024 and effort
+is low. Other output caps,
 sampling/options, arbitrary CLI arguments and concurrent create calls are
 unsupported. CLI retries/nonstream fallback are disabled; the plugin never
 relaunches a failed runtime. Use a separate client for a new role/task/session.
@@ -125,7 +136,7 @@ and a same-client `FOLLOWUP_OK` response without a second tool call.
 | Case | Native/model tool-use ID | MCP ID | Result |
 | --- | --- | --- | --- |
 | Primary | `toolu_01WcFyvBWJWiqWYAMNeGE5kC` | 2 | PASS, about 8.30s parent workflow |
-| Corrective, final runtime source | `toolu_01DSp2G9ZumxJGWt2CqTzAgL` | 2 | PASS, about 11.93s parent workflow |
+| Corrective, run49 runtime source | `toolu_01DSp2G9ZumxJGWt2CqTzAgL` | 2 | PASS, about 11.93s parent workflow |
 
 Fresh random nonce fixtures were frozen before each launch and excluded from
 model inputs. The actual installed native `AIAgent.run_conversation` discovered
@@ -161,7 +172,7 @@ entry-points metadata read; the genuine Python-backed native read still passed.
 These validation-only guards are not plugin deployment features or a fake
 bootstrap. No live profile/plugin/config/model selection was changed.
 
-Offline tests currently cover 28 provider mechanisms, four registration/scope
+Offline tests currently cover 39 provider mechanisms, four registration/scope
 contracts and the original ten prototype regressions. Default test imports do
 not load installed Hermes or contact providers. Inert Python children exercise
 actual client/MCP/process code; registration tests label peripheral fake
@@ -170,12 +181,48 @@ native discovery/metadata/transport and ordinary OpenAI/Zai aliases without
 inference; `openai-api` is a registry route, not a ProviderProfile in this version.
 These offline tests are not model or billing evidence.
 
+Run50 independent review rejected run49 candidate
+`7d280803fa8e55873350fa4a17efda772fa1bc6c` for startup cancellation/deadline and
+deferred scope defects. Run51 added regression assertions before repairs: actual
+sleeping/stubborn Python version children, startup/response/session bounds,
+closed-before-first-next, delayed scope changes and parked-result delivery.
+The initial 37-case RED had 14 assertion failures including scope subtests; its
+first green passed all 37. Additional backpressured-input cancellation/deadline
+REDs exposed blocking-lock/write defects and retained cleanup errors; the final
+39-case provider suite passes after bounded nonblocking writes. All failures,
+intermediate diffs and original evidence remain private for independent review.
+
+The two real integrations above are hash-bound to the rejected run49 candidate,
+not to the changed run51 client. Unchanged registration, MCP transport, message
+translation and official CLI controls retain those historical observations;
+startup ownership, earlier deadlines, deferred scope checks and input-write
+changes are reverified offline only. There is no new exact-candidate live
+attestation. Both live slots remain consumed; no live script was rerun.
+
+Fresh run51 isolated native inert controls also passed on the changed client:
+actual provider discovery/construction rejected closed and changed-scope deferred
+streams without starting a child, then the actual installed `AIAgent` main stream
+automatically executed one native read, returned the exact recorded result via
+MCP and completed a same-cached-client ordinary follow-up. The runtime was an
+inert Python event producer, **not Claude/model delivery**. Its owned version and
+runtime groups were reaped/absent; no auth/network/model call or dependency
+download occurred. Two preliminary native-control failures are retained: a
+driver cleanup assumed a not-yet-created request cache, then the explicit tool
+allowlist caught Kanban tools auto-injected by the test's activation environment.
+Neither reached a model child or tool execution. Corrected test-only setup
+removed that activation input before the passing fresh control; no core patch,
+live configuration change or evidence reset was used.
+
 Run48 retained real schema/history/MCP/client-tool RED/green, including failed
 test guards, but admitted some text-client code preceded its tests. Run49 retained
 assertion RED/green for pre-effect timeouts/history, malformed argument errors,
 stubborn-child cleanup, unmatched-tool false success and rejected rate limits.
-**The historical text-path TDD-order gap is not erased or claimed as full A6
-compliance; independent review must assess it.** Native setup/import failures,
+**The historical text-path TDD-order gap is not erased or claimed as original
+ordering compliance.** The owner explicitly accepted only this one historical
+exception, `t_51cbb4e0-run48-text-order-1`, after disclosure;
+`original_historical_TDD_order_compliant=false` remains recorded. New RED/green
+does not retroactively repair it. All behavioral/hermeticity/safety requirements,
+test-first repairs and independent same-card review remain mandatory. Native setup/import failures,
 failed expectations about registry-only OpenAI metadata, both live runs and
 exact source/output hashes remain in ignored `private/provider/` for review.
 No secrets/raw account output or private thinking are retained or published.

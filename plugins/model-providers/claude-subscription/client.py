@@ -282,14 +282,17 @@ class Message:
 
 
 class Runtime:
-    """One process group with a hard session deadline, including parked time."""
-    def __init__(self, argv, env, directory):
+    """Owned child process group; the client bounds startup and parked time."""
+    def __init__(self, argv, env, directory, *, cancel_mailbox=True):
         self.directory = directory
+        self.cancel_mailbox = cancel_mailbox
         self.lock = threading.Lock()
         self.cleanup = None
         self.started = time.monotonic()
         self.process = subprocess.Popen(argv, cwd=directory, env=env, stdin=subprocess.PIPE,
                                         stdout=subprocess.PIPE, stderr=subprocess.PIPE, start_new_session=True)
+        assert self.process.stdin is not None
+        os.set_blocking(self.process.stdin.fileno(), False)
         self.selector = selectors.DefaultSelector()
         self.buffer = b""
         self.stderr_bytes = 0
@@ -299,11 +302,38 @@ class Runtime:
             os.set_blocking(pipe.fileno(), False)
             self.selector.register(pipe, selectors.EVENT_READ)
 
-    def send(self, text):
+    def send(self, text, check_active):
         data = json.dumps({"type": "user", "message": {"role": "user", "content": text}}) + "\n"
         assert self.process.stdin is not None
-        self.process.stdin.write(data.encode())
-        self.process.stdin.flush()
+        remaining = memoryview(data.encode())
+        while remaining:
+            check_active()
+            try:
+                sent = os.write(self.process.stdin.fileno(), remaining)
+                remaining = remaining[sent:]
+            except BlockingIOError:
+                time.sleep(0.01)
+
+    def version_output(self, deadline, check_active):
+        """Read a bounded version response without an unowned blocking run()."""
+        output = b""
+        total = 0
+        while True:
+            check_active()
+            if time.monotonic() >= deadline:
+                raise ProviderError("runtime version startup timed out")
+            for key, _ in self.selector.select(0.01):
+                data = os.read(key.fd, 65536)
+                if not data:
+                    self.selector.unregister(key.fileobj)
+                    continue
+                total += len(data)
+                if total > 65536:
+                    raise ProviderError("runtime version output bound exceeded")
+                if key.fileobj is self.process.stdout:
+                    output += data
+            if self.process.poll() is not None and not self.selector.get_map():
+                return self.process.returncode, output
 
     def read(self):
         if b"\n" in self.buffer:
@@ -343,12 +373,19 @@ class Runtime:
         with self.lock:
             if self.cleanup is not None:
                 return self.cleanup
-            (self.directory / "cancel").touch(mode=0o600, exist_ok=True)
+            if self.cancel_mailbox:
+                (self.directory / "cancel").touch(mode=0o600, exist_ok=True)
             for sig, seconds in ((signal.SIGTERM, 4), (signal.SIGKILL, 0.5)):
                 try:
                     os.killpg(self.process.pid, sig)
                 except ProcessLookupError:
                     pass
+                except PermissionError:
+                    # macOS may report EPERM for a just-reaped group. Establish
+                    # absence via the same exact-PGID check, never ignore a denial
+                    # while an owned group is actually still present.
+                    if self.group_exists():
+                        raise
                 end = time.monotonic() + seconds
                 while time.monotonic() < end:
                     self.process.poll()
@@ -413,10 +450,15 @@ class ClaudeSubscriptionClient:
         self.base_url = "acp://claude-subscription"
         self.command, self.args, self.timeout = command or "claude", args or [], timeout
         self._busy = threading.Lock()
+        self._lifecycle = threading.RLock()
         self._closed = threading.Event()
+        self._startup = None
         self._runtime = None
         self._temporary = None
         self._timer = None
+        self._session_deadline = self._request_deadline = None
+        self._process_env = None
+        self._home = None
         self._history = History()
         self._scope = None
         self._tools = None
@@ -430,6 +472,23 @@ class ClaudeSubscriptionClient:
 
     def is_closed(self):
         return self._closed.is_set()
+
+    @staticmethod
+    def _current_scope(session_id):
+        return (os.getcwd(), os.environ.get("HERMES_HOME"), os.environ.get("HERMES_PROFILE"),
+                os.environ.get("HERMES_KANBAN_TASK"), os.environ.get("HOME"),
+                os.environ.get("HERMES_KANBAN_WORKSPACE"), session_id)
+
+    def _check_active(self):
+        if self.is_closed():
+            raise ProviderError("client closed or cancelled; no retry/resume")
+        if self._scope is None or self._current_scope(self._scope[-1]) != self._scope:
+            raise ProviderError("session/worktree/profile changed during execution; use a separate client")
+        now = time.monotonic()
+        if self._session_deadline is not None and now >= self._session_deadline:
+            raise ProviderError("runtime session timed out")
+        if self._request_deadline is not None and now >= self._request_deadline:
+            raise ProviderError("runtime response timed out")
 
     def _validate(self, kwargs):
         if kwargs.get("model") != MODEL:
@@ -454,8 +513,10 @@ class ClaudeSubscriptionClient:
         body = kwargs.get("extra_body") or {}
         if not isinstance(body, dict) or set(body) - {"subscription_session_id"}:
             raise ProviderError("unsupported extra_body configuration")
-        scope = (os.getcwd(), os.environ.get("HERMES_HOME"), os.environ.get("HERMES_PROFILE"),
-                 os.environ.get("HERMES_KANBAN_TASK"), body.get("subscription_session_id"))
+        session_id = body.get("subscription_session_id")
+        if session_id is not None and (not isinstance(session_id, str) or not session_id):
+            raise ProviderError("subscription session id must be nonempty text")
+        scope = self._current_scope(session_id)
         tools = convert_tools(kwargs.get("tools"))
         if self._scope is not None and (scope != self._scope or tools != self._tools):
             raise ProviderError("session/worktree/profile or tool schema changed; use a separate client")
@@ -476,7 +537,10 @@ class ClaudeSubscriptionClient:
             scope, tools = self._validate(kwargs)
             tail = self._history.accept(kwargs.get("messages"))
             self._scope, self._tools = scope, tools
-            stream = Stream(self, self._drive(tail, kwargs))
+            if self._process_env is None:
+                self._process_env = {k: os.environ[k] for k in ("HOME", "PATH", "LANG", "TMPDIR") if k in os.environ}
+                self._home = Path(scope[1] or Path(scope[4] or Path.home()) / ".hermes").absolute()
+            stream = Stream(self, self._drive(tail, response_seconds(kwargs.get("timeout", self.timeout))))
         except BaseException:
             self._busy.release()
             raise
@@ -487,7 +551,8 @@ class ClaudeSubscriptionClient:
         return self._last_response
 
     def _environment(self, directory):
-        env = {k: os.environ[k] for k in ("HOME", "PATH", "LANG", "TMPDIR") if k in os.environ}
+        assert self._process_env is not None
+        env = dict(self._process_env)
         env.update({"CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1", "CLAUDE_CODE_DISABLE_OFFICIAL_MARKETPLACE_AUTOINSTALL": "1",
                     "CLAUDE_CODE_PLUGIN_CACHE_DIR": str(directory / "empty-plugins"), "CLAUDE_CODE_DISABLE_CLAUDE_MDS": "1",
                     "CLAUDE_CODE_DISABLE_AUTO_MEMORY": "1", "CLAUDE_CODE_DISABLE_BACKGROUND_TASKS": "1", "CLAUDE_CODE_DISABLE_CRON": "1",
@@ -498,23 +563,31 @@ class ClaudeSubscriptionClient:
 
     def _start(self):
         assert self._tools is not None
-        root = Path(os.environ.get("HERMES_HOME") or Path.home() / ".hermes") / "cache/claude-subscription"
-        root.mkdir(parents=True, exist_ok=True, mode=0o700)
-        self._temporary = tempfile.TemporaryDirectory(prefix="session-", dir=root)
-        directory = Path(self._temporary.name)
-        (directory / "empty-plugins").mkdir(mode=0o700)
-        env = self._environment(directory)
-        check = subprocess.run([self.command, "--version"], env=env, cwd=directory, capture_output=True, timeout=10)
-        if check.returncode != 0 or check.stdout.strip() != b"2.1.283 (Claude Code)":
+        assert self._home is not None and self._session_deadline is not None
+        # Serialize ownership registration with cancel(), not the blocking read.
+        # Paths and child environment are bound at create(), never a later home.
+        with self._lifecycle:
+            self._check_active()
+            root = self._home / "cache/claude-subscription"
+            root.mkdir(parents=True, exist_ok=True, mode=0o700)
+            self._temporary = tempfile.TemporaryDirectory(prefix="session-", dir=root)
+            directory = Path(self._temporary.name)
+            (directory / "empty-plugins").mkdir(mode=0o700)
+            env = self._environment(directory)
+            self._check_active()
+            self._startup = Runtime([self.command, "--version"], env, directory, cancel_mailbox=False)
+        try:
+            code, output = self._startup.version_output(time.monotonic() + 10, self._check_active)
+        finally:
+            self._startup.close()
+            self._startup.dispose()
+        if code != 0 or output.strip() != b"2.1.283 (Claude Code)":
             raise ProviderError("untested Claude CLI version; required 2.1.283")
         settings = {"disableAllHooks": True, "autoMemoryEnabled": False, "syncClaudeAiPlugins": False,
                     "claudeMdExcludes": ["**"], "enabledPlugins": {}}
-        save(directory / "settings.json", settings)
-        save(directory / "bridge.json", {"tools": self._tools, "deadline": time.time() + 150})
         config = {"mcpServers": {"hermes": {"type": "stdio", "command": sys.executable,
                   "args": ["-I", "-S", str(Path(__file__).with_name("mcp_server.py")), str(directory)],
                   "env": {"HOME": str(directory), "PATH": "/usr/bin:/bin"}}}} if self._tools else {"mcpServers": {}}
-        save(directory / "mcp.json", config)
         system = self._history.messages[0]["content"] if self._history.messages[0]["role"] == "system" else ""
         argv = [self.command, "--print", "--model", MODEL, "--effort", "low", "--max-turns", "3",
                 "--input-format", "stream-json", "--output-format", "stream-json", "--verbose", "--include-partial-messages",
@@ -522,46 +595,55 @@ class ClaudeSubscriptionClient:
                 "--disable-slash-commands", "--no-chrome", "--tools", "", "--strict-mcp-config", "--mcp-config", str(directory / "mcp.json"),
                 "--allowedTools", ",".join(PREFIX + t["name"] for t in self._tools), "--permission-mode", "dontAsk",
                 "--permission-prompts", "none", "--system-prompt", system]
-        if self.is_closed():
-            raise ProviderError("cancelled during startup")
-        self._runtime = Runtime(argv, env, directory)
-        if self.is_closed():
-            self._runtime.close()
-            raise ProviderError("cancelled during process startup")
-        self._timer = threading.Timer(150, self.cancel)
-        self._timer.daemon = True
-        self._timer.start()
-        self.audit.append({"stage": "launch", "pid": self._runtime.process.pid, "model": MODEL})
+        with self._lifecycle:
+            self._check_active()
+            save(directory / "settings.json", settings)
+            save(directory / "bridge.json", {"tools": self._tools,
+                 "deadline": time.time() + max(0, self._session_deadline - time.monotonic())})
+            save(directory / "mcp.json", config)
+            self._check_active()
+            self._runtime = Runtime(argv, env, directory)
+            self.audit.append({"stage": "launch", "pid": self._runtime.process.pid, "model": MODEL})
 
-    def _drive(self, tail, kwargs):
+    def _drive(self, tail, seconds):
         try:
+            with self._lifecycle:
+                self._request_deadline = time.monotonic() + seconds
+                self._check_active()  # a deferred closed/drifted stream has no startup effects
+                if self._session_deadline is None:
+                    self._session_deadline = time.monotonic() + 150
+                    self._timer = threading.Timer(150, self.cancel)
+                    self._timer.daemon = True
+                    self._timer.start()
             if self._runtime is None:
                 self._start()
             runtime = self._runtime
             assert runtime is not None and self._tools is not None
-            deadline = time.monotonic() + response_seconds(kwargs.get("timeout", self.timeout))
-            if tail["role"] == "tool":
-                if self._pending is None or tail["tool_call_id"] != self._pending["tool_use_id"]:
-                    raise ProviderError("missing/mismatched parked invocation")
-                delivery = {**self._pending, "text": tail["content"]}
-                save(runtime.directory / f"result-{self._sequence}.json", delivery)
-                self.audit.append({"stage": "result_delivered", "tool_use_id": tail["tool_call_id"],
-                                   "rpc_id": delivery["rpc_id"], "text_sha256": hashlib.sha256(tail["content"].encode()).hexdigest()})
-                self._sequence += 1
-                self._pending = None
-            else:
-                if self._inputs >= 2:
-                    raise ProviderError("two-user-input session limit; start a new client")
-                self._inputs += 1
-                runtime.send(tail["content"])
+            with self._lifecycle:
+                self._check_active()
+                if tail["role"] == "tool":
+                    if self._pending is None or tail["tool_call_id"] != self._pending["tool_use_id"]:
+                        raise ProviderError("missing/mismatched parked invocation")
+                    delivery = {**self._pending, "text": tail["content"]}
+                    save(runtime.directory / f"result-{self._sequence}.json", delivery)
+                    self.audit.append({"stage": "result_delivered", "tool_use_id": tail["tool_call_id"],
+                                       "rpc_id": delivery["rpc_id"], "text_sha256": hashlib.sha256(tail["content"].encode()).hexdigest()})
+                    self._sequence += 1
+                    self._pending = None
+                else:
+                    if self._inputs >= 2:
+                        raise ProviderError("two-user-input session limit; start a new client")
+                    self._inputs += 1
+            if tail["role"] != "tool":
+                self._check_active()
+                # A full pipe must not hold the ownership lock and prevent
+                # cancel() from killing/reaping the reader to unblock this write.
+                runtime.send(tail["content"], self._check_active)
                 self.audit.append({"stage": "user_input", "number": self._inputs})
             message = Message()
             initialized = bool(self._turns)
             while True:
-                if self.is_closed():
-                    raise ProviderError("client cancelled or session timed out")
-                if time.monotonic() >= deadline:
-                    raise ProviderError("runtime response timed out")
+                self._check_active()
                 if message.done and message.call:
                     pending_path = runtime.directory / f"call-{self._sequence}.json"
                     if pending_path.exists():
@@ -640,18 +722,24 @@ class ClaudeSubscriptionClient:
             raise
 
     def _chunk(self, message, delta, *, finish=None, token_usage=None):
+        self._check_active()  # recheck even between deferred tool-argument chunks
         return record({"id": message.id, "object": "chat.completion.chunk", "created": int(time.time()), "model": MODEL,
                        "choices": [{"index": 0, "delta": delta, "finish_reason": finish}], "usage": token_usage})
 
     def cancel(self):
-        self._closed.set()
-        if self._timer is not None:
-            self._timer.cancel()
-        if self._runtime is not None:
-            self._runtime.close()
+        with self._lifecycle:
+            self._closed.set()
+            if self._timer is not None:
+                self._timer.cancel()
+            children = (self._startup, self._runtime)
+        for child in children:
+            if child is not None:
+                child.close()
 
     def _dispose_if_closed(self):
         if self.is_closed():
+            if self._startup is not None:
+                self._startup.dispose()
             if self._runtime is not None:
                 self._runtime.dispose()
             if self._temporary is not None:

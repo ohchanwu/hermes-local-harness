@@ -5,6 +5,7 @@ code. Native discovery/integration is separate, explicit isolated-home evidence.
 """
 import copy
 import asyncio
+from contextlib import ExitStack
 import importlib.util
 import io
 import json
@@ -173,14 +174,27 @@ class ClientTests(unittest.TestCase):
         self.environment.start()
         self.addCleanup(self.environment.stop)
         self.launches = []
+        self.children = []
+        self.version_mode = 'normal'
+        self.sleep_before_input = False
+        self.after_version_launch = None
         popen = subprocess.Popen
         def inert_only(argv, *args, **kwargs):
             if argv[0] == "synthetic-claude":
                 self.launches.append(argv)
                 argv = [sys.executable, "-I", "-S", str(Path(__file__).resolve()), "--synthetic-runtime"] + argv[1:]
+                if '--version' in argv:
+                    argv += ['--version-mode', self.version_mode, '--version-ready', str(self.directory/'version-ready')]
+                elif self.sleep_before_input:
+                    argv += ['--sleep-before-input', str(self.directory/'runtime-ready')]
             elif argv[0] != "/bin/ps":
                 raise AssertionError("unit test attempted non-synthetic process: " + str(argv[0]))
-            return popen(argv, *args, **kwargs)
+            process = popen(argv, *args, **kwargs)
+            if '--synthetic-runtime' in argv:
+                self.children.append(process)
+                if '--version' in argv and self.after_version_launch:
+                    self.after_version_launch()
+            return process
         self.process_guard = patch("subprocess.Popen", inert_only)
         self.process_guard.start()
         self.addCleanup(self.process_guard.stop)
@@ -393,15 +407,16 @@ class ClientTests(unittest.TestCase):
     def test_missing_binary_and_wrong_version_fail_in_owned_runtime_not_construction(self):
         c=client.ClaudeSubscriptionClient(command='/nonexistent/synthetic-only')
         self.addCleanup(c.close)
-        with patch('subprocess.run', side_effect=FileNotFoundError('synthetic missing binary')):
+        with patch('subprocess.Popen', side_effect=FileNotFoundError('synthetic missing binary')):
             with self.assertRaises(client.ProviderError):
                 c.create(model=client.MODEL,messages=[{'role':'user','content':'unused'}])
         other=client.ClaudeSubscriptionClient(command='synthetic-claude')
         self.addCleanup(other.close)
-        with patch('subprocess.run', return_value=subprocess.CompletedProcess([],0,b'wrong-version',b'')):
-            with self.assertRaisesRegex(client.ProviderError,'untested Claude CLI version'):
-                other.create(model=client.MODEL,messages=[{'role':'user','content':'unused'}])
-        self.assertEqual(self.launches,[])
+        self.version_mode = 'wrong'
+        with self.assertRaisesRegex(client.ProviderError,'untested Claude CLI version'):
+            other.create(model=client.MODEL,messages=[{'role':'user','content':'unused'}])
+        self.assertEqual(len(self.launches), 1)
+        self.assertIsNotNone(self.children[0].poll())
 
     def test_rejected_rate_limit_stops_instead_of_accepting_later_success(self):
         with self.assertRaises(client.ProviderError):
@@ -409,34 +424,208 @@ class ClientTests(unittest.TestCase):
         self.assertTrue(self.c.is_closed())
         self.assertTrue(self.c._runtime.cleanup['group_absent'])
 
-    def test_cancel_during_version_startup_prevents_model_process(self):
-        entered, release = threading.Event(), threading.Event()
-        def version(*args,**kwargs):
-            entered.set()
-            self.assertTrue(release.wait(2))
-            return subprocess.CompletedProcess([],0,b'2.1.283 (Claude Code)',b'')
-        errors=[]
+    def startup_request(self, **kwargs):
+        errors = []
         def run():
             try:
-                self.request()
-            except client.ProviderError as exc:
-                errors.append(str(exc))
-        with patch('subprocess.run', side_effect=version):
-            thread=threading.Thread(target=run)
-            thread.start()
-            self.assertTrue(entered.wait(2))
-            self.c.close()
-            release.set()
+                self.request(**kwargs)
+            except BaseException as exc:
+                errors.append(exc)
+        thread = threading.Thread(target=run)
+        thread.start()
+        def cleanup():
+            # Also reap the real inert child when an assertion fails on old code.
+            for process in self.children:
+                if process.poll() is None:
+                    process.kill()
             thread.join(3)
-        self.assertFalse(thread.is_alive())
-        self.assertEqual(len(errors),1)
-        self.assertEqual(self.launches,[])
+            for process in self.children:
+                process.wait(timeout=2)
+        self.addCleanup(cleanup)
+        end = time.monotonic() + 2
+        while not (self.directory/'version-ready').exists() and time.monotonic() < end:
+            time.sleep(.01)
+        self.assertTrue((self.directory/'version-ready').exists(), 'inert version child never became ready')
+        return thread, errors
+
+    def assert_startup_reaped(self, thread, errors):
+        self.assertFalse(thread.is_alive(), 'request remains blocked after startup cancellation/deadline')
+        self.assertEqual(len(errors), 1)
+        self.assertIsInstance(errors[0], client.ProviderError)
+        self.assertEqual(len(self.launches), 1, 'a model process was launched after startup failure')
+        self.assertIsNotNone(self.children[0].poll(), 'version child remains alive')
+        self.assertTrue(self.c._startup.cleanup['reaped'])
+        self.assertTrue(self.c._startup.cleanup['group_absent'])
+        receipt = dict(self.c._startup.cleanup)
+        self.c.close()
+        self.c.close()
+        self.assertEqual(self.c._startup.cleanup, receipt)
+        self.assertFalse(Path(self.c._temporary.name).exists())
+
+    def test_cancel_during_real_sleeping_version_child_reaps_before_close_returns(self):
+        self.version_mode = 'sleep'
+        thread, errors = self.startup_request()
+        started = time.monotonic()
+        self.c.close()
+        thread.join(.5)
+        self.assertLess(time.monotonic() - started, 2)
+        self.assert_startup_reaped(thread, errors)
+
+    def test_stubborn_version_child_cleanup_stays_within_five_second_grace(self):
+        self.version_mode = 'stubborn'
+        thread, errors = self.startup_request()
+        started = time.monotonic()
+        self.c.close()
+        thread.join(.5)
+        self.assertLess(time.monotonic() - started, 5)
+        self.assert_startup_reaped(thread, errors)
+
+    def test_response_deadline_includes_real_version_startup(self):
+        self.version_mode = 'sleep'
+        thread, errors = self.startup_request(timeout=.2)
+        thread.join(.8)
+        self.assert_startup_reaped(thread, errors)
+        self.assertIn('timed out', str(errors[0]))
+
+    def test_session_timer_is_armed_before_real_version_startup(self):
+        self.version_mode = 'sleep'
+        timer = threading.Timer
+        intervals = []
+        def short_session(seconds, callback):
+            intervals.append(seconds)
+            return timer(.2, callback)
+        with patch('threading.Timer', short_session):
+            thread, errors = self.startup_request()
+            thread.join(.8)
+        self.assert_startup_reaped(thread, errors)
+        self.assertEqual(intervals, [150])
+
+    def test_client_closed_before_first_next_has_no_file_or_process_effects(self):
+        stream = self.request(stream=True)
+        self.c.close()
+        with self.assertRaises(client.ProviderError):
+            list(stream)
+        self.assertEqual(self.launches, [])
+        self.assertFalse((self.directory/'cache').exists())
+        self.c.close()
+
+    def test_close_is_not_locked_out_by_backpressured_input_pipe(self):
+        self.sleep_before_input = True
+        thread, errors = self.startup_request(text='x' * 1_000_000)
+        end = time.monotonic() + 2
+        while not (self.directory/'runtime-ready').exists() and time.monotonic() < end:
+            time.sleep(.01)
+        self.assertTrue((self.directory/'runtime-ready').exists())
+        close_errors = []
+        def close():
+            try:
+                self.c.close()
+            except BaseException as exc:
+                close_errors.append(exc)
+        closer = threading.Thread(target=close)
+        closer.start()
+        try:
+            closer.join(.8)
+            self.assertFalse(closer.is_alive(), 'cancel cannot acquire lifecycle lock while send blocks')
+            self.assertEqual(close_errors, [])
+            thread.join(.5)
+            self.assertFalse(thread.is_alive())
+            self.assertEqual(len(errors), 1)
+            self.assertIsInstance(errors[0], client.ProviderError)
+            self.assertTrue(self.c._runtime.cleanup['reaped'])
+            self.assertTrue(self.c._runtime.cleanup['group_absent'])
+        finally:
+            # A failing implementation must not strand either thread/owned child.
+            for process in self.children:
+                if process.poll() is None:
+                    process.kill()
+            thread.join(3)
+            closer.join(3)
+
+    def test_response_deadline_also_bounds_backpressured_input_pipe(self):
+        self.sleep_before_input = True
+        thread, errors = self.startup_request(text='x' * 1_000_000, timeout=.2)
+        thread.join(1)
+        self.assertFalse(thread.is_alive(), 'response deadline cannot interrupt a full input pipe')
+        self.assertEqual(len(errors), 1)
+        self.assertIsInstance(errors[0], client.ProviderError)
+        self.assertIn('timed out', str(errors[0]))
+        self.assertTrue(self.c._runtime.cleanup['reaped'])
+        self.assertTrue(self.c._runtime.cleanup['group_absent'])
+
+    def test_deferred_first_iteration_rejects_changed_execution_scope_before_effects(self):
+        for name in ('HERMES_HOME', 'HERMES_PROFILE', 'HERMES_KANBAN_TASK',
+                     'HERMES_KANBAN_WORKSPACE', 'HOME', 'cwd'):
+            with self.subTest(scope=name), ExitStack() as stack:
+                c = client.ClaudeSubscriptionClient(command='synthetic-claude')
+                stack.callback(c.close)
+                stream = c.create(model=client.MODEL, messages=[{'role':'user','content':'unused'}], stream=True)
+                before = len(self.launches)
+                if name == 'cwd':
+                    previous = os.getcwd()
+                    os.chdir(self.directory)
+                    stack.callback(os.chdir, previous)
+                else:
+                    stack.enter_context(patch.dict(os.environ, {name:str(self.directory/'different-scope')}))
+                with self.assertRaisesRegex(client.ProviderError, 'session/worktree/profile'):
+                    list(stream)
+                self.assertEqual(len(self.launches), before)
+                self.assertIsNone(c._temporary)
+                self.assertIsNone(c._runtime)
+
+    def test_scope_change_during_version_check_prevents_model_launch(self):
+        with patch.dict(os.environ):
+            self.after_version_launch = lambda: os.environ.__setitem__('HERMES_PROFILE', 'changed-during-startup')
+            with self.assertRaisesRegex(client.ProviderError, 'session/worktree/profile'):
+                self.request()
+        self.assertEqual(len(self.launches), 1)
+        self.assertIsNotNone(self.children[0].poll())
+
+    def test_deferred_parked_result_rejects_scope_change_before_delivery(self):
+        response = self.request('__tool__', tools=[TOOL])
+        stream = self.continuation(response, stream=True)
+        before = len(self.launches)
+        with patch.dict(os.environ, {'HERMES_PROFILE':'changed-while-parked'}), \
+                patch.object(client, 'save', wraps=client.save) as saves:
+            with self.assertRaisesRegex(client.ProviderError, 'session/worktree/profile'):
+                list(stream)
+        self.assertFalse(any(call.args[0].name.startswith('result-') for call in saves.call_args_list))
+        self.assertFalse(any(a['stage'] == 'result_delivered' for a in self.c.audit))
+        self.assertEqual(len(self.launches), before)
+        self.assertTrue(self.c._runtime.cleanup['group_absent'])
+
+    def test_scope_change_during_stream_rejects_remaining_chunks(self):
+        stream = self.request(stream=True)
+        next(stream)
+        with patch.dict(os.environ, {'HERMES_KANBAN_TASK':'different-task'}):
+            with self.assertRaisesRegex(client.ProviderError, 'session/worktree/profile'):
+                next(stream)
+        self.assertTrue(self.c._runtime.cleanup['group_absent'])
+
+    def test_deferred_session_id_is_immutable_and_followup_change_is_rejected(self):
+        body = {'subscription_session_id':'original-session'}
+        stream = self.request(stream=True, extra_body=body)
+        body['subscription_session_id'] = 'mutated-caller-dict'
+        chunks = list(stream)
+        self.assertEqual(chunks[-1].choices[0].finish_reason, 'stop')
+        self.assertEqual(self.c._scope[-1], 'original-session')
+        messages = copy.deepcopy(self.c._history.messages) + [{'role':'user','content':'next'}]
+        with self.assertRaisesRegex(client.ProviderError, 'session/worktree/profile'):
+            self.c.create(model=client.MODEL, messages=messages, extra_body=body)
 
 
 def synthetic_runtime(argv):
     """Inert event producer, never an installed runtime, service or tool executor."""
     if "--version" in argv:
-        print("2.1.283 (Claude Code)", flush=True)
+        mode = argv[argv.index('--version-mode')+1] if '--version-mode' in argv else 'normal'
+        if mode == 'stubborn':
+            import signal
+            signal.signal(signal.SIGTERM, signal.SIG_IGN)
+        if '--version-ready' in argv:
+            Path(argv[argv.index('--version-ready')+1]).write_text('ready')
+        if mode in ('sleep', 'stubborn'):
+            time.sleep(30)
+        print("wrong-version" if mode == 'wrong' else "2.1.283 (Claude Code)", flush=True)
         return
     def emit(obj):
         print(json.dumps(obj), flush=True)
@@ -473,6 +662,9 @@ def synthetic_runtime(argv):
     fixture = argv[argv.index('--native-fixture')+1] if '--native-fixture' in argv else '/nonexistent/synthetic'
     badargs = False
     ordinal = 0
+    if '--sleep-before-input' in argv:
+        Path(argv[argv.index('--sleep-before-input')+1]).write_text('ready')
+        time.sleep(30)
     for line in sys.stdin:
         ordinal += 1
         text = json.loads(line)["message"]["content"]
