@@ -40,11 +40,19 @@ class History:
         body = canonical[1:] if canonical[0]["role"] == "system" else canonical
         if not body or body[0]["role"] != "user" or body[-1]["role"] not in ("user", "tool"):
             raise ProviderError("a transcript must start with a user message and end with a user or tool message")
-        calls = set()
+        calls, answered = set(), set()
         for message in body:
             calls.update(call["id"] for call in message.get("tool_calls", []))
-            if message["role"] == "tool" and message["tool_call_id"] not in calls:
-                raise ProviderError("tool result for a call not in the transcript")
+            if message["role"] == "tool":
+                if message["tool_call_id"] not in calls or message["tool_call_id"] in answered:
+                    raise ProviderError("tool result for a call not in the transcript, or answered twice")
+                answered.add(message["tool_call_id"])
+        if body[-1]["role"] == "tool":
+            # A final result must answer the latest assistant message, with only its results in between.
+            latest = next(i for i in range(len(body) - 1, -1, -1) if body[i]["role"] != "tool")
+            ids = {call["id"] for call in body[latest].get("tool_calls", [])}
+            if body[latest]["role"] != "assistant" or body[-1]["tool_call_id"] not in ids:
+                raise ProviderError("a final tool result must answer the latest assistant tool call")
         return copy.deepcopy(body[:-1])
 
     @staticmethod

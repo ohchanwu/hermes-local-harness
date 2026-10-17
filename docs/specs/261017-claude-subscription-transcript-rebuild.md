@@ -25,7 +25,8 @@ Native resume (`--resume <id> --fork-session` with on-disk sessions) was conside
 **Accepted transcripts for a new client:**
 - optional leading `system` message, then a `user` message, then any sequence of `user`, `assistant` and `tool` messages;
 - the final message must be `user` or `tool`;
-- a `tool` message's `tool_call_id` must name a call in an earlier assistant message.
+- a `tool` message's `tool_call_id` must name a call in an earlier assistant message, and each call is answered at most once;
+- a final `tool` message must answer a call in the latest assistant message, with only that message's results in between.
 
 Rejected as before: unknown roles, image or multipart content, malformed tool calls, an empty transcript, a transcript ending in `assistant`.
 
@@ -35,9 +36,10 @@ Rejected as before: unknown roles, image or multipart content, malformed tool ca
 
 **Rendering:**
 - The first `system` message stays the runtime system prompt.
-- Every other message is rendered in order: `[user]`, `[assistant]`, `[assistant tool call <name> id=<id>]` followed by the canonical JSON arguments, `[tool result id=<id>]`, and `[system]` for any later system message.
-- The block is wrapped in `<restored-transcript-NONCE>` … `</restored-transcript-NONCE>`, with a fresh random nonce per rebuild, so text inside a message cannot close the block.
-- A short note opens the block: the conversation was restored after a restart, and the tool calls shown already ran and should not be repeated unless needed.
+- A fresh random nonce is generated per rebuild and appears in the block delimiters and in every entry header, so message content (for example a fetched web page) can neither close the block nor forge an entry. This hardening came from the independent review.
+- Every other message is rendered in order: `[user NONCE]`, `[assistant NONCE]`, `[assistant tool call NONCE <name> id=<id>]` followed by the canonical JSON arguments, `[tool result NONCE id=<id>]`, and `[system NONCE]` for any later system message.
+- The block is wrapped in `<restored-transcript-NONCE>` … `</restored-transcript-NONCE>`.
+- A short note opens the block: the conversation was restored after a restart; only nonce-tagged lines start an entry; tool calls shown with a result already ran and should not be repeated unless needed.
 - After the block:
   - a `user` tail is sent as "New message from the user:" plus its content;
   - a `tool` tail (a result for a call parked by a client that no longer exists) is rendered as the last block entry, followed by an instruction to continue using that result.

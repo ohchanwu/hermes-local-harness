@@ -65,14 +65,15 @@ def run(command, model, workdir):
         check(stages.count("result_returned") == 1 and stages.count("launch") == 1, "unexpected bridge/launch audit")
         version = c._cli_version
         messages += [{"role": "assistant", "content": third.choices[0].message.content},
-                     {"role": "user", "content": "What was the exact content of the file you read earlier? "
-                                                 "Reply with only that content."}]
+                     {"role": "user", "content": "Without using any tools, reply with only the exact content "
+                                                 "of the file you read earlier in this conversation."}]
     finally:
         c.close()
     check(c._runtime is not None and c._runtime.cleanup["group_absent"], "runtime process group not reaped")
     rebuilt = client.ClaudeSubscriptionClient(command=command)
     try:
         fourth = rebuilt.create(model=model, messages=messages, tools=[TOOL])
+        check(fourth.choices[0].finish_reason == "stop", "rebuilt session repeated the tool call instead of recalling")
         check(nonce in fourth.choices[0].message.content, "rebuilt session did not recall the tool result")
         check([a["stage"] for a in rebuilt.audit].count("rebuild") == 1, "no recorded rebuild")
     finally:
