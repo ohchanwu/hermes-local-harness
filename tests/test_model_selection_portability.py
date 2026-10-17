@@ -50,6 +50,10 @@ class RegistrationTests(unittest.TestCase):
         self.assertEqual(self.profile.base_url, 'acp://claude-subscription')
         self.assertIs(self.profile.fixed_temperature, self.sentinel)
 
+    def test_cli_command_comes_only_from_dedicated_setting(self):
+        self.assertEqual(self.profile.process_command, '')
+        self.assertEqual(self.profile.process_command_env_vars, ('HERMES_CLAUDE_SUBSCRIPTION_CLI',))
+
     def test_model_catalog_is_not_a_request_fallback_chain(self):
         self.assertEqual(self.profile.fallback_models, ('claude-opus-5-5',))
         self.assertEqual(self.profile.model_aliases, {})
@@ -74,10 +78,10 @@ class RegistrationTests(unittest.TestCase):
         self.addCleanup(c.close)
         kwargs = {'model':'claude-opus-5-5', 'messages':[{'role':'user','content':'unused'}],
                   'extra_body': self.profile.build_extra_body(session_id='worker-session')}
-        scope, tools = c._validate(kwargs)
+        model, scope, tools, *_ = c._validate(kwargs)
         self.assertEqual(scope[-1], 'worker-session')
         self.assertEqual(tools, [])
-        c._scope, c._tools = scope, tools
+        c._model, c._scope, c._tools = model, scope, tools
         kwargs['extra_body'] = self.profile.build_extra_body(session_id='reviewer-session')
         with self.assertRaisesRegex(RuntimeError, 'session/worktree/profile'):
             c._validate(kwargs)
@@ -113,7 +117,7 @@ def native_api_checks():
             max_tokens_param_fn=lambda n: {'max_tokens':n})
         assert kw['model'] == model and kw['messages'][0]['role'] == 'user'
         if name == 'claude-subscription':
-            assert kw['max_tokens'] == 1024 and 'temperature' not in kw
+            assert kw.get('max_tokens') is None and 'temperature' not in kw
             assert kw['extra_body']['subscription_session_id'] == 'offline-native'
     c = subscription.create_client(command='/nonexistent/synthetic-only')
     try:

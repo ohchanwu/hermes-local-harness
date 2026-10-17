@@ -1,6 +1,6 @@
 # Claude subscription provider: upgrade-tolerant compatibility, unbounded sessions, socket bridge and modular client
 
-Status: awaiting owner approval. Specification only; no code, configuration, installation or live call has been made under it.
+Status: implemented and verified. Steps 1–8 done, independent review approved, owner-approved live smoke test passed on 2026-10-17 (`SMOKE PASS cli=2.1.283 model=claude-opus-5-5`); see §14. Attended installation into live Hermes and provider selection remain separate owner actions.
 Prepared: 2026-10-17 KST. Baseline: `f031b4e` (`main`), carrying the run51 provider candidate from `7127e61`.
 Subject: [`plugins/model-providers/claude-subscription/`](../../plugins/model-providers/claude-subscription/README.md). Parent specification: [Claude Max 20x inside Hermes](261016-claude-max20x-model-portability.md).
 
@@ -129,7 +129,7 @@ Design:
   - server → client: `{"call": seq, "rpc_id", "name", "arguments"}`
   - client → server: `{"result": seq, "rpc_id", "tool_use_id", "text"}`
   - server → client: `{"returned": seq, "rpc_id", "tool_use_id"}`
-- The client waits on the socket with the same `selectors` loop it already uses for the runtime's stdout, so it wakes on a call immediately instead of polling for a file.
+- The client checks the socket without blocking on every pass of its existing runtime-read loop, so a call is seen as soon as it arrives rather than by polling for a file. The server side blocks on the socket, so it has no polling loop at all.
 - Cancellation: the client closes the socket; the server sees end-of-file, exits without answering the parked call, and the CLI is then reaped as today. If the server dies, the client sees end-of-file and terminates the client.
 - All existing correlation checks are kept unchanged: name and arguments must match the model's `tool_use`; RPC IDs and tool-use IDs are never reused; a result must match the parked call; `returned` must echo both IDs.
 - `mcp_server.py` remains a stdlib-only script run with `python -I -S` (isolated mode, so it cannot import package modules). It keeps its own small copy of the framing code; a test drives both sides through a real socket to keep the two copies compatible.
@@ -176,3 +176,36 @@ Then submit the combined candidate (run51 plus these changes) for independent re
 ## 13. Authority
 
 Approving this specification authorizes steps 1–8 as local repository changes, offline tests, local commits and independent review. It does not authorize installing a CLI under `$HERMES_HOME`, changing live Hermes configuration or provider selection, running the smoke test or any other live model call, pushing, or rollout. Each of those needs explicit owner approval when it comes up.
+
+Gates for this work:
+
+```text
+AUTO GATE — independent review
+Actor: a non-authoring reviewer agent
+Preconditions: steps 1–8 committed on wt/provider-hardening; offline suites green
+Action: review the exact candidate diff against main for correctness and the §2 invariants
+On failure: fix each confirmed finding test-first, rerun the suites, re-review the new SHA once
+Retry identity: the candidate commit SHA
+Automatic resume: a clean verdict hands the candidate to the smoke-test gate
+```
+
+```text
+HUMAN GATE — question-budget case 2
+Decision: the owner starts one live smoke test (and approves installing the dedicated CLI it runs against)
+Why human: it spends the owner's subscription allowance and is a deliberate live action this spec reserves to the owner
+Blocked dependency: adding the version to CLI_TESTED, merging to main, attended installation
+Independent work: none required; offline work is complete
+Resume evidence: a SMOKE PASS or SMOKE FAIL line from smoke.py
+```
+
+## 14. Implementation notes
+
+- **Hermes setting.** Hermes `v0.21.5` already resolves an external-process binary from `process_command_env_vars`, so the profile sets `process_command=""` and `process_command_env_vars=("HERMES_CLAUDE_SUBSCRIPTION_CLI",)`. With the variable unset, Hermes itself reports the missing setting, and the client raises before any effect. Effort comes from `HERMES_CLAUDE_SUBSCRIPTION_EFFORT`.
+- **Output cap.** The profile's `default_max_tokens` is now unset, so Hermes sends no cap unless configured and the CLI default applies. A requested cap is applied to the session through `CLAUDE_CODE_MAX_OUTPUT_TOKENS`. Because the cap is fixed per process, a different cap on a later request is rejected ("use a separate client").
+- **Pinned install.** `@anthropic-ai/claude-code` is published on npm at exact versions (verified for `2.1.283`); the native installer's `claude install <version>` is the alternative. On 2026-10-17 the interactive CLI had already self-updated to `2.1.302`, so the provider as previously written could not have started there.
+- **Extra module.** `errors.py` holds `ProviderError` so the other modules do not import each other just for the error type.
+- **Server end-of-file.** End-of-file from the MCP server is an error only while the client still expects a call or an acknowledgement; a server that exits after its work is done is not.
+- **Test order.** Steps 3–7 and the review fixes recorded a failing run before each implementation. The smoke script (step 8) was written just before its offline tests.
+- **Review fixes.** The independent review requested changes: `selectors` instead of `select.select` (which fails on descriptors ≥ 1024), absolute-path-only CLI setting, oversized tool results rejected before delivery, a finalizer for the socket directory, the smoke-test hint when the CLI exits before reading input, and stronger tests. The new early-exit test also exposed an existing cleanup bug on `main`: an exited but unreaped CLI made `Runtime.close` raise `PermissionError`. It now reaps the process first.
+- **Pre-existing failure.** `spikes/claude-subscription-feasibility` tests fail identically on `main` (they read ignored `private/feasibility/` evidence files absent from fresh worktrees). They are not in this spec's acceptance set.
+- **Live smoke test.** Owner-approved, 2026-10-17 KST, against a dedicated copy of CLI 2.1.283 at `~/.hermes/runtimes/claude-code/2.1.283/claude` (the native-installer binary, copied): `SMOKE PASS cli=2.1.283 model=claude-opus-5-5`. One run, no retry.
