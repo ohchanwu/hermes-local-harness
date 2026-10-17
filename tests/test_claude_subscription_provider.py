@@ -742,6 +742,33 @@ class ClientTests(unittest.TestCase):
         with self.assertRaisesRegex(client.ProviderError, 'smoke'):
             self.request('x' * 1_000_000)
 
+    def test_cli_retry_before_reply_text_is_transparent(self):
+        response = self.request('__cli_retry__')
+        self.assertEqual(response.choices[0].message.content, 'RETRIED')
+        self.assertEqual([a for a in self.c.audit if a['stage'] == 'runtime_retry'], [{'stage': 'runtime_retry', 'number': 1}])
+        self.c.close()
+        self.c = client.ClaudeSubscriptionClient(command=SYNTHETIC_CLI)
+        self.addCleanup(self.c.close)
+        chunks = list(self.request('__cli_retry__', stream=True))
+        deltas = [c.choices[0].delta for c in chunks]
+        self.assertEqual(sum(1 for d in deltas if getattr(d, 'role', None)), 1)
+        self.assertEqual(''.join(getattr(d, 'content', None) or '' for d in deltas), 'RETRIED')
+        self.assertEqual(chunks[-1].choices[0].finish_reason, 'stop')
+
+    def test_cli_retry_after_reply_text_streamed_fails_retryably(self):
+        with self.assertRaisesRegex(client.ProviderError, 'after part of it had streamed'):
+            list(self.request('__cli_retry_after_text__', stream=True))
+        self.assertTrue(self.c._runtime.cleanup['group_absent'])
+
+    def test_unknown_stream_event_is_named_and_error_needs_a_restart(self):
+        with self.assertRaisesRegex(client.ProviderError, 'unknown assistant stream event: mystery_event'):
+            self.request('__unknown_event__')
+        self.c.close()
+        self.c = client.ClaudeSubscriptionClient(command=SYNTHETIC_CLI)
+        self.addCleanup(self.c.close)
+        with self.assertRaisesRegex(client.ProviderError, 'outside message boundary'):
+            self.request('__error_without_restart__')
+
     def test_malformed_stream_arguments_are_provider_errors(self):
         with self.assertRaises(client.ProviderError):
             self.request('__badargs__', tools=[TOOL])
@@ -1451,6 +1478,31 @@ def synthetic_runtime(argv):
             message(f"msg_{ordinal}_final", text="RESTORED " + restored[-1] if restored else "RESTORED")
             emit({"type": "result", "subtype": "success", "is_error": False, "num_turns": 1,
                   "modelUsage": {model: {"canonicalModel": model, "provider": "firstParty"}}})
+            continue
+        if text in ('__cli_retry__', '__cli_retry_after_text__'):
+            # The real CLI retries a failed API call and streams the reply again from message_start.
+            ev("ping")
+            ev("message_start", message={"id": "msg_aborted", "model": model, "usage": {"input_tokens": 1}})
+            ev("content_block_start", index=0, content_block={"type": "thinking", "thinking": ""})
+            ev("content_block_delta", index=0, delta={"type": "thinking_delta", "thinking": "Partial."})
+            if text == '__cli_retry_after_text__':
+                ev("content_block_stop", index=0)
+                ev("content_block_start", index=1, content_block={"type": "text", "text": ""})
+                ev("content_block_delta", index=1, delta={"type": "text_delta", "text": "Half a rep"})
+            ev("error", error={"type": "overloaded_error", "message": "Overloaded"})
+            emit({"type": "system", "subtype": "api_retry", "attempt": 1})
+            message(f"msg_{ordinal}_final", text="RETRIED", thinking=True)
+            emit({"type": "result", "subtype": "success", "is_error": False, "num_turns": 1,
+                  "modelUsage": {model: {"canonicalModel": model, "provider": "firstParty"}}})
+            continue
+        if text == '__unknown_event__':
+            ev("message_start", message={"id": "msg_unknown", "model": model, "usage": {"input_tokens": 1}})
+            ev("mystery_event")
+            continue
+        if text == '__error_without_restart__':
+            ev("message_start", message={"id": "msg_lost", "model": model, "usage": {"input_tokens": 1}})
+            ev("error", error={"type": "overloaded_error"})
+            ev("content_block_start", index=0, content_block={"type": "text", "text": ""})
             continue
         if text == '__assistant_error__':
             ev("message_start", message={"id": "msg_err", "model": model, "usage": {"input_tokens": 1}})

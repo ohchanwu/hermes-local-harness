@@ -17,6 +17,9 @@ class Message:
         self.usage = {}
         self.call = None
         self.argument_fragments = []
+        self.streamed_text = False  # text already handed to Hermes, which keeps it
+        self.interrupted = None     # error type of a mid-stream API failure
+        self.restarts = 0
 
     def feed(self, obj):
         kind = obj.get("type")
@@ -37,15 +40,32 @@ class Message:
             return []
         ev = obj.get("event", {})
         event = ev.get("type")
+        if event == "ping":
+            return []
         if event == "message_start":
             msg = ev.get("message", {})
-            if self.id is not None or msg.get("model") not in self.served or not isinstance(msg.get("id"), str) or not msg["id"]:
-                raise ProviderError("unexpected/duplicate streamed message or model")
+            if msg.get("model") not in self.served or not isinstance(msg.get("id"), str) or not msg["id"]:
+                raise ProviderError("unexpected streamed message model or id")
+            restart = self.id is not None
+            if restart:
+                # The CLI retries a failed API call itself and streams the reply again from the start.
+                if self.done:
+                    raise ProviderError("duplicate streamed message")
+                if self.streamed_text:
+                    raise ProviderError("runtime retried a reply after part of it had streamed; retry the request")
+                restarts = self.restarts + 1
+                self.__init__(self.served)
+                self.restarts = restarts
             self.id = msg["id"]
             self.usage.update(msg.get("usage") or {})
-            return [{"role": "assistant"}]
-        if not self.id or self.done:
+            return [] if restart else [{"role": "assistant"}]
+        if not self.id or self.done or self.interrupted:
             raise ProviderError("event outside message boundary")
+        if event == "error":
+            # A mid-stream API failure; only a restarted message may follow.
+            error = ev.get("error")
+            self.interrupted = str(error.get("type") if isinstance(error, dict) else "unknown")[:40] or "unknown"
+            return []
         index = ev.get("index")
         if event == "content_block_start":
             block = ev.get("content_block", {})
@@ -60,6 +80,7 @@ class Message:
                 raise ProviderError("unsupported runtime content block")
             if block.get("type") == "text" and block.get("text"):
                 self.text += block["text"]
+                self.streamed_text = True
                 return [{"content": block["text"]}]
         elif event == "content_block_delta":
             block = self.blocks.get(index)
@@ -75,6 +96,7 @@ class Message:
                 if delta.get("type") != "text_delta" or not isinstance(delta.get("text"), str):
                     raise ProviderError("invalid text delta")
                 self.text += delta["text"]
+                self.streamed_text = self.streamed_text or bool(delta["text"])
                 return [{"content": delta["text"]}]
             if delta.get("type") not in ("thinking_delta", "signature_delta"):
                 raise ProviderError("unsupported thinking delta")
@@ -106,5 +128,5 @@ class Message:
                 raise ProviderError("stream/snapshot tool identity or arguments mismatch")
             self.done = True
         else:
-            raise ProviderError("unknown assistant stream event")
+            raise ProviderError(f"unknown assistant stream event: {str(event)[:40]}")
         return []

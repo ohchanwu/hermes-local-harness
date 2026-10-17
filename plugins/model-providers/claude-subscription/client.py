@@ -395,6 +395,7 @@ class ClaudeSubscriptionClient:
                     self.audit.append({"stage": "user_input", "number": self._inputs})
             served = served_names(self._model)
             message = Message(served)
+            restarts = 0
             while True:
                 self._check_active()
                 self._pump_bridge()
@@ -450,6 +451,10 @@ class ClaudeSubscriptionClient:
                         raise ProviderError("model event before verified initialization")
                     for delta in message.feed(obj):
                         yield self._chunk(message, delta)
+                    if message.restarts > restarts:
+                        restarts = message.restarts
+                        self.audit.append({"stage": "runtime_retry", "number": restarts})
+                        log.warning("claude-subscription: the Claude CLI retried a failed API call before any reply text")
                 elif kind == "result":
                     if not message.done or message.call or obj.get("is_error") or obj.get("subtype") != "success" or obj.get("permission_denials"):
                         raise ProviderError("runtime quota/refusal/permission/turn error or incomplete result")
