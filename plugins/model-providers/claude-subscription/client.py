@@ -6,6 +6,7 @@ import logging
 import math
 import os
 from pathlib import Path
+import pwd
 import re
 import selectors
 import subprocess
@@ -202,9 +203,11 @@ class ClaudeSubscriptionClient:
             if self._effort is None:
                 self._max_output, self._effort = max_output, effort
             if self._process_env is None:
-                # USER/LOGNAME let the CLI find the subscription login in the macOS Keychain.
-                self._process_env = {k: os.environ[k] for k in ("HOME", "PATH", "LANG", "TMPDIR", "USER", "LOGNAME")
-                                     if os.environ.get(k)}
+                self._process_env = {k: os.environ[k] for k in ("HOME", "PATH", "LANG", "TMPDIR") if os.environ.get(k)}
+                # The CLI needs USER/LOGNAME to find the subscription login in the macOS
+                # Keychain; Hermes' Kanban worker environment drops them, so ask the OS.
+                login = pwd.getpwuid(os.getuid()).pw_name
+                self._process_env.update(USER=login, LOGNAME=login)
                 self._home = Path(scope[1] or Path(scope[4] or Path.home()) / ".hermes").absolute()
             stream = Stream(self, self._drive(tail, response_seconds(kwargs.get("timeout", self.timeout))))
         except BaseException:

@@ -825,15 +825,14 @@ class ClientTests(unittest.TestCase):
         self.assertEqual(self.launches, [])
         self.assertEqual(c._history.messages, [])
 
-    def test_runtime_children_receive_the_login_user(self):
-        # The CLI needs USER to find the subscription login in the macOS Keychain.
-        with patch.dict(os.environ, {'USER': 'synthetic-user', 'LOGNAME': 'synthetic-user'}):
-            self.c = client.ClaudeSubscriptionClient(command=SYNTHETIC_CLI)
-            self.addCleanup(self.c.close)
-            self.request()
+    def test_login_user_comes_from_the_os_when_the_parent_lacks_it(self):
+        # Hermes' Kanban worker environment drops USER; the test environment has none either.
+        import pwd
+        self.assertNotIn('USER', os.environ)
+        self.request()
+        name = pwd.getpwuid(os.getuid()).pw_name
         envs = [env for env in self.child_envs if env is not None]
-        self.assertTrue(envs and all(env.get('USER') == 'synthetic-user' and env.get('LOGNAME') == 'synthetic-user'
-                                     for env in envs))
+        self.assertTrue(envs and all(env.get('USER') == name and env.get('LOGNAME') == name for env in envs))
 
     def test_runtime_children_disable_cli_self_update(self):
         self.request()
