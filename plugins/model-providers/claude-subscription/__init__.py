@@ -23,7 +23,7 @@ claude_subscription = ClaudeSubscriptionProfile(
     env_vars=(), process_command="", process_command_env_vars=(CLI_SETTING,), process_args=(),
     supports_health_check=False, supports_model_listing=False,
     supports_vision=False, supports_vision_tool_messages=False,
-    fixed_temperature=OMIT_TEMPERATURE, default_max_tokens=1024,
+    fixed_temperature=OMIT_TEMPERATURE, default_max_tokens=None,
     fallback_models=tuple(MODELS), model_aliases={},
     model_capabilities={name: {"context_length": spec["context_length"]} for name, spec in MODELS.items()},
 )

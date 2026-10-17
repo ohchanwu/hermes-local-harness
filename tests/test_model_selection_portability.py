@@ -78,7 +78,7 @@ class RegistrationTests(unittest.TestCase):
         self.addCleanup(c.close)
         kwargs = {'model':'claude-opus-5-5', 'messages':[{'role':'user','content':'unused'}],
                   'extra_body': self.profile.build_extra_body(session_id='worker-session')}
-        model, scope, tools = c._validate(kwargs)
+        model, scope, tools, *_ = c._validate(kwargs)
         self.assertEqual(scope[-1], 'worker-session')
         self.assertEqual(tools, [])
         c._model, c._scope, c._tools = model, scope, tools
@@ -117,7 +117,7 @@ def native_api_checks():
             max_tokens_param_fn=lambda n: {'max_tokens':n})
         assert kw['model'] == model and kw['messages'][0]['role'] == 'user'
         if name == 'claude-subscription':
-            assert kw['max_tokens'] == 1024 and 'temperature' not in kw
+            assert kw.get('max_tokens') is None and 'temperature' not in kw
             assert kw['extra_body']['subscription_session_id'] == 'offline-native'
     c = subscription.create_client(command='/nonexistent/synthetic-only')
     try:

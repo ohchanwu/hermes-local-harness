@@ -48,7 +48,7 @@ def serve(directory, source=None, sink=None):
             save(directory / f"call-{sequence}.json", {"rpc_id": rpc, "name": params["name"], "arguments": params["arguments"]})
             delivery = directory / f"result-{sequence}.json"
             while True:
-                if (directory / "cancel").exists() or time.time() >= cfg["deadline"]:
+                if (directory / "cancel").exists() or (cfg["deadline"] is not None and time.time() >= cfg["deadline"]):
                     return
                 if delivery.exists():
                     break

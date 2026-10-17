@@ -240,7 +240,7 @@ class ClientTests(unittest.TestCase):
     def test_lazy_constructor_and_invalid_configuration_have_no_runtime_effects(self):
         self.assertEqual(self.launches, [])
         for extras in ({"model": "opus"}, {"parallel_tool_calls": True}, {"temperature": 0.5},
-                       {"max_tokens": 2048}, {"extra_body": {"unknown": True}}):
+                       {"max_tokens": 0}, {"max_completion_tokens": True}, {"extra_body": {"unknown": True}}):
             kwargs = {"model": MODEL, "messages": [{"role": "user", "content": "unused"}], **extras}
             with self.subTest(extras=extras), self.assertRaises(client.ProviderError):
                 self.c.create(**kwargs)
@@ -390,7 +390,7 @@ class ClientTests(unittest.TestCase):
         self.assertTrue(other._runtime.cleanup['group_absent'])
         other.close()
 
-    def test_same_client_scope_change_and_third_user_input_rejected_before_send(self):
+    def test_same_client_scope_change_rejected_and_further_user_inputs_accepted(self):
         self.request()
         messages = copy.deepcopy(self.c._history.messages) + [{'role':'user','content':'next'}]
         before = copy.deepcopy(self.c._history.messages)
@@ -398,11 +398,10 @@ class ClientTests(unittest.TestCase):
             self.c.create(model=MODEL, messages=messages)
         self.assertEqual(before, self.c._history.messages)
         self.c.create(model=MODEL, messages=messages)
-        messages = copy.deepcopy(self.c._history.messages) + [{'role':'user','content':'third'}]
-        before = copy.deepcopy(self.c._history.messages)
-        with self.assertRaises(client.ProviderError):
-            self.c.create(model=MODEL, messages=messages)
-        self.assertEqual(before, self.c._history.messages)
+        for turn in ('third', 'fourth', 'fifth'):
+            messages = copy.deepcopy(self.c._history.messages) + [{'role':'user','content':turn}]
+            self.assertEqual(self.c.create(model=MODEL, messages=messages).choices[0].message.content, 'FOLLOWUP')
+        self.assertEqual(len([a for a in self.c.audit if a['stage'] == 'user_input']), 5)
 
     def test_malformed_stream_arguments_are_provider_errors(self):
         with self.assertRaises(client.ProviderError):
@@ -591,18 +590,48 @@ class ClientTests(unittest.TestCase):
         self.assert_startup_reaped(thread, errors)
         self.assertIn('timed out', str(errors[0]))
 
-    def test_session_timer_is_armed_before_real_version_startup(self):
-        self.version_mode = 'sleep'
-        timer = threading.Timer
-        intervals = []
-        def short_session(seconds, callback):
-            intervals.append(seconds)
-            return timer(.2, callback)
-        with patch('threading.Timer', short_session):
-            thread, errors = self.startup_request()
-            thread.join(.8)
-        self.assert_startup_reaped(thread, errors)
-        self.assertEqual(intervals, [150])
+    def test_no_session_ceiling_timer_is_armed(self):
+        with patch('threading.Timer', side_effect=AssertionError('session ceiling timer')):
+            self.request()
+
+    def test_idle_timeout_spares_an_active_slow_response(self):
+        response = self.request('__slow__', timeout=.5)
+        self.assertEqual(response.choices[0].message.content, 'SLOW')
+
+    def test_long_serial_tool_loop_is_not_capped(self):
+        response = self.request('__multi6__', tools=[TOOL])
+        for index in range(6):
+            self.assertEqual(response.choices[0].finish_reason, 'tool_calls')
+            response = self.continuation(response, f'R{index}')
+        self.assertEqual(response.choices[0].message.content, 'R0|R1|R2|R3|R4|R5')
+
+    def test_requested_output_cap_and_effort_reach_the_runtime(self):
+        with patch.dict(os.environ, {'HERMES_CLAUDE_SUBSCRIPTION_EFFORT': 'high'}):
+            self.request(max_tokens=16000)
+        self.assertEqual(self.child_envs[-1]['CLAUDE_CODE_MAX_OUTPUT_TOKENS'], '16000')
+        argv = self.launches[-1]
+        self.assertEqual(argv[argv.index('--effort') + 1], 'high')
+        self.assertNotIn('--max-turns', argv)
+        messages = copy.deepcopy(self.c._history.messages) + [{'role': 'user', 'content': 'next'}]
+        with self.assertRaisesRegex(client.ProviderError, 'separate client'):
+            self.c.create(model=MODEL, messages=messages, max_tokens=8000)
+
+    def test_default_effort_is_medium_and_output_cap_is_left_to_the_cli(self):
+        self.request()
+        argv = self.launches[-1]
+        self.assertEqual(argv[argv.index('--effort') + 1], 'medium')
+        self.assertNotIn('CLAUDE_CODE_MAX_OUTPUT_TOKENS', self.child_envs[-1])
+
+    def test_invalid_effort_setting_fails_before_effects(self):
+        with patch.dict(os.environ, {'HERMES_CLAUDE_SUBSCRIPTION_EFFORT': 'extreme'}), \
+                self.assertRaisesRegex(client.ProviderError, 'effort'):
+            self.request()
+        self.assertEqual(self.launches, [])
+
+    def test_oversized_runtime_line_is_rejected(self):
+        with self.assertRaisesRegex(client.ProviderError, 'line bound'):
+            self.request('__hugeline__', timeout=5)
+        self.assertTrue(self.c._runtime.cleanup['group_absent'])
 
     def test_client_closed_before_first_next_has_no_file_or_process_effects(self):
         stream = self.request(stream=True)
@@ -803,7 +832,19 @@ def synthetic_runtime(argv):
             continue
         if text == '__ratelimit__':
             emit({'type':'rate_limit_event','rate_limit_info':{'status':'rejected'}})
-        count = 2 if text == "__multi__" else 1 if text in ('__tool__', '__badargs__') else 0
+        if text == '__hugeline__':
+            sys.stdout.write('x' * 8_500_000)
+            sys.stdout.flush()
+            time.sleep(30)
+        if text == '__slow__':
+            for fragment in range(8):
+                emit({"type": "system", "subtype": "status"})
+                time.sleep(.1)
+            message(f"msg_{ordinal}_final", text="SLOW")
+            emit({"type": "result", "subtype": "success", "is_error": False, "num_turns": 1,
+                  "modelUsage": {model: {"canonicalModel": model, "provider": "firstParty"}}})
+            continue
+        count = 2 if text == "__multi__" else 6 if text == "__multi6__" else 1 if text in ('__tool__', '__badargs__') else 0
         if text == "__two_tools__":
             message("msg_parallel", tool_ids=["toolu_a", "toolu_b"])
             time.sleep(30)

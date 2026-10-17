@@ -9,6 +9,8 @@ import time
 
 from .errors import ProviderError
 
+LINE_BOUND = 8_000_000  # bytes per runtime JSON line
+
 
 class Runtime:
     """Owned child process group; the client bounds startup and parked time."""
@@ -25,7 +27,6 @@ class Runtime:
         self.selector = selectors.DefaultSelector()
         self.buffer = b""
         self.stderr_bytes = 0
-        self.total = 0
         for pipe in (self.process.stdout, self.process.stderr):
             assert pipe is not None
             os.set_blocking(pipe.fileno(), False)
@@ -73,13 +74,12 @@ class Runtime:
             if not data:
                 self.selector.unregister(key.fileobj)
                 continue
-            self.total += len(data)
-            if self.total > 4_000_000:
-                raise ProviderError("runtime output bound exceeded")
             if key.fileobj is self.process.stderr:
                 self.stderr_bytes += len(data)  # never store arbitrary stderr/account data
             else:
                 self.buffer += data
+                if len(self.buffer) > LINE_BOUND and b"\n" not in self.buffer:
+                    raise ProviderError("runtime JSON line bound exceeded")
         if self.process.poll() is not None and not self.selector.get_map() and not self.buffer:
             raise ProviderError("runtime process died before the next complete response")
         if self.process.poll() is not None and not self.selector.get_map() and b"\n" not in self.buffer:

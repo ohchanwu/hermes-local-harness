@@ -16,7 +16,7 @@ from types import SimpleNamespace
 
 from .bridge import save
 from . import compat
-from .compat import CHILD_ENV, CLI_FLAGS, CLI_SETTING, CLI_MINIMUM, CLI_TESTED, PREFIX, SETTINGS, served_names, version_text
+from .compat import CHILD_ENV, CLI_FLAGS, CLI_SETTING, DEFAULT_EFFORT, EFFORT_SETTING, EFFORTS, CLI_MINIMUM, CLI_TESTED, PREFIX, SETTINGS, served_names, version_text
 from .errors import ProviderError
 from .history import History
 from .runtime import Runtime
@@ -38,11 +38,11 @@ def parse_version(output):
 
 def response_seconds(value):
     if value is None:
-        return 60
+        return 300
     seconds = value if type(value) in (int, float) else getattr(value, "read", None)
     if type(seconds) not in (int, float) or not math.isfinite(seconds) or seconds <= 0:
         raise ProviderError("invalid response timeout")
-    return min(seconds, 150)
+    return seconds
 
 
 class Stream:
@@ -94,16 +94,17 @@ class ClaudeSubscriptionClient:
         self._startup = None
         self._runtime = None
         self._temporary = None
-        self._timer = None
         self._cli_version = None
         self._model = None
-        self._session_deadline = self._request_deadline = None
+        self._request_deadline = None
+        self._max_output = self._effort = None
+        self._initialized = False
         self._process_env = None
         self._home = None
         self._history = History()
         self._scope = None
         self._tools = None
-        self._inputs = self._turns = 0
+        self._inputs = 0
         self._pending = None
         self._sequence = 0
         self._seen_ids = set()
@@ -126,8 +127,6 @@ class ClaudeSubscriptionClient:
         if self._scope is None or self._current_scope(self._scope[-1]) != self._scope:
             raise ProviderError("session/worktree/profile changed during execution; use a separate client")
         now = time.monotonic()
-        if self._session_deadline is not None and now >= self._session_deadline:
-            raise ProviderError("runtime session timed out")
         if self._request_deadline is not None and now >= self._request_deadline:
             raise ProviderError("runtime response timed out")
 
@@ -146,15 +145,18 @@ class ClaudeSubscriptionClient:
             raise ProviderError("only automatic serial tool calls are supported")
         if kwargs.get("stream_options", {"include_usage": True}) != {"include_usage": True}:
             raise ProviderError("unsupported stream options")
-        for key in ("max_tokens", "max_completion_tokens"):
-            if key in kwargs and kwargs[key] != 1024:
-                raise ProviderError("this bounded provider supports only a 1024-token requested cap")
+        caps = {kwargs[key] for key in ("max_tokens", "max_completion_tokens") if kwargs.get(key) is not None}
+        if len(caps) > 1 or any(type(cap) is not int or cap <= 0 for cap in caps):
+            raise ProviderError("invalid output token cap")
+        max_output = caps.pop() if caps else None
+        if self._model is not None and max_output != self._max_output:
+            raise ProviderError("output token cap changed; use a separate client")
+        effort = os.environ.get(EFFORT_SETTING) or DEFAULT_EFFORT
+        if effort not in EFFORTS:
+            raise ProviderError(f"invalid effort setting {EFFORT_SETTING}; use one of: " + ", ".join(EFFORTS))
         if self.args:
             raise ProviderError("arbitrary runtime arguments are unsupported")
         response_seconds(kwargs.get("timeout", self.timeout))
-        messages = kwargs.get("messages")
-        if self._inputs >= 2 and isinstance(messages, list) and messages and messages[-1].get("role") == "user":
-            raise ProviderError("two-user-input session limit; start a new client")
         body = kwargs.get("extra_body") or {}
         if not isinstance(body, dict) or set(body) - {"subscription_session_id"}:
             raise ProviderError("unsupported extra_body configuration")
@@ -165,7 +167,7 @@ class ClaudeSubscriptionClient:
         tools = convert_tools(kwargs.get("tools"))
         if self._scope is not None and (scope != self._scope or tools != self._tools):
             raise ProviderError("session/worktree/profile or tool schema changed; use a separate client")
-        return model, scope, tools
+        return model, scope, tools, max_output, effort
 
     def create(self, **kwargs):
         try:
@@ -179,12 +181,14 @@ class ClaudeSubscriptionClient:
         try:
             if self.is_closed():
                 raise ProviderError("client closed or cancelled; no retry/resume")
-            model, scope, tools = self._validate(kwargs)
+            model, scope, tools, max_output, effort = self._validate(kwargs)
             if not self.command:
                 # Never fall back to the interactive `claude` on PATH: it updates itself.
                 raise ProviderError(f"no Claude CLI configured; set {CLI_SETTING} to the provider's dedicated install")
             tail = self._history.accept(kwargs.get("messages"))
             self._model, self._scope, self._tools = model, scope, tools
+            if self._effort is None:
+                self._max_output, self._effort = max_output, effort
             if self._process_env is None:
                 self._process_env = {k: os.environ[k] for k in ("HOME", "PATH", "LANG", "TMPDIR") if k in os.environ}
                 self._home = Path(scope[1] or Path(scope[4] or Path.home()) / ".hermes").absolute()
@@ -203,11 +207,13 @@ class ClaudeSubscriptionClient:
         env = dict(self._process_env)
         env.update(CHILD_ENV)
         env["CLAUDE_CODE_PLUGIN_CACHE_DIR"] = str(directory / "empty-plugins")
+        if self._max_output is not None:
+            env["CLAUDE_CODE_MAX_OUTPUT_TOKENS"] = str(self._max_output)
         return env
 
     def _start(self):
         assert self._tools is not None
-        assert self._home is not None and self._session_deadline is not None
+        assert self._home is not None
         # Serialize ownership registration with cancel(), not the blocking read.
         # Paths and child environment are bound at create(), never a later home.
         with self._lifecycle:
@@ -239,14 +245,14 @@ class ClaudeSubscriptionClient:
                   "args": ["-I", "-S", str(Path(__file__).with_name("mcp_server.py")), str(directory)],
                   "env": {"HOME": str(directory), "PATH": "/usr/bin:/bin"}}}} if self._tools else {"mcpServers": {}}
         system = self._history.messages[0]["content"] if self._history.messages[0]["role"] == "system" else ""
-        argv = [self.command, *CLI_FLAGS, "--model", self._model, "--settings", str(directory / "settings.json"),
+        argv = [self.command, *CLI_FLAGS, "--model", self._model, "--effort", self._effort, "--settings", str(directory / "settings.json"),
                 "--mcp-config", str(directory / "mcp.json"), "--allowedTools", ",".join(PREFIX + t["name"] for t in self._tools),
                 "--system-prompt", system]
         with self._lifecycle:
             self._check_active()
             save(directory / "settings.json", settings)
             save(directory / "bridge.json", {"tools": self._tools,
-                 "deadline": time.time() + max(0, self._session_deadline - time.monotonic())})
+                 "deadline": None})
             save(directory / "mcp.json", config)
             self._check_active()
             self._runtime = Runtime(argv, env, directory)
@@ -257,11 +263,6 @@ class ClaudeSubscriptionClient:
             with self._lifecycle:
                 self._request_deadline = time.monotonic() + seconds
                 self._check_active()  # a deferred closed/drifted stream has no startup effects
-                if self._session_deadline is None:
-                    self._session_deadline = time.monotonic() + 150
-                    self._timer = threading.Timer(150, self.cancel)
-                    self._timer.daemon = True
-                    self._timer.start()
             if self._runtime is None:
                 self._start()
             runtime = self._runtime
@@ -278,8 +279,6 @@ class ClaudeSubscriptionClient:
                     self._sequence += 1
                     self._pending = None
                 else:
-                    if self._inputs >= 2:
-                        raise ProviderError("two-user-input session limit; start a new client")
                     self._inputs += 1
             if tail["role"] != "tool":
                 self._check_active()
@@ -289,7 +288,6 @@ class ClaudeSubscriptionClient:
                 self.audit.append({"stage": "user_input", "number": self._inputs})
             served = served_names(self._model)
             message = Message(served)
-            initialized = bool(self._turns)
             while True:
                 self._check_active()
                 if message.done and message.call:
@@ -303,9 +301,6 @@ class ClaudeSubscriptionClient:
                             raise ProviderError("unmatched/replayed/unadvertised model and MCP invocation")
                         self._seen_ids.add(call["id"])
                         self._pending = {"rpc_id": pending["rpc_id"], "tool_use_id": call["id"]}
-                        self._turns += 1
-                        if self._turns >= 4:
-                            raise ProviderError("session turn budget cannot accommodate tool continuation")
                         native_call = {"id": call["id"], "type": "function", "function": {
                             "name": pending["name"], "arguments": json.dumps(call["arguments"], sort_keys=True, separators=(",", ":"))}}
                         assistant = {"role": "assistant", "content": message.text, "tool_calls": [native_call]}
@@ -323,12 +318,13 @@ class ClaudeSubscriptionClient:
                 try:
                     obj = runtime.read()
                 except ProviderError as exc:
-                    if initialized:
+                    if self._initialized:
                         raise
                     raise ProviderError(f"{exc} (before initialization; an upgraded Claude CLI "
                                         f"{version_text(self._cli_version)} may reject a flag: run smoke.py)") from None
                 if obj is None:
                     continue
+                self._request_deadline = time.monotonic() + seconds  # idle timeout: any runtime event is activity
                 if not isinstance(obj, dict) or obj.get("parent_tool_use_id"):
                     raise ProviderError("malformed runtime event or unexpected subagent")
                 kind = obj.get("type")
@@ -338,19 +334,18 @@ class ClaudeSubscriptionClient:
                         raise ProviderError("unexpected runtime model/auth source/executor")
                     if obj.get("claude_code_version") != version_text(self._cli_version):
                         raise ProviderError("unexpected runtime version")
-                    initialized = True
+                    self._initialized = True
                     self.audit.append({"stage": "init", "model": obj["model"], "tools": obj["tools"]})
                 elif kind in ("assistant", "stream_event"):
-                    if not initialized:
+                    if not self._initialized:
                         raise ProviderError("model event before verified initialization")
                     for delta in message.feed(obj):
                         yield self._chunk(message, delta)
                 elif kind == "result":
                     if not message.done or message.call or obj.get("is_error") or obj.get("subtype") != "success" or obj.get("permission_denials"):
                         raise ProviderError("runtime quota/refusal/permission/turn error or incomplete result")
-                    self._turns += 1
-                    if self._turns > 4 or type(obj.get("num_turns")) is not int or obj["num_turns"] > 3:
-                        raise ProviderError("runtime model-turn bound exceeded")
+                    if type(obj.get("num_turns")) is not int or obj["num_turns"] < 0:
+                        raise ProviderError("invalid runtime turn count")
                     meta = obj.get("modelUsage") or {}
                     if any(k not in served or v.get("canonicalModel", k) not in served or v.get("provider") != "firstParty" for k, v in meta.items()):
                         raise ProviderError("unexpected result model/provider")
@@ -383,8 +378,6 @@ class ClaudeSubscriptionClient:
     def cancel(self):
         with self._lifecycle:
             self._closed.set()
-            if self._timer is not None:
-                self._timer.cancel()
             children = (self._startup, self._runtime)
         for child in children:
             if child is not None:
