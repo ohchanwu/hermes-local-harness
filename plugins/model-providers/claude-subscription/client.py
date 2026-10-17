@@ -174,8 +174,10 @@ class ClaudeSubscriptionClient:
             raise ProviderError("arbitrary runtime arguments are unsupported")
         response_seconds(kwargs.get("timeout", self.timeout))
         body = kwargs.get("extra_body") or {}
-        # response_format is ignored: the prompt already asks for the format.
-        if not isinstance(body, dict) or set(body) - {"subscription_session_id", "response_format"}:
+        # response_format is ignored: the prompt already asks for the format. Hermes adds reasoning
+        # to helper calls (titles turn thinking off); the runtime's effort setting governs instead.
+        if (not isinstance(body, dict) or set(body) - {"subscription_session_id", "response_format", "reasoning"}
+                or not isinstance(body.get("reasoning", {}), dict)):
             raise ProviderError("unsupported extra_body configuration")
         session_id = body.get("subscription_session_id")
         if session_id is not None and (not isinstance(session_id, str) or not session_id):

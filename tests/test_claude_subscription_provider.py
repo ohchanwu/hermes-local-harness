@@ -909,6 +909,16 @@ class ClientTests(unittest.TestCase):
         self.assertEqual(response.choices[0].message.content, 'YES')
         self.assertEqual(self.child_envs[-1]['CLAUDE_CODE_MAX_OUTPUT_TOKENS'], '4096')
 
+    def test_helper_reasoning_settings_are_accepted_and_ignored(self):
+        # Hermes title generation sends this exact shape alongside response_format.
+        response = self.request(max_tokens=16, extra_body={'response_format': {'type': 'json_object'},
+                                                           'reasoning': {'enabled': False}})
+        self.assertEqual(response.choices[0].message.content, 'YES')
+        response = self.request(extra_body={'reasoning': {'enabled': True, 'effort': 'medium'}})
+        self.assertEqual(response.choices[0].message.content, 'YES')
+        with self.assertRaisesRegex(client.ProviderError, 'unsupported extra_body'):
+            self.request(extra_body={'reasoning': 'off'})
+
     def image_message(self, url=None):
         url = url or 'data:image/png;base64,' + base64.b64encode(b'\x89PNG\r\n\x1a\nfake').decode()
         return {'role': 'user', 'content': [{'type': 'text', 'text': '__image__'},

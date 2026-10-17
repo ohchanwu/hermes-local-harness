@@ -170,7 +170,8 @@ analysis and the rest) can run on this provider
   the client's own conversation, or changes its tool list or output cap, ends
   the CLI session (cancelling any parked tool call) and starts a new one, fresh
   or rebuilt.
-- **Options:** `extra_body.response_format` is ignored, and output caps below
+- **Options:** `extra_body.response_format` and `extra_body.reasoning` (title
+  generation turns thinking off) are ignored, and output caps below
   4096 tokens are raised to 4096 because thinking counts toward the cap.
 - **Images:** base64 `data:` images (PNG, JPEG, GIF, WebP) in user messages are
   sent as image blocks. Remote image URLs and images in tool results are
