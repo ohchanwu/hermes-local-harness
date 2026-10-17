@@ -1,0 +1,93 @@
+#!/usr/bin/env python3
+"""Switch a Hermes profile's main model and its helper jobs between providers.
+
+    scripts/switch-profile-model --profile harness-worker --to claude-opus
+    scripts/switch-profile-model --profile worker-sol --to gpt --model gpt-5.6-sol --dispatch add
+    scripts/switch-profile-model --profile harness-reviewer --to glm --dry-run
+
+Backs up the profile's config.yaml first, then uses `hermes config set` for
+model.provider, model.default, model.base_url and every auxiliary helper task.
+"""
+import argparse
+import re
+import shutil
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+# Each target: provider, base URL, default main model, and the helper model.
+TARGETS = {
+    "claude-opus": ("claude-subscription", "acp://claude-subscription", "claude-opus-5-5", "claude-opus-5-5"),
+    "claude-fable": ("claude-subscription", "acp://claude-subscription", "claude-fable-5-1", "claude-opus-5-5"),
+    "gpt": ("openai-codex", "https://chatgpt.com/backend-api/codex", "gpt-5.6-sol", None),
+    "glm": ("zai", "https://api.z.ai/api/coding/paas/v4", "glm-5.3", None),
+}
+HELPER_TASKS = ("vision", "compression", "skills_hub", "approval", "review", "mcp", "title_generation",
+                "memory_query_rewrite", "tts_audio_tags", "triage_specifier", "kanban_decomposer",
+                "profile_describer", "goal_judge", "curator", "monitor", "background_review")
+DISPATCH = re.compile(r"^  dispatch_profiles:(?: \[\])?\n((?:    - .*\n)*)", re.M)
+
+
+def home_of(root, profile):
+    return root if profile == "default" else root / "profiles" / profile
+
+
+def settings(target, model):
+    provider, base_url, default_model, helper_model = TARGETS[target]
+    model = model or default_model
+    pairs = [("model.provider", provider), ("model.default", model), ("model.base_url", base_url)]
+    for task in HELPER_TASKS:
+        pairs += [(f"auxiliary.{task}.provider", provider), (f"auxiliary.{task}.model", helper_model or model)]
+    return pairs
+
+
+def set_dispatch(config, profile, action):
+    """Add or remove the profile in the default home's kanban.dispatch_profiles list."""
+    text = config.read_text()
+    match = DISPATCH.search(text)
+    if match is None:
+        raise SystemExit("no kanban.dispatch_profiles list in " + str(config))
+    names = [line.strip()[2:] for line in match.group(1).splitlines()]
+    names = [n for n in names if n != profile] + ([profile] if action == "add" else [])
+    block = "  dispatch_profiles:\n" + "".join(f"    - {n}\n" for n in names) if names else "  dispatch_profiles: []\n"
+    config.write_text(text[:match.start()] + block + text[match.end():])
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
+    parser.add_argument("--profile", required=True, help="profile name, or 'default' for ~/.hermes itself")
+    parser.add_argument("--to", required=True, choices=sorted(TARGETS))
+    parser.add_argument("--model", help="main model id (defaults to the target's usual model)")
+    parser.add_argument("--dispatch", choices=("add", "remove"), help="change the profile's Kanban dispatch membership")
+    parser.add_argument("--home-root", type=Path, default=Path.home() / ".hermes")
+    parser.add_argument("--hermes", default=str(Path.home() / ".hermes/hermes-agent/.hermes/bin/hermes"))
+    parser.add_argument("--dry-run", action="store_true")
+    args = parser.parse_args(argv)
+    if "/" in args.profile or args.profile in {"", ".", ".."}:
+        parser.error("--profile must be a profile identifier")
+    home = home_of(args.home_root, args.profile)
+    config = home / "config.yaml"
+    if not config.is_file():
+        parser.error(f"no config at {config}")
+    pairs = settings(args.to, args.model)
+    prefix = [args.hermes] + ([] if args.profile == "default" else ["-p", args.profile])
+    if args.dry_run:
+        for key, value in pairs:
+            print(" ".join(prefix + ["config", "set", key, value]))
+        return 0
+    backup = config.with_name(f"config.yaml.pre-switch-{time.strftime('%Y%m%d-%H%M%S')}")
+    shutil.copy2(config, backup)
+    for key, value in pairs:
+        subprocess.run(prefix + ["config", "set", key, value], check=True, capture_output=True)
+    if args.dispatch:
+        set_dispatch(args.home_root / "config.yaml", args.profile, args.dispatch)
+    print(f"{args.profile}: {args.to} ({pairs[1][1]}); helpers on {pairs[4][1]}; backup {backup.name}")
+    if TARGETS[args.to][0] == "claude-subscription":
+        print("needs the claude-subscription plugin and HERMES_CLAUDE_SUBSCRIPTION_CLI / _TOKEN_FILE in the "
+              "profile's .env (see plugins/model-providers/claude-subscription/README.md)")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
