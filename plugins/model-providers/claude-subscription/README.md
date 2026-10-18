@@ -88,7 +88,12 @@ user message or tool result
 ([rebuild specification](../../../docs/specs/261017-claude-subscription-transcript-rebuild.md)).
 The transcript must start with a user message (after an optional system
 message), end with a user or tool message, and every tool result must name an
-earlier call. Each rebuild records a `rebuild` audit entry and logs a warning.
+earlier call. Hermes' context compaction can leave complete tool-call groups
+(an assistant message with calls, then exactly one result per call) ahead of
+the user message carrying its summary; those leading groups are accepted and
+left out of the replay, while the client still tracks the full transcript.
+Each rebuild records a `rebuild` audit entry (with the count of leading rows
+left out, `skipped_leading`) and logs a warning.
 A rebuild never delivers a result into an MCP call, so it cannot run a tool
 twice. Changed system/tools/session/profile/worktree/task identity on the same
 client, unsupported roles, images and multipart content are still rejected. No

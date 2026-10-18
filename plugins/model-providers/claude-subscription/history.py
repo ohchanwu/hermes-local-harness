@@ -34,6 +34,7 @@ class History:
         self.pending_ids = []  # the last assistant message's tool calls, each owed one result
         self.dropped = []  # calls Hermes removed from that message's batch (duplicates, over-limit delegations)
         self.restored = None  # prior messages a new client must replay, until its first send
+        self.skipped = 0  # leading tool-call rows of that transcript left out of the replay
 
     def accept(self, messages):
         """Validate the next request's transcript; return its new messages (the tail)."""
@@ -41,12 +42,13 @@ class History:
             raise ProviderError("messages must be a nonempty transcript")
         canonical = [self.canonical(m) for m in messages]
         self.restored = None
+        self.skipped = 0
         self.dropped = []
         tail = canonical[-1:]  # a fresh start or a rebuild continues from the last message
         if not self.messages:
             roles = [m["role"] for m in canonical]
             if roles not in (["user"], ["system", "user"]):
-                self.restored = self.rebuild(canonical)
+                self.restored, self.skipped = self.rebuild(canonical)
         elif self.pending_ids:
             # Hermes may drop calls from the batch (duplicates, delegations over its limit)
             # before recording the assistant message; it answers only the calls it kept.
@@ -80,10 +82,32 @@ class History:
 
     @staticmethod
     def rebuild(canonical):
-        """Validate an existing transcript handed to a new client; return what to replay."""
+        """Validate an existing transcript handed to a new client.
+
+        Return what to replay and how many leading rows were left out of it.
+        """
         body = canonical[1:] if canonical[0]["role"] == "system" else canonical
-        if not body or body[0]["role"] != "user" or body[-1]["role"] not in ("user", "tool"):
+        if not body or body[-1]["role"] not in ("user", "tool"):
             raise ProviderError("a transcript must start with a user message and end with a user or tool message")
+        # Hermes' context compaction can keep one or more complete tool-call groups
+        # (an assistant message with calls, then exactly one result per call) ahead of
+        # the user message that carries its summary. The summary covers them, so they
+        # are left out of the replay; History still tracks the transcript as sent.
+        skipped = 0
+        while skipped < len(body) and body[skipped]["role"] != "user":
+            head = body[skipped]
+            if head["role"] != "assistant" or not head.get("tool_calls"):
+                raise ProviderError("a transcript must start with a user message and end with a user or tool message")
+            end = skipped + 1
+            while end < len(body) and body[end]["role"] == "tool":
+                end += 1
+            if (sorted(m["tool_call_id"] for m in body[skipped + 1:end])
+                    != sorted(call["id"] for call in head["tool_calls"])):
+                raise ProviderError("a leading tool call group needs exactly one result per call")
+            skipped = end
+        body = body[skipped:]
+        if not body:
+            raise ProviderError("leading tool call groups must be followed by a user message")
         # Track outstanding calls, as Hermes does: some models reuse one id for
         # every call, so a later call re-arms its id for one more result.
         outstanding = set()
@@ -99,7 +123,7 @@ class History:
             ids = sorted(call["id"] for call in body[latest].get("tool_calls", []))
             if body[latest]["role"] != "assistant" or sorted(m["tool_call_id"] for m in body[latest + 1:]) != ids:
                 raise ProviderError("final tool results must answer every call of the latest assistant message")
-        return copy.deepcopy(body[:-1])
+        return copy.deepcopy(body[:-1]), skipped
 
     @staticmethod
     def canonical(message):
