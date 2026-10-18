@@ -28,6 +28,7 @@ from .compat import CHILD_ENV, CLI_FLAGS, CLI_SETTING, TOKEN_FD_VARIABLE, TOKEN_
 from .errors import ProviderError
 from .history import History
 from .runtime import Runtime
+from . import stream_audit
 from .stream_events import Message
 from .transcript import render_restored
 from .translate import convert_tools, record, usage
@@ -411,6 +412,7 @@ class ClaudeSubscriptionClient:
                     self.audit.append({"stage": "user_input", "number": self._inputs})
             served = served_names(self._model)
             message = Message(served)
+            stream_log = stream_audit.StreamLog()  # this request's events, persisted if the stream fails
             restarts = 0
             while True:
                 self._check_active()
@@ -466,8 +468,12 @@ class ClaudeSubscriptionClient:
                     continue
                 self._request_deadline = time.monotonic() + seconds  # idle timeout: any runtime event is activity
                 if not isinstance(obj, dict) or obj.get("parent_tool_use_id"):
-                    raise ProviderError("malformed runtime event or unexpected subagent")
+                    error = ProviderError("malformed runtime event or unexpected subagent")
+                    self._persist_stream_audit(stream_log, error, runtime, obj)
+                    raise error
                 kind = obj.get("type")
+                if kind not in ("assistant", "stream_event"):
+                    stream_log.observe(obj)
                 if kind == "system" and obj.get("subtype") == "init":
                     expected = {PREFIX + t["name"] for t in self._tools}
                     if obj.get("model") not in served or set(obj.get("tools", [])) != expected or obj.get("apiKeySource") != "none":
@@ -477,11 +483,21 @@ class ClaudeSubscriptionClient:
                     self._initialized = True
                     self.audit.append({"stage": "init", "model": obj["model"], "tools": obj["tools"]})
                 elif kind in ("assistant", "stream_event", "result") and self._awaiting:
-                    raise ProviderError("runtime continued before requesting every tool call of its message")
+                    error = ProviderError("runtime continued before requesting every tool call of its message")
+                    self._persist_stream_audit(stream_log, error, runtime, obj, observed=kind == "result")
+                    raise error
                 elif kind in ("assistant", "stream_event"):
                     if not self._initialized:
-                        raise ProviderError("model event before verified initialization")
-                    for delta in message.feed(obj):
+                        error = ProviderError("model event before verified initialization")
+                        self._persist_stream_audit(stream_log, error, runtime, obj)
+                        raise error
+                    try:
+                        deltas = message.feed(obj)
+                    except ProviderError as exc:
+                        self._persist_stream_audit(stream_log, exc, runtime, obj)
+                        raise
+                    stream_log.observe(obj, forwarded=True)
+                    for delta in deltas:
                         yield self._chunk(message, delta)
                     if message.restarts > restarts:
                         restarts = message.restarts
@@ -509,13 +525,38 @@ class ClaudeSubscriptionClient:
                     if obj.get("rate_limit_info", {}).get("status") == "rejected":
                         raise ProviderError("runtime subscription rate limit rejected; no retry or substitute")
                 elif kind not in ("system", "user"):
-                    raise ProviderError("unknown runtime event")
+                    error = ProviderError("unknown runtime event")
+                    self._persist_stream_audit(stream_log, error, runtime, obj, observed=True)
+                    raise error
         except (ValueError, TypeError, KeyError, OSError, subprocess.SubprocessError) as exc:
             self.cancel()
             raise ProviderError("runtime startup, I/O or malformed protocol: " + type(exc).__name__) from None
         except BaseException:
             self.cancel()
             raise
+
+    def _persist_stream_audit(self, stream_log, error, runtime, failed, *, observed=False):
+        """Write this request's stream audit; the caller then raises the original error unchanged.
+
+        The event that failed is recorded (as not forwarded) unless it already was, then the rest of
+        the current message is read briefly into the record only, never to Hermes, so a second
+        message's relation to the first is known. Any failure here is one warning, never a new error.
+        """
+        try:
+            if not observed:
+                stream_log.observe(failed)
+            stream_log.drain(runtime.read, lambda: not self.is_closed())
+            if self._home is None:
+                raise ProviderError("no profile home")
+            session = self._scope[-1] if self._scope else None
+            record = stream_audit.payload(error, session, self._model,
+                                          version_text(self._cli_version) if self._cli_version else None,
+                                          self.audit, stream_log)
+            path = stream_audit.write(self._home, session, record)
+        except Exception as exc:
+            log.warning("claude-subscription stream failed (%s); stream audit not written (%s)", error, type(exc).__name__)
+        else:
+            log.warning("claude-subscription stream failed (%s); stream audit written to %s", error, path.name)
 
     def _match(self, pending, calls):
         """The first of the message's calls that this MCP request is for; the CLI may request them in any order."""

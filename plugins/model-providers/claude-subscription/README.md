@@ -142,6 +142,18 @@ reply text has reached Hermes, the provider discards the partial message and
 continues (audit stage `runtime_retry`). After visible text has streamed, Hermes
 already holds that text, so the request fails; Hermes keeps the partial reply and
 does not retry it.
+When the stream itself fails (duplicate streamed message, retry after streamed
+text, event outside a message, invalid block, snapshot mismatch, malformed or
+unknown runtime event), the client first reads the rest of the current message
+briefly into memory only (never to Hermes), then writes one owner-only (0600)
+file `$HERMES_HOME/sessions/stream_audit_<session>_<YYYYMMDD_HHMMSS_ffffff>.json`
+(`stream_audit.py`), and raises the original error unchanged. The file holds an
+allowlist only: error class/message, session id, model, CLI version, the client
+audit without tool arguments, and per message its id, model, stop reason, event
+types (bounded), blocks, restarts, whether text reached Hermes, text length and
+sha256, and its relation to the previous message's text. It never holds text,
+thinking, tool arguments/results, prompts, environment, paths or credentials. A
+write failure is one log warning; an existing file is never replaced.
 Snapshot/stream mismatch, malformed protocol, quota/refusal, rejected rate limit,
 process death and unsupported model/executor selection terminate the client.
 An unmatched tool cannot become a text-success result. Unknown usage is absent,
