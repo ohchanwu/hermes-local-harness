@@ -695,12 +695,12 @@
     "chapt-worker": "6bd46152500f54f4955b657d80a20f31db27f2d3162845fd8194436e03c5b5ab",
     "chapt-worker-glm-1": "79b114ac428183ec8140ff872490afed6a9512a729896aa99faf4f4554dcb7a1",
     "chapt-worker-glm-2": "420248cde44ce10386aa9ad46c2f145e964198ba5d02b906fc8d929cb591793b",
-    "chapt-reviewer": "b8b07f2b210c08d9d97fe278665bf26e9b11d5ad2013b932d88cb590bca94e37",
+    "chapt-reviewer": "4bdc98c15aba6f1580ac58dcf0af671a2e54d48db591845cd3737303f5bee191",
     "harness-orchestrator": "0146225230db3d1afaf4ea3ccdf8a12a5bf9b2ac719bd606fba563091ff7e519",
     "harness-worker": "8ee6127b833f8278b3ed3932aa05c77cac917ee8391ccc633474b4ce8fc1ef61",
     "harness-worker-glm-1": "1d08b686385ea599cadcaabbfd39ecc9065ae9ec1863859d4fdbc53c3193a708",
     "harness-worker-glm-2": "1d08b686385ea599cadcaabbfd39ecc9065ae9ec1863859d4fdbc53c3193a708",
-    "harness-reviewer": "2ce61d59db24691da2782f8dd9519404432203892e4e781f4978dae3db4b2ecc"
+    "harness-reviewer": "1f5b2755d75f77f99a757eb8cb7bfdc67cd24887bfbb91815a71f8edbf24b613"
   },
   "repository_policy_hashes": {
     "cha-pt-frontend": "113b81fd55294cfc3057f66163e1745d590f520003997d36c85b46c938342817"

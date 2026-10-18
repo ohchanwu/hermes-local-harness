@@ -803,7 +803,7 @@
     "chapt-reviewer": {
       "source": "policies/profile-souls/chapt-reviewer/SOUL.md",
       "live": "/Users/chanbla11mit/.hermes/profiles/chapt-reviewer/SOUL.md",
-      "sha256": "b8b07f2b210c08d9d97fe278665bf26e9b11d5ad2013b932d88cb590bca94e37"
+      "sha256": "4bdc98c15aba6f1580ac58dcf0af671a2e54d48db591845cd3737303f5bee191"
     },
     "harness-orchestrator": {
       "source": "policies/profile-souls/harness-orchestrator/SOUL.md",
@@ -828,7 +828,7 @@
     "harness-reviewer": {
       "source": "policies/profile-souls/harness-reviewer/SOUL.md",
       "live": "/Users/chanbla11mit/.hermes/profiles/harness-reviewer/SOUL.md",
-      "sha256": "2ce61d59db24691da2782f8dd9519404432203892e4e781f4978dae3db4b2ecc"
+      "sha256": "1f5b2755d75f77f99a757eb8cb7bfdc67cd24887bfbb91815a71f8edbf24b613"
     }
   },
   "repository_policies": {

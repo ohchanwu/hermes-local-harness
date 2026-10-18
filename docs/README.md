@@ -24,6 +24,7 @@ This index is the entry point for durable harness documentation tracked in Git. 
 
 - [Concurrent project fleets](specs/261004-concurrent-project-fleets.md) — implemented and verified Jobcron, Cha PT, and Harness isolation; the Harness attended live rollout is operational.
 - [Diagnostic convergence policy](../policies/diagnostic-convergence.md) — maintained design and review contract; [authority boundaries](../policies/authority-and-review.md).
+- [Overgating review checklist](../policies/overgating-review.md) — reviewer findings for gates, holds, caps and ceremony in specs, plans, procedures and policy; applied by the harness, Cha PT and Jobcron reviewer SOULs.
 - [Completed diagnostic-convergence implementation plan](archive/261003-diagnostic-convergence.md)
 
 - [Autonomous Astra terminal-retry harness plan](plans/260929-autonomous-astra-terminal-retry.md)
