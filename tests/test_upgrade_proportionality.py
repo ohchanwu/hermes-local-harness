@@ -36,6 +36,7 @@ FIXTURE_RESULTS = {
     "unexpected-plugin.yaml": (1, "behavior-changing unexpected plugin"),
     "missing-plugin.yaml": (1, "plugin drift"),
     "approval-mode-drift.yaml": (1, "approval mode drift jobcron-worker"),
+    "compression-drift.yaml": (1, "managed setting drift advisor compression.threshold_tokens"),
     "terminal-deployment-pending.yaml": (1, "terminal notification deployment pending"),
     "terminal-notification-rollback.yaml": (1, "terminal notification deployment pending"),
     "plugin-pin-drift.yaml": (1, "expected pinned 4.8.4@16f29800"),

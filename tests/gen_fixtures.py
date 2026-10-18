@@ -63,6 +63,9 @@ clean["profile_models"] = {profile["name"]: profile["model"] for profile in rost
 clean["profile_providers"] = {profile["name"]: profile["provider"] for profile in roster["profiles"]}
 clean["profile_approval_modes"] = {
     profile: desired["approvals"]["mode"] for profile in desired["approvals"]["profiles"]}
+clean["profile_managed_settings"] = {
+    profile: copy.deepcopy(desired["managed_profile_settings"]["settings"])
+    for profile in desired["managed_profile_settings"]["profiles"]}
 clean["dispatch_profiles"] = copy.deepcopy(desired["kanban"]["dispatch_profiles"])
 clean["kanban"] = {key: copy.deepcopy(value) for key, value in desired["kanban"].items()
                    if key != "dispatch_profiles"}
@@ -119,6 +122,15 @@ def retired_glm_dispatch(d):
 
 
 write("retired-glm-dispatch-drift.yaml", delta(retired_glm_dispatch))
+
+
+def compression_drift(d):
+    # One profile carries a wrong value; another cannot report one key (unreadable).
+    d["profile_managed_settings"]["advisor"]["compression.threshold_tokens"] = 200000
+    del d["profile_managed_settings"]["harness-orchestrator"]["compression.idle_compact_after_seconds"]
+
+
+write("compression-drift.yaml", delta(compression_drift))
 
 
 def rogue(d):

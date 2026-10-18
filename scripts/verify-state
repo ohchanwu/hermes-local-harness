@@ -1316,6 +1316,37 @@ def check_live_terminal_notification_runtime(errors, producer_profiles):
         check_terminal_notification_runtime(errors, runtime, producer_profiles)
 
 
+def check_managed_profile_settings(errors, managed, roster_profiles, read):
+    """Per-profile config keys the harness manages. read(profile, key) returns the
+    observed value or UNREADABLE; live mode passes json_config, fixture mode a
+    reader over fixture data only."""
+    profiles = managed.get("profiles") if isinstance(managed, dict) else None
+    settings = managed.get("settings") if isinstance(managed, dict) else None
+    if (not isinstance(profiles, list) or not profiles or len(set(profiles)) != len(profiles)
+            or not isinstance(settings, dict) or not settings):
+        fail(errors, "managed profile settings malformed: expected unique profiles and non-empty settings")
+        return
+    for profile in profiles:
+        if profile not in roster_profiles:
+            fail(errors, f"managed profile settings name unknown roster profile: {profile}")
+            continue
+        for key, want in settings.items():
+            actual = read(profile, key)
+            if actual is UNREADABLE or actual != want:
+                fail(errors, f"managed setting drift {profile} {key}: expected {want!r}, "
+                             f"actual {'<unreadable>' if actual is UNREADABLE else repr(actual)}")
+
+
+def fixture_setting_reader(observed_settings):
+    """Fixture analogue of json_config: an absent or malformed entry is unreadable."""
+    def read(profile, key):
+        values = observed_settings.get(profile) if isinstance(observed_settings, dict) else None
+        if not isinstance(values, dict) or key not in values:
+            return UNREADABLE
+        return values[key]
+    return read
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--fixture", help="sanitized observed-state fixture; never reads live state")
@@ -1354,6 +1385,9 @@ def main():
         fail(errors, "approval policy profiles must exactly match the installed roster order")
     if snapshot.get("approvals") != approval_policy:
         fail(errors, "approval policy snapshot drift")
+    managed_settings = roster.get("managed_profile_settings")
+    if snapshot.get("managed_profile_settings") != managed_settings:
+        fail(errors, "managed profile settings snapshot drift")
     expected_local_overrides = snapshot["skill"].get("profile_local_skill_overrides", {})
     check_profile_local_skill_overrides(errors, expected_local_overrides)
     dispatch_profiles = snapshot["kanban"]["dispatch_profiles"]
@@ -1375,7 +1409,7 @@ def main():
             return 2
         # Fail-closed fixture schema: a passing fixture must represent every required
         # observed field and every installed roster profile; omission is drift, not success.
-        for section in ("profile_models", "profile_providers", "profile_approval_modes", "plugins", "dispatch_profiles", "kanban", "skill_files", "profile_local_skill_overrides", "profile_soul_hashes", "repository_policy_hashes", "adapters", "terminal_notification_runtime", "terminal_retry_policy", "project_isolation", "project_repair_policy", "project_repair_cards"):
+        for section in ("profile_models", "profile_providers", "profile_approval_modes", "plugins", "dispatch_profiles", "kanban", "skill_files", "profile_local_skill_overrides", "profile_soul_hashes", "repository_policy_hashes", "adapters", "terminal_notification_runtime", "terminal_retry_policy", "project_isolation", "project_repair_policy", "project_repair_cards", "profile_managed_settings"):
             if section not in observed:
                 fail(errors, f"incomplete fixture: missing required section '{section}'")
         # None is a live/desired-only sentinel in these helpers, not a fixture
@@ -1422,6 +1456,8 @@ def main():
         for name in list(models) + list(providers) + list(approval_modes):
             if name not in expected:
                 fail(errors, f"behavior-changing unexpected profile: {name}")
+        check_managed_profile_settings(errors, managed_settings, expected,
+                                       fixture_setting_reader(observed.get("profile_managed_settings")))
         plugins = observed.get("plugins", {})
         check_terminal_notification_observed(errors, plugins, snapshot["terminal_notification"]["producer_profiles"])
         check_terminal_notification_runtime(errors, observed.get("terminal_notification_runtime", {}),
@@ -1488,6 +1524,7 @@ def main():
                             fail(errors, message)
                     check_plugins(errors, warnings, name, profile["required_plugins"], state, snapshot["plugins"],
                                   profile.get("installed_disabled_plugins"))
+        check_managed_profile_settings(errors, managed_settings, expected, json_config)
         check_live_terminal_notification_runtime(errors, snapshot["terminal_notification"]["producer_profiles"])
         for key, want in snapshot["kanban"].items():
             actual = json_config("default", f"kanban.{key}")

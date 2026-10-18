@@ -66,6 +66,21 @@
       "jss-reviewer"
     ]
   },
+  "managed_profile_settings": {
+    "profiles": [
+      "advisor",
+      "jobcron-orchestrator",
+      "chapt-orchestrator",
+      "harness-orchestrator",
+      "default"
+    ],
+    "settings": {
+      "compression.threshold_tokens": 150000,
+      "compression.proactive_prune_tokens": 100000,
+      "compression.min_tail_user_messages": 3,
+      "compression.idle_compact_after_seconds": 3600
+    }
+  },
   "kanban": {
     "max_in_progress": null,
     "max_in_progress_per_profile": 1,

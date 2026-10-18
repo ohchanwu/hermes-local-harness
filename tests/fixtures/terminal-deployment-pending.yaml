@@ -683,5 +683,37 @@
       "jss-genr"
     ]
   },
-  "project_repair_cards": []
+  "project_repair_cards": [],
+  "profile_managed_settings": {
+    "advisor": {
+      "compression.threshold_tokens": 150000,
+      "compression.proactive_prune_tokens": 100000,
+      "compression.min_tail_user_messages": 3,
+      "compression.idle_compact_after_seconds": 3600
+    },
+    "jobcron-orchestrator": {
+      "compression.threshold_tokens": 150000,
+      "compression.proactive_prune_tokens": 100000,
+      "compression.min_tail_user_messages": 3,
+      "compression.idle_compact_after_seconds": 3600
+    },
+    "chapt-orchestrator": {
+      "compression.threshold_tokens": 150000,
+      "compression.proactive_prune_tokens": 100000,
+      "compression.min_tail_user_messages": 3,
+      "compression.idle_compact_after_seconds": 3600
+    },
+    "harness-orchestrator": {
+      "compression.threshold_tokens": 150000,
+      "compression.proactive_prune_tokens": 100000,
+      "compression.min_tail_user_messages": 3,
+      "compression.idle_compact_after_seconds": 3600
+    },
+    "default": {
+      "compression.threshold_tokens": 150000,
+      "compression.proactive_prune_tokens": 100000,
+      "compression.min_tail_user_messages": 3,
+      "compression.idle_compact_after_seconds": 3600
+    }
+  }
 }
