@@ -1,7 +1,7 @@
 ---
 name: multi-agent-coding-orchestrator
 description: "Use when orchestrating jss-genr repository and writing-round work."
-version: 0.6.7-jss.3
+version: 0.6.7-jss.4
 author: chanbla11mit, Hermes Agent
 license: MIT
 platforms: [macos]
@@ -33,10 +33,11 @@ If any board, repository, card-kind, profile, worktree, baseline, write-target, 
 
 `profile/`, `companies/`, and `resume/resources/` hold personal and third-party data. They are gitignored and exist only in the main checkout. Privacy is a hard gate on every card.
 
-- Never copy anything from them into tracked files, commits, card bodies, comments, handoffs, `repair_history`, memory, or Telegram summaries. Only the company slug, file names, command names, exit codes, SHA-256 digests, counts, and pass/fail verdicts may appear there.
+- Never copy anything from them into tracked files or commits. The repository has a public remote.
+- Owner decision, 2026-10-18: Telegram replies to the owner, card bodies, comments, handoffs, `repair_history`, and memory may quote or summarize this content. They stay local or private. Worker and reviewer SOULs carry the same exception.
 - Review findings, fact checks, and owner questions live in the round's own files under `companies/<slug>/`; cards and messages point to those files by name.
 - Resume content changes use only text the owner gives for the public resume (Workflow B). Never move files out of `resume/resources/`.
-- A leak is a material defect even when everything else passes. Reviewers reject it; the controller never integrates it.
+- A leak into a tracked file or commit is a material defect even when everything else passes. Reviewers reject it; the controller never integrates it.
 
 ## Card Kinds
 

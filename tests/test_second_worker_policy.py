@@ -41,7 +41,7 @@ VERSIONS = {
     PROFILE_SKILLS["jobcron"]: "0.6.9-jobcron.4",
     PROFILE_SKILLS["chapt"]: "0.6.7-chapt.4",
     PROFILE_SKILLS["harness"]: "0.6.7-harness.3",
-    PROFILE_SKILLS["jss"]: "0.6.7-jss.3",
+    PROFILE_SKILLS["jss"]: "0.6.7-jss.4",
     SHARED_SKILL: "0.6.10",
 }
 PINNED_WORKERS = ("chapt-worker", "harness-worker", "jss-worker")  # jobcron-worker has no tracked SOUL

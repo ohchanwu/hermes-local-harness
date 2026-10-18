@@ -318,7 +318,7 @@
         "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md": "d91b241db42b2a5125cad3e07fc67b1f51fe7fb16bfd86bf5175fade258c55aa"
       },
       "jss-orchestrator": {
-        "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md": "1cda27b0f963a8f1d02fb3cc38d0921f3954edbb9a0e49b49d03366ae3e85379"
+        "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md": "599dc4d0c2ca2b8b0a6fd7de7711af06854ee9036c21cdb2df25fcfccd9c2519"
       }
     }
   },
@@ -479,22 +479,22 @@
     "jss-orchestrator": {
       "source": "policies/profile-souls/jss-orchestrator/SOUL.md",
       "live": "/Users/chanbla11mit/.hermes/profiles/jss-orchestrator/SOUL.md",
-      "sha256": "5187ab980ee76e17cc18151df880b588acf1407edde418d7acf791cc9dab0480"
+      "sha256": "99dd9aa1d8574b5b41203f08058e95a54fc33428cca0437d70bbb7e0cf5aec1a"
     },
     "jss-worker": {
       "source": "policies/profile-souls/jss-worker/SOUL.md",
       "live": "/Users/chanbla11mit/.hermes/profiles/jss-worker/SOUL.md",
-      "sha256": "a3c4e1fe3881c0ed9eedb8b7c258c3fa399328e26e3a18703cf4ce22b3a7e2f4"
+      "sha256": "b640041cb3051150bc6acfaa0559465e248f2bffbb3a0c2b897bf643fac98582"
     },
     "jss-worker-2": {
       "source": "policies/profile-souls/jss-worker-2/SOUL.md",
       "live": "/Users/chanbla11mit/.hermes/profiles/jss-worker-2/SOUL.md",
-      "sha256": "a3c4e1fe3881c0ed9eedb8b7c258c3fa399328e26e3a18703cf4ce22b3a7e2f4"
+      "sha256": "b640041cb3051150bc6acfaa0559465e248f2bffbb3a0c2b897bf643fac98582"
     },
     "jss-reviewer": {
       "source": "policies/profile-souls/jss-reviewer/SOUL.md",
       "live": "/Users/chanbla11mit/.hermes/profiles/jss-reviewer/SOUL.md",
-      "sha256": "fc7028634eb78a4567fb5566cefdb96fe0c9f3d247ab6b09af1b5b51b6fda1da"
+      "sha256": "511323e318df6ee6acc542c9b93ac33fdf3cc9d68d19cdc666f1d91d2d3aaf5c"
     }
   },
   "repository_policies": {

@@ -31,6 +31,15 @@ RUN_SCRIPT = ROOT / "scripts/run-jss-orchestrator"
 ADOPTION = ROOT / "adoption/jss-genr.md"
 CHECKLIST_ABS = "/Users/chanbla11mit/hermes-local-harness/policies/overgating-review.md"
 RETIRED_MODEL = re.compile(r"(?i)\bgpt\b|gpt-\d|\b(?:sol|astra|luna|terra)\b|openai-codex")
+# Owner decision, 2026-10-18: private content may appear in local/private channels
+# (Telegram replies, cards, comments, handoffs, memory) but never in tracked files or commits.
+OWNER_EXCEPTION = "(owner decision, 2026-10-18)"
+PRIVACY_FORBID = {
+    ORCH: "never copy anything from `profile/`, `companies/`, or `resume/resources/` into tracked files or commits.",
+    WORKER: "never copy anything from `profile/`, `companies/`, or `resume/resources/` into tracked files or commits.",
+    WORKER2: "never copy anything from `profile/`, `companies/`, or `resume/resources/` into tracked files or commits.",
+    REVIEWER: "reject any commit or tracked file that copies anything from `profile/`, `companies/`, or `resume/resources/`.",
+}
 
 
 def sha(path):
@@ -228,7 +237,8 @@ class RoleContracts(unittest.TestCase):
                 self.assertIn("Privacy is a hard gate", body)
                 for folder in ("`profile/`", "`companies/`", "`resume/resources/`"):
                     self.assertIn(folder, body)
-                self.assertIn("beyond the company slug and file names", body)
+                self.assertIn(PRIVACY_FORBID[profile], body)
+                self.assertIn(OWNER_EXCEPTION, body)
                 self.assertRegex(body, r"[Nn]ever overwrite, rename, or delete an existing draft")
                 for limit in ("push", "open a pr", "deploy", "submit an application",
                               "log in to a job site", "credentials", "external write"):
@@ -244,7 +254,8 @@ class RoleContracts(unittest.TestCase):
                 "Every card declares exactly one kind.",
                 "`profile/facts.md` and `profile/voice.md` change only after the owner's explicit confirmation",
                 "Unverified facts, sensitive material, suggestion choices, and \"final\" are owner decisions.",
-                "Telegram summaries"):
+                "Telegram replies to the owner, card bodies, comments, handoffs, and memory may contain it "
+                "(owner decision, 2026-10-18), because they stay local or private."):
             self.assertIn(marker, body)
 
     def test_worker_souls(self):
@@ -257,6 +268,13 @@ class RoleContracts(unittest.TestCase):
                 self.assertIn("Do not commit.", body)
                 self.assertIn("never install, download, or commit dependencies", body)
                 self.assertIn("Never delegate", body)
+
+    def test_workers_carry_identical_privacy_paragraph(self):
+        paragraphs = {profile: [p for p in self.souls[profile].split("\n\n") if "Privacy is a hard gate" in p]
+                      for profile in WORKERS}
+        self.assertEqual(len(paragraphs[WORKER]), 1)
+        self.assertEqual(paragraphs[WORKER], paragraphs[WORKER2])
+        self.assertIn("Card bodies, comments, handoffs, and memory may contain it", flat(paragraphs[WORKER][0]))
 
     def test_reviewer_soul_and_overgating_rule(self):
         text = self.souls[REVIEWER]
@@ -279,7 +297,7 @@ class RoleContracts(unittest.TestCase):
         self.assertLessEqual(len(paragraph), 1000)
 
     def test_skill_version_size_and_sections(self):
-        self.assertRegex(self.skill_raw, r"(?m)^version: 0\.6\.7-jss\.3$")
+        self.assertRegex(self.skill_raw, r"(?m)^version: 0\.6\.7-jss\.4$")
         self.assertLessEqual(len(self.skill_raw.splitlines()), 260)
         self.assertEqual(re.findall(r"^## (.+)$", self.skill_raw, re.M), [
             "Hard Scope", "Privacy Gate", "Card Kinds", "Role Separation", "Card Contract",
@@ -321,6 +339,11 @@ class RoleContracts(unittest.TestCase):
                 "`Baseline EXACT <40-hex-commit>.`",
                 "`Reviewer EXACT jss-reviewer.`",
                 "Privacy is a hard gate on every card.",
+                "Never copy anything from them into tracked files or commits. The repository has a public remote.",
+                "Owner decision, 2026-10-18: Telegram replies to the owner, card bodies, comments, handoffs, "
+                "`repair_history`, and memory may quote or summarize this content.",
+                "A leak into a tracked file or commit is a material defect even when everything else passes. "
+                "Reviewers reject it; the controller never integrates it.",
                 "Never overwrite, rename, or delete an existing draft",
                 "Keep at most one open writing-round card per company slug",
                 "nothing is ever pushed",
