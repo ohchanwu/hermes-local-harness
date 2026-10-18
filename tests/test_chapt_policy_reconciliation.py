@@ -13,9 +13,17 @@ ROOT = Path(__file__).resolve().parents[1]
 RELATIVE = "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md"
 SOURCE = ROOT / "policies/profile-skills/chapt-orchestrator" / RELATIVE
 BASELINE_SHA256 = "3fa1151192959b77e23921a813994517cb3cad8c655c901e425f0f958fb7674c"
+PRE_PORT_SHA256 = "575419e386187a028b7c449bf6da7f298e88dfa3d4250619c06caa8d5a52e330"
 RULE_SHA256 = "0b3349307eaaf7bc4de6716198dfdd5e72d3f99862ee335a0fdc4124ad5e1d5e"
 UPGRADE_SHA256 = "0e9c5f1f07e50dd3653fc51ffba481427bb237d5805d3213aa209169ac64cd94"
-MERGED_SHA256 = "575419e386187a028b7c449bf6da7f298e88dfa3d4250619c06caa8d5a52e330"
+MERGED_SHA256 = "e60d361a5d41f0c864ce1796d107e38a995df76e9449037cb01ed44714b846d7"
+# The 0.6.7-chapt.1 port adds exactly these three sections before their
+# successor headings; dropping them inverts the port byte-exactly.
+PORTED_SECTIONS = (
+    (b"## Card Setup\n", b"## Task Construction\n"),
+    (b"## Autonomy\n", b"## Worker Contract\n"),
+    (b"## Completion Gate\n", b"## Verification\n"),
+)
 HEADING = b"## Operator Effort and Evidence Lifecycle\n\n"
 RULE_START = b"Distinguish worker-stop conditions from controller-disposition points and actual human authorization boundaries."
 
@@ -47,11 +55,26 @@ class ChaptPolicyReconciliationTests(unittest.TestCase):
         self.retained_rule()
 
     def test_entire_reviewed_source_is_preserved(self):
+        self.assertEqual(self.source.count(b"version: 0.6.7-chapt.1\n"), 1)
+        # Invert the 0.6.7-chapt.1 port: remove each added section exactly,
+        # then restore the pre-port version line. Frozen full-source identity,
+        # not a keyword-only preservation claim.
+        original = self.source
+        for start, successor in PORTED_SECTIONS:
+            self.assertEqual(self.source.count(start), 1, start)
+            prefix, rest = original.split(start, 1)
+            added, tail = rest.split(successor, 1)
+            self.assertTrue(added.startswith(b"\nSet up a card without a setup-only hold")
+                            or added.startswith(b"\nBookkeeping never gates")
+                            or added.startswith(b"\nBefore reporting a cha-pt card complete"), added[:60])
+            original = prefix + successor + tail
+        original = original.replace(b"version: 0.6.7-chapt.1\n", b"version: 0.6.5-chapt.4\n", 1)
+        self.assertEqual(digest(original), PRE_PORT_SHA256)
+        # The pre-port reviewed state still contains the retained live-only rule;
+        # removing it recovers the pre-rule-merge baseline, as before this port.
         rule = self.retained_rule()
-        self.assertEqual(self.source.count(b"version: 0.6.5-chapt.4\n"), 1)
-        original = self.source.replace(rule + b"\n", b"", 1).replace(
+        original = original.replace(rule + b"\n", b"", 1).replace(
             b"version: 0.6.5-chapt.4\n", b"version: 0.6.5-chapt.3\n", 1)
-        # Frozen full-source identity, not a keyword-only preservation claim.
         self.assertEqual(digest(original), BASELINE_SHA256)
         self.assertEqual(digest(self.source), MERGED_SHA256)
 

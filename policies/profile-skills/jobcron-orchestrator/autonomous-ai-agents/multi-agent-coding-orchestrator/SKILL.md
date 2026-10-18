@@ -1,7 +1,7 @@
 ---
 name: multi-agent-coding-orchestrator
 description: "Use when orchestrating multi-agent coding with Hermes."
-version: 0.6.8-jobcron.1
+version: 0.6.9-jobcron.1
 author: chanbla11mit, Hermes Agent
 license: MIT
 platforms: [macos]
@@ -46,6 +46,7 @@ Each approach object has exactly `approach_id`, `strategy`, `strategy_sha256`, `
 - `max_attempts_per_approach: 3`: the initial implementation and at most two reviewer-directed corrections. Every completed semantic attempt records a unique 40-hex candidate commit and non-empty independent review run ID.
 - `max_infrastructure_retries_per_attempt: 1`: retry the materially unchanged pending operation once after a provider, process, transport, timeout, unavailable-model, or environment failure. If that retry also fails, the attempt is spent and becomes `infrastructure_failed`; advance within the remaining attempt/approach budget or human-block. An implementation defect is not infrastructure failure.
 - A rejected third attempt cannot be approved. Retire the approach and either begin one recorded materially different approach on the same card or human-block. A third attempt that independently passes may be `approve`.
+- Do not manufacture an architecture pivot to unlock budget for a localized defect in an exhausted approach. If the proportionate repair uses the same strategy, preserve the retirement and request a narrowly explicit same-card owner amendment for the additional attempt; record its exact limit before dispatch. A remaining approach slot does not make a renamed helper or broader rewrite materially different. Unchanged-source revalidation after an infrastructure-failed attempt needs no ceremonial code commit; retain original authorship and count the new verification attempt honestly.
 - Exhausting three approaches always human-blocks under `bounded-convergence-v1`. Further work requires a newly authorized policy version or explicit amended limits on the exact card; retain the complete prior history rather than resetting v1.
 - An approach stop is not a campaign stop. The orchestrator may autonomously reassess and continue within the remaining budget, but user stop, product decisions, credentials/MFA, prohibited or external writes, unsafe state, capability boundaries, and policy/legal/security decisions still human-block immediately.
 
@@ -181,7 +182,7 @@ Before creating a card with `skills`, run the reviewed harness preflight for the
 
 It imports Hermes's installed resolver under that profile's `HERMES_HOME`; it does not parse `hermes skills list` table output and does not start model inference. A nonzero result, including a mixed present/missing request, rejects the card creation. Do not rely on Hermes's current partial-load behavior, which skips unknown names when another requested skill resolves.
 
-Preflight the runtime-effective forced set for every intended lane, not only the creation assignee. Same-card review inherits `task.skills`, and the native dispatcher additionally force-loads `sdlc-review`; include both in the exact reviewer's resolver check before enabling that handoff. Run that check with invocation-local `HERMES_KANBAN_TASK=<actual-card>` and `HERMES_KANBAN_BOARD=<exact-board>` when validating a Kanban lane: environment-scoped skills can be hidden by offer-time discovery outside the worker context even though they are installed and explicitly loadable. Verify existing files and the correct context before diagnosing a missing installation; never overwrite an existing skill to repair a discovery false negative. Do not set worker environment flags globally in the controller. A passing `requesting-code-review` check cannot substitute for missing inherited or auto-added skills. If review capability is unavailable, continue useful authorized artifact preparation while gating review dispatch separately; preserve the existing card and evidence, do not edit the database or another profile's skills/configuration without authorization, and do not reinterpret the control-plane prerequisite as an application failure or a repair-budget reset. Task-scoped policy excerpts are reference data, not proof that a forced skill is installed.
+Preflight the runtime-effective forced set for every intended lane, not only the creation assignee. Before creating a card, first check that intended reviewer skills actually exist; an unnecessary worker-only forced skill can otherwise become an uneditable inherited review blocker. Prefer no card-level forced skill when the worker can load its available procedural skill normally and the reviewer lacks it; never bypass a required review skill or install into another profile without authorization. Same-card review inherits `task.skills`, and the native dispatcher additionally force-loads `sdlc-review`; include both in the exact reviewer's resolver check before enabling that handoff. Run that check with invocation-local `HERMES_KANBAN_TASK=<actual-card>` and `HERMES_KANBAN_BOARD=<exact-board>` when validating a Kanban lane: environment-scoped skills can be hidden by offer-time discovery outside the worker context even though they are installed and explicitly loadable. Verify existing files and the correct context before diagnosing a missing installation; never overwrite an existing skill to repair a discovery false negative. Do not set worker environment flags globally in the controller. A passing `requesting-code-review` check cannot substitute for missing inherited or auto-added skills. If review capability is unavailable, continue useful authorized artifact preparation while gating review dispatch separately; preserve the existing card and evidence, do not edit the database or another profile's skills/configuration without authorization, and do not reinterpret the control-plane prerequisite as an application failure or a repair-budget reset. Task-scoped policy excerpts are reference data, not proof that a forced skill is installed.
 
 After activating a lane and assigning or promoting a card intended to run immediately:
 
@@ -190,6 +191,8 @@ After activating a lane and assigning or promoting a card intended to run immedi
 3. If no new run appears, treat routing as failed: inspect profile existence, active lanes, parents, scheduling, concurrency, and card events. Report the exact blocker; never say the worker started merely because reassignment or promotion succeeded.
 
 Do not force a manual dispatcher pass while the gateway dispatcher is active; observe its normal ticks.
+
+For a completed candidate escalated to `triage` by block-loop detection, preserve the card and artifact: native CLI `promote`, `unblock`, and `request-review` do not accept triage. Use the documented native dashboard PATCH status interface to recover an inactive card to `ready`, then immediately request ordinary same-card review with exact candidate provenance and no forced claim override. Inspect current installed handler semantics first, retain prior events, and verify the result. Do not run auxiliary specification/decomposition merely to exit triage, recreate the graph, or issue raw database edits. If a worker claims during recovery, reconcile its actual identity before any override.
 
 ## Legacy Five-Lane Implementation Pool
 
@@ -228,6 +231,10 @@ Do not remove a running profile from the active allowlist to make room; wait for
 ### Side-by-side
 
 Discuss consequential decisions as they arise. Delegation is preferred for implementation, but no autonomous product run begins merely because a specification exists.
+
+### Documentation-only closeout
+
+A request to write or reorganize specifications and plans includes routine independent documentation/design-readiness review and corrections within that authorized documentation scope. Route the board-designated reviewer automatically after freezing the candidate; do not ask the owner to reauthorize ordinary review, finding resolution, or approved local integration. Preserve a same-card audit trail and require real dispatch/run evidence before reporting review active. Protected-file approval prompts remain separate security gates: obtain consent, never treat a timeout as consent or bypass a refusal. Neither documentation review nor approval grants application implementation, credential, publication, deployment, or live-experiment authority.
 
 ### Autonomous
 
@@ -315,6 +322,20 @@ Shared cleanup and historical impact remain unknown unless directly established:
 
 For broad-test child commands, explicitly remove the project's inspected optional integration activation inputs in each child environment; a shell unset or URL override is insufficient. Separately run required targeted disposable-fixture tests only with inspected ownership/routing and their specifically permitted inputs. Derive names from the actual test surface, not a universal blacklist. Synthetic child tests prove only that command pattern, not live project enforcement.
 
+## Card Setup
+
+Set up a card without a setup-only hold:
+
+1. Create it with `hermes kanban --board jobcron create ... --initial-status blocked` before any notification subscription exists.
+2. Read the new ID and write the exact ID, worktree path, and branch into the body.
+3. Pin the approved baseline commit for that exact card before dispatch.
+4. Subscribe the callback with `hermes kanban --board jobcron notify-subscribe`.
+5. Unblock the card so it becomes `ready`.
+
+Never claim a card and `kanban_block` it as a setup hold. The worker's first action verifies `$HERMES_KANBAN_TASK`, worktree path, branch, and baseline, and it blocks only on a real mismatch.
+
+At creation Hermes records `workspace_path` as the repository root; the dispatcher's claim materializes the repository-owned worktree under `/Users/chanbla11mit/projects/jobcron`. A root value before claim is expected, not a mismatch; rely on the worker's start check.
+
 ## Task Construction
 
 ### Diagnostic convergence
@@ -356,6 +377,43 @@ Estimate the whole worker attempt, not just editing time: repository discovery, 
 - If any prior attempt timed out, increase the cap before the next attempt. Choose a value comfortably above the observed elapsed time and remaining work; do not merely add a few minutes.
 - Prefer a larger bounded cap over splitting work solely to evade the timer. Split into dependent cards only when the stages have real independent acceptance criteria or handoffs.
 - Preserve committed progress and timeout evidence. If the installed Hermes version cannot update an existing card's cap through a supported interface, do not edit the Kanban database directly; create an explicitly linked continuation card with the higher cap and durable handoff, then retire or block the superseded card without losing its audit trail.
+
+## Autonomy
+
+Bookkeeping never gates. Fix malformed `repair_history`, ledger, receipt, or handoff formatting by appending a valid successor that preserves the original. Such a correction is never a completion or integration prerequisite and never an owner question. Semantic gates are unchanged and still block: required tests, exact-candidate independent review, candidate drift, real budgets, and authority/external-write limits.
+
+Never ask the owner about:
+
+- bookkeeping corrections
+- historical test-order disclosures
+- retry or budget accounting
+- infrastructure retries
+- read-only local diagnosis
+- routine same-card rework
+- local integration after approval
+
+Ask only for:
+
+- external writes (push, PR, deploy)
+- credentials or MFA
+- live profile, skill, policy, board, or gateway changes
+- product decisions
+- money or billing
+- genuine capability limits
+- a user stop or resume
+
+These lists never override a Jobcron board-specific control: the local-only repository boundary and scraping rules, repair budgets, incident recovery, user stop, and every credential/MFA, production/deployment, external-write, and protected-file approval gate. A protected-file approval prompt stays a security gate: obtain consent, never treat a timeout as consent or bypass a refusal.
+
+Stale callbacks: run one `kanban_show(..., board: jobcron)`. If the card has already moved past the notified status, reply in at most one line (or say it is already handled) and do nothing else. `notify-subscribe` has no per-event filter (verified from CLI help on 2026-10-17). Filtering would need a Hermes patch, which the upgrade-safety rule forbids.
+
+Proportional handoff checks:
+
+- Trust successful tool results, and do not read back your own comments.
+- Do not re-hash what the reviewer already verified; one exact-candidate/diff check at integration is enough.
+- Keep controller comments to about 5 lines or fewer.
+- Batch independent checks in one response; serialize only when a call depends on an earlier result.
+
+No numeric caps on harmless actions: local reads, local tests, and anonymous public reads already in scope. Keep caps only where a real cost, rate, mutation, or ambiguity risk exists (for example, live model calls and the repair budgets above).
 
 ## Worker Contract
 
@@ -400,16 +458,39 @@ Send only milestone completions, genuine blockers, and approval requests. Do not
 - For Hermes plugin or service specifications, validate every required hook and payload against the installed source or current official documentation on each emitting surface. CLI, TUI, gateway, and automatic lifecycle paths can expose different identifiers and ordering.
 - Standard `kanban_request_changes` immediately routes back to the original implementer; use a structured block for tier escalation to prevent a reassignment race. A normal unblock preserves review provenance and returns to review, so escalation must reassign and then explicitly promote the card to `ready`.
 - Hermes's global `kanban.max_in_progress` counts review tasks. Do not use it for the implementation-only cap; enforce the active profile pool instead.
-- Profile isolation does not isolate files. Every code-changing card needs its own worktree.
+- Profile isolation does not isolate files. Every code-changing card needs its own worktree. For an already-created worktree, prefer `workspace_kind: dir` with its exact path; native `worktree` allocation can replace a supplied path on claim. Verify the claimed path and branch against the body before edits, and reconcile any mismatch on the same card rather than accepting a different workspace receipt.
+- A native `crashed`/exited-worker receipt does not by itself prove the former process is dead. Before accepting a retry into the same worktree, reconcile the recorded old and replacement PIDs against observed process identity/start time and cwd. If both owners remain active, fence further edits/effects and resolve ownership through supported controls; never kill an unverified/reused PID. Preserve any false-death/overlap discrepancy on the existing card, retain budget history and partial work, and continue only after one active owner is observed.
+- Bind test evidence to the actual command cwd, including temporary parent-source archives, rather than a recorder's hardcoded primary worktree. Audit claimed RED-before-fix ordering against the original tool protocol and observed source-change/GREEN timestamps; a log title cannot establish chronology. Preserve each failed output under an immutable unique name instead of deleting/replacing it; if replacement already occurred, retain the recovered original protocol and explicitly mark the file-custody loss rather than recreating the deleted file.
+- Do not declare crashed-worker evidence lost merely because the advertised profile scratch is empty. Resolve the actual task command's inherited `TMPDIR` and output paths, read only the task-specific originals, and preserve them unchanged in native attachments with explicit source/exit/environment limitations. A pipeline's `ok` text or a post-hoc baseline reproduction cannot manufacture an original exit receipt, source binding, or historical RED-before-implementation ordering; forbid stash/reset gymnastics solely to recreate that history. Put new output under the exact worker's own scratch and reuse attributable evidence without gratuitous matrix replay.
+- Gate a host-run native database suite on the exact disposable fixture's effective host mapping, host TCP reachability and authenticated host-side SQL, not in-container `pg_isready` or SQL alone. Preserve setup failures distinctly from product/TDD RED, and stop at the connectivity boundary instead of generating a suite-wide connection-refused cascade. A requested loopback binding is not proof Docker actually published it; inspect effective mapping before tests. Keep provider/scraper denial explicit when changing fixture-network topology rather than assuming a bridge is egress-isolated.
+- Inspect integration-test fixture routing before enabling optional database inputs. A URL override does not prove isolation: a test may check the disposable URL while its subprocess hard-codes an existing managed service. Scope owned fixture URLs to inspected targeted packages. For EVERY Jobcron broad-suite launch, clear optional inputs at that exact invocation with `env -u JOBCRON_TEST_POSTGRES_URL -u JOBCRON_RERATE_BROWSER_PROBE -u JOBCRON_RERATE_PROBE_OUT` and clear any new opt-ins too; do not rely on an earlier shell `unset` or exported environment surviving a fresh/background shell. Record effective opt-in presence value-blindly before launch. Preserve a fixture-boundary incident separately from code correctness and fence further unsafe effects. Classify assessment and cleanup separately: perform a useful, authorized, narrowly project-scoped non-secret read-only assessment without inventing a fresh approval gate; retain genuine protected-access/shared-mutation gates. A worker execution fence is not automatically a controller diagnosis ban, and unresolved cleanup does not block independent authorized work without an evidenced dependency. Owned cleanup is not proof or authorization of shared cleanup. Preserve global user-stop behavior.
+- For custody-sensitive runner tests, set invocation-local `TMPDIR` to a newly created controller-owned mode-0700 directory with real, non-symlink ancestry; macOS terminal tools can inherit `/var/...` despite the advertised profile scratch path, and `/var` is a symlink. Disable bytecode writes with `PYTHONDONTWRITEBYTECODE=1` when testing canonical source. Preserve prerequisite refusal logs and correct only the test environment, never weaken custody checks or treat an unexecuted test body as a semantic rejection. Use tracked notifying background execution for measured suites that exceed the foreground tool window; an API timeout is not evidence that its actor stopped. Verify old process identity/absence before another invocation, and reuse complete unaffected package results rather than repeating the whole suite.
 - Apply Incident recovery at fixture-boundary failures; keep incident effects separate from code correctness. Inspect subprocess scripts, which can hard-code an existing managed service. Reported cleanup neither authorizes the original access nor bypasses an independent HUMAN_BLOCK.
 - When canonical `gofmt -l .` reports only ignored evidence inside nested worktrees, preserve those files and the literal command result; check all Git-indexed Go files separately instead of editing private historical fixtures or treating them as application defects. Never claim the literal command was empty. A canonical rebuild without `-trimpath` can differ in bytes from an exact-tree nested-worktree build because compile paths differ: record separate hashes and source/version bindings, exercise the canonical artifact, and reuse unchanged source-bound review evidence without claiming binary identity.
 - Resolve handoff filenames from the native run's submitted artifact paths before comparing hashes. A prepared `.md` placeholder may coexist with an authored `.txt` or `.json` deliverable; preserve both and verify the exact submitted bytes before diagnosing wrong placement or requesting revision.
+- Store recurring evidence basenames under run-scoped attachment names with `hermes kanban --board <project> attach <task> <original-path> --name <run-scoped-name>`; verify the stored bytes against the untouched original and refuse to overwrite a prior run's path. A successor report or manifest must not silently replace the earlier attachment's custody.
+- When required native lifecycle coverage cannot be reached with compiled metadata, distinguish a real product decision from missing synthetic-input testability. Use bounded independent contract classification before adding a seam or waiving coverage; an UNKNOWN saved ID is not deprecated acknowledgement, and pure helper tests are not authenticated native save proof. If original fixture authority permits a narrow private instance-local supplier, explicitly bind its scope, identical nil/default behavior, fresh-copy/isolation controls and unchanged runtime/security boundaries before continuation. Keep classification separate from CODE acceptance and preserve the same pending attempt/counters; never mutate production catalogue facts or invent unreachable producer sequences merely to make tests pass.
+- Resolve contradictory terminal/notification requirements against the original approved contract through bounded independent classification before demanding a new architecture or owner decision. A recovery callback that can fail only after observing a truthful immutable terminal cannot retroactively change that terminal without violating exactly-once semantics; distinguish it narrowly from still-owned pre-terminal work and other unfinished scopes. Preserve the disputed raw failure, require separately named corrected controls, and retain real operation-failure requirements plus subsequent independent code review. If no successor or semantic rejection occurred, resume the same pending uncommitted attempt after verified interpretation without inventing an attempt, infrastructure retry or green result. Actual product/security changes still require human approval.
+- Respect attachment size caps before recursively nesting prior evidence archives. Reference an already-durable native attachment by exact task/id/name/hash/size after rechecking stored/source bytes and CRC, while including every unique current artifact and explicit provenance links. Preserve an oversized producer archive/nonpass distinctly; repackaging duplicate bytes is not a new code-validation result, semantic attempt or infrastructure retry.
+- Resolve virtual archive prefixes through an explicit source-path map before asserting evidence loss or byte equality; archive paths such as checks/, final-source/ and recovered originals need not be direct siblings. Validate every member against its real original and bind committed source snapshots to Git blobs separately; a verifier mapping failure is not a semantic implementation failure or retry-budget reset.
+- Verify stored evidence against the original worker file's SHA256 and validate ZIP/gzip CRC before declaring custody; successful attachment, matching size, or readable plain text does not prove byte identity. If an inline attachment differs or fails CRC, preserve that copy and attach the intact original through the native file-path CLI under a distinct filename, then verify the stored hash. Never reconstruct test logs, assume sibling attachments are intact, blame a transport without evidence, or turn a corrected evidence-copy problem into a semantic rejection or repair-budget reset.
 - A skill installed only under `default` cannot be force-loaded by a worker profile. Put the minimum role contract in each worker's `SOUL.md` and card.
 - Never copy OpenAI Codex OAuth stores between profiles. Complete separate authorization when a profile needs an independent grant.
 - Do not manually force `hermes kanban dispatch` while the gateway-embedded dispatcher is already active merely to accelerate a handoff. Let the next gateway tick claim it; overlapping immediate ticks can produce a short-lived duplicate/protocol-violation retry even though the board lock preserves correctness.
 - Inspect the actual persisted/CLI JSON schema rather than assuming tool-view fields are stored verbatim. CLI `show --json` can wrap the card under `task`; a reviewer-owned closed card can retain the reviewer as assignee. A completed native run can be stored as `status: done` plus `outcome: completed`, rather than `status: completed`. Match the actual board/profile/workspace and durable outcome before accepting a receipt. `hermes kanban --board <project> show <id> --json` may omit tool-added `unsatisfied_parents` and comment `id`; verify dependencies from listed parents' current states and comment writes by exact author/body. Native cron may render `continuity: true` from persisted `context_from`, without a stored `continuity` key; self-continuity can be stored literally as `["self"]`, not as the job ID. Verify the actual context source and exact owner-profile job/script/workdir; a local verifier's missing-field error is not a task, scheduler, or product failure.
 - Treat `tmux capture-pane` text as rendered terminal data: trailing prompt spaces may be trimmed. Match a fixed masked-input label without its trailing space and confirm it is the last nonempty line, with no anchored exit or consumption marker. Trace the actual prompt call into its delegated helper before deriving labels; an entrypoint can delegate to a module's `prompt()` rather than contain any `getpass()` calls. If a post-launch presence assertion fails, inspect the exact pane and phase value-blindly before any retry; preserve the original receipt and record the verifier correction separately instead of relaunching a healthy waiting process.
 - Do not enable automatic decomposition until observed use shows manual decomposition is the bottleneck.
+
+## Completion Gate
+
+Before reporting a jobcron card complete, check semantic validity, not bookkeeping-format validity:
+
+- The board, repository, worktree, baseline, assignee, reviewer, and test contract match the card.
+- Required focused and broader tests pass.
+- The candidate commit is reviewed by `jobcron-reviewer` on the same card.
+- The approved change is locally integrated or an exact integration blocker is recorded.
+- Git and `kanban_show(..., board: jobcron)` agree on the result.
+- No unauthorized push, PR, deployment, policy rollout, credential operation, production/cloud mutation, or external write occurred.
 
 ## Verification
 

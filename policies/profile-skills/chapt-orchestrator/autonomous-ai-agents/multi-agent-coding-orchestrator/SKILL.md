@@ -1,7 +1,7 @@
 ---
 name: multi-agent-coding-orchestrator
 description: "Use when orchestrating multi-agent coding with Hermes."
-version: 0.6.5-chapt.4
+version: 0.6.7-chapt.1
 author: chanbla11mit, Hermes Agent
 license: MIT
 platforms: [macos]
@@ -315,6 +315,20 @@ When the user refers to another session, "the spec," or prior work from another 
 
 Completion criterion: the next action is grounded in current files, Git state, active lanes, and board state rather than transcript memory.
 
+## Card Setup
+
+Set up a card without a setup-only hold:
+
+1. Create it with `hermes kanban --board cha-pt create ... --initial-status blocked` before any notification subscription exists.
+2. Read the new ID and write the exact ID, worktree path, and branch into the body.
+3. Pin the approved baseline commit for that exact card before dispatch.
+4. Subscribe the callback with `hermes kanban --board cha-pt notify-subscribe`.
+5. Unblock the card so it becomes `ready`.
+
+Never claim a card and `kanban_block` it as a setup hold. The worker's first action verifies `$HERMES_KANBAN_TASK`, worktree path, branch, and baseline, and it blocks only on a real mismatch.
+
+At creation Hermes records `workspace_path` as the repository root; the dispatcher's claim materializes the repository-owned worktree under the card's one allowlisted repository (`/Users/chanbla11mit/projects/cha-pt` or a `cha-pt-frontend` project worktree). A root value before claim is expected, not a mismatch; rely on the worker's start check.
+
 ## Task Construction
 
 ### Diagnostic convergence
@@ -356,6 +370,43 @@ Estimate the whole worker attempt, not just editing time: repository discovery, 
 - If any prior attempt timed out, increase the cap before the next attempt. Choose a value comfortably above the observed elapsed time and remaining work; do not merely add a few minutes.
 - Prefer a larger bounded cap over splitting work solely to evade the timer. Split into dependent cards only when the stages have real independent acceptance criteria or handoffs.
 - Preserve committed progress and timeout evidence. If the installed Hermes version cannot update an existing card's cap through a supported interface, do not edit the Kanban database directly; create an explicitly linked continuation card with the higher cap and durable handoff, then retire or block the superseded card without losing its audit trail.
+
+## Autonomy
+
+Bookkeeping never gates. Fix malformed `repair_history`, ledger, receipt, or handoff formatting by appending a valid successor that preserves the original. Such a correction is never a completion or integration prerequisite and never an owner question. Semantic gates are unchanged and still block: required tests, exact-candidate independent review, candidate drift, real budgets, and authority/external-write limits.
+
+Never ask the owner about:
+
+- bookkeeping corrections
+- historical test-order disclosures
+- retry or budget accounting
+- infrastructure retries
+- read-only local diagnosis
+- routine same-card rework
+- local integration after approval
+
+Ask only for:
+
+- external writes (push, PR, deploy)
+- credentials or MFA
+- live profile, skill, policy, board, or gateway changes
+- product decisions
+- money or billing
+- genuine capability limits
+- a user stop or resume
+
+These lists never override a Cha PT board-specific control: frontend operator-protected paths and the frontend `AGENTS.md` rules, clinical/nonempty-data, production/deployment, credential/MFA, external-write, repair budgets, incident recovery, and user stop. A protected-file approval prompt stays a security gate: obtain consent, never treat a timeout as consent or bypass a refusal.
+
+Stale callbacks: run one `kanban_show(..., board: cha-pt)`. If the card has already moved past the notified status, reply in at most one line (or say it is already handled) and do nothing else. `notify-subscribe` has no per-event filter (verified from CLI help on 2026-10-17). Filtering would need a Hermes patch, which the upgrade-safety rule forbids.
+
+Proportional handoff checks:
+
+- Trust successful tool results, and do not read back your own comments.
+- Do not re-hash what the reviewer already verified; one exact-candidate/diff check at integration is enough.
+- Keep controller comments to about 5 lines or fewer.
+- Batch independent checks in one response; serialize only when a call depends on an earlier result.
+
+No numeric caps on harmless actions: local reads, local tests, and anonymous public reads already in scope. Keep caps only where a real cost, rate, mutation, or ambiguity risk exists (for example, live model calls and the repair budgets above).
 
 ## Worker Contract
 
@@ -415,6 +466,17 @@ Send only milestone completions, genuine blockers, and approval requests. Do not
 - Pause the owned supervisor before taking interactive integration/release ownership, then re-read exact Git/card/events: pausing future fires does not cancel an already-in-flight wake. Reuse its valid approved integration, evidence and existing dependent cards; supersede ownership durably and do not create duplicates, repeat completed gates or reset artifacts. If a newer hold causes a worker to stop, classify it as intentional controller steering, not semantic or infrastructure failure; resume through one exact release and verify a new run receipt.
 - Treat a native `crashed` / PID-not-alive receipt as claim history, not proof that the old worker exited. Before a retry shares its worktree or SQL/fault resource, verify the original PID, exact profile/task command, cwd and descendants directly. Capture recorded and fresh process fingerprints before termination when safely available; otherwise a later strict-comparison or clock-drift explanation remains a hypothesis, not a proved cause. Fence and terminate only a proven stale owned process tree, verify non-execution/exit, and leave the genuine current owner, committed artifacts and evidence untouched; otherwise a falsely reclaimed worker can resume alongside its replacement. If the actual card is already blocked/gave_up, respect that state instead of a notification promising retry, pause the owned supervisor, and preserve unfinished independent RED probes as well as passing broad-suite evidence; no final semantic verdict means no approval or integration.
 - Do not enable automatic decomposition until observed use shows manual decomposition is the bottleneck.
+
+## Completion Gate
+
+Before reporting a cha-pt card complete, check semantic validity, not bookkeeping-format validity:
+
+- The board, repository, worktree, baseline, assignee, reviewer, and test contract match the card.
+- Required focused and broader tests pass.
+- The candidate commit is reviewed by `chapt-reviewer` on the same card.
+- The approved change is locally integrated or an exact integration blocker is recorded.
+- Git and `kanban_show(..., board: cha-pt)` agree on the result.
+- No unauthorized push, PR, deployment, policy rollout, credential operation, production/cloud mutation, or external write occurred.
 
 ## Verification
 
