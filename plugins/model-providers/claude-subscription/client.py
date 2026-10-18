@@ -404,6 +404,7 @@ class ClaudeSubscriptionClient:
                                         f"Claude CLI {version_text(self._cli_version)} may reject a flag: run smoke.py)") from None
                 if restored is not None:
                     self.audit.append({"stage": "rebuild", "messages": len(restored), "tail": last["role"],
+                                       "skipped_leading": self._history.skipped,
                                        "sha256": hashlib.sha256(json.dumps(text).encode()).hexdigest()})
                     log.warning("claude-subscription rebuilt a session from a %d-message transcript", len(restored))
                 else:
