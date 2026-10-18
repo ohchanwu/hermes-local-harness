@@ -194,6 +194,7 @@ PROFILE_SOUL_PATHS = {
     for profile in (
         "chapt-orchestrator", "chapt-worker", "chapt-reviewer",
         "harness-orchestrator", "harness-worker", "harness-reviewer",
+        "jobcron-orchestrator",
         "jss-orchestrator", "jss-worker", "jss-reviewer",
     )
 }

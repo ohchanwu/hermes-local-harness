@@ -135,6 +135,14 @@
         "baseline": "1799a9b728681c3672fc29239dff9bf5564280f4",
         "protected_reference": "refs/harness/baselines/t_f953035b",
         "status": "repository-only GLM worker retirement and desired-source pins, not observed deployment; live dispatch removal performed by the controller 2026-10-18; live SOUL/skill rollout pending"
+      },
+      "glm_retirement_followup": {
+        "baseline": "0bca93283a8030e729ec82c05a0c64e8958bfabd",
+        "protected_reference": "refs/harness/baselines/t_56d81c3a",
+        "upstream_live_sha256": {
+          "jobcron-orchestrator/SOUL.md": "c1a69bf14dccd1ea413ba4002ae7526af7fbb38f40d125e617608d0e42c306ea"
+        },
+        "status": "repository-only jobcron-orchestrator SOUL tracking and legacy-lane skill notes with desired-source pins, not observed deployment; live SOUL/skill rollout pending"
       }
     },
     "policy_version": "scoped-ponytail-separation-v1",
@@ -270,10 +278,10 @@
         "software-development/test-driven-development/SKILL.md": "9e9a4bb630506f4f3b4ff19cca80bb464e57db19b8a175959388d2112fc096ff"
       },
       "jobcron-orchestrator": {
-        "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md": "77ec7176249e2a126b02c2833396c70fc0a9c98f6922d002664041020e4b628c"
+        "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md": "3490572d31ef930ef57257fad092d99ba34d799fb0579c87629d41e4f0f127ea"
       },
       "chapt-orchestrator": {
-        "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md": "b6b80cef78fbcade77043e05de07a0382c0e1e94c705180c89869287f9696892"
+        "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md": "ff0a7f380f77ede2e429c497329fea3a4660889a5dc2801e4072cb62bb66a0c2"
       },
       "harness-orchestrator": {
         "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md": "929e89dc132b34b47bc85e64769c7c272bf8b11c44302c58f67dfaa376e4336a"
@@ -417,6 +425,11 @@
       "source": "policies/profile-souls/harness-reviewer/SOUL.md",
       "live": "/Users/chanbla11mit/.hermes/profiles/harness-reviewer/SOUL.md",
       "sha256": "3fb47b43935d4856e24b4722ed809b666abcdb4d76453d1318a9f480482bd176"
+    },
+    "jobcron-orchestrator": {
+      "source": "policies/profile-souls/jobcron-orchestrator/SOUL.md",
+      "live": "/Users/chanbla11mit/.hermes/profiles/jobcron-orchestrator/SOUL.md",
+      "sha256": "d05684af5981060323ddff999f05c22d845fecac44ae7690f580ba510e45d5fa"
     },
     "jss-orchestrator": {
       "source": "policies/profile-souls/jss-orchestrator/SOUL.md",

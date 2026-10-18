@@ -738,6 +738,11 @@
       "live": "/Users/chanbla11mit/.hermes/profiles/harness-reviewer/SOUL.md",
       "sha256": "3fb47b43935d4856e24b4722ed809b666abcdb4d76453d1318a9f480482bd176"
     },
+    "jobcron-orchestrator": {
+      "source": "policies/profile-souls/jobcron-orchestrator/SOUL.md",
+      "live": "/Users/chanbla11mit/.hermes/profiles/jobcron-orchestrator/SOUL.md",
+      "sha256": "d05684af5981060323ddff999f05c22d845fecac44ae7690f580ba510e45d5fa"
+    },
     "jss-orchestrator": {
       "source": "policies/profile-souls/jss-orchestrator/SOUL.md",
       "live": "/Users/chanbla11mit/.hermes/profiles/jss-orchestrator/SOUL.md",

@@ -25,6 +25,9 @@ FLEETS = {"jobcron": "jobcron", "cha-pt": "chapt", "harness": "harness", "jss-ge
 GLM = tuple(f"{prefix}-worker-glm-{n}" for prefix in FLEETS.values() for n in (1, 2))
 GLM_NAME = re.compile(r"\b(?:jobcron|chapt|harness|jss)-worker-glm-\d\b")
 GLM_LANE = re.compile(r"(?i)GLM Full workers?|idle GLM worker|both GLM workers|GLM workers may|three-(?:worker|profile) pool")
+# Legacy/default-board GLM lanes archived 2026-10-18 (t_56d81c3a).
+LEGACY_GLM_NAME = re.compile(r"\bworker-flash-\d\b|\bworker-glm-full\b")
+LEGACY_LANE_LIST = re.compile(r"(?i)implementation profiles, in escalation order|control profiles remain installed")
 RELATIVE = "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md"
 PROFILE_SKILLS = {
     profile: ROOT / "policies/profile-skills" / profile / RELATIVE
@@ -32,13 +35,23 @@ PROFILE_SKILLS = {
 }
 SHARED_SKILL = ROOT / "skills/multi-agent-coding-orchestrator/SKILL.md"
 VERSIONS = {
-    PROFILE_SKILLS["jobcron-orchestrator"]: "0.6.9-jobcron.2",
-    PROFILE_SKILLS["chapt-orchestrator"]: "0.6.7-chapt.2",
+    PROFILE_SKILLS["jobcron-orchestrator"]: "0.6.9-jobcron.3",
+    PROFILE_SKILLS["chapt-orchestrator"]: "0.6.7-chapt.3",
     PROFILE_SKILLS["harness-orchestrator"]: "0.6.7-harness.2",
     PROFILE_SKILLS["jss-orchestrator"]: "0.6.7-jss.2",
     SHARED_SKILL: "0.6.9",
 }
 PROCEDURE = ROOT / "procedures/switching-hermes-models.md"
+JOBCRON_SOUL = ROOT / "policies/profile-souls/jobcron-orchestrator/SOUL.md"
+JOBCRON_SOUL_LIVE = "/Users/chanbla11mit/.hermes/profiles/jobcron-orchestrator/SOUL.md"
+# The upstream live SOUL read once for t_56d81c3a; the tracked copy differs only
+# by removing the two GLM workers from the implementation pool.
+JOBCRON_SOUL_UPSTREAM_SHA256 = "c1a69bf14dccd1ea413ba4002ae7526af7fbb38f40d125e617608d0e42c306ea"
+JOBCRON_SOUL_EDIT = (
+    b"Assign implementation only to `jobcron-worker`; assign same-card review only to `jobcron-reviewer`.",
+    b"Assign implementation only to the Jobcron pool: `jobcron-worker`, `jobcron-worker-glm-1`, or "
+    b"`jobcron-worker-glm-2`; assign same-card review only to `jobcron-reviewer`.",
+)
 RETIREMENT_FIXTURE = "retired-glm-dispatch-drift.yaml"
 CURRENT_STATE_DOCS = (
     "adoption/cha-pt.md", "adoption/harness.md", "adoption/jobcron.md", "adoption/jss-genr.md",
@@ -50,6 +63,10 @@ CURRENT_STATE_DOCS = (
 
 def sha(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def sha_bytes(content):
+    return hashlib.sha256(content).hexdigest()
 
 
 def load(path):
@@ -165,10 +182,45 @@ class PolicyText(unittest.TestCase):
         for prefix in FLEETS.values():
             for role in ("orchestrator", "reviewer"):
                 path = ROOT / f"policies/profile-souls/{prefix}-{role}/SOUL.md"
-                if not path.is_file():  # jobcron-orchestrator has no tracked SOUL
-                    continue
                 with self.subTest(profile=f"{prefix}-{role}"):
+                    self.assertTrue(path.is_file())
                     self.assertIn(f"`{prefix}-worker`", path.read_text())
+
+    def test_no_repo_soul_names_a_glm_or_legacy_glm_lane(self):
+        souls = sorted((ROOT / "policies/profile-souls").glob("*/SOUL.md"))
+        self.assertIn(JOBCRON_SOUL, souls)
+        for path in souls:
+            text = path.read_text()
+            with self.subTest(soul=path.parent.name):
+                self.assertIsNone(GLM_NAME.search(text))
+                self.assertIsNone(LEGACY_GLM_NAME.search(text))
+
+    def test_jobcron_orchestrator_soul_routes_only_to_its_worker(self):
+        text = JOBCRON_SOUL.read_bytes()
+        self.assertEqual(text.count(JOBCRON_SOUL_EDIT[0]), 1)
+        self.assertNotIn(b"glm", text.lower())
+        self.assertIn(b"assign same-card review only to `jobcron-reviewer`", text)
+        # Every other byte is the upstream live SOUL, verbatim.
+        self.assertEqual(sha_bytes(text.replace(*JOBCRON_SOUL_EDIT, 1)), JOBCRON_SOUL_UPSTREAM_SHA256)
+
+    def test_no_orchestrator_skill_names_a_legacy_glm_lane(self):
+        for path in PROFILE_SKILLS.values():
+            text = path.read_text()
+            with self.subTest(path=str(path.relative_to(ROOT))):
+                self.assertIsNone(GLM_NAME.search(text))
+                self.assertIsNone(LEGACY_GLM_NAME.search(text))
+                self.assertIsNone(LEGACY_LANE_LIST.search(text))
+        for profile in ("jobcron-orchestrator", "chapt-orchestrator"):
+            text = PROFILE_SKILLS[profile].read_text()
+            with self.subTest(note=profile):
+                note = next(p for p in text.split("\n\n") if p.startswith("Legacy/default-board lanes are retired"))
+                for marker in ("retired and inert", "2026-10-18", "`reviewer-sol`",
+                               "Never assign, escalate, or route review to them.",
+                               "`~/.hermes/profile-exports/`", "`procedures/switching-hermes-models.md`"):
+                    self.assertIn(marker, note)
+                self.assertIn("\n- `advisor`: read/analyze advisor; not a Kanban implementation lane.\n", text)
+                self.assertNotIn("`default`: legacy", text)
+                self.assertNotIn("rollback/spare lane", text)
 
     def test_skills_route_only_to_the_remaining_worker(self):
         for path, version in VERSIONS.items():
@@ -228,6 +280,29 @@ class Pins(unittest.TestCase):
         self.assertEqual(provenance["baseline"], "1799a9b728681c3672fc29239dff9bf5564280f4")
         self.assertEqual(provenance["protected_reference"], "refs/harness/baselines/t_f953035b")
         self.assertIn("not observed deployment", provenance["status"])
+        followup = self.snapshot["skill"]["source_pin_provenance"]["glm_retirement_followup"]
+        self.assertEqual(followup["baseline"], "0bca93283a8030e729ec82c05a0c64e8958bfabd")
+        self.assertEqual(followup["protected_reference"], "refs/harness/baselines/t_56d81c3a")
+        self.assertEqual(followup["upstream_live_sha256"],
+                         {"jobcron-orchestrator/SOUL.md": JOBCRON_SOUL_UPSTREAM_SHA256})
+        self.assertIn("not observed deployment", followup["status"])
+
+    def test_jobcron_orchestrator_soul_is_pinned(self):
+        entry = self.roster["profile_souls"]["jobcron-orchestrator"]
+        self.assertEqual(entry, {
+            "source": "policies/profile-souls/jobcron-orchestrator/SOUL.md",
+            "live": JOBCRON_SOUL_LIVE,
+            "sha256": sha(JOBCRON_SOUL),
+        })
+        self.assertEqual(self.snapshot["profile_souls"]["jobcron-orchestrator"], entry)
+        verifier = load_verifier()
+        self.assertEqual(verifier.PROFILE_SOUL_PATHS["jobcron-orchestrator"],
+                         {"source": entry["source"], "live": entry["live"]})
+        self.assertEqual(quiet(verifier.check_profile_souls, self.roster["profile_souls"]), [])
+        drifted = {profile: soul["sha256"] for profile, soul in self.roster["profile_souls"].items()}
+        drifted["jobcron-orchestrator"] = JOBCRON_SOUL_UPSTREAM_SHA256  # the undeployed live GLM pool
+        self.assertEqual(quiet(verifier.check_profile_souls, self.roster["profile_souls"], drifted),
+                         ["profile SOUL drift jobcron-orchestrator"])
 
     def test_fixture_pins_and_observations(self):
         souls = {profile: entry["sha256"] for profile, entry in self.roster["profile_souls"].items()}

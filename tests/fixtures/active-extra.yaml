@@ -479,10 +479,10 @@
       "software-development/test-driven-development/SKILL.md": "9e9a4bb630506f4f3b4ff19cca80bb464e57db19b8a175959388d2112fc096ff"
     },
     "jobcron-orchestrator": {
-      "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md": "77ec7176249e2a126b02c2833396c70fc0a9c98f6922d002664041020e4b628c"
+      "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md": "3490572d31ef930ef57257fad092d99ba34d799fb0579c87629d41e4f0f127ea"
     },
     "chapt-orchestrator": {
-      "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md": "b6b80cef78fbcade77043e05de07a0382c0e1e94c705180c89869287f9696892"
+      "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md": "ff0a7f380f77ede2e429c497329fea3a4660889a5dc2801e4072cb62bb66a0c2"
     },
     "harness-orchestrator": {
       "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md": "929e89dc132b34b47bc85e64769c7c272bf8b11c44302c58f67dfaa376e4336a"
@@ -608,6 +608,7 @@
     "harness-orchestrator": "e48129502bfee166cf9bc2e0c97abf3163e8fbbe6aebf7f133aa3305131fa968",
     "harness-worker": "8ee6127b833f8278b3ed3932aa05c77cac917ee8391ccc633474b4ce8fc1ef61",
     "harness-reviewer": "3fb47b43935d4856e24b4722ed809b666abcdb4d76453d1318a9f480482bd176",
+    "jobcron-orchestrator": "d05684af5981060323ddff999f05c22d845fecac44ae7690f580ba510e45d5fa",
     "jss-orchestrator": "91ac0736c53de7e8e0ef4ab6209a2b6b11b5ed743b17a6205bab31c1634cb7e1",
     "jss-worker": "a3c4e1fe3881c0ed9eedb8b7c258c3fa399328e26e3a18703cf4ce22b3a7e2f4",
     "jss-reviewer": "52490695d59094b54bf136045698085574f8317ca6f419f9c54e2a559c147e36"

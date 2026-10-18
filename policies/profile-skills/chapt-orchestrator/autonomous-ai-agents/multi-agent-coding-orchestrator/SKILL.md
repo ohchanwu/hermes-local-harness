@@ -1,7 +1,7 @@
 ---
 name: multi-agent-coding-orchestrator
 description: "Use when orchestrating multi-agent coding with Hermes."
-version: 0.6.7-chapt.2
+version: 0.6.7-chapt.3
 author: chanbla11mit, Hermes Agent
 license: MIT
 platforms: [macos]
@@ -59,22 +59,9 @@ Each approach object has exactly `approach_id`, `strategy`, `strategy_sha256`, `
 - Exhausting three approaches always human-blocks under `bounded-convergence-v1`. Further work requires a newly authorized policy version or explicit amended limits on the exact card; retain the complete prior history rather than resetting v1.
 - An approach stop is not a campaign stop. The orchestrator may autonomously reassess and continue within the remaining budget, but user stop, product decisions, credentials/MFA, prohibited or external writes, unsafe state, capability boundaries, and policy/legal/security decisions still human-block immediately.
 
-Legacy/default-board control profiles remain installed for rollback and existing history:
+Legacy/default-board lanes are retired and inert: the GLM Flash and GLM-full workers were archived on 2026-10-18 and the GPT Luna, Terra, Sol and Astra workers and `reviewer-sol` were retired the same day. Never assign, escalate, or route review to them. Archived copies are in `~/.hermes/profile-exports/`; restore one only per `procedures/switching-hermes-models.md`.
 
-- `default`: legacy `gpt-5.6-sol` orchestrator and user-facing profile.
-- `reviewer-sol`: legacy `gpt-5.6-sol` independent reviewer.
 - `advisor`: read/analyze advisor; not a Kanban implementation lane.
-
-Legacy/default-board implementation profiles, in escalation order:
-
-1. `worker-flash-1`, `worker-flash-2`, `worker-flash-3`: Z.AI `glm-5.3-flash`.
-2. `worker-luna-1`, `worker-luna-2`: OpenAI Codex `gpt-5.6-luna`.
-3. `worker-terra-1`: OpenAI Codex `gpt-5.6-terra`.
-4. `worker-glm-full`: Z.AI `glm-5.3`.
-5. `worker-sol`: OpenAI Codex `gpt-5.6-sol`.
-6. `worker-astra`: OpenAI Codex `gpt-6-astra`.
-
-Keep `worker-terra-2` installed but dormant as a rollback/spare lane. It is outside the active legacy roster unless the human changes the policy.
 
 The escalation ladder and terminal-retry rules below apply only to cards that explicitly use the legacy/default-board roster. Project-isolated Jobcron and Cha PT cards use their five-profile fleets and never fall through to a legacy profile.
 
