@@ -29,7 +29,12 @@
     "harness-worker",
     "harness-worker-glm-1",
     "harness-worker-glm-2",
-    "harness-reviewer"
+    "harness-reviewer",
+    "jss-orchestrator",
+    "jss-worker",
+    "jss-worker-glm-1",
+    "jss-worker-glm-2",
+    "jss-reviewer"
   ],
   "approvals": {
     "mode": "off",
@@ -61,7 +66,12 @@
       "harness-worker",
       "harness-worker-glm-1",
       "harness-worker-glm-2",
-      "harness-reviewer"
+      "harness-reviewer",
+      "jss-orchestrator",
+      "jss-worker",
+      "jss-worker-glm-1",
+      "jss-worker-glm-2",
+      "jss-reviewer"
     ]
   },
   "kanban": {
@@ -81,7 +91,11 @@
       "harness-worker",
       "harness-worker-glm-1",
       "harness-worker-glm-2",
-      "harness-reviewer"
+      "harness-reviewer",
+      "jss-worker",
+      "jss-worker-glm-1",
+      "jss-worker-glm-2",
+      "jss-reviewer"
     ]
   },
   "plugins": {
@@ -135,6 +149,11 @@
         "installed_input_sha256": "e1e5d81f39353eabc49850354d4d76964587cd8b884de2276751b89018edb4f1",
         "retained_rule_sha256": "0b3349307eaaf7bc4de6716198dfdd5e72d3f99862ee335a0fdc4124ad5e1d5e",
         "status": "repository-only preservation merge and desired-source pin, not observed deployment; live rollout unperformed and live verification pending"
+      },
+      "jss_genr_fleet": {
+        "baseline": "8c9cd47d06f1d71dd5e8c448334aa17ebb050a20",
+        "protected_reference": "refs/harness/baselines/t_c4564182",
+        "status": "repository-only jss-genr fleet definition and desired-source pins, not observed deployment; live setup unperformed and live verification pending"
       }
     },
     "policy_version": "scoped-ponytail-separation-v1",
@@ -149,7 +168,8 @@
           "default",
           "jobcron-orchestrator",
           "chapt-orchestrator",
-          "harness-orchestrator"
+          "harness-orchestrator",
+          "jss-orchestrator"
         ],
         "version": "0.6.8",
         "files": {
@@ -179,7 +199,10 @@
           "chapt-worker-glm-2",
           "harness-worker",
           "harness-worker-glm-1",
-          "harness-worker-glm-2"
+          "harness-worker-glm-2",
+          "jss-worker",
+          "jss-worker-glm-1",
+          "jss-worker-glm-2"
         ],
         "version": "1.0.0",
         "files": {
@@ -208,7 +231,10 @@
           "chapt-worker-glm-2",
           "harness-worker",
           "harness-worker-glm-1",
-          "harness-worker-glm-2"
+          "harness-worker-glm-2",
+          "jss-worker",
+          "jss-worker-glm-1",
+          "jss-worker-glm-2"
         ],
         "version": "1.0.0",
         "files": {
@@ -298,6 +324,9 @@
       },
       "harness-orchestrator": {
         "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md": "ecf1ff7eff2024bedd23c7025c980405e004b81ccc2a866d57e2219bb5e49cd1"
+      },
+      "jss-orchestrator": {
+        "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md": "b7c14cf169aa166b3d5dd711b4abf60f6818fd641c0250deb8f14d5b0d41b624"
       }
     }
   },
@@ -320,6 +349,12 @@
         "path": "/Users/chanbla11mit/hermes-local-harness/docs/specs/261004-concurrent-project-fleets.md",
         "marker": "Status: operational; attended live rollout verified.",
         "record_marker": "Status: operational; attended live rollout verified."
+      },
+      {
+        "repo": "jss-genr",
+        "path": "/Users/chanbla11mit/projects/jss-genr/CLAUDE.md",
+        "marker": "**This repo is pushed publicly.**",
+        "record_marker": "Status: defined in repository source; live setup pending."
       }
     ]
   },
@@ -377,6 +412,21 @@
         "harness-worker-glm-1",
         "harness-worker-glm-2"
       ]
+    },
+    "jss-genr": {
+      "board": "jss-genr",
+      "repository": "/Users/chanbla11mit/projects/jss-genr",
+      "repositories": [
+        "/Users/chanbla11mit/projects/jss-genr"
+      ],
+      "orchestrator": "jss-orchestrator",
+      "worker": "jss-worker",
+      "reviewer": "jss-reviewer",
+      "workers": [
+        "jss-worker",
+        "jss-worker-glm-1",
+        "jss-worker-glm-2"
+      ]
     }
   },
   "project_repair_policy": {
@@ -388,7 +438,8 @@
     "project_boards": [
       "jobcron",
       "cha-pt",
-      "harness"
+      "harness",
+      "jss-genr"
     ]
   },
   "profile_souls": {
@@ -441,6 +492,31 @@
       "source": "policies/profile-souls/harness-reviewer/SOUL.md",
       "live": "/Users/chanbla11mit/.hermes/profiles/harness-reviewer/SOUL.md",
       "sha256": "1f5b2755d75f77f99a757eb8cb7bfdc67cd24887bfbb91815a71f8edbf24b613"
+    },
+    "jss-orchestrator": {
+      "source": "policies/profile-souls/jss-orchestrator/SOUL.md",
+      "live": "/Users/chanbla11mit/.hermes/profiles/jss-orchestrator/SOUL.md",
+      "sha256": "a5b62eeca704b5042038fe0bae42be4360bb1153a873f72c82de759ba7097c18"
+    },
+    "jss-worker": {
+      "source": "policies/profile-souls/jss-worker/SOUL.md",
+      "live": "/Users/chanbla11mit/.hermes/profiles/jss-worker/SOUL.md",
+      "sha256": "a3c4e1fe3881c0ed9eedb8b7c258c3fa399328e26e3a18703cf4ce22b3a7e2f4"
+    },
+    "jss-worker-glm-1": {
+      "source": "policies/profile-souls/jss-worker-glm-1/SOUL.md",
+      "live": "/Users/chanbla11mit/.hermes/profiles/jss-worker-glm-1/SOUL.md",
+      "sha256": "49ac6c88e3f11b9dec5aa0e1473e886da52e8293893989df1c436164c6b75738"
+    },
+    "jss-worker-glm-2": {
+      "source": "policies/profile-souls/jss-worker-glm-2/SOUL.md",
+      "live": "/Users/chanbla11mit/.hermes/profiles/jss-worker-glm-2/SOUL.md",
+      "sha256": "cae153fb7575b11d82c54d1da6062b5c2b1f4dc124239fb100aecf1af53e18bc"
+    },
+    "jss-reviewer": {
+      "source": "policies/profile-souls/jss-reviewer/SOUL.md",
+      "live": "/Users/chanbla11mit/.hermes/profiles/jss-reviewer/SOUL.md",
+      "sha256": "393f09a3a86276f6a28a42d1ae940f61276ab34db0d66dc253380bb7fc0d33e1"
     }
   },
   "repository_policies": {

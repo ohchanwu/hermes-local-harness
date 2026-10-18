@@ -79,7 +79,12 @@
       "harness-worker",
       "harness-worker-glm-1",
       "harness-worker-glm-2",
-      "harness-reviewer"
+      "harness-reviewer",
+      "jss-orchestrator",
+      "jss-worker",
+      "jss-worker-glm-1",
+      "jss-worker-glm-2",
+      "jss-reviewer"
     ]
   },
   "dispatch_pool": {
@@ -714,6 +719,121 @@
       "installed_disabled_plugins": [
         "hermes-terminal-outcome-notification"
       ]
+    },
+    {
+      "name": "jss-orchestrator",
+      "role": "project orchestrator",
+      "model": "claude-opus-5-5",
+      "provider": "claude-subscription",
+      "installed": true,
+      "dispatch_eligible": false,
+      "in_dispatch_pool": false,
+      "lifecycle": "project-active",
+      "concurrency_limit": 1,
+      "required_plugins": [],
+      "modes": [
+        "project-isolated",
+        "jss-genr"
+      ],
+      "toolsets": "orchestrator",
+      "credential_required": true,
+      "credential_present": true,
+      "installed_disabled_plugins": [
+        "hermes-terminal-outcome-notification"
+      ]
+    },
+    {
+      "name": "jss-worker",
+      "role": "project implementation",
+      "model": "claude-opus-5-5",
+      "provider": "claude-subscription",
+      "installed": true,
+      "dispatch_eligible": true,
+      "in_dispatch_pool": true,
+      "lifecycle": "project-active",
+      "concurrency_limit": 1,
+      "required_plugins": [],
+      "modes": [
+        "project-isolated",
+        "jss-genr"
+      ],
+      "toolsets": "implementation",
+      "credential_required": true,
+      "credential_present": true,
+      "installed_disabled_plugins": [
+        "ponytail",
+        "hermes-terminal-outcome-notification"
+      ]
+    },
+    {
+      "name": "jss-worker-glm-1",
+      "role": "project GLM Full implementation",
+      "model": "glm-5.3",
+      "provider": "zai",
+      "installed": true,
+      "dispatch_eligible": true,
+      "in_dispatch_pool": true,
+      "lifecycle": "project-active",
+      "concurrency_limit": 1,
+      "required_plugins": [],
+      "modes": [
+        "project-isolated",
+        "jss-genr",
+        "glm-full"
+      ],
+      "toolsets": "implementation",
+      "credential_required": true,
+      "credential_present": true,
+      "installed_disabled_plugins": [
+        "ponytail",
+        "hermes-terminal-outcome-notification"
+      ]
+    },
+    {
+      "name": "jss-worker-glm-2",
+      "role": "project GLM Full implementation",
+      "model": "glm-5.3",
+      "provider": "zai",
+      "installed": true,
+      "dispatch_eligible": true,
+      "in_dispatch_pool": true,
+      "lifecycle": "project-active",
+      "concurrency_limit": 1,
+      "required_plugins": [],
+      "modes": [
+        "project-isolated",
+        "jss-genr",
+        "glm-full"
+      ],
+      "toolsets": "implementation",
+      "credential_required": true,
+      "credential_present": true,
+      "installed_disabled_plugins": [
+        "ponytail",
+        "hermes-terminal-outcome-notification"
+      ]
+    },
+    {
+      "name": "jss-reviewer",
+      "role": "project independent reviewer",
+      "model": "claude-fable-5-1",
+      "provider": "claude-subscription",
+      "installed": true,
+      "dispatch_eligible": true,
+      "in_dispatch_pool": true,
+      "lifecycle": "project-active",
+      "concurrency_limit": 1,
+      "required_plugins": [],
+      "modes": [
+        "project-isolated",
+        "jss-genr"
+      ],
+      "toolsets": "review",
+      "credential_required": true,
+      "credential_present": true,
+      "installed_disabled_plugins": [
+        "hermes-terminal-outcome-notification"
+      ]
     }
   ],
   "project_fleets": {
@@ -765,6 +885,21 @@
         "harness-worker-glm-1",
         "harness-worker-glm-2"
       ]
+    },
+    "jss-genr": {
+      "board": "jss-genr",
+      "repository": "/Users/chanbla11mit/projects/jss-genr",
+      "repositories": [
+        "/Users/chanbla11mit/projects/jss-genr"
+      ],
+      "orchestrator": "jss-orchestrator",
+      "worker": "jss-worker",
+      "reviewer": "jss-reviewer",
+      "workers": [
+        "jss-worker",
+        "jss-worker-glm-1",
+        "jss-worker-glm-2"
+      ]
     }
   },
   "project_repair_policy": {
@@ -776,7 +911,8 @@
     "project_boards": [
       "jobcron",
       "cha-pt",
-      "harness"
+      "harness",
+      "jss-genr"
     ]
   },
   "profile_souls": {
@@ -829,6 +965,31 @@
       "source": "policies/profile-souls/harness-reviewer/SOUL.md",
       "live": "/Users/chanbla11mit/.hermes/profiles/harness-reviewer/SOUL.md",
       "sha256": "1f5b2755d75f77f99a757eb8cb7bfdc67cd24887bfbb91815a71f8edbf24b613"
+    },
+    "jss-orchestrator": {
+      "source": "policies/profile-souls/jss-orchestrator/SOUL.md",
+      "live": "/Users/chanbla11mit/.hermes/profiles/jss-orchestrator/SOUL.md",
+      "sha256": "a5b62eeca704b5042038fe0bae42be4360bb1153a873f72c82de759ba7097c18"
+    },
+    "jss-worker": {
+      "source": "policies/profile-souls/jss-worker/SOUL.md",
+      "live": "/Users/chanbla11mit/.hermes/profiles/jss-worker/SOUL.md",
+      "sha256": "a3c4e1fe3881c0ed9eedb8b7c258c3fa399328e26e3a18703cf4ce22b3a7e2f4"
+    },
+    "jss-worker-glm-1": {
+      "source": "policies/profile-souls/jss-worker-glm-1/SOUL.md",
+      "live": "/Users/chanbla11mit/.hermes/profiles/jss-worker-glm-1/SOUL.md",
+      "sha256": "49ac6c88e3f11b9dec5aa0e1473e886da52e8293893989df1c436164c6b75738"
+    },
+    "jss-worker-glm-2": {
+      "source": "policies/profile-souls/jss-worker-glm-2/SOUL.md",
+      "live": "/Users/chanbla11mit/.hermes/profiles/jss-worker-glm-2/SOUL.md",
+      "sha256": "cae153fb7575b11d82c54d1da6062b5c2b1f4dc124239fb100aecf1af53e18bc"
+    },
+    "jss-reviewer": {
+      "source": "policies/profile-souls/jss-reviewer/SOUL.md",
+      "live": "/Users/chanbla11mit/.hermes/profiles/jss-reviewer/SOUL.md",
+      "sha256": "393f09a3a86276f6a28a42d1ae940f61276ab34db0d66dc253380bb7fc0d33e1"
     }
   },
   "repository_policies": {
@@ -849,6 +1010,10 @@
     "harness-worker",
     "harness-worker-glm-1",
     "harness-worker-glm-2",
-    "harness-reviewer"
+    "harness-reviewer",
+    "jss-worker",
+    "jss-worker-glm-1",
+    "jss-worker-glm-2",
+    "jss-reviewer"
   ]
 }
