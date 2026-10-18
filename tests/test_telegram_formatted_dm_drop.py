@@ -22,6 +22,9 @@ committed venv interpreter with ``-I -B`` (no byte-compile into the installed tr
 stubbed Bot API request object (only getMe is answered, offline), INET/INET6 sockets
 blocked in the child, no bot token, synthetic text only.  Skips (never passes) when the
 installed Hermes cannot be provided in an isolated home.
+
+``run_probe(iso, patched=...)`` is reused by tests/test_telegram_unserved_update_patch.py to
+run the same dispatch against a patched copy of the telegram package (card t_a9b14c3c).
 """
 
 from __future__ import annotations
@@ -51,6 +54,9 @@ _sm.socket = _NoInet
 import asyncio, json, logging, os, sys
 sys.path.insert(0, {root!r})
 import hermes_bootstrap  # noqa: F401
+if {patched!r}:  # a patched copy of plugins/platforms/telegram shadows the installed one
+    import plugins
+    plugins.__path__.insert(0, {patched!r})
 from unittest.mock import AsyncMock, patch
 from telegram import Update
 from telegram.request import BaseRequest
@@ -58,10 +64,12 @@ from gateway.config import PlatformConfig
 from plugins.platforms.telegram.adapter import TelegramAdapter
 
 BOT_ID = 111
+ADMISSION_LOGGER = "plugins.platforms.telegram.update_admission"
 RECORDS = []
 class _Collect(logging.Handler):
     def emit(self, record):
-        RECORDS.append((record.levelno, record.name))
+        message = record.getMessage() if record.name == ADMISSION_LOGGER else None
+        RECORDS.append((record.levelno, record.name, message))
 logging.getLogger().addHandler(_Collect())
 logging.getLogger().setLevel(logging.DEBUG)
 
@@ -128,11 +136,14 @@ async def main(cases):
                 "receipt": "%d:%d" % (BOT_ID, uid) in adapter._seen_update_ids,
                 "held": len(getattr(adapter, "_held_inbound_events", None) or []),
                 "pending": len(adapter._pending_text_batches),
-                "info_or_higher_logs": sum(1 for lvl, _ in window if lvl >= logging.INFO),
+                "info_or_higher_logs": sum(1 for lvl, _, _ in window if lvl >= logging.INFO),
+                "admission_logs": [msg for lvl, _, msg in window if msg is not None and lvl >= logging.INFO],
                 "error": error,
             }})
         await adapter.disconnect()
-    return out
+    files = {{name: sys.modules[name].__file__ for name in (
+        "plugins.platforms.telegram.adapter", ADMISSION_LOGGER)}}
+    return {{"files": files, "cases": out}}
 
 cases = json.loads(sys.argv[1])
 print({marker!r} + json.dumps(asyncio.run(main(cases))))
@@ -181,26 +192,34 @@ _RESULTS: dict[str, dict] | None = None
 _SKIP: str | None = None
 
 
+def run_probe(iso: hih.IsolatedHome, patched: str = "") -> dict:
+    """Run the real-PTB dispatch child in *iso*; *patched* is a plugins root to shadow with.
+
+    Returns ``{"files": {module: path}, "cases": {name: result}}``.
+    """
+    import subprocess
+    script = iso.home / "telegram_formatted_dm_probe.py"
+    script.write_text(_CHILD.format(root=str(iso.checkout_root), marker=RESULT_MARKER,
+                                    patched=patched), encoding="utf-8")
+    proc = subprocess.run(iso.child_command(script) + [json.dumps(_cases())], env=iso.env,
+                          capture_output=True, text=True, timeout=240, check=False)
+    lines = [ln for ln in proc.stdout.splitlines() if ln.startswith(RESULT_MARKER)]
+    if proc.returncode != 0 or not lines:
+        raise AssertionError(f"probe child failed rc={proc.returncode}\nstdout: {proc.stdout[-3000:]}\n"
+                             f"stderr: {proc.stderr[-3000:]}")
+    payload = json.loads(lines[-1][len(RESULT_MARKER):])
+    return {"files": payload["files"], "cases": {r["name"]: r for r in payload["cases"]}}
+
+
 def _run_child() -> None:
     global _RESULTS, _SKIP
     if _RESULTS is not None or _SKIP is not None:
         return
     try:
         with hih.isolated_hermes_home() as iso:
-            script = iso.home / "telegram_formatted_dm_probe.py"
-            script.write_text(_CHILD.format(root=str(iso.checkout_root), marker=RESULT_MARKER),
-                              encoding="utf-8")
-            import subprocess
-            proc = subprocess.run(iso.child_command(script) + [json.dumps(_cases())], env=iso.env,
-                                  capture_output=True, text=True, timeout=240, check=False)
+            _RESULTS = run_probe(iso)["cases"]
     except hih.IsolatedHomeError as exc:
         _SKIP = f"installed Hermes not available in an isolated home: {exc}"
-        return
-    lines = [ln for ln in proc.stdout.splitlines() if ln.startswith(RESULT_MARKER)]
-    if proc.returncode != 0 or not lines:
-        raise AssertionError(f"probe child failed rc={proc.returncode}\nstdout: {proc.stdout[-3000:]}\n"
-                             f"stderr: {proc.stderr[-3000:]}")
-    _RESULTS = {r["name"]: r for r in json.loads(lines[-1][len(RESULT_MARKER):])}
 
 
 class _ProbeCase(unittest.TestCase):

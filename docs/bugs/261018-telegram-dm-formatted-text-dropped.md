@@ -95,3 +95,24 @@ The installed Hermes source must not be modified locally.
 1. **First, observe (recommended prerequisite).** Capture the decisive observation above, either from a gateway DEBUG line that already exists, or with the owner repeating the repro while a metadata-only update-shape log is enabled. Only then choose the fix for the formatted-paste symptom.
 2. **Upstream patch (recommended fix for the proven path).** In `update_admission.py`, do not let the group-99 observer alone mark a claim completed. Alternatively, log at INFO (update id plus field names, no content) when an update is receipted without any core handler having served it.
 3. **Harness-owned mitigation.** A Harness plugin registering a `gateway_platform_event`-independent observer cannot see group-0 matching without patching the adapter, so only a log/alert can be owned locally. Prefer option 2.
+
+## Proposed fix
+
+Card `t_a9b14c3c` implements option 2 as an upstream-ready patch. It has not been applied to the installed checkout or filed upstream.
+
+- Patch: `docs/bugs/261018-telegram-unserved-update-receipt.patch`. It is a `git diff` against upstream `9cf7960f` and touches only `plugins/platforms/telegram/update_admission.py`.
+- Behaviour:
+  - Only a group-0 (core) callback completes a claim. The group-99 observer returning no longer does.
+  - An update that nothing served or failed is therefore not receipted, so a Telegram redelivery is not suppressed.
+  - Instead it logs one INFO line: `[Telegram] Update <id> matched no core handler; not receipted (fields: ...)`. The line carries the field names of the update and of its message (for example `message(chat,date,dice,from,message_id), update_id`). It never logs values, text, or chat/user ids.
+  - Served updates, commands, callbacks, native plugin handlers and the failed-preparation path are unchanged.
+- Test: `python3 tests/test_telegram_unserved_update_patch.py`. Inside the isolated home it copies the installed telegram package, applies the patch to the copy with `git apply`, and runs the same real-PTB dispatch against it. The test checks three things:
+  - the unserved update is not receipted and logs exactly one names-only line;
+  - plain and formatted DM text are each delivered once with one receipt;
+  - the dispatch imported the patched copy.
+
+  It skips with a reason if the copy cannot be prepared, and fails if the patch does not apply to its base blob. The `expectedFailure` in `tests/test_telegram_formatted_dm_drop.py` still targets the unpatched installed adapter. Once the patch is applied there, that test becomes an unexpected success and the current-behaviour mechanism test fails, so both need updating.
+- Applying or filing it is a separate, attended owner step:
+  - To file upstream: attach the patch file. Its header is the commit message.
+  - To apply locally: run `git apply --check <patch>` and then `git apply <patch>` in the Hermes checkout, then restart the gateway.
+- Next repro: the INFO line names the shape of every unserved update. That is the decisive observation above: for example, whether the formatted paste arrived as `message(...,text,...)`, with `caption`/`document`, or as another update type. It lands in `gateway.log` next to the update id.
