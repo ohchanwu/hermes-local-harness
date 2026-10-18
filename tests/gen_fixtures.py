@@ -9,10 +9,7 @@ roster = json.loads((Path(__file__).resolve().parents[1] / "roster.yaml").read_t
 
 IMPL = ["worker-flash-1", "worker-flash-2", "worker-flash-3", "worker-luna-1", "worker-luna-2",
         "worker-terra-1", "worker-terra-2", "worker-glm-full", "worker-sol", "worker-astra",
-        "jobcron-worker", "jobcron-worker-glm-1", "jobcron-worker-glm-2",
-        "chapt-worker", "chapt-worker-glm-1", "chapt-worker-glm-2",
-        "harness-worker", "harness-worker-glm-1", "harness-worker-glm-2",
-        "jss-worker", "jss-worker-glm-1", "jss-worker-glm-2"]
+        "jobcron-worker", "chapt-worker", "harness-worker", "jss-worker"]
 NOTIF = "hermes-terminal-outcome-notification"
 ENABLED_NOTIF = f"enabled      git pinned@6ae2bf2d 0.2.0    {NOTIF}"
 DISABLED_NOTIF = f"disabled     git pinned@6ae2bf2d 0.2.0    {NOTIF}"
@@ -112,6 +109,15 @@ write("approval-mode-drift.yaml", delta(
     lambda d: d["profile_approval_modes"].__setitem__("jobcron-worker", "smart")))
 write("active-extra.yaml", delta(lambda d: d["active_extras"].append("unapproved-running-profile")))
 write("dormant-extra.yaml", delta(lambda d: d["dormant_extras"].append("unused-local-profile")))
+
+
+def retired_glm_dispatch(d):
+    # A retired GLM worker stays installed and stopped, but is back on the dispatch list.
+    d["dormant_extras"].append("harness-worker-glm-1")
+    d["dispatch_profiles"].append("harness-worker-glm-1")
+
+
+write("retired-glm-dispatch-drift.yaml", delta(retired_glm_dispatch))
 
 
 def rogue(d):

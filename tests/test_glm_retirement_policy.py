@@ -1,0 +1,316 @@
+#!/usr/bin/env python3
+"""Offline source contract for the 2026-10-18 GLM worker retirement.
+
+Checks tracked repository text, desired state, pins and fixture-mode
+verification only; no live profile, board, or model observation.
+"""
+from contextlib import redirect_stdout
+import copy
+import hashlib
+import importlib.machinery
+import importlib.util
+import io
+import json
+import os
+from pathlib import Path
+import re
+import sys
+import tempfile
+import unittest
+from unittest.mock import patch
+
+from incident_recovery_verify_fixture import LocalReads, ROOT, load_verifier
+
+FLEETS = {"jobcron": "jobcron", "cha-pt": "chapt", "harness": "harness", "jss-genr": "jss"}
+GLM = tuple(f"{prefix}-worker-glm-{n}" for prefix in FLEETS.values() for n in (1, 2))
+GLM_NAME = re.compile(r"\b(?:jobcron|chapt|harness|jss)-worker-glm-\d\b")
+GLM_LANE = re.compile(r"(?i)GLM Full workers?|idle GLM worker|both GLM workers|GLM workers may|three-(?:worker|profile) pool")
+RELATIVE = "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md"
+PROFILE_SKILLS = {
+    profile: ROOT / "policies/profile-skills" / profile / RELATIVE
+    for profile in ("jobcron-orchestrator", "chapt-orchestrator", "harness-orchestrator", "jss-orchestrator")
+}
+SHARED_SKILL = ROOT / "skills/multi-agent-coding-orchestrator/SKILL.md"
+VERSIONS = {
+    PROFILE_SKILLS["jobcron-orchestrator"]: "0.6.9-jobcron.2",
+    PROFILE_SKILLS["chapt-orchestrator"]: "0.6.7-chapt.2",
+    PROFILE_SKILLS["harness-orchestrator"]: "0.6.7-harness.2",
+    PROFILE_SKILLS["jss-orchestrator"]: "0.6.7-jss.2",
+    SHARED_SKILL: "0.6.9",
+}
+PROCEDURE = ROOT / "procedures/switching-hermes-models.md"
+RETIREMENT_FIXTURE = "retired-glm-dispatch-drift.yaml"
+CURRENT_STATE_DOCS = (
+    "adoption/cha-pt.md", "adoption/harness.md", "adoption/jobcron.md", "adoption/jss-genr.md",
+    "procedures/manual-apply.md", "procedures/rollback-restore.md",
+    "procedures/hermes-terminal-outcome-notifications.md",
+    "deployment/hermes-terminal-outcome-notification.example.yaml",
+)
+
+
+def sha(path):
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def load(path):
+    return json.loads(path.read_text())
+
+
+def quiet(function, *args):
+    errors = []
+    with redirect_stdout(io.StringIO()):
+        function(errors, *args)
+    return errors
+
+
+class DesiredState(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.roster = load(ROOT / "roster.yaml")
+        cls.snapshot = load(ROOT / "snapshots/sanitized-current-state.yaml")
+        cls.verifier = load_verifier()
+
+    def test_no_glm_worker_in_any_roster_list(self):
+        names = [profile["name"] for profile in self.roster["profiles"]]
+        lists = {
+            "profiles": names,
+            "approval_policy": self.roster["approval_policy"]["profiles"],
+            "project_dispatch_allowlist": self.roster["project_dispatch_allowlist"],
+            "implementation_allowlist": self.roster["dispatch_pool"]["implementation_allowlist"],
+            "dispatch_allowlist": self.roster["dispatch_pool"]["dispatch_allowlist"],
+            "profile_souls": list(self.roster["profile_souls"]),
+        }
+        for project, fleet in self.roster["project_fleets"].items():
+            lists[f"fleet {project}"] = [fleet["orchestrator"], fleet["worker"], fleet["reviewer"], *fleet["workers"]]
+        for label, listing in lists.items():
+            with self.subTest(list=label):
+                self.assertEqual([name for name in listing if name in GLM], [])
+        self.assertNotIn("worker-glm-", json.dumps(self.roster).replace("worker-glm-full", ""))
+
+    def test_no_glm_worker_in_snapshot(self):
+        lists = {
+            "profiles": self.snapshot["profiles"],
+            "approvals": self.snapshot["approvals"]["profiles"],
+            "dispatch_profiles": self.snapshot["kanban"]["dispatch_profiles"],
+            "profile_souls": list(self.snapshot["profile_souls"]),
+        }
+        for entry in self.snapshot["skill"]["shared_skills"]:
+            lists[f"deploy {entry['name']}"] = entry["deploy_profiles"]
+        for label, listing in lists.items():
+            with self.subTest(list=label):
+                self.assertEqual([name for name in listing if name in GLM], [])
+        self.assertEqual(self.snapshot["project_isolation"], self.roster["project_fleets"])
+        self.assertEqual(self.snapshot["approvals"], self.roster["approval_policy"])
+
+    def test_each_fleet_has_one_worker_and_its_reviewer(self):
+        dispatch = self.snapshot["kanban"]["dispatch_profiles"]
+        for project, prefix in FLEETS.items():
+            fleet = self.roster["project_fleets"][project]
+            with self.subTest(project=project):
+                self.assertEqual(fleet["worker"], f"{prefix}-worker")
+                self.assertEqual(fleet["workers"], [f"{prefix}-worker"])
+                self.assertEqual(fleet["reviewer"], f"{prefix}-reviewer")
+                self.assertIn(fleet["worker"], dispatch)
+                self.assertIn(fleet["reviewer"], dispatch)
+        self.assertEqual(self.roster["project_dispatch_allowlist"], [
+            "jobcron-worker", "jobcron-reviewer", "chapt-worker", "chapt-reviewer",
+            "harness-worker", "harness-reviewer", "jss-worker", "jss-reviewer"])
+        self.assertEqual(dispatch[-8:], self.roster["project_dispatch_allowlist"])
+
+    def test_verifier_constants(self):
+        self.assertEqual(set(self.verifier.RETIRED_PROFILES), set(GLM))
+        for name in GLM:
+            with self.subTest(profile=name):
+                self.assertNotIn(name, self.verifier.PROFILE_SOUL_PATHS)
+                for assignees in (self.verifier.CHAPT_ASSIGNEES, self.verifier.HARNESS_ASSIGNEES,
+                                  self.verifier.JSS_ASSIGNEES):
+                    self.assertNotIn(name, assignees)
+        self.assertEqual(self.verifier.HARNESS_ASSIGNEES, {"harness-worker", "harness-reviewer"})
+        self.assertEqual(self.verifier.CHAPT_ASSIGNEES, {"chapt-worker", "chapt-reviewer"})
+        self.assertEqual(self.verifier.JSS_ASSIGNEES, {"jss-worker", "jss-reviewer"})
+
+    def test_verifier_rejects_glm_reentry(self):
+        fleets = copy.deepcopy(self.roster["project_fleets"])
+        fleets["harness"]["workers"].append("harness-worker-glm-1")
+        self.assertIn("project worker pool mapping malformed: harness",
+                      quiet(self.verifier.check_project_isolation, fleets))
+        self.assertEqual(quiet(self.verifier.check_project_isolation, self.roster["project_fleets"]), [])
+        for label in ("kanban.dispatch_profiles", "project_dispatch_allowlist"):
+            self.assertEqual(
+                quiet(self.verifier.check_retired_dispatch, label, ["harness-worker", "jss-worker-glm-2"]),
+                [f"retired profile back in {label}: jss-worker-glm-2"])
+        self.assertEqual(quiet(self.verifier.check_retired_dispatch, "x", self.roster["project_dispatch_allowlist"]), [])
+        body = ("Repository /Users/chanbla11mit/hermes-local-harness ONLY.\n"
+                f"Baseline EXACT {'a' * 40}.\n## Tests\n- `python3 tests/test_x.py`\n"
+                "Reviewer EXACT harness-reviewer.\n")
+        card = {"id": "t_glm", "board": "harness", "body": body, "assignee": "harness-worker",
+                "workspace_kind": "worktree",
+                "workspace_path": "/Users/chanbla11mit/hermes-local-harness/.worktrees/t_glm"}
+        self.assertEqual(quiet(self.verifier.check_harness_card_contract, [card]), [])
+        card["assignee"] = "harness-worker-glm-2"
+        self.assertIn("Harness card contract drift t_glm: Harness worker assignment invalid",
+                      quiet(self.verifier.check_harness_card_contract, [card]))
+
+
+class PolicyText(unittest.TestCase):
+    def test_active_souls_name_no_glm_worker(self):
+        souls = load(ROOT / "roster.yaml")["profile_souls"]
+        for profile, entry in souls.items():
+            text = (ROOT / entry["source"]).read_text()
+            with self.subTest(profile=profile):
+                self.assertIsNone(GLM_NAME.search(text))
+                self.assertIsNone(GLM_LANE.search(text))
+
+    def test_orchestrator_and_reviewer_souls_name_only_the_remaining_worker(self):
+        for prefix in FLEETS.values():
+            for role in ("orchestrator", "reviewer"):
+                path = ROOT / f"policies/profile-souls/{prefix}-{role}/SOUL.md"
+                if not path.is_file():  # jobcron-orchestrator has no tracked SOUL
+                    continue
+                with self.subTest(profile=f"{prefix}-{role}"):
+                    self.assertIn(f"`{prefix}-worker`", path.read_text())
+
+    def test_skills_route_only_to_the_remaining_worker(self):
+        for path, version in VERSIONS.items():
+            text = path.read_text()
+            with self.subTest(path=str(path.relative_to(ROOT))):
+                self.assertRegex(text, rf"(?m)^version: {re.escape(version)}$")
+                self.assertIsNone(GLM_NAME.search(text))
+                self.assertIsNone(GLM_LANE.search(text))
+        for prefix in ("harness", "jss"):
+            text = PROFILE_SKILLS[f"{prefix}-orchestrator"].read_text()
+            self.assertIn(f"The sole implementation worker is `{prefix}-worker`.", text)
+        for path in (PROFILE_SKILLS["jobcron-orchestrator"], PROFILE_SKILLS["chapt-orchestrator"], SHARED_SKILL):
+            text = path.read_text()
+            self.assertIn("Each project has one implementation worker.", text)
+            self.assertIn("implementation worker `jobcron-worker`", text)
+
+    def test_current_state_docs_list_no_glm_worker(self):
+        for rel in CURRENT_STATE_DOCS:
+            with self.subTest(path=rel):
+                self.assertIsNone(GLM_NAME.search((ROOT / rel).read_text()))
+
+    def test_retirement_note(self):
+        text = PROCEDURE.read_text()
+        section = text.split("## Where the GLM worker profiles are kept", 1)[1].split("\n## ", 1)[0]
+        self.assertIn("retired the GLM workers on 2026-10-18", section)
+        for name in GLM:
+            self.assertIn(f"`{name}`", section)
+        for marker in ("~/.hermes/profile-exports/<name>-20261018-*.tar.gz", "`hermes profile export`",
+                       "`hermes profile import <archive>`", "`hermes -p <profile> auth add zai`",
+                       "`scripts/switch-profile-model --profile <profile> --to glm --dispatch add`",
+                       "They are inert.", "exclude `.env` and `auth.json`"):
+            self.assertIn(marker, section)
+        self.assertIn("Every provider stays switchable", text)
+        self.assertIn("`glm`: `zai`, default `glm-5.3`.", text)
+
+
+class Pins(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.roster = load(ROOT / "roster.yaml")
+        cls.snapshot = load(ROOT / "snapshots/sanitized-current-state.yaml")
+
+    def test_pins_equal_tracked_bytes(self):
+        self.assertEqual(self.snapshot["profile_souls"], self.roster["profile_souls"])
+        for profile, entry in self.roster["profile_souls"].items():
+            with self.subTest(soul=profile):
+                self.assertEqual(entry["sha256"], sha(ROOT / entry["source"]))
+        overrides = self.snapshot["skill"]["profile_local_skill_overrides"]
+        for profile, path in PROFILE_SKILLS.items():
+            with self.subTest(skill=profile):
+                self.assertEqual(overrides[profile], {RELATIVE: sha(path)})
+        shared = next(e for e in self.snapshot["skill"]["shared_skills"] if e["name"] == "multi-agent-coding-orchestrator")
+        self.assertEqual(shared["version"], "0.6.9")
+        for rel, want in shared["files"].items():
+            self.assertEqual(want, sha(SHARED_SKILL.parent / rel))
+        provenance = self.snapshot["skill"]["source_pin_provenance"]["glm_worker_retirement"]
+        self.assertEqual(provenance["baseline"], "1799a9b728681c3672fc29239dff9bf5564280f4")
+        self.assertEqual(provenance["protected_reference"], "refs/harness/baselines/t_f953035b")
+        self.assertIn("not observed deployment", provenance["status"])
+
+    def test_fixture_pins_and_observations(self):
+        souls = {profile: entry["sha256"] for profile, entry in self.roster["profile_souls"].items()}
+        for fixture in sorted((ROOT / "tests/fixtures").glob("*.yaml")):
+            data = load(fixture)
+            if fixture.name == "incomplete-empty.yaml":
+                continue
+            with self.subTest(fixture=fixture.name):
+                want = dict(souls)
+                if fixture.name == "chapt-profile-soul-drift.yaml":  # its intended drift
+                    want["chapt-reviewer"] = "0" * 64
+                self.assertEqual(data["profile_soul_hashes"], want)
+                for profile, path in PROFILE_SKILLS.items():
+                    self.assertEqual(data["profile_local_skill_overrides"][profile][RELATIVE], sha(path))
+                observed = {key: data[key] for key in ("profile_models", "profile_providers", "plugins",
+                                                       "skill_files", "project_isolation")}
+                self.assertIsNone(GLM_NAME.search(json.dumps(observed)))
+                dispatch = [name for name in data["dispatch_profiles"] if name in GLM]
+                self.assertEqual(dispatch, ["harness-worker-glm-1"] if fixture.name == RETIREMENT_FIXTURE else [])
+
+
+def fixture_main(path):
+    verifier = load_verifier()
+    output = io.StringIO()
+    with LocalReads(), patch.object(sys, "argv", ["TEST-ONLY", "--fixture", str(path)]), redirect_stdout(output):
+        code = verifier.main()
+    return code, output.getvalue()
+
+
+class FixtureMode(unittest.TestCase):
+    """Real verifier main() under the no-command/no-network/worktree-only guard."""
+
+    def test_clean_is_green(self):
+        code, output = fixture_main(ROOT / "tests/fixtures/clean.yaml")
+        self.assertEqual(code, 0, output)
+        self.assertNotIn("FAIL:", output)
+
+    def test_glm_back_in_dispatch_is_red(self):
+        code, output = fixture_main(ROOT / "tests/fixtures" / RETIREMENT_FIXTURE)
+        self.assertEqual(code, 1, output)
+        self.assertIn("FAIL: retired profile back in dispatch_profiles: harness-worker-glm-1", output)
+        self.assertIn("FAIL: dispatch drift", output)
+        self.assertIn("WARN: dormant unexpected profile: harness-worker-glm-1", output)
+
+    def test_installed_inert_glm_profile_is_only_a_dormant_warning(self):
+        fixture = load(ROOT / "tests/fixtures/clean.yaml")
+        fixture["dormant_extras"] = list(GLM)
+        with tempfile.TemporaryDirectory(prefix="glm-retirement-") as directory:
+            path = Path(directory) / "observation.yaml"
+            path.write_text(json.dumps(fixture))
+            verifier = load_verifier()
+            output = io.StringIO()
+            guard = LocalReads()
+            guard.allowed.add(os.path.abspath(path))
+            with guard, patch.object(sys, "argv", ["TEST-ONLY", "--fixture", str(path)]), redirect_stdout(output):
+                code = verifier.main()
+        self.assertEqual(code, 0, output.getvalue())
+        for name in GLM:
+            self.assertIn(f"WARN: dormant unexpected profile: {name}", output.getvalue())
+
+
+class SwitchStillSupportsGlm(unittest.TestCase):
+    def test_switch_profile_model_accepts_to_glm(self):
+        loader = importlib.machinery.SourceFileLoader("switch_profile_model_glm", str(ROOT / "scripts/switch-profile-model"))
+        spec = importlib.util.spec_from_loader(loader.name, loader)
+        assert spec is not None
+        switch = importlib.util.module_from_spec(spec)
+        loader.exec_module(switch)
+        self.assertEqual(switch.TARGETS["glm"][:3], ("zai", "https://api.z.ai/api/coding/paas/v4", "glm-5.3"))
+        with tempfile.TemporaryDirectory(prefix="glm-switch-") as directory:
+            root = Path(directory)
+            (root / "profiles/harness-worker-glm-1").mkdir(parents=True)
+            (root / "profiles/harness-worker-glm-1/config.yaml").write_text("model:\n  default: x\n")
+            with redirect_stdout(io.StringIO()) as out:
+                code = switch.main(["--home-root", str(root), "--hermes", str(root / "absent-hermes"),
+                                    "--profile", "harness-worker-glm-1", "--to", "glm", "--dispatch", "add",
+                                    "--dry-run"])
+            self.assertEqual(code, 0)
+            self.assertIn("config set model.provider zai", out.getvalue())
+            self.assertIn("config set model.default glm-5.3", out.getvalue())
+            self.assertEqual(sorted(p.name for p in (root / "profiles/harness-worker-glm-1").iterdir()),
+                             ["config.yaml"])
+
+
+if __name__ == "__main__":
+    unittest.main(verbosity=2)

@@ -192,14 +192,28 @@ PROFILE_SOUL_PATHS = {
         "live": f"/Users/chanbla11mit/.hermes/profiles/{profile}/SOUL.md",
     }
     for profile in (
-        "chapt-orchestrator", "chapt-worker", "chapt-worker-glm-1",
-        "chapt-worker-glm-2", "chapt-reviewer",
-        "harness-orchestrator", "harness-worker", "harness-worker-glm-1",
-        "harness-worker-glm-2", "harness-reviewer",
-        "jss-orchestrator", "jss-worker", "jss-worker-glm-1",
-        "jss-worker-glm-2", "jss-reviewer",
+        "chapt-orchestrator", "chapt-worker", "chapt-reviewer",
+        "harness-orchestrator", "harness-worker", "harness-reviewer",
+        "jss-orchestrator", "jss-worker", "jss-reviewer",
     )
 }
+# Fleet GLM workers retired 2026-10-18 (procedures/switching-hermes-models.md).
+# They stay installed but inert: a dormant extra at most, never dispatchable.
+RETIRED_PROFILES = (
+    "jobcron-worker-glm-1", "jobcron-worker-glm-2",
+    "chapt-worker-glm-1", "chapt-worker-glm-2",
+    "harness-worker-glm-1", "harness-worker-glm-2",
+    "jss-worker-glm-1", "jss-worker-glm-2",
+)
+
+
+def check_retired_dispatch(errors, label, profiles):
+    """A retired profile must never reappear in a dispatch or approval list."""
+    if not isinstance(profiles, list):
+        return
+    for name in RETIRED_PROFILES:
+        if name in profiles:
+            fail(errors, f"retired profile back in {label}: {name}")
 
 
 def check_profile_souls(errors, expected, observed=None):
@@ -317,15 +331,9 @@ PROJECT_LAUNCHERS = {
     "harness": "run-harness-orchestrator",
     "jss-genr": "run-jss-orchestrator",
 }
-CHAPT_ASSIGNEES = {
-    "chapt-worker", "chapt-worker-glm-1", "chapt-worker-glm-2", "chapt-reviewer",
-}
-HARNESS_ASSIGNEES = {
-    "harness-worker", "harness-worker-glm-1", "harness-worker-glm-2", "harness-reviewer",
-}
-JSS_ASSIGNEES = {
-    "jss-worker", "jss-worker-glm-1", "jss-worker-glm-2", "jss-reviewer",
-}
+CHAPT_ASSIGNEES = {"chapt-worker", "chapt-reviewer"}
+HARNESS_ASSIGNEES = {"harness-worker", "harness-reviewer"}
+JSS_ASSIGNEES = {"jss-worker", "jss-reviewer"}
 JSS_CARD_KIND = re.compile(r"(?m)^Card kind EXACT (repository|writing-round)\.$")
 JSS_WRITE_TARGETS = re.compile(r"(?m)^Write targets EXACT ([^\n]+)\.$")
 JSS_WRITE_TARGET = re.compile(
@@ -397,7 +405,7 @@ def check_project_isolation(errors, fleets, observed=None):
         if repos != PROJECT_REPOSITORY_ALLOWLISTS.get(project):
             fail(errors, f"project repository allowlist drift: {project}")
         workers = fleet.get("workers")
-        if (not isinstance(workers, list) or len(workers) != 3
+        if (not isinstance(workers, list) or len(workers) != 1
                 or workers[0] != fleet.get("worker") or len(set(workers)) != len(workers)):
             fail(errors, f"project worker pool mapping malformed: {project}")
             workers = []
@@ -1309,6 +1317,9 @@ def main():
     expected_local_overrides = snapshot["skill"].get("profile_local_skill_overrides", {})
     check_profile_local_skill_overrides(errors, expected_local_overrides)
     dispatch_profiles = snapshot["kanban"]["dispatch_profiles"]
+    check_retired_dispatch(errors, "desired dispatch_profiles", dispatch_profiles)
+    check_retired_dispatch(errors, "project_dispatch_allowlist", roster.get("project_dispatch_allowlist"))
+    check_retired_dispatch(errors, "approval policy profiles", approval_profiles)
     if args.fixture is not None:
         try:
             observed = load(args.fixture)
@@ -1344,6 +1355,7 @@ def main():
                 fail(errors, f"concurrency/dispatch drift kanban.{key}: expected {want!r}, actual {kanban[key]!r}")
         if "dispatch_profiles" in observed and observed["dispatch_profiles"] != dispatch_profiles:
             fail(errors, f"dispatch drift: expected {dispatch_profiles}, actual {observed['dispatch_profiles']}")
+        check_retired_dispatch(errors, "dispatch_profiles", observed.get("dispatch_profiles"))
         models = observed.get("profile_models", {})
         providers = observed.get("profile_providers", {})
         approval_modes = observed.get("profile_approval_modes", {})
@@ -1436,6 +1448,8 @@ def main():
             actual = json_config("default", f"kanban.{key}")
             if actual is UNREADABLE or actual != want:
                 fail(errors, f"concurrency/dispatch drift kanban.{key}: expected {want!r}, actual {'<unreadable>' if actual is UNREADABLE else actual!r}")
+            if key == "dispatch_profiles":
+                check_retired_dispatch(errors, "kanban.dispatch_profiles", actual)
         inherited_db_pin = os.environ.get("HERMES_KANBAN_DB", "").strip()
         launchd_db_pin = run("launchctl", "getenv", "HERMES_KANBAN_DB")
         if inherited_db_pin:

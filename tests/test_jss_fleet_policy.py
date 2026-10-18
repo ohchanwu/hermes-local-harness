@@ -20,10 +20,10 @@ from unittest.mock import patch
 from incident_recovery_verify_fixture import LocalReads, ROOT, load_verifier
 
 REPO = "/Users/chanbla11mit/projects/jss-genr"
-ORCH, WORKER, GLM1, GLM2, REVIEWER = (
-    "jss-orchestrator", "jss-worker", "jss-worker-glm-1", "jss-worker-glm-2", "jss-reviewer")
-JSS = (ORCH, WORKER, GLM1, GLM2, REVIEWER)
-WORKERS = (WORKER, GLM1, GLM2)
+ORCH, WORKER, REVIEWER = (
+    "jss-orchestrator", "jss-worker", "jss-reviewer")
+JSS = (ORCH, WORKER, REVIEWER)
+WORKERS = (WORKER,)
 FLEETS = {"jobcron", "cha-pt", "harness", "jss-genr"}
 RELATIVE = "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md"
 SKILL = ROOT / "policies/profile-skills" / ORCH / RELATIVE
@@ -107,8 +107,6 @@ class FleetDesiredState(unittest.TestCase):
         expected = {
             ORCH: ("claude-opus-5-5", "claude-subscription", "orchestrator", False),
             WORKER: ("claude-opus-5-5", "claude-subscription", "implementation", True),
-            GLM1: ("glm-5.3", "zai", "implementation", True),
-            GLM2: ("glm-5.3", "zai", "implementation", True),
             REVIEWER: ("claude-fable-5-1", "claude-subscription", "review", True),
         }
         for name, (model, provider, toolsets, dispatchable) in expected.items():
@@ -126,7 +124,7 @@ class FleetDesiredState(unittest.TestCase):
         self.assertEqual(self.snapshot["approvals"], self.roster["approval_policy"])
         self.assertEqual(self.snapshot["profiles"], list(self.profiles))
         for listing in (self.roster["project_dispatch_allowlist"], self.snapshot["kanban"]["dispatch_profiles"]):
-            self.assertEqual(listing[-4:], [*WORKERS, REVIEWER])
+            self.assertEqual(listing[-2:], [*WORKERS, REVIEWER])
             self.assertNotIn(ORCH, listing)
 
     def test_skill_deployment_matrix(self):
@@ -257,8 +255,6 @@ class RoleContracts(unittest.TestCase):
                 self.assertIn("Do not commit.", body)
                 self.assertIn("never install, download, or commit dependencies", body)
                 self.assertIn("Never delegate", body)
-        for profile in (GLM1, GLM2):
-            self.assertIn("large-context", self.souls[profile])
 
     def test_reviewer_soul_and_overgating_rule(self):
         text = self.souls[REVIEWER]
@@ -281,7 +277,7 @@ class RoleContracts(unittest.TestCase):
         self.assertLessEqual(len(paragraph), 1000)
 
     def test_skill_version_size_and_sections(self):
-        self.assertRegex(self.skill_raw, r"(?m)^version: 0\.6\.7-jss\.1$")
+        self.assertRegex(self.skill_raw, r"(?m)^version: 0\.6\.7-jss\.2$")
         self.assertLessEqual(len(self.skill_raw.splitlines()), 260)
         self.assertEqual(re.findall(r"^## (.+)$", self.skill_raw, re.M), [
             "Hard Scope", "Privacy Gate", "Card Kinds", "Role Separation", "Card Contract",
@@ -390,7 +386,7 @@ class CardContract(unittest.TestCase):
         return errors
 
     def test_valid_cards_of_both_kinds(self):
-        self.assertEqual(self.errors([card(REPOSITORY_BODY), card(WRITING_BODY, assignee=GLM2)]), [])
+        self.assertEqual(self.errors([card(REPOSITORY_BODY), card(WRITING_BODY)]), [])
         generic = REPOSITORY_BODY.replace("- `make -C resume qa`", "- `python3 tools/check-materials.py --no-links`")
         self.assertEqual(self.errors([card(generic)]), [])
 
@@ -493,8 +489,8 @@ class FixtureMode(unittest.TestCase):
                  f"ponytail enabled drift {WORKER}"),
                 (lambda d: d["project_isolation"]["jss-genr"]["repositories"].append("/Users/chanbla11mit/projects/other"),
                  "project repository allowlist drift: jss-genr"),
-                (lambda d: d["skill_files"]["minimal-implementation"].pop(GLM1),
-                 f"deployed skill copy missing: minimal-implementation {GLM1}"),
+                (lambda d: d["skill_files"]["minimal-implementation"].pop(WORKER),
+                 f"deployed skill copy missing: minimal-implementation {WORKER}"),
                 (lambda d: next(a for a in d["adapters"] if a["repo"] == "jss-genr").__setitem__("content", "changed"),
                  "adoption status drift jss-genr")):
             with self.subTest(diagnostic=diagnostic):

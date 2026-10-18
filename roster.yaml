@@ -67,23 +67,15 @@
       "worker-terra-2",
       "jobcron-orchestrator",
       "jobcron-worker",
-      "jobcron-worker-glm-1",
-      "jobcron-worker-glm-2",
       "jobcron-reviewer",
       "chapt-orchestrator",
       "chapt-worker",
-      "chapt-worker-glm-1",
-      "chapt-worker-glm-2",
       "chapt-reviewer",
       "harness-orchestrator",
       "harness-worker",
-      "harness-worker-glm-1",
-      "harness-worker-glm-2",
       "harness-reviewer",
       "jss-orchestrator",
       "jss-worker",
-      "jss-worker-glm-1",
-      "jss-worker-glm-2",
       "jss-reviewer"
     ]
   },
@@ -421,54 +413,6 @@
       ]
     },
     {
-      "name": "jobcron-worker-glm-1",
-      "role": "project GLM Full implementation",
-      "model": "glm-5.3",
-      "provider": "zai",
-      "installed": true,
-      "dispatch_eligible": true,
-      "in_dispatch_pool": true,
-      "lifecycle": "project-active",
-      "concurrency_limit": 1,
-      "required_plugins": [],
-      "modes": [
-        "project-isolated",
-        "jobcron",
-        "glm-full"
-      ],
-      "toolsets": "implementation",
-      "credential_required": true,
-      "credential_present": true,
-      "installed_disabled_plugins": [
-        "ponytail",
-        "hermes-terminal-outcome-notification"
-      ]
-    },
-    {
-      "name": "jobcron-worker-glm-2",
-      "role": "project GLM Full implementation",
-      "model": "glm-5.3",
-      "provider": "zai",
-      "installed": true,
-      "dispatch_eligible": true,
-      "in_dispatch_pool": true,
-      "lifecycle": "project-active",
-      "concurrency_limit": 1,
-      "required_plugins": [],
-      "modes": [
-        "project-isolated",
-        "jobcron",
-        "glm-full"
-      ],
-      "toolsets": "implementation",
-      "credential_required": true,
-      "credential_present": true,
-      "installed_disabled_plugins": [
-        "ponytail",
-        "hermes-terminal-outcome-notification"
-      ]
-    },
-    {
       "name": "jobcron-reviewer",
       "role": "project independent reviewer",
       "model": "gpt-6-astra",
@@ -526,54 +470,6 @@
       "modes": [
         "project-isolated",
         "cha-pt"
-      ],
-      "toolsets": "implementation",
-      "credential_required": true,
-      "credential_present": true,
-      "installed_disabled_plugins": [
-        "ponytail",
-        "hermes-terminal-outcome-notification"
-      ]
-    },
-    {
-      "name": "chapt-worker-glm-1",
-      "role": "project GLM Full implementation",
-      "model": "glm-5.3",
-      "provider": "zai",
-      "installed": true,
-      "dispatch_eligible": true,
-      "in_dispatch_pool": true,
-      "lifecycle": "project-active",
-      "concurrency_limit": 1,
-      "required_plugins": [],
-      "modes": [
-        "project-isolated",
-        "cha-pt",
-        "glm-full"
-      ],
-      "toolsets": "implementation",
-      "credential_required": true,
-      "credential_present": true,
-      "installed_disabled_plugins": [
-        "ponytail",
-        "hermes-terminal-outcome-notification"
-      ]
-    },
-    {
-      "name": "chapt-worker-glm-2",
-      "role": "project GLM Full implementation",
-      "model": "glm-5.3",
-      "provider": "zai",
-      "installed": true,
-      "dispatch_eligible": true,
-      "in_dispatch_pool": true,
-      "lifecycle": "project-active",
-      "concurrency_limit": 1,
-      "required_plugins": [],
-      "modes": [
-        "project-isolated",
-        "cha-pt",
-        "glm-full"
       ],
       "toolsets": "implementation",
       "credential_required": true,
@@ -651,54 +547,6 @@
       ]
     },
     {
-      "name": "harness-worker-glm-1",
-      "role": "project GLM Full implementation",
-      "model": "glm-5.3",
-      "provider": "zai",
-      "installed": true,
-      "dispatch_eligible": true,
-      "in_dispatch_pool": true,
-      "lifecycle": "project-active",
-      "concurrency_limit": 1,
-      "required_plugins": [],
-      "modes": [
-        "project-isolated",
-        "harness",
-        "glm-full"
-      ],
-      "toolsets": "implementation",
-      "credential_required": true,
-      "credential_present": true,
-      "installed_disabled_plugins": [
-        "ponytail",
-        "hermes-terminal-outcome-notification"
-      ]
-    },
-    {
-      "name": "harness-worker-glm-2",
-      "role": "project GLM Full implementation",
-      "model": "glm-5.3",
-      "provider": "zai",
-      "installed": true,
-      "dispatch_eligible": true,
-      "in_dispatch_pool": true,
-      "lifecycle": "project-active",
-      "concurrency_limit": 1,
-      "required_plugins": [],
-      "modes": [
-        "project-isolated",
-        "harness",
-        "glm-full"
-      ],
-      "toolsets": "implementation",
-      "credential_required": true,
-      "credential_present": true,
-      "installed_disabled_plugins": [
-        "ponytail",
-        "hermes-terminal-outcome-notification"
-      ]
-    },
-    {
       "name": "harness-reviewer",
       "role": "project independent reviewer",
       "model": "gpt-6-astra",
@@ -766,54 +614,6 @@
       ]
     },
     {
-      "name": "jss-worker-glm-1",
-      "role": "project GLM Full implementation",
-      "model": "glm-5.3",
-      "provider": "zai",
-      "installed": true,
-      "dispatch_eligible": true,
-      "in_dispatch_pool": true,
-      "lifecycle": "project-active",
-      "concurrency_limit": 1,
-      "required_plugins": [],
-      "modes": [
-        "project-isolated",
-        "jss-genr",
-        "glm-full"
-      ],
-      "toolsets": "implementation",
-      "credential_required": true,
-      "credential_present": true,
-      "installed_disabled_plugins": [
-        "ponytail",
-        "hermes-terminal-outcome-notification"
-      ]
-    },
-    {
-      "name": "jss-worker-glm-2",
-      "role": "project GLM Full implementation",
-      "model": "glm-5.3",
-      "provider": "zai",
-      "installed": true,
-      "dispatch_eligible": true,
-      "in_dispatch_pool": true,
-      "lifecycle": "project-active",
-      "concurrency_limit": 1,
-      "required_plugins": [],
-      "modes": [
-        "project-isolated",
-        "jss-genr",
-        "glm-full"
-      ],
-      "toolsets": "implementation",
-      "credential_required": true,
-      "credential_present": true,
-      "installed_disabled_plugins": [
-        "ponytail",
-        "hermes-terminal-outcome-notification"
-      ]
-    },
-    {
       "name": "jss-reviewer",
       "role": "project independent reviewer",
       "model": "claude-fable-5-1",
@@ -848,9 +648,7 @@
       "reviewer": "jobcron-reviewer",
       "preview_port": 17777,
       "workers": [
-        "jobcron-worker",
-        "jobcron-worker-glm-1",
-        "jobcron-worker-glm-2"
+        "jobcron-worker"
       ]
     },
     "cha-pt": {
@@ -866,9 +664,7 @@
       "reviewer": "chapt-reviewer",
       "preview_port": 18080,
       "workers": [
-        "chapt-worker",
-        "chapt-worker-glm-1",
-        "chapt-worker-glm-2"
+        "chapt-worker"
       ]
     },
     "harness": {
@@ -881,9 +677,7 @@
       "worker": "harness-worker",
       "reviewer": "harness-reviewer",
       "workers": [
-        "harness-worker",
-        "harness-worker-glm-1",
-        "harness-worker-glm-2"
+        "harness-worker"
       ]
     },
     "jss-genr": {
@@ -896,9 +690,7 @@
       "worker": "jss-worker",
       "reviewer": "jss-reviewer",
       "workers": [
-        "jss-worker",
-        "jss-worker-glm-1",
-        "jss-worker-glm-2"
+        "jss-worker"
       ]
     }
   },
@@ -919,77 +711,47 @@
     "chapt-orchestrator": {
       "source": "policies/profile-souls/chapt-orchestrator/SOUL.md",
       "live": "/Users/chanbla11mit/.hermes/profiles/chapt-orchestrator/SOUL.md",
-      "sha256": "6cad04cc2a650ba78fea836aa124b4edb7e8c102da30120fb1bb80a41a610b52"
+      "sha256": "8fbb853c331dc773f482f320a55e654185d8c5360699eda58fecd40fb0d3c359"
     },
     "chapt-worker": {
       "source": "policies/profile-souls/chapt-worker/SOUL.md",
       "live": "/Users/chanbla11mit/.hermes/profiles/chapt-worker/SOUL.md",
       "sha256": "6bd46152500f54f4955b657d80a20f31db27f2d3162845fd8194436e03c5b5ab"
     },
-    "chapt-worker-glm-1": {
-      "source": "policies/profile-souls/chapt-worker-glm-1/SOUL.md",
-      "live": "/Users/chanbla11mit/.hermes/profiles/chapt-worker-glm-1/SOUL.md",
-      "sha256": "79b114ac428183ec8140ff872490afed6a9512a729896aa99faf4f4554dcb7a1"
-    },
-    "chapt-worker-glm-2": {
-      "source": "policies/profile-souls/chapt-worker-glm-2/SOUL.md",
-      "live": "/Users/chanbla11mit/.hermes/profiles/chapt-worker-glm-2/SOUL.md",
-      "sha256": "420248cde44ce10386aa9ad46c2f145e964198ba5d02b906fc8d929cb591793b"
-    },
     "chapt-reviewer": {
       "source": "policies/profile-souls/chapt-reviewer/SOUL.md",
       "live": "/Users/chanbla11mit/.hermes/profiles/chapt-reviewer/SOUL.md",
-      "sha256": "4bdc98c15aba6f1580ac58dcf0af671a2e54d48db591845cd3737303f5bee191"
+      "sha256": "bc3f576c27ce7b14fd86e9dd3569f6fabd4d466749db904f877d348c029f5860"
     },
     "harness-orchestrator": {
       "source": "policies/profile-souls/harness-orchestrator/SOUL.md",
       "live": "/Users/chanbla11mit/.hermes/profiles/harness-orchestrator/SOUL.md",
-      "sha256": "0146225230db3d1afaf4ea3ccdf8a12a5bf9b2ac719bd606fba563091ff7e519"
+      "sha256": "e48129502bfee166cf9bc2e0c97abf3163e8fbbe6aebf7f133aa3305131fa968"
     },
     "harness-worker": {
       "source": "policies/profile-souls/harness-worker/SOUL.md",
       "live": "/Users/chanbla11mit/.hermes/profiles/harness-worker/SOUL.md",
       "sha256": "8ee6127b833f8278b3ed3932aa05c77cac917ee8391ccc633474b4ce8fc1ef61"
     },
-    "harness-worker-glm-1": {
-      "source": "policies/profile-souls/harness-worker-glm-1/SOUL.md",
-      "live": "/Users/chanbla11mit/.hermes/profiles/harness-worker-glm-1/SOUL.md",
-      "sha256": "1d08b686385ea599cadcaabbfd39ecc9065ae9ec1863859d4fdbc53c3193a708"
-    },
-    "harness-worker-glm-2": {
-      "source": "policies/profile-souls/harness-worker-glm-2/SOUL.md",
-      "live": "/Users/chanbla11mit/.hermes/profiles/harness-worker-glm-2/SOUL.md",
-      "sha256": "1d08b686385ea599cadcaabbfd39ecc9065ae9ec1863859d4fdbc53c3193a708"
-    },
     "harness-reviewer": {
       "source": "policies/profile-souls/harness-reviewer/SOUL.md",
       "live": "/Users/chanbla11mit/.hermes/profiles/harness-reviewer/SOUL.md",
-      "sha256": "1f5b2755d75f77f99a757eb8cb7bfdc67cd24887bfbb91815a71f8edbf24b613"
+      "sha256": "3fb47b43935d4856e24b4722ed809b666abcdb4d76453d1318a9f480482bd176"
     },
     "jss-orchestrator": {
       "source": "policies/profile-souls/jss-orchestrator/SOUL.md",
       "live": "/Users/chanbla11mit/.hermes/profiles/jss-orchestrator/SOUL.md",
-      "sha256": "a5b62eeca704b5042038fe0bae42be4360bb1153a873f72c82de759ba7097c18"
+      "sha256": "91ac0736c53de7e8e0ef4ab6209a2b6b11b5ed743b17a6205bab31c1634cb7e1"
     },
     "jss-worker": {
       "source": "policies/profile-souls/jss-worker/SOUL.md",
       "live": "/Users/chanbla11mit/.hermes/profiles/jss-worker/SOUL.md",
       "sha256": "a3c4e1fe3881c0ed9eedb8b7c258c3fa399328e26e3a18703cf4ce22b3a7e2f4"
     },
-    "jss-worker-glm-1": {
-      "source": "policies/profile-souls/jss-worker-glm-1/SOUL.md",
-      "live": "/Users/chanbla11mit/.hermes/profiles/jss-worker-glm-1/SOUL.md",
-      "sha256": "49ac6c88e3f11b9dec5aa0e1473e886da52e8293893989df1c436164c6b75738"
-    },
-    "jss-worker-glm-2": {
-      "source": "policies/profile-souls/jss-worker-glm-2/SOUL.md",
-      "live": "/Users/chanbla11mit/.hermes/profiles/jss-worker-glm-2/SOUL.md",
-      "sha256": "cae153fb7575b11d82c54d1da6062b5c2b1f4dc124239fb100aecf1af53e18bc"
-    },
     "jss-reviewer": {
       "source": "policies/profile-souls/jss-reviewer/SOUL.md",
       "live": "/Users/chanbla11mit/.hermes/profiles/jss-reviewer/SOUL.md",
-      "sha256": "393f09a3a86276f6a28a42d1ae940f61276ab34db0d66dc253380bb7fc0d33e1"
+      "sha256": "52490695d59094b54bf136045698085574f8317ca6f419f9c54e2a559c147e36"
     }
   },
   "repository_policies": {
@@ -1000,20 +762,12 @@
   },
   "project_dispatch_allowlist": [
     "jobcron-worker",
-    "jobcron-worker-glm-1",
-    "jobcron-worker-glm-2",
     "jobcron-reviewer",
     "chapt-worker",
-    "chapt-worker-glm-1",
-    "chapt-worker-glm-2",
     "chapt-reviewer",
     "harness-worker",
-    "harness-worker-glm-1",
-    "harness-worker-glm-2",
     "harness-reviewer",
     "jss-worker",
-    "jss-worker-glm-1",
-    "jss-worker-glm-2",
     "jss-reviewer"
   ]
 }

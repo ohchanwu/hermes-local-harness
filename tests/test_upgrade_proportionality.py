@@ -30,6 +30,7 @@ FIXTURE_RESULTS = {
     "clean.yaml": (0, "OK: desired state matches observed state"),
     "astra-local-override.yaml": (0, "OK: desired state matches observed state"),
     "dormant-extra.yaml": (0, "WARN: dormant"),
+    "retired-glm-dispatch-drift.yaml": (1, "retired profile back in dispatch_profiles: harness-worker-glm-1"),
     "behavior-changing-model-drift.yaml": (1, "model drift"),
     "active-extra.yaml": (1, "behavior-changing unexpected profile"),
     "unexpected-plugin.yaml": (1, "behavior-changing unexpected plugin"),

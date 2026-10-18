@@ -72,12 +72,9 @@ The desired state is `approvals.mode: off` on every installed roster profile. Th
                    worker-flash-1 worker-flash-2 worker-flash-3 \
                    worker-luna-1 worker-luna-2 worker-terra-1 worker-glm-full \
                    worker-sol worker-astra worker-terra-2 \
-                   jobcron-orchestrator jobcron-worker jobcron-worker-glm-1 \
-                   jobcron-worker-glm-2 jobcron-reviewer \
-                   chapt-orchestrator chapt-worker chapt-worker-glm-1 \
-                   chapt-worker-glm-2 chapt-reviewer \
-                   harness-orchestrator harness-worker harness-worker-glm-1 \
-                   harness-worker-glm-2 harness-reviewer; do
+                   jobcron-orchestrator jobcron-worker jobcron-reviewer \
+                   chapt-orchestrator chapt-worker chapt-reviewer \
+                   harness-orchestrator harness-worker harness-reviewer; do
       hermes -p "$profile" config set approvals.mode off
     done
 
@@ -198,22 +195,22 @@ repositories from here.
 
 ## 8b. Project-isolated concurrent fleets
 
-Create or repair the fifteen project profiles and three named boards exactly as recorded in `docs/specs/261004-concurrent-project-fleets.md`. This section is an attended reconstruction procedure, not authority for an agent to apply it. Use `--clone-from` only as a bootstrap; delete copied `MEMORY.md`/`USER.md`, replace `SOUL.md` with the project role contract, and do not clone messaging channels. Configure:
+Create or repair the nine project profiles and three named boards exactly as recorded in `docs/specs/261004-concurrent-project-fleets.md`. This section is an attended reconstruction procedure, not authority for an agent to apply it. Use `--clone-from` only as a bootstrap; delete copied `MEMORY.md`/`USER.md`, replace `SOUL.md` with the project role contract, and do not clone messaging channels. Configure:
 
-- `jobcron-orchestrator`, `jobcron-worker`: `openai-codex/gpt-6.1-sol`; `jobcron-worker-glm-1`, `jobcron-worker-glm-2`: `zai/glm-5.3`; `jobcron-reviewer`: `openai-codex/gpt-6-astra`; all rooted at `/Users/chanbla11mit/projects/jobcron`.
-- `chapt-orchestrator`, `chapt-worker`: `openai-codex/gpt-6.1-sol`; `chapt-worker-glm-1`, `chapt-worker-glm-2`: `zai/glm-5.3`; `chapt-reviewer`: `openai-codex/gpt-6-astra`; all rooted at `/Users/chanbla11mit/projects/cha-pt`.
-- `harness-orchestrator`, `harness-worker`: `openai-codex/gpt-6.1-sol`; `harness-worker-glm-1`, `harness-worker-glm-2`: `zai/glm-5.3`; `harness-reviewer`: `openai-codex/gpt-6-astra`; all rooted solely at `/Users/chanbla11mit/hermes-local-harness`.
+- `jobcron-orchestrator`, `jobcron-worker`: `openai-codex/gpt-6.1-sol`; `jobcron-reviewer`: `openai-codex/gpt-6-astra`; all rooted at `/Users/chanbla11mit/projects/jobcron`.
+- `chapt-orchestrator`, `chapt-worker`: `openai-codex/gpt-6.1-sol`; `chapt-reviewer`: `openai-codex/gpt-6-astra`; all rooted at `/Users/chanbla11mit/projects/cha-pt`.
+- `harness-orchestrator`, `harness-worker`: `openai-codex/gpt-6.1-sol`; `harness-reviewer`: `openai-codex/gpt-6-astra`; all rooted solely at `/Users/chanbla11mit/hermes-local-harness`.
 - Project orchestrator CLI toolsets: `clarify`, `kanban`, `memory`, `session_search`, `skills`, `todo` only.
 - `kanban.dispatch_in_gateway: false` on every named project profile; the default multiplexed gateway remains the sole dispatcher.
 - Boards `jobcron`, `cha-pt`, and `harness` with their canonical repositories as `default_workdir`.
-- Default-profile `kanban.dispatch_profiles` includes each project's three-worker pool and reviewer plus explicitly retained legacy lanes. It excludes all project orchestrators because dispatcher-spawned task sessions intentionally lack board-routing tools.
+- Default-profile `kanban.dispatch_profiles` includes each project's worker and reviewer plus explicitly retained legacy lanes. It excludes all project orchestrators because dispatcher-spawned task sessions intentionally lack board-routing tools.
 - Clear any legacy global launchd database pin with `launchctl unsetenv HERMES_KANBAN_DB`; a gateway inheriting that variable intentionally resolves every board slug to the one pinned database. The notifier LaunchAgent keeps its own explicit database path and is unaffected.
 
 Disable `hermes-terminal-outcome-notification` on project profiles: its legacy shared-default-DB deployment is not the authority for named-board events. Named-board lifecycle and subscriptions remain inside stock Hermes Kanban.
 
 Launch controllers only through `scripts/run-jobcron-orchestrator`, `scripts/run-chapt-orchestrator`, and `scripts/run-harness-orchestrator`; these set the per-process board pin before starting the profile.
 
-Cha PT uses one board with two repository-specific worktree roots. Keep the board default and all five profile `terminal.cwd` values at `/Users/chanbla11mit/projects/cha-pt`. Create the frontend project only in the `chapt-orchestrator` profile; do not run `project bind-board` afterward because that command would replace the board default workdir:
+Cha PT uses one board with two repository-specific worktree roots. Keep the board default and all three profile `terminal.cwd` values at `/Users/chanbla11mit/projects/cha-pt`. Create the frontend project only in the `chapt-orchestrator` profile; do not run `project bind-board` afterward because that command would replace the board default workdir:
 
     hermes -p chapt-orchestrator project create "Cha PT Frontend" \
       /Users/chanbla11mit/projects/cha-pt-frontend \
@@ -224,13 +221,13 @@ Cha PT uses one board with two repository-specific worktree roots. Keep the boar
 
 Deploy the exact tracked Cha PT role contracts; never patch the live copies directly:
 
-    for profile in chapt-orchestrator chapt-worker chapt-worker-glm-1 chapt-worker-glm-2 chapt-reviewer; do
+    for profile in chapt-orchestrator chapt-worker chapt-reviewer; do
       cp "policies/profile-souls/$profile/SOUL.md" "$HOME/.hermes/profiles/$profile/SOUL.md"
     done
 
 Deploy the exact tracked harness role contracts only during a separately authorized attended rollout; never let `harness-orchestrator` modify its own active live policy:
 
-    for profile in harness-orchestrator harness-worker harness-worker-glm-1 harness-worker-glm-2 harness-reviewer; do
+    for profile in harness-orchestrator harness-worker harness-reviewer; do
       cp "policies/profile-souls/$profile/SOUL.md" "$HOME/.hermes/profiles/$profile/SOUL.md"
     done
 

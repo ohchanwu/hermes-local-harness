@@ -16,7 +16,30 @@ BASELINE_SHA256 = "3fa1151192959b77e23921a813994517cb3cad8c655c901e425f0f958fb76
 PRE_PORT_SHA256 = "575419e386187a028b7c449bf6da7f298e88dfa3d4250619c06caa8d5a52e330"
 RULE_SHA256 = "0b3349307eaaf7bc4de6716198dfdd5e72d3f99862ee335a0fdc4124ad5e1d5e"
 UPGRADE_SHA256 = "0e9c5f1f07e50dd3653fc51ffba481427bb237d5805d3213aa209169ac64cd94"
-MERGED_SHA256 = "e60d361a5d41f0c864ce1796d107e38a995df76e9449037cb01ed44714b846d7"
+PRE_RETIREMENT_SHA256 = "e60d361a5d41f0c864ce1796d107e38a995df76e9449037cb01ed44714b846d7"
+MERGED_SHA256 = "b6b80cef78fbcade77043e05de07a0382c0e1e94c705180c89869287f9696892"
+# The 0.6.7-chapt.2 GLM worker retirement (t_f953035b) changes exactly these
+# lines; reversing them recovers the reviewed 0.6.7-chapt.1 bytes.
+RETIREMENT_EDITS = (
+    (b"version: 0.6.7-chapt.2\n", b"version: 0.6.7-chapt.1\n"),
+    (b"implementation worker `jobcron-worker` (`gpt-6.1-sol`);",
+     b"implementation pool `jobcron-worker` (`gpt-6.1-sol`), `jobcron-worker-glm-1` and `jobcron-worker-glm-2` (both `glm-5.3`);"),
+    (b"implementation worker `chapt-worker` (`gpt-6.1-sol`);",
+     b"implementation pool `chapt-worker` (`gpt-6.1-sol`), `chapt-worker-glm-1` and `chapt-worker-glm-2` (both `glm-5.3`);"),
+    (b"A project orchestrator may assign only its matching worker and reviewer.",
+     b"A project orchestrator may assign only its matching worker pool and reviewer."),
+    (b"Each project has one implementation worker. Assign implementation only to it, never to a foreign-project "
+     b"or legacy worker. Review revision stays on the same assignee.",
+     b"Each project has one Sol worker and two GLM Full workers. Use Sol for routine bounded implementation; "
+     b"prefer GLM Full for large-context, repo-wide, long-horizon, multimodal, visual, or broadly specified work, "
+     b"and use either idle GLM worker for independent parallel slices. Capacity alone may select another matching "
+     b"project worker, but never a foreign-project or legacy worker. Review revision stays on the same assignee "
+     b"unless the reviewer identifies a concrete capability boundary; then the orchestrator may create a "
+     b"continuation card for another worker in the same project pool with explicit lineage and preserved evidence."),
+    (b"return `gpt-6.1-sol` for orchestrator/worker and `gpt-6-astra` for reviewer.",
+     b"return `gpt-6.1-sol` for orchestrator/primary worker, `glm-5.3` for both GLM Full workers, and `gpt-6-astra` for reviewer."),
+    (b"contains each project's worker and reviewer plus", b"contains each project's three-worker pool and reviewer plus"),
+)
 # The 0.6.7-chapt.1 port adds exactly these three sections before their
 # successor headings; dropping them inverts the port byte-exactly.
 PORTED_SECTIONS = (
@@ -55,13 +78,18 @@ class ChaptPolicyReconciliationTests(unittest.TestCase):
         self.retained_rule()
 
     def test_entire_reviewed_source_is_preserved(self):
-        self.assertEqual(self.source.count(b"version: 0.6.7-chapt.1\n"), 1)
+        self.assertEqual(self.source.count(b"version: 0.6.7-chapt.2\n"), 1)
+        # Invert the 0.6.7-chapt.2 GLM worker retirement first.
+        original = self.source
+        for new, old in RETIREMENT_EDITS:
+            self.assertEqual(original.count(new), 1, new)
+            original = original.replace(new, old, 1)
+        self.assertEqual(digest(original), PRE_RETIREMENT_SHA256)
         # Invert the 0.6.7-chapt.1 port: remove each added section exactly,
         # then restore the pre-port version line. Frozen full-source identity,
         # not a keyword-only preservation claim.
-        original = self.source
         for start, successor in PORTED_SECTIONS:
-            self.assertEqual(self.source.count(start), 1, start)
+            self.assertEqual(original.count(start), 1, start)
             prefix, rest = original.split(start, 1)
             added, tail = rest.split(successor, 1)
             self.assertTrue(added.startswith(b"\nSet up a card without a setup-only hold")
