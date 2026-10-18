@@ -1,7 +1,7 @@
 ---
 name: multi-agent-coding-orchestrator
 description: "Use when orchestrating multi-agent coding with Hermes."
-version: 0.6.9-jobcron.3
+version: 0.6.9-jobcron.4
 author: chanbla11mit, Hermes Agent
 license: MIT
 platforms: [macos]
@@ -27,14 +27,14 @@ Do not use this procedure for a simple question that needs no repository change 
 
 Project-isolated fleets:
 
-- Jobcron board `jobcron`: `jobcron-orchestrator` (`gpt-6.1-sol`); implementation worker `jobcron-worker` (`gpt-6.1-sol`); independent `jobcron-reviewer` (`gpt-6-astra`). Repository root: `/Users/chanbla11mit/projects/jobcron`; preview port: `17777`.
-- Cha PT board `cha-pt`: `chapt-orchestrator` (`gpt-6.1-sol`); implementation worker `chapt-worker` (`gpt-6.1-sol`); independent `chapt-reviewer` (`gpt-6-astra`). Repository root: `/Users/chanbla11mit/projects/cha-pt`; preview port: `18080`.
+- Jobcron board `jobcron`: `jobcron-orchestrator` (`gpt-6.1-sol`); implementation workers `jobcron-worker` (`gpt-6.1-sol`) and `jobcron-worker-2` (`claude-opus-5-5`); independent `jobcron-reviewer` (`gpt-6-astra`). Repository root: `/Users/chanbla11mit/projects/jobcron`; preview port: `17777`.
+- Cha PT board `cha-pt`: `chapt-orchestrator` (`gpt-6.1-sol`); implementation workers `chapt-worker` (`gpt-6.1-sol`) and `chapt-worker-2` (`claude-opus-5-5`); independent `chapt-reviewer` (`gpt-6-astra`). Repository root: `/Users/chanbla11mit/projects/cha-pt`; preview port: `18080`.
 
-Each project profile has an independent Hermes home, memory, sessions, and fixed terminal root. Named boards provide separate databases, logs, attachments, and workspaces. A project orchestrator may assign only its matching worker and reviewer. A task or callback with a mismatched board, profile, repository, or workspace is invalid and must be blocked before file access or mutation.
+Each project profile has an independent Hermes home, memory, sessions, and fixed terminal root. Named boards provide separate databases, logs, attachments, and workspaces. A project orchestrator may assign only its matching workers and reviewer. A task or callback with a mismatched board, profile, repository, or workspace is invalid and must be blocked before file access or mutation.
 
 Project orchestrators are interactive control-plane sessions, not dispatcher-spawned task workers. Hermes intentionally hides `kanban_list` and `kanban_unblock` whenever `HERMES_KANBAN_TASK` is set, so assigning a card to an orchestrator removes the board-routing tools it needs. Launch each controller through the tracked board-pinning wrapper (`scripts/run-jobcron-orchestrator` or `scripts/run-chapt-orchestrator`). Keep only project workers and reviewers in `kanban.dispatch_profiles`.
 
-Each project has one implementation worker. Assign implementation only to it, never to a foreign-project or legacy worker. Review revision stays on the same assignee.
+Each project has two implementation workers. Assign implementation only to them, never to a foreign-project or legacy worker. Spread independent ready cards across the two workers; keep cards that touch the same files serialized or dependency-linked. Review revision stays on the same assignee.
 
 ### Autonomous project repair budget
 
@@ -485,7 +485,7 @@ Before declaring the harness or an autonomous workstream complete, verify:
 
 - The Hermes source checkout is clean and updateable.
 - Every active profile returns its configured model identity on a fresh inference probe.
-- The dispatch allowlist contains each project's worker and reviewer plus the intended legacy lanes, excludes project orchestrators, and has no project card assigned outside its project tuple.
+- The dispatch allowlist contains each project's workers and reviewer plus the intended legacy lanes, excludes project orchestrators, and has no project card assigned outside its project tuple.
 - Board `jobcron` resolves only the Jobcron repository/workspaces and board `cha-pt` only the Cha PT repository/workspaces.
 - Fresh project profile sessions have separate state homes and return `gpt-6.1-sol` for orchestrator/worker and `gpt-6-astra` for reviewer.
 - No running implementation profile was removed during a lane swap.

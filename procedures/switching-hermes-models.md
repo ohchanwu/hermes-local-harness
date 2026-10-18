@@ -10,7 +10,7 @@ State on 2026-10-17: every active profile runs on the Claude subscription provid
 
 ## Where the GLM worker profiles are kept
 
-The owner retired the GLM workers on 2026-10-18. Each fleet now has one implementation worker (`harness-worker`, `chapt-worker`, `jobcron-worker`, `jss-worker`) plus its reviewer.
+The owner retired the GLM workers on 2026-10-18. The same day the owner added a second Opus worker to every fleet, so each fleet now has two implementation workers (`harness-worker` and `harness-worker-2`, `chapt-worker` and `chapt-worker-2`, `jobcron-worker` and `jobcron-worker-2`, `jss-worker` and `jss-worker-2`) plus its reviewer.
 
 - **On disk, unchanged:** `harness-worker-glm-1`, `harness-worker-glm-2`, `chapt-worker-glm-1`, `chapt-worker-glm-2`, `jobcron-worker-glm-1`, `jobcron-worker-glm-2`, `jss-worker-glm-1`, `jss-worker-glm-2` stay in `~/.hermes/profiles/`. They are inert. They are in no `kanban.dispatch_profiles` list, and the roster no longer manages them, so `scripts/verify-state` reports them as dormant extras and fails if one returns to a dispatch list. The legacy `worker-flash-1`, `worker-flash-2`, `worker-flash-3` and `worker-glm-full` were archived the same way.
 - **Archived copies:** `~/.hermes/profile-exports/<name>-20261018-*.tar.gz` (mode 600), made with `hermes profile export`. Exports exclude `.env` and `auth.json`.

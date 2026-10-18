@@ -35,20 +35,22 @@ PROFILE_SKILLS = {
 }
 SHARED_SKILL = ROOT / "skills/multi-agent-coding-orchestrator/SKILL.md"
 VERSIONS = {
-    PROFILE_SKILLS["jobcron-orchestrator"]: "0.6.9-jobcron.3",
-    PROFILE_SKILLS["chapt-orchestrator"]: "0.6.7-chapt.3",
-    PROFILE_SKILLS["harness-orchestrator"]: "0.6.7-harness.2",
-    PROFILE_SKILLS["jss-orchestrator"]: "0.6.7-jss.2",
-    SHARED_SKILL: "0.6.9",
+    PROFILE_SKILLS["jobcron-orchestrator"]: "0.6.9-jobcron.4",
+    PROFILE_SKILLS["chapt-orchestrator"]: "0.6.7-chapt.4",
+    PROFILE_SKILLS["harness-orchestrator"]: "0.6.7-harness.3",
+    PROFILE_SKILLS["jss-orchestrator"]: "0.6.7-jss.3",
+    SHARED_SKILL: "0.6.10",
 }
 PROCEDURE = ROOT / "procedures/switching-hermes-models.md"
 JOBCRON_SOUL = ROOT / "policies/profile-souls/jobcron-orchestrator/SOUL.md"
 JOBCRON_SOUL_LIVE = "/Users/chanbla11mit/.hermes/profiles/jobcron-orchestrator/SOUL.md"
 # The upstream live SOUL read once for t_56d81c3a; the tracked copy differs only
-# by removing the two GLM workers from the implementation pool.
+# in its implementation pool sentence (GLM workers removed, t_56d81c3a;
+# second worker added, t_b12ba0d9).
 JOBCRON_SOUL_UPSTREAM_SHA256 = "c1a69bf14dccd1ea413ba4002ae7526af7fbb38f40d125e617608d0e42c306ea"
 JOBCRON_SOUL_EDIT = (
-    b"Assign implementation only to `jobcron-worker`; assign same-card review only to `jobcron-reviewer`.",
+    b"Assign implementation only to `jobcron-worker` or `jobcron-worker-2`; assign same-card review only to "
+    b"`jobcron-reviewer`.",
     b"Assign implementation only to the Jobcron pool: `jobcron-worker`, `jobcron-worker-glm-1`, or "
     b"`jobcron-worker-glm-2`; assign same-card review only to `jobcron-reviewer`.",
 )
@@ -119,20 +121,22 @@ class DesiredState(unittest.TestCase):
         self.assertEqual(self.snapshot["project_isolation"], self.roster["project_fleets"])
         self.assertEqual(self.snapshot["approvals"], self.roster["approval_policy"])
 
-    def test_each_fleet_has_one_worker_and_its_reviewer(self):
+    def test_each_fleet_has_its_two_workers_and_its_reviewer(self):
         dispatch = self.snapshot["kanban"]["dispatch_profiles"]
         for project, prefix in FLEETS.items():
             fleet = self.roster["project_fleets"][project]
             with self.subTest(project=project):
                 self.assertEqual(fleet["worker"], f"{prefix}-worker")
-                self.assertEqual(fleet["workers"], [f"{prefix}-worker"])
+                self.assertEqual(fleet["workers"], [f"{prefix}-worker", f"{prefix}-worker-2"])
                 self.assertEqual(fleet["reviewer"], f"{prefix}-reviewer")
-                self.assertIn(fleet["worker"], dispatch)
+                for worker in fleet["workers"]:
+                    self.assertIn(worker, dispatch)
                 self.assertIn(fleet["reviewer"], dispatch)
         self.assertEqual(self.roster["project_dispatch_allowlist"], [
             "jobcron-worker", "jobcron-reviewer", "chapt-worker", "chapt-reviewer",
-            "harness-worker", "harness-reviewer", "jss-worker", "jss-reviewer"])
-        self.assertEqual(dispatch[-8:], self.roster["project_dispatch_allowlist"])
+            "harness-worker", "harness-reviewer", "jss-worker", "jss-reviewer",
+            "harness-worker-2", "chapt-worker-2", "jobcron-worker-2", "jss-worker-2"])
+        self.assertEqual(dispatch[-12:], self.roster["project_dispatch_allowlist"])
 
     def test_verifier_constants(self):
         self.assertEqual(set(self.verifier.RETIRED_PROFILES), set(GLM))
@@ -142,9 +146,9 @@ class DesiredState(unittest.TestCase):
                 for assignees in (self.verifier.CHAPT_ASSIGNEES, self.verifier.HARNESS_ASSIGNEES,
                                   self.verifier.JSS_ASSIGNEES):
                     self.assertNotIn(name, assignees)
-        self.assertEqual(self.verifier.HARNESS_ASSIGNEES, {"harness-worker", "harness-reviewer"})
-        self.assertEqual(self.verifier.CHAPT_ASSIGNEES, {"chapt-worker", "chapt-reviewer"})
-        self.assertEqual(self.verifier.JSS_ASSIGNEES, {"jss-worker", "jss-reviewer"})
+        self.assertEqual(self.verifier.HARNESS_ASSIGNEES, {"harness-worker", "harness-worker-2", "harness-reviewer"})
+        self.assertEqual(self.verifier.CHAPT_ASSIGNEES, {"chapt-worker", "chapt-worker-2", "chapt-reviewer"})
+        self.assertEqual(self.verifier.JSS_ASSIGNEES, {"jss-worker", "jss-worker-2", "jss-reviewer"})
 
     def test_verifier_rejects_glm_reentry(self):
         fleets = copy.deepcopy(self.roster["project_fleets"])
@@ -231,11 +235,11 @@ class PolicyText(unittest.TestCase):
                 self.assertIsNone(GLM_LANE.search(text))
         for prefix in ("harness", "jss"):
             text = PROFILE_SKILLS[f"{prefix}-orchestrator"].read_text()
-            self.assertIn(f"The sole implementation worker is `{prefix}-worker`.", text)
+            self.assertIn(f"The implementation workers are `{prefix}-worker` and `{prefix}-worker-2`.", text)
         for path in (PROFILE_SKILLS["jobcron-orchestrator"], PROFILE_SKILLS["chapt-orchestrator"], SHARED_SKILL):
             text = path.read_text()
-            self.assertIn("Each project has one implementation worker.", text)
-            self.assertIn("implementation worker `jobcron-worker`", text)
+            self.assertIn("Each project has two implementation workers.", text)
+            self.assertIn("implementation workers `jobcron-worker`", text)
 
     def test_current_state_docs_list_no_glm_worker(self):
         for rel in CURRENT_STATE_DOCS:
@@ -273,7 +277,7 @@ class Pins(unittest.TestCase):
             with self.subTest(skill=profile):
                 self.assertEqual(overrides[profile], {RELATIVE: sha(path)})
         shared = next(e for e in self.snapshot["skill"]["shared_skills"] if e["name"] == "multi-agent-coding-orchestrator")
-        self.assertEqual(shared["version"], "0.6.9")
+        self.assertEqual(shared["version"], "0.6.10")
         for rel, want in shared["files"].items():
             self.assertEqual(want, sha(SHARED_SKILL.parent / rel))
         provenance = self.snapshot["skill"]["source_pin_provenance"]["glm_worker_retirement"]

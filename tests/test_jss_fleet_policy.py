@@ -20,10 +20,10 @@ from unittest.mock import patch
 from incident_recovery_verify_fixture import LocalReads, ROOT, load_verifier
 
 REPO = "/Users/chanbla11mit/projects/jss-genr"
-ORCH, WORKER, REVIEWER = (
-    "jss-orchestrator", "jss-worker", "jss-reviewer")
-JSS = (ORCH, WORKER, REVIEWER)
-WORKERS = (WORKER,)
+ORCH, WORKER, WORKER2, REVIEWER = (
+    "jss-orchestrator", "jss-worker", "jss-worker-2", "jss-reviewer")
+JSS = (ORCH, WORKER, WORKER2, REVIEWER)
+WORKERS = (WORKER, WORKER2)
 FLEETS = {"jobcron", "cha-pt", "harness", "jss-genr"}
 RELATIVE = "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md"
 SKILL = ROOT / "policies/profile-skills" / ORCH / RELATIVE
@@ -107,6 +107,7 @@ class FleetDesiredState(unittest.TestCase):
         expected = {
             ORCH: ("claude-opus-5-5", "claude-subscription", "orchestrator", False),
             WORKER: ("claude-opus-5-5", "claude-subscription", "implementation", True),
+            WORKER2: ("claude-opus-5-5", "claude-subscription", "implementation", True),
             REVIEWER: ("claude-fable-5-1", "claude-subscription", "review", True),
         }
         for name, (model, provider, toolsets, dispatchable) in expected.items():
@@ -124,7 +125,8 @@ class FleetDesiredState(unittest.TestCase):
         self.assertEqual(self.snapshot["approvals"], self.roster["approval_policy"])
         self.assertEqual(self.snapshot["profiles"], list(self.profiles))
         for listing in (self.roster["project_dispatch_allowlist"], self.snapshot["kanban"]["dispatch_profiles"]):
-            self.assertEqual(listing[-2:], [*WORKERS, REVIEWER])
+            # The second worker was appended after the reviewer in the live dispatch order.
+            self.assertEqual([name for name in listing if name.startswith("jss-")], [WORKER, REVIEWER, WORKER2])
             self.assertNotIn(ORCH, listing)
 
     def test_skill_deployment_matrix(self):
@@ -277,7 +279,7 @@ class RoleContracts(unittest.TestCase):
         self.assertLessEqual(len(paragraph), 1000)
 
     def test_skill_version_size_and_sections(self):
-        self.assertRegex(self.skill_raw, r"(?m)^version: 0\.6\.7-jss\.2$")
+        self.assertRegex(self.skill_raw, r"(?m)^version: 0\.6\.7-jss\.3$")
         self.assertLessEqual(len(self.skill_raw.splitlines()), 260)
         self.assertEqual(re.findall(r"^## (.+)$", self.skill_raw, re.M), [
             "Hard Scope", "Privacy Gate", "Card Kinds", "Role Separation", "Card Contract",

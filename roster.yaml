@@ -67,15 +67,19 @@
       "worker-terra-2",
       "jobcron-orchestrator",
       "jobcron-worker",
+      "jobcron-worker-2",
       "jobcron-reviewer",
       "chapt-orchestrator",
       "chapt-worker",
+      "chapt-worker-2",
       "chapt-reviewer",
       "harness-orchestrator",
       "harness-worker",
+      "harness-worker-2",
       "harness-reviewer",
       "jss-orchestrator",
       "jss-worker",
+      "jss-worker-2",
       "jss-reviewer"
     ]
   },
@@ -413,6 +417,29 @@
       ]
     },
     {
+      "name": "jobcron-worker-2",
+      "role": "project implementation",
+      "model": "claude-opus-5-5",
+      "provider": "claude-subscription",
+      "installed": true,
+      "dispatch_eligible": true,
+      "in_dispatch_pool": true,
+      "lifecycle": "project-active",
+      "concurrency_limit": 1,
+      "required_plugins": [],
+      "modes": [
+        "project-isolated",
+        "jobcron"
+      ],
+      "toolsets": "implementation",
+      "credential_required": true,
+      "credential_present": true,
+      "installed_disabled_plugins": [
+        "ponytail",
+        "hermes-terminal-outcome-notification"
+      ]
+    },
+    {
       "name": "jobcron-reviewer",
       "role": "project independent reviewer",
       "model": "gpt-6-astra",
@@ -461,6 +488,29 @@
       "role": "project implementation",
       "model": "gpt-6.1-sol",
       "provider": "openai-codex",
+      "installed": true,
+      "dispatch_eligible": true,
+      "in_dispatch_pool": true,
+      "lifecycle": "project-active",
+      "concurrency_limit": 1,
+      "required_plugins": [],
+      "modes": [
+        "project-isolated",
+        "cha-pt"
+      ],
+      "toolsets": "implementation",
+      "credential_required": true,
+      "credential_present": true,
+      "installed_disabled_plugins": [
+        "ponytail",
+        "hermes-terminal-outcome-notification"
+      ]
+    },
+    {
+      "name": "chapt-worker-2",
+      "role": "project implementation",
+      "model": "claude-opus-5-5",
+      "provider": "claude-subscription",
       "installed": true,
       "dispatch_eligible": true,
       "in_dispatch_pool": true,
@@ -547,6 +597,29 @@
       ]
     },
     {
+      "name": "harness-worker-2",
+      "role": "project implementation",
+      "model": "claude-opus-5-5",
+      "provider": "claude-subscription",
+      "installed": true,
+      "dispatch_eligible": true,
+      "in_dispatch_pool": true,
+      "lifecycle": "project-active",
+      "concurrency_limit": 1,
+      "required_plugins": [],
+      "modes": [
+        "project-isolated",
+        "harness"
+      ],
+      "toolsets": "implementation",
+      "credential_required": true,
+      "credential_present": true,
+      "installed_disabled_plugins": [
+        "ponytail",
+        "hermes-terminal-outcome-notification"
+      ]
+    },
+    {
       "name": "harness-reviewer",
       "role": "project independent reviewer",
       "model": "gpt-6-astra",
@@ -614,6 +687,29 @@
       ]
     },
     {
+      "name": "jss-worker-2",
+      "role": "project implementation",
+      "model": "claude-opus-5-5",
+      "provider": "claude-subscription",
+      "installed": true,
+      "dispatch_eligible": true,
+      "in_dispatch_pool": true,
+      "lifecycle": "project-active",
+      "concurrency_limit": 1,
+      "required_plugins": [],
+      "modes": [
+        "project-isolated",
+        "jss-genr"
+      ],
+      "toolsets": "implementation",
+      "credential_required": true,
+      "credential_present": true,
+      "installed_disabled_plugins": [
+        "ponytail",
+        "hermes-terminal-outcome-notification"
+      ]
+    },
+    {
       "name": "jss-reviewer",
       "role": "project independent reviewer",
       "model": "claude-fable-5-1",
@@ -648,7 +744,8 @@
       "reviewer": "jobcron-reviewer",
       "preview_port": 17777,
       "workers": [
-        "jobcron-worker"
+        "jobcron-worker",
+        "jobcron-worker-2"
       ]
     },
     "cha-pt": {
@@ -664,7 +761,8 @@
       "reviewer": "chapt-reviewer",
       "preview_port": 18080,
       "workers": [
-        "chapt-worker"
+        "chapt-worker",
+        "chapt-worker-2"
       ]
     },
     "harness": {
@@ -677,7 +775,8 @@
       "worker": "harness-worker",
       "reviewer": "harness-reviewer",
       "workers": [
-        "harness-worker"
+        "harness-worker",
+        "harness-worker-2"
       ]
     },
     "jss-genr": {
@@ -690,7 +789,8 @@
       "worker": "jss-worker",
       "reviewer": "jss-reviewer",
       "workers": [
-        "jss-worker"
+        "jss-worker",
+        "jss-worker-2"
       ]
     }
   },
@@ -711,52 +811,67 @@
     "chapt-orchestrator": {
       "source": "policies/profile-souls/chapt-orchestrator/SOUL.md",
       "live": "/Users/chanbla11mit/.hermes/profiles/chapt-orchestrator/SOUL.md",
-      "sha256": "8fbb853c331dc773f482f320a55e654185d8c5360699eda58fecd40fb0d3c359"
+      "sha256": "8ad31689d6c74fd17ebc77596f0389ae112ac1fe6e8f5d7e605ad6a17389f2c2"
     },
     "chapt-worker": {
       "source": "policies/profile-souls/chapt-worker/SOUL.md",
       "live": "/Users/chanbla11mit/.hermes/profiles/chapt-worker/SOUL.md",
       "sha256": "6bd46152500f54f4955b657d80a20f31db27f2d3162845fd8194436e03c5b5ab"
     },
+    "chapt-worker-2": {
+      "source": "policies/profile-souls/chapt-worker-2/SOUL.md",
+      "live": "/Users/chanbla11mit/.hermes/profiles/chapt-worker-2/SOUL.md",
+      "sha256": "6bd46152500f54f4955b657d80a20f31db27f2d3162845fd8194436e03c5b5ab"
+    },
     "chapt-reviewer": {
       "source": "policies/profile-souls/chapt-reviewer/SOUL.md",
       "live": "/Users/chanbla11mit/.hermes/profiles/chapt-reviewer/SOUL.md",
-      "sha256": "bc3f576c27ce7b14fd86e9dd3569f6fabd4d466749db904f877d348c029f5860"
+      "sha256": "0b5f4e69cbb1ea449ad8da2311705f5e1954f59564fa42f1773f0e0bf570066f"
     },
     "harness-orchestrator": {
       "source": "policies/profile-souls/harness-orchestrator/SOUL.md",
       "live": "/Users/chanbla11mit/.hermes/profiles/harness-orchestrator/SOUL.md",
-      "sha256": "e48129502bfee166cf9bc2e0c97abf3163e8fbbe6aebf7f133aa3305131fa968"
+      "sha256": "8b9a3e7f66d57a9367a416f74a025babd7e0578be885657db4c9f29d2a6ab1fd"
     },
     "harness-worker": {
       "source": "policies/profile-souls/harness-worker/SOUL.md",
       "live": "/Users/chanbla11mit/.hermes/profiles/harness-worker/SOUL.md",
       "sha256": "8ee6127b833f8278b3ed3932aa05c77cac917ee8391ccc633474b4ce8fc1ef61"
     },
+    "harness-worker-2": {
+      "source": "policies/profile-souls/harness-worker-2/SOUL.md",
+      "live": "/Users/chanbla11mit/.hermes/profiles/harness-worker-2/SOUL.md",
+      "sha256": "8ee6127b833f8278b3ed3932aa05c77cac917ee8391ccc633474b4ce8fc1ef61"
+    },
     "harness-reviewer": {
       "source": "policies/profile-souls/harness-reviewer/SOUL.md",
       "live": "/Users/chanbla11mit/.hermes/profiles/harness-reviewer/SOUL.md",
-      "sha256": "3fb47b43935d4856e24b4722ed809b666abcdb4d76453d1318a9f480482bd176"
+      "sha256": "d46167c337aedb0ee3ac4246a6ba9420f484e336f3084ec843efc2c97d76cf66"
     },
     "jobcron-orchestrator": {
       "source": "policies/profile-souls/jobcron-orchestrator/SOUL.md",
       "live": "/Users/chanbla11mit/.hermes/profiles/jobcron-orchestrator/SOUL.md",
-      "sha256": "d05684af5981060323ddff999f05c22d845fecac44ae7690f580ba510e45d5fa"
+      "sha256": "3bd62ad5483cfcffd8f00a06f34fd1f3b471928e636a3c93b9b62e2a579fd713"
     },
     "jss-orchestrator": {
       "source": "policies/profile-souls/jss-orchestrator/SOUL.md",
       "live": "/Users/chanbla11mit/.hermes/profiles/jss-orchestrator/SOUL.md",
-      "sha256": "91ac0736c53de7e8e0ef4ab6209a2b6b11b5ed743b17a6205bab31c1634cb7e1"
+      "sha256": "5187ab980ee76e17cc18151df880b588acf1407edde418d7acf791cc9dab0480"
     },
     "jss-worker": {
       "source": "policies/profile-souls/jss-worker/SOUL.md",
       "live": "/Users/chanbla11mit/.hermes/profiles/jss-worker/SOUL.md",
       "sha256": "a3c4e1fe3881c0ed9eedb8b7c258c3fa399328e26e3a18703cf4ce22b3a7e2f4"
     },
+    "jss-worker-2": {
+      "source": "policies/profile-souls/jss-worker-2/SOUL.md",
+      "live": "/Users/chanbla11mit/.hermes/profiles/jss-worker-2/SOUL.md",
+      "sha256": "a3c4e1fe3881c0ed9eedb8b7c258c3fa399328e26e3a18703cf4ce22b3a7e2f4"
+    },
     "jss-reviewer": {
       "source": "policies/profile-souls/jss-reviewer/SOUL.md",
       "live": "/Users/chanbla11mit/.hermes/profiles/jss-reviewer/SOUL.md",
-      "sha256": "52490695d59094b54bf136045698085574f8317ca6f419f9c54e2a559c147e36"
+      "sha256": "fc7028634eb78a4567fb5566cefdb96fe0c9f3d247ab6b09af1b5b51b6fda1da"
     }
   },
   "repository_policies": {
@@ -773,6 +888,10 @@
     "harness-worker",
     "harness-reviewer",
     "jss-worker",
-    "jss-reviewer"
+    "jss-reviewer",
+    "harness-worker-2",
+    "chapt-worker-2",
+    "jobcron-worker-2",
+    "jss-worker-2"
   ]
 }

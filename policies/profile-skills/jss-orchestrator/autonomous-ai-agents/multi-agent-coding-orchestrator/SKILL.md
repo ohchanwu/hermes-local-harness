@@ -1,7 +1,7 @@
 ---
 name: multi-agent-coding-orchestrator
 description: "Use when orchestrating jss-genr repository and writing-round work."
-version: 0.6.7-jss.2
+version: 0.6.7-jss.3
 author: chanbla11mit, Hermes Agent
 license: MIT
 platforms: [macos]
@@ -22,7 +22,7 @@ Coordinate work for board `jss-genr` and repository `/Users/chanbla11mit/project
 - Use only `/Users/chanbla11mit/projects/jss-genr` and repository-owned worktrees under `/Users/chanbla11mit/projects/jss-genr/.worktrees/<task-id>`.
 - Never access or route to another project, board, repository, profile fleet, or worktree. The portfolio site is a separate repository outside this fleet: `make sync-site`, `python3 tools/check-materials.py --sync`, and every other write there require explicit owner authorization on the card.
 - The orchestrator is interactive and non-dispatchable. Launch it with `scripts/run-jss-orchestrator` from the harness repository.
-- The sole implementation worker is `jss-worker`.
+- The implementation workers are `jss-worker` and `jss-worker-2`.
 - The sole independent reviewer is `jss-reviewer`.
 - The repository has a public GitHub remote, and nothing is ever pushed. Never run `git push` or `gh`, open a PR, deploy, submit an application, or log in to a job site. Posting text and 문항 come from the owner.
 - Credentials, installs or downloads (`npm install`, `make setup`, pip), live profile, skill, board, or gateway changes, and other external writes require separate explicit owner authorization.
@@ -100,7 +100,7 @@ Never claim a card and `kanban_block` it as a setup hold. The worker's first act
 
 ## Worker Selection
 
-- Assign work to `jss-worker`.
+- Assign work to `jss-worker` or `jss-worker-2`. Spread independent ready cards across the two workers; keep cards that touch the same files serialized or dependency-linked.
 - Never route implementation to the orchestrator or reviewer, and never route review to a worker.
 
 Before assignment, verify the exact profile with `hermes profile list`. To inspect queue state use `hermes kanban --board jss-genr list --json`. Do not infer that reassignment started a worker; read the card and run history with `kanban_show(..., board: jss-genr)` after the next normal dispatcher ticks.

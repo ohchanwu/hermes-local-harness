@@ -192,10 +192,10 @@ PROFILE_SOUL_PATHS = {
         "live": f"/Users/chanbla11mit/.hermes/profiles/{profile}/SOUL.md",
     }
     for profile in (
-        "chapt-orchestrator", "chapt-worker", "chapt-reviewer",
-        "harness-orchestrator", "harness-worker", "harness-reviewer",
+        "chapt-orchestrator", "chapt-worker", "chapt-worker-2", "chapt-reviewer",
+        "harness-orchestrator", "harness-worker", "harness-worker-2", "harness-reviewer",
         "jobcron-orchestrator",
-        "jss-orchestrator", "jss-worker", "jss-reviewer",
+        "jss-orchestrator", "jss-worker", "jss-worker-2", "jss-reviewer",
     )
 }
 # Fleet GLM workers retired 2026-10-18 (procedures/switching-hermes-models.md).
@@ -215,6 +215,21 @@ def check_retired_dispatch(errors, label, profiles):
     for name in RETIRED_PROFILES:
         if name in profiles:
             fail(errors, f"retired profile back in {label}: {name}")
+
+
+def check_fleet_dispatch(errors, label, fleets, profiles, exact=False):
+    """Both workers of every fleet and its reviewer stay dispatchable; exact lists admit nothing else."""
+    if not isinstance(profiles, list) or not isinstance(fleets, dict):
+        return
+    wanted = [name for pool in PROJECT_WORKER_POOLS.values() for name in pool]
+    wanted += [fleet.get("reviewer") for fleet in fleets.values() if isinstance(fleet, dict)]
+    for name in wanted:
+        if name not in profiles:
+            fail(errors, f"project fleet profile missing from {label}: {name}")
+    if exact:
+        for name in profiles:
+            if name not in wanted:
+                fail(errors, f"unexpected profile in {label}: {name}")
 
 
 def check_profile_souls(errors, expected, observed=None):
@@ -332,9 +347,16 @@ PROJECT_LAUNCHERS = {
     "harness": "run-harness-orchestrator",
     "jss-genr": "run-jss-orchestrator",
 }
-CHAPT_ASSIGNEES = {"chapt-worker", "chapt-reviewer"}
-HARNESS_ASSIGNEES = {"harness-worker", "harness-reviewer"}
-JSS_ASSIGNEES = {"jss-worker", "jss-reviewer"}
+# Each fleet has two implementation workers (second Opus worker added 2026-10-18).
+PROJECT_WORKER_POOLS = {
+    "jobcron": ["jobcron-worker", "jobcron-worker-2"],
+    "cha-pt": ["chapt-worker", "chapt-worker-2"],
+    "harness": ["harness-worker", "harness-worker-2"],
+    "jss-genr": ["jss-worker", "jss-worker-2"],
+}
+CHAPT_ASSIGNEES = {"chapt-worker", "chapt-worker-2", "chapt-reviewer"}
+HARNESS_ASSIGNEES = {"harness-worker", "harness-worker-2", "harness-reviewer"}
+JSS_ASSIGNEES = {"jss-worker", "jss-worker-2", "jss-reviewer"}
 JSS_CARD_KIND = re.compile(r"(?m)^Card kind EXACT (repository|writing-round)\.$")
 JSS_WRITE_TARGETS = re.compile(r"(?m)^Write targets EXACT ([^\n]+)\.$")
 JSS_WRITE_TARGET = re.compile(
@@ -406,8 +428,8 @@ def check_project_isolation(errors, fleets, observed=None):
         if repos != PROJECT_REPOSITORY_ALLOWLISTS.get(project):
             fail(errors, f"project repository allowlist drift: {project}")
         workers = fleet.get("workers")
-        if (not isinstance(workers, list) or len(workers) != 1
-                or workers[0] != fleet.get("worker") or len(set(workers)) != len(workers)):
+        if (not isinstance(workers, list) or workers != PROJECT_WORKER_POOLS.get(project)
+                or workers[0] != fleet.get("worker")):
             fail(errors, f"project worker pool mapping malformed: {project}")
             workers = []
         profiles = [fleet.get("orchestrator"), *workers, fleet.get("reviewer")]
@@ -1321,6 +1343,10 @@ def main():
     check_retired_dispatch(errors, "desired dispatch_profiles", dispatch_profiles)
     check_retired_dispatch(errors, "project_dispatch_allowlist", roster.get("project_dispatch_allowlist"))
     check_retired_dispatch(errors, "approval policy profiles", approval_profiles)
+    fleets = snapshot.get("project_isolation")
+    check_fleet_dispatch(errors, "desired dispatch_profiles", fleets, dispatch_profiles)
+    check_fleet_dispatch(errors, "project_dispatch_allowlist", fleets,
+                         roster.get("project_dispatch_allowlist"), exact=True)
     if args.fixture is not None:
         try:
             observed = load(args.fixture)
@@ -1357,6 +1383,7 @@ def main():
         if "dispatch_profiles" in observed and observed["dispatch_profiles"] != dispatch_profiles:
             fail(errors, f"dispatch drift: expected {dispatch_profiles}, actual {observed['dispatch_profiles']}")
         check_retired_dispatch(errors, "dispatch_profiles", observed.get("dispatch_profiles"))
+        check_fleet_dispatch(errors, "dispatch_profiles", fleets, observed.get("dispatch_profiles"))
         models = observed.get("profile_models", {})
         providers = observed.get("profile_providers", {})
         approval_modes = observed.get("profile_approval_modes", {})
@@ -1451,6 +1478,7 @@ def main():
                 fail(errors, f"concurrency/dispatch drift kanban.{key}: expected {want!r}, actual {'<unreadable>' if actual is UNREADABLE else actual!r}")
             if key == "dispatch_profiles":
                 check_retired_dispatch(errors, "kanban.dispatch_profiles", actual)
+                check_fleet_dispatch(errors, "kanban.dispatch_profiles", fleets, actual)
         inherited_db_pin = os.environ.get("HERMES_KANBAN_DB", "").strip()
         launchd_db_pin = run("launchctl", "getenv", "HERMES_KANBAN_DB")
         if inherited_db_pin:

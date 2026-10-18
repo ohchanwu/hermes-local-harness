@@ -218,8 +218,8 @@ assert roster["terminal_retry"]["default"] == "bounded-human-block"
 assert roster["terminal_retry"]["supported_opt_in"] == "astra-until-approve-v1"
 assert roster["project_fleets"]["jobcron"]["reviewer"] == "jobcron-reviewer"
 assert roster["project_fleets"]["cha-pt"]["orchestrator"] == "chapt-orchestrator"
-assert roster["project_fleets"]["jobcron"]["workers"] == ["jobcron-worker"]
-assert roster["project_fleets"]["cha-pt"]["workers"] == ["chapt-worker"]
+assert roster["project_fleets"]["jobcron"]["workers"] == ["jobcron-worker", "jobcron-worker-2"]
+assert roster["project_fleets"]["cha-pt"]["workers"] == ["chapt-worker", "chapt-worker-2"]
 assert roster["project_fleets"]["harness"] == {
     "board": "harness",
     "repository": "/Users/chanbla11mit/hermes-local-harness",
@@ -227,7 +227,7 @@ assert roster["project_fleets"]["harness"] == {
     "orchestrator": "harness-orchestrator",
     "worker": "harness-worker",
     "reviewer": "harness-reviewer",
-    "workers": ["harness-worker"],
+    "workers": ["harness-worker", "harness-worker-2"],
 }
 assert roster["project_fleets"]["cha-pt"]["repositories"] == [
     "/Users/chanbla11mit/projects/cha-pt",
@@ -463,14 +463,16 @@ assert roster["project_dispatch_allowlist"] == [
     "jobcron-worker", "jobcron-reviewer",
     "chapt-worker", "chapt-reviewer",
     "harness-worker", "harness-reviewer",
-    "jss-worker", "jss-reviewer"]
+    "jss-worker", "jss-reviewer",
+    "harness-worker-2", "chapt-worker-2", "jobcron-worker-2", "jss-worker-2"]
 roster_profiles = {profile["name"]: profile for profile in roster["profiles"]}
 assert roster["approval_policy"]["mode"] == "off"
 assert roster["approval_policy"]["profiles"] == list(roster_profiles)
 assert not roster_profiles["jobcron-orchestrator"]["dispatch_eligible"]
 assert not roster_profiles["chapt-orchestrator"]["dispatch_eligible"]
 assert not roster_profiles["harness-orchestrator"]["dispatch_eligible"]
-project_workers = ("jobcron-worker", "chapt-worker", "harness-worker")
+project_workers = ("jobcron-worker", "jobcron-worker-2", "chapt-worker", "chapt-worker-2",
+                   "harness-worker", "harness-worker-2")
 for profile in (*project_workers, "jobcron-reviewer", "chapt-reviewer", "harness-reviewer"):
     assert roster_profiles[profile]["dispatch_eligible"]
 for profile in verify_state.RETIRED_PROFILES:
@@ -710,7 +712,7 @@ assert errors == ["unable to read open Cha PT card list"], errors
 assert "`/Users/chanbla11mit/projects/cha-pt-frontend`" in orchestrator
 assert "one exact repository" in orchestrator
 assert "Operator-protected" in orchestrator
-for profile in ("chapt-orchestrator", "chapt-worker", "chapt-reviewer"):
+for profile in ("chapt-orchestrator", "chapt-worker", "chapt-worker-2", "chapt-reviewer"):
     contract = (ROOT / "policies" / "profile-souls" / profile / "SOUL.md").read_text()
     assert "/Users/chanbla11mit/projects/cha-pt" in contract
     assert "/Users/chanbla11mit/projects/cha-pt-frontend" in contract
@@ -771,7 +773,7 @@ assert "HERMES_KANBAN_BOARD=harness" in harness_launcher_text
 assert "harness-orchestrator" in harness_launcher_text
 assert "/Users/chanbla11mit/hermes-local-harness" in harness_launcher_text
 
-for profile in ("harness-orchestrator", "harness-worker", "harness-reviewer"):
+for profile in ("harness-orchestrator", "harness-worker", "harness-worker-2", "harness-reviewer"):
     contract = (ROOT / "policies" / "profile-souls" / profile / "SOUL.md").read_text()
     contract_lower = contract.lower()
     assert "board `harness`" in contract

@@ -15,15 +15,19 @@
     "worker-terra-2": "gpt-5.6-terra",
     "jobcron-orchestrator": "gpt-6.1-sol",
     "jobcron-worker": "gpt-6.1-sol",
+    "jobcron-worker-2": "claude-opus-5-5",
     "jobcron-reviewer": "gpt-6-astra",
     "chapt-orchestrator": "gpt-6.1-sol",
     "chapt-worker": "gpt-6.1-sol",
+    "chapt-worker-2": "claude-opus-5-5",
     "chapt-reviewer": "gpt-6-astra",
     "harness-orchestrator": "gpt-6.1-sol",
     "harness-worker": "gpt-6.1-sol",
+    "harness-worker-2": "claude-opus-5-5",
     "harness-reviewer": "gpt-6-astra",
     "jss-orchestrator": "claude-opus-5-5",
     "jss-worker": "claude-opus-5-5",
+    "jss-worker-2": "claude-opus-5-5",
     "jss-reviewer": "claude-fable-5-1"
   },
   "profile_providers": {
@@ -42,15 +46,19 @@
     "worker-terra-2": "openai-codex",
     "jobcron-orchestrator": "openai-codex",
     "jobcron-worker": "openai-codex",
+    "jobcron-worker-2": "claude-subscription",
     "jobcron-reviewer": "openai-codex",
     "chapt-orchestrator": "openai-codex",
     "chapt-worker": "openai-codex",
+    "chapt-worker-2": "claude-subscription",
     "chapt-reviewer": "openai-codex",
     "harness-orchestrator": "openai-codex",
     "harness-worker": "openai-codex",
+    "harness-worker-2": "claude-subscription",
     "harness-reviewer": "openai-codex",
     "jss-orchestrator": "claude-subscription",
     "jss-worker": "claude-subscription",
+    "jss-worker-2": "claude-subscription",
     "jss-reviewer": "claude-subscription"
   },
   "plugins": {
@@ -107,6 +115,10 @@
       "hermes-terminal-outcome-notification": "disabled     git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification",
       "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail"
     },
+    "jobcron-worker-2": {
+      "hermes-terminal-outcome-notification": "disabled     git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification",
+      "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail"
+    },
     "jobcron-reviewer": {
       "hermes-terminal-outcome-notification": "disabled     git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification"
     },
@@ -114,6 +126,10 @@
       "hermes-terminal-outcome-notification": "disabled     git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification"
     },
     "chapt-worker": {
+      "hermes-terminal-outcome-notification": "disabled     git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification",
+      "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail"
+    },
+    "chapt-worker-2": {
       "hermes-terminal-outcome-notification": "disabled     git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification",
       "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail"
     },
@@ -127,6 +143,10 @@
       "hermes-terminal-outcome-notification": "disabled     git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification",
       "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail"
     },
+    "harness-worker-2": {
+      "hermes-terminal-outcome-notification": "disabled     git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification",
+      "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail"
+    },
     "harness-reviewer": {
       "hermes-terminal-outcome-notification": "disabled     git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification"
     },
@@ -134,6 +154,10 @@
       "hermes-terminal-outcome-notification": "disabled     git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification"
     },
     "jss-worker": {
+      "hermes-terminal-outcome-notification": "disabled     git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification",
+      "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail"
+    },
+    "jss-worker-2": {
       "hermes-terminal-outcome-notification": "disabled     git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification",
       "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail"
     },
@@ -151,7 +175,11 @@
     "harness-worker",
     "harness-reviewer",
     "jss-worker",
-    "jss-reviewer"
+    "jss-reviewer",
+    "harness-worker-2",
+    "chapt-worker-2",
+    "jobcron-worker-2",
+    "jss-worker-2"
   ],
   "kanban": {
     "max_in_progress": null,
@@ -160,23 +188,23 @@
   "skill_files": {
     "multi-agent-coding-orchestrator": {
       "default": {
-        "SKILL.md": "bf6c131f45d8dab75efbdf0562a8d12565c5cb5b51a66e139cef99d89aeb941b",
+        "SKILL.md": "c17d4c5499fcedcc809c4429e0ff11e537488fc17deb32774b31680b3ca1c3c5",
         "scripts/set-active-lanes.py": "157419c7c190b0a9f647271f7bd3839182f2e9324f8f9d74e43ec0553a5b77df"
       },
       "jobcron-orchestrator": {
-        "SKILL.md": "bf6c131f45d8dab75efbdf0562a8d12565c5cb5b51a66e139cef99d89aeb941b",
+        "SKILL.md": "c17d4c5499fcedcc809c4429e0ff11e537488fc17deb32774b31680b3ca1c3c5",
         "scripts/set-active-lanes.py": "157419c7c190b0a9f647271f7bd3839182f2e9324f8f9d74e43ec0553a5b77df"
       },
       "chapt-orchestrator": {
-        "SKILL.md": "bf6c131f45d8dab75efbdf0562a8d12565c5cb5b51a66e139cef99d89aeb941b",
+        "SKILL.md": "c17d4c5499fcedcc809c4429e0ff11e537488fc17deb32774b31680b3ca1c3c5",
         "scripts/set-active-lanes.py": "157419c7c190b0a9f647271f7bd3839182f2e9324f8f9d74e43ec0553a5b77df"
       },
       "harness-orchestrator": {
-        "SKILL.md": "bf6c131f45d8dab75efbdf0562a8d12565c5cb5b51a66e139cef99d89aeb941b",
+        "SKILL.md": "c17d4c5499fcedcc809c4429e0ff11e537488fc17deb32774b31680b3ca1c3c5",
         "scripts/set-active-lanes.py": "157419c7c190b0a9f647271f7bd3839182f2e9324f8f9d74e43ec0553a5b77df"
       },
       "jss-orchestrator": {
-        "SKILL.md": "bf6c131f45d8dab75efbdf0562a8d12565c5cb5b51a66e139cef99d89aeb941b",
+        "SKILL.md": "c17d4c5499fcedcc809c4429e0ff11e537488fc17deb32774b31680b3ca1c3c5",
         "scripts/set-active-lanes.py": "157419c7c190b0a9f647271f7bd3839182f2e9324f8f9d74e43ec0553a5b77df"
       }
     },
@@ -214,13 +242,25 @@
       "jobcron-worker": {
         "SKILL.md": "a017ca2b203644ce6d5bd688c0b06875bbbe3908fe9dc6212ff39098ab53d794"
       },
+      "jobcron-worker-2": {
+        "SKILL.md": "a017ca2b203644ce6d5bd688c0b06875bbbe3908fe9dc6212ff39098ab53d794"
+      },
       "chapt-worker": {
+        "SKILL.md": "a017ca2b203644ce6d5bd688c0b06875bbbe3908fe9dc6212ff39098ab53d794"
+      },
+      "chapt-worker-2": {
         "SKILL.md": "a017ca2b203644ce6d5bd688c0b06875bbbe3908fe9dc6212ff39098ab53d794"
       },
       "harness-worker": {
         "SKILL.md": "a017ca2b203644ce6d5bd688c0b06875bbbe3908fe9dc6212ff39098ab53d794"
       },
+      "harness-worker-2": {
+        "SKILL.md": "a017ca2b203644ce6d5bd688c0b06875bbbe3908fe9dc6212ff39098ab53d794"
+      },
       "jss-worker": {
+        "SKILL.md": "a017ca2b203644ce6d5bd688c0b06875bbbe3908fe9dc6212ff39098ab53d794"
+      },
+      "jss-worker-2": {
         "SKILL.md": "a017ca2b203644ce6d5bd688c0b06875bbbe3908fe9dc6212ff39098ab53d794"
       }
     },
@@ -258,13 +298,25 @@
       "jobcron-worker": {
         "SKILL.md": "d058cd37b2cf161097dfc51eafd373414603f5feb22ff22e8fe1e198679edb47"
       },
+      "jobcron-worker-2": {
+        "SKILL.md": "d058cd37b2cf161097dfc51eafd373414603f5feb22ff22e8fe1e198679edb47"
+      },
       "chapt-worker": {
+        "SKILL.md": "d058cd37b2cf161097dfc51eafd373414603f5feb22ff22e8fe1e198679edb47"
+      },
+      "chapt-worker-2": {
         "SKILL.md": "d058cd37b2cf161097dfc51eafd373414603f5feb22ff22e8fe1e198679edb47"
       },
       "harness-worker": {
         "SKILL.md": "d058cd37b2cf161097dfc51eafd373414603f5feb22ff22e8fe1e198679edb47"
       },
+      "harness-worker-2": {
+        "SKILL.md": "d058cd37b2cf161097dfc51eafd373414603f5feb22ff22e8fe1e198679edb47"
+      },
       "jss-worker": {
+        "SKILL.md": "d058cd37b2cf161097dfc51eafd373414603f5feb22ff22e8fe1e198679edb47"
+      },
+      "jss-worker-2": {
         "SKILL.md": "d058cd37b2cf161097dfc51eafd373414603f5feb22ff22e8fe1e198679edb47"
       }
     },
@@ -324,6 +376,11 @@
         "references/live-state-reconciliation.md": "67e4bcbf1ca79059ed961f99d0c008eac9d92c8c5413da83365188bffe70a9f9",
         "references/release-ci-portability.md": "e1f016b1c60f713729cb9e93c5b2090b311dea09e662f93baa09d50c04e8c3f7"
       },
+      "jobcron-worker-2": {
+        "SKILL.md": "ba500d0e84119d1ea03b2e3c6f811692a089f8134a088eb9ac6db7771c720554",
+        "references/live-state-reconciliation.md": "67e4bcbf1ca79059ed961f99d0c008eac9d92c8c5413da83365188bffe70a9f9",
+        "references/release-ci-portability.md": "e1f016b1c60f713729cb9e93c5b2090b311dea09e662f93baa09d50c04e8c3f7"
+      },
       "jobcron-orchestrator": {
         "SKILL.md": "ba500d0e84119d1ea03b2e3c6f811692a089f8134a088eb9ac6db7771c720554",
         "references/live-state-reconciliation.md": "67e4bcbf1ca79059ed961f99d0c008eac9d92c8c5413da83365188bffe70a9f9",
@@ -339,6 +396,11 @@
         "references/live-state-reconciliation.md": "67e4bcbf1ca79059ed961f99d0c008eac9d92c8c5413da83365188bffe70a9f9",
         "references/release-ci-portability.md": "e1f016b1c60f713729cb9e93c5b2090b311dea09e662f93baa09d50c04e8c3f7"
       },
+      "chapt-worker-2": {
+        "SKILL.md": "ba500d0e84119d1ea03b2e3c6f811692a089f8134a088eb9ac6db7771c720554",
+        "references/live-state-reconciliation.md": "67e4bcbf1ca79059ed961f99d0c008eac9d92c8c5413da83365188bffe70a9f9",
+        "references/release-ci-portability.md": "e1f016b1c60f713729cb9e93c5b2090b311dea09e662f93baa09d50c04e8c3f7"
+      },
       "chapt-orchestrator": {
         "SKILL.md": "ba500d0e84119d1ea03b2e3c6f811692a089f8134a088eb9ac6db7771c720554",
         "references/live-state-reconciliation.md": "67e4bcbf1ca79059ed961f99d0c008eac9d92c8c5413da83365188bffe70a9f9",
@@ -350,6 +412,11 @@
         "references/release-ci-portability.md": "e1f016b1c60f713729cb9e93c5b2090b311dea09e662f93baa09d50c04e8c3f7"
       },
       "harness-worker": {
+        "SKILL.md": "ba500d0e84119d1ea03b2e3c6f811692a089f8134a088eb9ac6db7771c720554",
+        "references/live-state-reconciliation.md": "67e4bcbf1ca79059ed961f99d0c008eac9d92c8c5413da83365188bffe70a9f9",
+        "references/release-ci-portability.md": "e1f016b1c60f713729cb9e93c5b2090b311dea09e662f93baa09d50c04e8c3f7"
+      },
+      "harness-worker-2": {
         "SKILL.md": "ba500d0e84119d1ea03b2e3c6f811692a089f8134a088eb9ac6db7771c720554",
         "references/live-state-reconciliation.md": "67e4bcbf1ca79059ed961f99d0c008eac9d92c8c5413da83365188bffe70a9f9",
         "references/release-ci-portability.md": "e1f016b1c60f713729cb9e93c5b2090b311dea09e662f93baa09d50c04e8c3f7"
@@ -421,12 +488,27 @@
         "references/temporary-cloud-bootstrap-iam.md": "6a7c5b7180221ba4b8e3ddbfa54dc68e28724c12ab2e4e8d21822b04d565c51b",
         "references/frontend-origin-separation.md": "2051367f3203d0991cbe9df0ce14428e53f7c03f91dc00df5260532a17b878e6"
       },
+      "jobcron-worker-2": {
+        "SKILL.md": "50d28337a025102b29b766627eb527e862884cbabcca810b29da5c2cfb021089",
+        "references/temporary-cloud-bootstrap-iam.md": "6a7c5b7180221ba4b8e3ddbfa54dc68e28724c12ab2e4e8d21822b04d565c51b",
+        "references/frontend-origin-separation.md": "2051367f3203d0991cbe9df0ce14428e53f7c03f91dc00df5260532a17b878e6"
+      },
       "chapt-worker": {
         "SKILL.md": "50d28337a025102b29b766627eb527e862884cbabcca810b29da5c2cfb021089",
         "references/temporary-cloud-bootstrap-iam.md": "6a7c5b7180221ba4b8e3ddbfa54dc68e28724c12ab2e4e8d21822b04d565c51b",
         "references/frontend-origin-separation.md": "2051367f3203d0991cbe9df0ce14428e53f7c03f91dc00df5260532a17b878e6"
       },
+      "chapt-worker-2": {
+        "SKILL.md": "50d28337a025102b29b766627eb527e862884cbabcca810b29da5c2cfb021089",
+        "references/temporary-cloud-bootstrap-iam.md": "6a7c5b7180221ba4b8e3ddbfa54dc68e28724c12ab2e4e8d21822b04d565c51b",
+        "references/frontend-origin-separation.md": "2051367f3203d0991cbe9df0ce14428e53f7c03f91dc00df5260532a17b878e6"
+      },
       "harness-worker": {
+        "SKILL.md": "50d28337a025102b29b766627eb527e862884cbabcca810b29da5c2cfb021089",
+        "references/temporary-cloud-bootstrap-iam.md": "6a7c5b7180221ba4b8e3ddbfa54dc68e28724c12ab2e4e8d21822b04d565c51b",
+        "references/frontend-origin-separation.md": "2051367f3203d0991cbe9df0ce14428e53f7c03f91dc00df5260532a17b878e6"
+      },
+      "harness-worker-2": {
         "SKILL.md": "50d28337a025102b29b766627eb527e862884cbabcca810b29da5c2cfb021089",
         "references/temporary-cloud-bootstrap-iam.md": "6a7c5b7180221ba4b8e3ddbfa54dc68e28724c12ab2e4e8d21822b04d565c51b",
         "references/frontend-origin-separation.md": "2051367f3203d0991cbe9df0ce14428e53f7c03f91dc00df5260532a17b878e6"
@@ -451,12 +533,12 @@
     {
       "repo": "harness",
       "content": "Status: operational; attended live rollout verified.",
-      "record": "# Hermes local harness adoption\n\nAdapter: `/Users/chanbla11mit/hermes-local-harness/docs/specs/261004-concurrent-project-fleets.md`.\n\nStatus: operational; attended live rollout verified. Board `harness` is rooted solely at `/Users/chanbla11mit/hermes-local-harness` and routes only through `harness-orchestrator`, the worker `harness-worker`, and `harness-reviewer`. The orchestrator and worker use `openai-codex/gpt-6.1-sol`; the reviewer uses `openai-codex/gpt-6-astra`. Fresh inference probes succeeded for all five profiles.\n\nHarness work is local-only by default. Local commits are permitted only in isolated task worktrees. Pushes, PRs, live profile or skill deployment, board or gateway changes, credentials, production/cloud mutations, and other external writes require separate explicit human authorization. `docs/bugs/` entries are evidence and triage input, not automatic implementation authorization. The harness orchestrator may not autonomously modify or deploy its own active live policy; repository policy changes require same-card `harness-reviewer` review, and live rollout is separately attended.\n"
+      "record": "# Hermes local harness adoption\n\nAdapter: `/Users/chanbla11mit/hermes-local-harness/docs/specs/261004-concurrent-project-fleets.md`.\n\nStatus: operational; attended live rollout verified. Board `harness` is rooted solely at `/Users/chanbla11mit/hermes-local-harness` and routes only through `harness-orchestrator`, the workers `harness-worker` and `harness-worker-2`, and `harness-reviewer`. The orchestrator and `harness-worker` use `openai-codex/gpt-6.1-sol`; `harness-worker-2` uses `claude-subscription/claude-opus-5-5`; the reviewer uses `openai-codex/gpt-6-astra`. Fresh inference probes succeeded for all five profiles.\n\nHarness work is local-only by default. Local commits are permitted only in isolated task worktrees. Pushes, PRs, live profile or skill deployment, board or gateway changes, credentials, production/cloud mutations, and other external writes require separate explicit human authorization. `docs/bugs/` entries are evidence and triage input, not automatic implementation authorization. The harness orchestrator may not autonomously modify or deploy its own active live policy; repository policy changes require same-card `harness-reviewer` review, and live rollout is separately attended.\n"
     },
     {
       "repo": "jss-genr",
       "content": "**This repo is pushed publicly.**",
-      "record": "# jss-genr adoption\n\nAdapter: `/Users/chanbla11mit/projects/jss-genr/CLAUDE.md` (the repository's own agent rules, adopted unchanged; this fleet never writes it outside an owner-scoped repository card). The verifier's adapter marker is the repository's public-push privacy boundary.\n\nStatus: defined in repository source; live setup pending. Board `jss-genr` is rooted solely at `/Users/chanbla11mit/projects/jss-genr` and routes only through `jss-orchestrator`, the worker `jss-worker`, and `jss-reviewer`. The orchestrator and worker use `claude-subscription/claude-opus-5-5`; the reviewer uses `claude-subscription/claude-fable-5-1`. There is no preview-port contract. Launch the controller with `scripts/run-jss-orchestrator`.\n\nTwo card kinds, declared on every card: repository cards (`tools/`, `resume/` HTML/PDF build and QA, `guides/`, `CLAUDE.md`, `README.md`) work in an isolated worktree with executable tests, one local candidate commit, same-card `jss-reviewer` review, and controller local integration; writing-round cards (\uc790\uae30\uc18c\uac1c\uc11c Workflow A rounds, resume or portfolio copy rounds) use the worktree only as the dispatch workspace and create only their declared new numbered files under `companies/<slug>/drafts/` in the main checkout, with no commit. Existing drafts are never overwritten or deleted.\n\nPrivacy is a hard gate: nothing from `profile/`, `companies/`, or `resume/resources/` is copied into tracked files, commits, card bodies, comments, handoffs, or Telegram summaries beyond the company slug and file names. The repository has a public GitHub remote; the fleet never pushes, opens PRs, deploys, submits applications, or logs in to job sites. Writes to the separate portfolio site repository (`make sync-site`, `tools/check-materials.py --sync`), installs, credentials, and live profile, skill, board, or gateway changes require separate explicit owner authorization.\n\nGT dependency: none.\n"
+      "record": "# jss-genr adoption\n\nAdapter: `/Users/chanbla11mit/projects/jss-genr/CLAUDE.md` (the repository's own agent rules, adopted unchanged; this fleet never writes it outside an owner-scoped repository card). The verifier's adapter marker is the repository's public-push privacy boundary.\n\nStatus: defined in repository source; live setup pending. Board `jss-genr` is rooted solely at `/Users/chanbla11mit/projects/jss-genr` and routes only through `jss-orchestrator`, the workers `jss-worker` and `jss-worker-2`, and `jss-reviewer`. The orchestrator and both workers use `claude-subscription/claude-opus-5-5`; the reviewer uses `claude-subscription/claude-fable-5-1`. There is no preview-port contract. Launch the controller with `scripts/run-jss-orchestrator`.\n\nTwo card kinds, declared on every card: repository cards (`tools/`, `resume/` HTML/PDF build and QA, `guides/`, `CLAUDE.md`, `README.md`) work in an isolated worktree with executable tests, one local candidate commit, same-card `jss-reviewer` review, and controller local integration; writing-round cards (\uc790\uae30\uc18c\uac1c\uc11c Workflow A rounds, resume or portfolio copy rounds) use the worktree only as the dispatch workspace and create only their declared new numbered files under `companies/<slug>/drafts/` in the main checkout, with no commit. Existing drafts are never overwritten or deleted.\n\nPrivacy is a hard gate: nothing from `profile/`, `companies/`, or `resume/resources/` is copied into tracked files, commits, card bodies, comments, handoffs, or Telegram summaries beyond the company slug and file names. The repository has a public GitHub remote; the fleet never pushes, opens PRs, deploys, submits applications, or logs in to job sites. Writes to the separate portfolio site repository (`make sync-site`, `tools/check-materials.py --sync`), installs, credentials, and live profile, skill, board, or gateway changes require separate explicit owner authorization.\n\nGT dependency: none.\n"
     }
   ],
   "terminal_notification_runtime": {
@@ -479,16 +561,16 @@
       "software-development/test-driven-development/SKILL.md": "9e9a4bb630506f4f3b4ff19cca80bb464e57db19b8a175959388d2112fc096ff"
     },
     "jobcron-orchestrator": {
-      "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md": "3490572d31ef930ef57257fad092d99ba34d799fb0579c87629d41e4f0f127ea"
+      "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md": "fe96e5b7831d73427a906081de9ea603e7094fe89a8f52f1092bd02cc70dca92"
     },
     "chapt-orchestrator": {
-      "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md": "ff0a7f380f77ede2e429c497329fea3a4660889a5dc2801e4072cb62bb66a0c2"
+      "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md": "c963e090ef2f19929b01a8cd3581f1b6e87501d6371439e27e3e7573469fdf62"
     },
     "harness-orchestrator": {
-      "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md": "929e89dc132b34b47bc85e64769c7c272bf8b11c44302c58f67dfaa376e4336a"
+      "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md": "d91b241db42b2a5125cad3e07fc67b1f51fe7fb16bfd86bf5175fade258c55aa"
     },
     "jss-orchestrator": {
-      "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md": "a01f082ac903ccb7a0a8d3924508ba1be6198edd4fce0046c647c593a6b4b09a"
+      "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md": "1cda27b0f963a8f1d02fb3cc38d0921f3954edbb9a0e49b49d03366ae3e85379"
     }
   },
   "terminal_retry_policy": {
@@ -528,7 +610,8 @@
       "reviewer": "jobcron-reviewer",
       "preview_port": 17777,
       "workers": [
-        "jobcron-worker"
+        "jobcron-worker",
+        "jobcron-worker-2"
       ]
     },
     "cha-pt": {
@@ -544,7 +627,8 @@
       "reviewer": "chapt-reviewer",
       "preview_port": 18080,
       "workers": [
-        "chapt-worker"
+        "chapt-worker",
+        "chapt-worker-2"
       ]
     },
     "harness": {
@@ -557,7 +641,8 @@
       "worker": "harness-worker",
       "reviewer": "harness-reviewer",
       "workers": [
-        "harness-worker"
+        "harness-worker",
+        "harness-worker-2"
       ]
     },
     "jss-genr": {
@@ -570,7 +655,8 @@
       "worker": "jss-worker",
       "reviewer": "jss-reviewer",
       "workers": [
-        "jss-worker"
+        "jss-worker",
+        "jss-worker-2"
       ]
     }
   },
@@ -590,28 +676,35 @@
     "worker-terra-2": "off",
     "jobcron-orchestrator": "off",
     "jobcron-worker": "off",
+    "jobcron-worker-2": "off",
     "jobcron-reviewer": "off",
     "chapt-orchestrator": "off",
     "chapt-worker": "off",
+    "chapt-worker-2": "off",
     "chapt-reviewer": "off",
     "harness-orchestrator": "off",
     "harness-worker": "off",
+    "harness-worker-2": "off",
     "harness-reviewer": "off",
     "jss-orchestrator": "off",
     "jss-worker": "off",
+    "jss-worker-2": "off",
     "jss-reviewer": "off"
   },
   "profile_soul_hashes": {
-    "chapt-orchestrator": "8fbb853c331dc773f482f320a55e654185d8c5360699eda58fecd40fb0d3c359",
+    "chapt-orchestrator": "8ad31689d6c74fd17ebc77596f0389ae112ac1fe6e8f5d7e605ad6a17389f2c2",
     "chapt-worker": "6bd46152500f54f4955b657d80a20f31db27f2d3162845fd8194436e03c5b5ab",
-    "chapt-reviewer": "bc3f576c27ce7b14fd86e9dd3569f6fabd4d466749db904f877d348c029f5860",
-    "harness-orchestrator": "e48129502bfee166cf9bc2e0c97abf3163e8fbbe6aebf7f133aa3305131fa968",
+    "chapt-worker-2": "6bd46152500f54f4955b657d80a20f31db27f2d3162845fd8194436e03c5b5ab",
+    "chapt-reviewer": "0b5f4e69cbb1ea449ad8da2311705f5e1954f59564fa42f1773f0e0bf570066f",
+    "harness-orchestrator": "8b9a3e7f66d57a9367a416f74a025babd7e0578be885657db4c9f29d2a6ab1fd",
     "harness-worker": "8ee6127b833f8278b3ed3932aa05c77cac917ee8391ccc633474b4ce8fc1ef61",
-    "harness-reviewer": "3fb47b43935d4856e24b4722ed809b666abcdb4d76453d1318a9f480482bd176",
-    "jobcron-orchestrator": "d05684af5981060323ddff999f05c22d845fecac44ae7690f580ba510e45d5fa",
-    "jss-orchestrator": "91ac0736c53de7e8e0ef4ab6209a2b6b11b5ed743b17a6205bab31c1634cb7e1",
+    "harness-worker-2": "8ee6127b833f8278b3ed3932aa05c77cac917ee8391ccc633474b4ce8fc1ef61",
+    "harness-reviewer": "d46167c337aedb0ee3ac4246a6ba9420f484e336f3084ec843efc2c97d76cf66",
+    "jobcron-orchestrator": "3bd62ad5483cfcffd8f00a06f34fd1f3b471928e636a3c93b9b62e2a579fd713",
+    "jss-orchestrator": "5187ab980ee76e17cc18151df880b588acf1407edde418d7acf791cc9dab0480",
     "jss-worker": "a3c4e1fe3881c0ed9eedb8b7c258c3fa399328e26e3a18703cf4ce22b3a7e2f4",
-    "jss-reviewer": "52490695d59094b54bf136045698085574f8317ca6f419f9c54e2a559c147e36"
+    "jss-worker-2": "a3c4e1fe3881c0ed9eedb8b7c258c3fa399328e26e3a18703cf4ce22b3a7e2f4",
+    "jss-reviewer": "fc7028634eb78a4567fb5566cefdb96fe0c9f3d247ab6b09af1b5b51b6fda1da"
   },
   "repository_policy_hashes": {
     "cha-pt-frontend": "113b81fd55294cfc3057f66163e1745d590f520003997d36c85b46c938342817"

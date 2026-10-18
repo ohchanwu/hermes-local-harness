@@ -1,7 +1,7 @@
 ---
 name: multi-agent-coding-orchestrator
 description: "Use when orchestrating Harness repository work."
-version: 0.6.7-harness.2
+version: 0.6.7-harness.3
 author: chanbla11mit, Hermes Agent
 license: MIT
 platforms: [macos]
@@ -22,7 +22,7 @@ Coordinate specification-driven work for board `harness` and repository `/Users/
 - Use only `/Users/chanbla11mit/hermes-local-harness` and repository-owned worktrees under `/Users/chanbla11mit/hermes-local-harness/.worktrees/<task-id>`.
 - Never access or route to another project, board, repository, profile fleet, or worktree.
 - The orchestrator is interactive and non-dispatchable. Launch it with `scripts/run-harness-orchestrator`.
-- The sole implementation worker is `harness-worker`.
+- The implementation workers are `harness-worker` and `harness-worker-2`.
 - The sole independent reviewer is `harness-reviewer`.
 - Files under `docs/bugs/` are evidence and triage input, not implementation authorization.
 - Repository work is local-only unless the human separately authorizes an external action.
@@ -73,7 +73,7 @@ At creation Hermes records `workspace_path` as the repository root; the dispatch
 
 ## Worker Selection
 
-- Assign implementation to `harness-worker`.
+- Assign implementation to `harness-worker` or `harness-worker-2`. Spread independent ready cards across the two workers; keep cards that touch the same files serialized or dependency-linked.
 - Never route implementation to the orchestrator or reviewer.
 - Never route review to an implementation worker.
 
