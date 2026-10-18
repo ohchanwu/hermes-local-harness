@@ -537,7 +537,7 @@
     {
       "repo": "jss-genr",
       "content": "**This repo is pushed publicly.**",
-      "record": "# jss-genr adoption\n\nAdapter: `/Users/chanbla11mit/projects/jss-genr/CLAUDE.md` (the repository's own agent rules, adopted unchanged; this fleet never writes it outside an owner-scoped repository card). The verifier's adapter marker is the repository's public-push privacy boundary.\n\nStatus: defined in repository source; live setup pending. Board `jss-genr` is rooted solely at `/Users/chanbla11mit/projects/jss-genr` and routes only through `jss-orchestrator`, the workers `jss-worker` and `jss-worker-2`, and `jss-reviewer`. The orchestrator and both workers use `claude-subscription/claude-opus-5-5`; the reviewer uses `claude-subscription/claude-fable-5-1`. There is no preview-port contract. Launch the controller with `scripts/run-jss-orchestrator`.\n\nTwo card kinds, declared on every card: repository cards (`tools/`, `resume/` HTML/PDF build and QA, `guides/`, `CLAUDE.md`, `README.md`) work in an isolated worktree with executable tests, one local candidate commit, same-card `jss-reviewer` review, and controller local integration; writing-round cards (\uc790\uae30\uc18c\uac1c\uc11c Workflow A rounds, resume or portfolio copy rounds) use the worktree only as the dispatch workspace and create only their declared new numbered files under `companies/<slug>/drafts/` in the main checkout, with no commit. Existing drafts are never overwritten or deleted.\n\nPrivacy is a hard gate: nothing from `profile/`, `companies/`, or `resume/resources/` is copied into tracked files, commits, card bodies, comments, handoffs, or Telegram summaries beyond the company slug and file names. The repository has a public GitHub remote; the fleet never pushes, opens PRs, deploys, submits applications, or logs in to job sites. Writes to the separate portfolio site repository (`make sync-site`, `tools/check-materials.py --sync`), installs, credentials, and live profile, skill, board, or gateway changes require separate explicit owner authorization.\n\nGT dependency: none.\n"
+      "record": "# jss-genr adoption\n\nAdapter: `/Users/chanbla11mit/projects/jss-genr/CLAUDE.md` (the repository's own agent rules, adopted unchanged; this fleet never writes it outside an owner-scoped repository card). The verifier's adapter marker is the repository's public-push privacy boundary.\n\nStatus: defined in repository source; live setup pending. Board `jss-genr` is rooted solely at `/Users/chanbla11mit/projects/jss-genr` and routes only through `jss-orchestrator`, the workers `jss-worker` and `jss-worker-2`, and `jss-reviewer`. The orchestrator and both workers use `claude-subscription/claude-opus-5-5`; the reviewer uses `claude-subscription/claude-fable-5-1`. There is no preview-port contract. Launch the controller with `scripts/run-jss-orchestrator`.\n\nTwo card kinds, declared on every card: repository cards (`tools/`, `resume/` HTML/PDF build and QA, `guides/`, `CLAUDE.md`, `README.md`) work in an isolated worktree with executable tests, one local candidate commit, same-card `jss-reviewer` review, and controller local integration; writing-round cards (\uc790\uae30\uc18c\uac1c\uc11c Workflow A rounds, resume or portfolio copy rounds) use the worktree only as the dispatch workspace and create only their declared new files under `profile/` or one `companies/<slug>/` (normally numbered drafts under `companies/<slug>/drafts/`) in the main checkout, with no commit. Existing drafts are never overwritten or deleted.\n\nPrivacy is a hard gate: nothing from `profile/`, `companies/`, or `resume/resources/` is copied into tracked files, commits, card bodies, comments, handoffs, or Telegram summaries beyond the company slug and file names. The repository has a public GitHub remote; the fleet never pushes, opens PRs, deploys, submits applications, or logs in to job sites. Writes to the separate portfolio site repository (`make sync-site`, `tools/check-materials.py --sync`), installs, credentials, and live profile, skill, board, or gateway changes require separate explicit owner authorization.\n\nGT dependency: none.\n"
     }
   ],
   "terminal_notification_runtime": {
@@ -569,7 +569,7 @@
       "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md": "d91b241db42b2a5125cad3e07fc67b1f51fe7fb16bfd86bf5175fade258c55aa"
     },
     "jss-orchestrator": {
-      "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md": "599dc4d0c2ca2b8b0a6fd7de7711af06854ee9036c21cdb2df25fcfccd9c2519"
+      "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md": "0b5d6aeb5459b197d07da79398f9d97f2d23814ea1d6291a993a8c2dbf2c1edd"
     }
   },
   "terminal_retry_policy": {
@@ -700,10 +700,10 @@
     "harness-worker-2": "8ee6127b833f8278b3ed3932aa05c77cac917ee8391ccc633474b4ce8fc1ef61",
     "harness-reviewer": "d46167c337aedb0ee3ac4246a6ba9420f484e336f3084ec843efc2c97d76cf66",
     "jobcron-orchestrator": "3bd62ad5483cfcffd8f00a06f34fd1f3b471928e636a3c93b9b62e2a579fd713",
-    "jss-orchestrator": "99dd9aa1d8574b5b41203f08058e95a54fc33428cca0437d70bbb7e0cf5aec1a",
-    "jss-worker": "b640041cb3051150bc6acfaa0559465e248f2bffbb3a0c2b897bf643fac98582",
-    "jss-worker-2": "b640041cb3051150bc6acfaa0559465e248f2bffbb3a0c2b897bf643fac98582",
-    "jss-reviewer": "511323e318df6ee6acc542c9b93ac33fdf3cc9d68d19cdc666f1d91d2d3aaf5c"
+    "jss-orchestrator": "74b1248127cb5f5674c5649bba9bd2cd61e0cfa2f064395fec97058c537ddf23",
+    "jss-worker": "c53c3147dc2b6979312208cacf37aad80f627f8fbaada2094439eefc9d77af32",
+    "jss-worker-2": "c53c3147dc2b6979312208cacf37aad80f627f8fbaada2094439eefc9d77af32",
+    "jss-reviewer": "6d20c970e3775a3888731c3330928ea9f24ed8c40d8a5a742e59170091fb7334"
   },
   "repository_policy_hashes": {
     "cha-pt-frontend": "113b81fd55294cfc3057f66163e1745d590f520003997d36c85b46c938342817"

@@ -7,6 +7,7 @@ import os
 import re
 import subprocess
 import sys
+import unicodedata
 from pathlib import Path, PurePosixPath
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -359,8 +360,11 @@ HARNESS_ASSIGNEES = {"harness-worker", "harness-worker-2", "harness-reviewer"}
 JSS_ASSIGNEES = {"jss-worker", "jss-worker-2", "jss-reviewer"}
 JSS_CARD_KIND = re.compile(r"(?m)^Card kind EXACT (repository|writing-round)\.$")
 JSS_WRITE_TARGETS = re.compile(r"(?m)^Write targets EXACT ([^\n]+)\.$")
-JSS_WRITE_TARGET = re.compile(
-    r"^(?:companies/([a-z0-9][a-z0-9-]*)/[A-Za-z0-9._/-]+\.md|profile/(?:facts|voice)\.md)$")
+# Writing-round targets: new files at any depth under `profile/` or one `companies/<slug>/`.
+JSS_WRITE_TARGET_SEPARATOR = re.compile(r", ?")
+JSS_COMPANY_SLUG = re.compile(r"[a-z0-9][a-z0-9-]*")
+# Backslashes and glob metacharacters never name one concrete repository-relative file.
+JSS_WRITE_TARGET_FORBIDDEN = re.compile(r"[\\*?\[\]]")
 # jss-genr defines its own executable checks in addition to the generic forms.
 JSS_TEST_COMMAND_LINE = re.compile(
     r"(?im)^\s*(?:[-*]\s+)?`{0,3}\s*(?:"
@@ -919,19 +923,32 @@ def check_harness_card_contract(errors, tasks):
                             "harness-reviewer", (TEST_COMMAND_LINE,))
 
 
+def jss_write_target_text_valid(text):
+    """One item: non-empty, unpadded, printable, no backslash or glob metacharacter."""
+    return bool(text) and text == text.strip() and not JSS_WRITE_TARGET_FORBIDDEN.search(text) and not any(
+        unicodedata.category(char)[0] == "C" or unicodedata.category(char) in ("Zl", "Zp") for char in text)
+
+
 def jss_write_targets_valid(declaration):
-    """Writing-round targets: concrete relative files under one company folder or profile facts/voice."""
-    targets = [item.strip() for item in declaration.split(",")]
+    """Writing-round targets: normalized relative files under `profile/` or one `companies/<slug>/`.
+
+    Any depth and extension; a bare root or company directory is not a file.
+    Create-only (no existing target) is enforced by the worker, not here.
+    """
     slugs = set()
-    for target in targets:
-        match = JSS_WRITE_TARGET.fullmatch(target)
-        parts = PurePosixPath(target).parts
-        if (not match or str(PurePosixPath(target)) != target
-                or "." in parts or ".." in parts):
+    for target in JSS_WRITE_TARGET_SEPARATOR.split(declaration):
+        if not jss_write_target_text_valid(target):
             return False
-        if match.group(1):
-            slugs.add(match.group(1))
-    return bool(targets) and len(slugs) <= 1
+        parts = target.split("/")
+        if any(not part or part in (".", "..") or part != part.strip() for part in parts):
+            return False
+        if parts[0] == "profile" and len(parts) >= 2:
+            continue
+        if parts[0] == "companies" and len(parts) >= 3 and JSS_COMPANY_SLUG.fullmatch(parts[1]):
+            slugs.add(parts[1])
+            continue
+        return False
+    return len(slugs) <= 1
 
 
 def check_jss_card_contract(errors, tasks):

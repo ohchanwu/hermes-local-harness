@@ -269,6 +269,33 @@ class RoleContracts(unittest.TestCase):
                 self.assertIn("never install, download, or commit dependencies", body)
                 self.assertIn("Never delegate", body)
 
+    def test_write_scope_is_new_files_under_profile_or_one_company(self):
+        # Owner, 2026-10-18: scope widened; create-only and the privacy gate unchanged.
+        scope = "declared new files under `profile/` or one `companies/<slug>/`"
+        for profile, text in self.souls.items():
+            with self.subTest(profile=profile):
+                self.assertIn(scope, flat(text))
+                self.assertNotIn("declared new numbered files", text)
+        for marker in (
+                "Each target is a new file at any depth under `profile/` or one `companies/<slug>/`.",
+                "new files under `profile/` or one `companies/<slug>/` (or owner-confirmed "
+                "`profile/facts.md` / `profile/voice.md`)",
+                "the targets must not exist yet",
+                "create each target exclusively and fail if it exists",
+                "Never overwrite, rename, or delete an existing draft or any other file",
+                "only when the card records the owner's confirmation by date and notes-file reference"):
+            self.assertIn(marker, self.skill)
+        for profile in WORKERS:
+            with self.subTest(profile=profile):
+                body = flat(self.souls[profile])
+                self.assertIn("create each exclusively and block if a target already exists", body)
+                self.assertIn("Never overwrite, rename, or delete an existing draft", body)
+                self.assertIn("unless the card records the owner's confirmation for that exact `CLAUDE.md` step",
+                              body)
+        self.assertEqual(soul_path(WORKER).read_bytes(), soul_path(WORKER2).read_bytes())
+        self.assertIn(scope + " (normally numbered drafts under `companies/<slug>/drafts/`)",
+                      flat(ADOPTION.read_text()))
+
     def test_workers_carry_identical_privacy_paragraph(self):
         paragraphs = {profile: [p for p in self.souls[profile].split("\n\n") if "Privacy is a hard gate" in p]
                       for profile in WORKERS}
@@ -297,7 +324,7 @@ class RoleContracts(unittest.TestCase):
         self.assertLessEqual(len(paragraph), 1000)
 
     def test_skill_version_size_and_sections(self):
-        self.assertRegex(self.skill_raw, r"(?m)^version: 0\.6\.7-jss\.4$")
+        self.assertRegex(self.skill_raw, r"(?m)^version: 0\.6\.7-jss\.5$")
         self.assertLessEqual(len(self.skill_raw.splitlines()), 260)
         self.assertEqual(re.findall(r"^## (.+)$", self.skill_raw, re.M), [
             "Hard Scope", "Privacy Gate", "Card Kinds", "Role Separation", "Card Contract",
@@ -443,21 +470,46 @@ class CardContract(unittest.TestCase):
                 self.assertTrue(any(expected in error for error in errors), errors)
 
     def test_write_targets_are_concrete_and_single_company(self):
+        # Owner, 2026-10-18: any new file under `profile/` or one `companies/<slug>/`.
         valid = self.verifier.jss_write_targets_valid
-        self.assertTrue(valid("companies/acme-backend/drafts/ko-v3.md, companies/acme-backend/drafts/notes-v3.md"))
-        self.assertTrue(valid("profile/facts.md, companies/acme-backend/final.md"))
         for declaration in (
-                "companies/acme-backend/drafts/ko-v3.md, companies/other-role/drafts/ko-v1.md",
+                "profile/notes.md",
+                "profile/research/2026/a.txt",
+                "companies/acme/drafts/ko-v3.md",
+                "companies/acme/research/x.pdf",
+                "companies/acme/a.md, profile/b.md",
+                "companies/acme-backend/drafts/ko-v3.md, companies/acme-backend/drafts/notes-v3.md",
+                "profile/facts.md, companies/acme-backend/final.md",
+                "companies/acme/README"):
+            with self.subTest(accept=declaration):
+                self.assertTrue(valid(declaration))
+        for declaration in (
+                "", "companies/acme/a.md,", ",companies/acme/a.md", "companies/acme/a.md,,profile/b.md",
+                "/Users/chanbla11mit/projects/jss-genr/companies/acme/drafts/ko-v3.md", "/profile/a.md",
+                "profile\\a.md", "companies\\acme\\a.md",
+                "profile/a\x07.md", "profile/a\t.md", "profile/a\r.md", "profile/a\x7f.md",
+                " profile/a.md", "profile/a.md ", "companies/acme/a.md,  profile/b.md",
+                "companies/acme/a.md , profile/b.md", "companies/acme/ a.md",
+                "profile/./a.md", "./profile/a.md", "profile/../a.md", "companies/acme/../beta/a.md",
                 "companies/acme-backend/../other/drafts/ko-v1.md",
+                "profile//a.md", "companies/acme//a.md", "profile/a/", "companies/acme/drafts/",
+                "profile", "profile/", "companies/acme", "companies/acme/", "companies",
+                "companies/acme/a.md, companies/beta/b.md",
+                "companies/acme-backend/drafts/ko-v3.md, profile/a.md, companies/other-role/drafts/ko-v1.md",
+                "companies/Acme/drafts/ko-v1.md", "companies/-acme/a.md", "companies/acme_x/a.md",
                 "companies/acme-backend/drafts/*.md",
-                "/Users/chanbla11mit/projects/jss-genr/companies/acme-backend/drafts/ko-v3.md",
-                "profile/sensitive.md",
-                "resume/resume-en/resume-en.html",
-                "companies/Acme/drafts/ko-v1.md",
-                "companies/acme-backend//drafts/ko-v1.md",
-                ""):
-            with self.subTest(declaration=declaration):
+                "resume/resume-en/resume-en.html", "resume/resources/a.pdf", "tools/x.py", "CLAUDE.md",
+                "guides/review.md", "profiles/a.md"):
+            with self.subTest(reject=declaration):
                 self.assertFalse(valid(declaration))
+
+    def test_widened_targets_pass_the_card_contract(self):
+        body = WRITING_BODY.replace(
+            "Write targets EXACT companies/acme-backend/drafts/ko-v2.md, companies/acme-backend/drafts/notes-v2.md.",
+            "Write targets EXACT companies/acme-backend/research/x.pdf, profile/research/2026/a.txt.")
+        self.assertEqual(self.errors([card(body)]), [])
+        two = WRITING_BODY.replace("companies/acme-backend/drafts/notes-v2.md", "companies/beta/drafts/notes-v2.md")
+        self.assertTrue(any("writing-round write targets invalid" in error for error in self.errors([card(two)])))
 
     def test_boards_do_not_cross_check(self):
         harness_card = card(REPOSITORY_BODY, board="harness")

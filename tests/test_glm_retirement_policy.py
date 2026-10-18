@@ -38,7 +38,7 @@ VERSIONS = {
     PROFILE_SKILLS["jobcron-orchestrator"]: "0.6.9-jobcron.4",
     PROFILE_SKILLS["chapt-orchestrator"]: "0.6.7-chapt.4",
     PROFILE_SKILLS["harness-orchestrator"]: "0.6.7-harness.3",
-    PROFILE_SKILLS["jss-orchestrator"]: "0.6.7-jss.4",
+    PROFILE_SKILLS["jss-orchestrator"]: "0.6.7-jss.5",
     SHARED_SKILL: "0.6.10",
 }
 PROCEDURE = ROOT / "procedures/switching-hermes-models.md"

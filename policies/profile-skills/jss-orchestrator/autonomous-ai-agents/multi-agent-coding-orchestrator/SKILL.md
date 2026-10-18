@@ -1,7 +1,7 @@
 ---
 name: multi-agent-coding-orchestrator
 description: "Use when orchestrating jss-genr repository and writing-round work."
-version: 0.6.7-jss.4
+version: 0.6.7-jss.5
 author: chanbla11mit, Hermes Agent
 license: MIT
 platforms: [macos]
@@ -52,7 +52,7 @@ Repository card: `tools/`, `resume/` HTML/PDF build and QA, `guides/`, `CLAUDE.m
 Writing-round card: 자기소개서 Workflow A rounds and resume or portfolio copy rounds.
 
 - The worktree is only the dispatch workspace. Read `profile/` and `companies/<slug>/` from the main checkout `/Users/chanbla11mit/projects/jss-genr`.
-- Declare `Write targets EXACT <comma-separated repository-relative files>.` Normally these are the next numbered `companies/<slug>/drafts/ko-vN.md` and `companies/<slug>/drafts/notes-vN.md` per `CLAUDE.md`. Choose N from the current drafts listing; the targets must not exist yet.
+- Declare `Write targets EXACT <comma-separated repository-relative files>.` Each target is a new file at any depth under `profile/` or one `companies/<slug>/`. Normally these are the next numbered `companies/<slug>/drafts/ko-vN.md` and `companies/<slug>/drafts/notes-vN.md` per `CLAUDE.md`. Choose N from the current drafts listing; the targets must not exist yet.
 - Never overwrite, rename, or delete an existing draft or any other file; create each target exclusively and fail if it exists. Never write elsewhere in `profile/` or `companies/` except a step `CLAUDE.md` assigns to an owner-confirmed action (intake files, `final.md`, `profile/facts.md`, `profile/voice.md`), and only when the card records the owner's confirmation by date and notes-file reference.
 - Tests: `python3 tools/charcount.py companies/<slug>/drafts/ko-vN.md`, with `--limit` when the limit is known. No commit.
 - Review: `jss-reviewer` checks the new files against the `CLAUDE.md` hard rules, `guides/review.md`, and `.claude/agents/jss-reviewer.md`. It writes findings to one new `companies/<slug>/reviews/ko-vN-review.md` and returns only the verdict and file name on the card.
@@ -74,7 +74,7 @@ Every card must contain:
 2. Workspace kind `worktree` and exact path `/Users/chanbla11mit/projects/jss-genr/.worktrees/<task-id>`.
 3. `Baseline EXACT <40-hex-commit>.`
 4. `Card kind EXACT repository.` or `Card kind EXACT writing-round.`
-5. Writing rounds only: `Write targets EXACT <files>.` under one `companies/<slug>/` (or owner-confirmed `profile/facts.md` / `profile/voice.md`).
+5. Writing rounds only: `Write targets EXACT <files>.`, new files under `profile/` or one `companies/<slug>/` (or owner-confirmed `profile/facts.md` / `profile/voice.md`).
 6. The governing source (specification path or `CLAUDE.md` workflow step) and one bounded slice.
 7. Acceptance criteria.
 8. A Tests or Verification section containing executable commands.
