@@ -243,7 +243,7 @@ project_repair_policy = {
     "max_approaches": 3,
     "max_attempts_per_approach": 3,
     "max_infrastructure_retries_per_attempt": 1,
-    "project_boards": ["jobcron", "cha-pt", "harness"],
+    "project_boards": ["jobcron", "cha-pt", "harness", "jss-genr"],
 }
 assert roster["project_repair_policy"] == project_repair_policy
 assert snapshot["project_repair_policy"] == project_repair_policy
@@ -464,7 +464,8 @@ check("--fixture", str(FIXTURES / "frontend-repository-policy-drift.yaml"), code
 assert roster["project_dispatch_allowlist"] == [
     "jobcron-worker", "jobcron-worker-glm-1", "jobcron-worker-glm-2", "jobcron-reviewer",
     "chapt-worker", "chapt-worker-glm-1", "chapt-worker-glm-2", "chapt-reviewer",
-    "harness-worker", "harness-worker-glm-1", "harness-worker-glm-2", "harness-reviewer"]
+    "harness-worker", "harness-worker-glm-1", "harness-worker-glm-2", "harness-reviewer",
+    "jss-worker", "jss-worker-glm-1", "jss-worker-glm-2", "jss-reviewer"]
 roster_profiles = {profile["name"]: profile for profile in roster["profiles"]}
 assert roster["approval_policy"]["mode"] == "off"
 assert roster["approval_policy"]["profiles"] == list(roster_profiles)

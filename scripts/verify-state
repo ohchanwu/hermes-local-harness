@@ -176,7 +176,8 @@ def check_profile_local_skill_overrides(errors, expected, observed=None):
                 fail(errors, f"malformed profile-local skill override path: {profile}/{path!r}")
                 continue
             tracked = ROOT / "policies" / "profile-skills" / profile / path
-            if profile in ("jobcron-orchestrator", "chapt-orchestrator", "harness-orchestrator"):
+            if profile in ("jobcron-orchestrator", "chapt-orchestrator", "harness-orchestrator",
+                           "jss-orchestrator"):
                 if not tracked.is_file():
                     fail(errors, f"missing tracked profile-local skill override: {profile}/{path}")
                 elif hashlib.sha256(tracked.read_bytes()).hexdigest() != want:
@@ -195,6 +196,8 @@ PROFILE_SOUL_PATHS = {
         "chapt-worker-glm-2", "chapt-reviewer",
         "harness-orchestrator", "harness-worker", "harness-worker-glm-1",
         "harness-worker-glm-2", "harness-reviewer",
+        "jss-orchestrator", "jss-worker", "jss-worker-glm-1",
+        "jss-worker-glm-2", "jss-reviewer",
     )
 }
 
@@ -295,6 +298,7 @@ ADOPTION_REPOS = {
     "cha-pt": "adoption/cha-pt.md",
     "jobcron": "adoption/jobcron.md",
     "harness": "adoption/harness.md",
+    "jss-genr": "adoption/jss-genr.md",
 }
 PROJECT_REPOSITORY_ALLOWLISTS = {
     "jobcron": ["/Users/chanbla11mit/projects/jobcron"],
@@ -303,6 +307,15 @@ PROJECT_REPOSITORY_ALLOWLISTS = {
         "/Users/chanbla11mit/projects/cha-pt-frontend",
     ],
     "harness": ["/Users/chanbla11mit/hermes-local-harness"],
+    "jss-genr": ["/Users/chanbla11mit/projects/jss-genr"],
+}
+# Control and writing repositories have no preview-server contract.
+PROJECTS_WITHOUT_PREVIEW_PORT = {"harness", "jss-genr"}
+PROJECT_LAUNCHERS = {
+    "jobcron": "run-jobcron-orchestrator",
+    "cha-pt": "run-chapt-orchestrator",
+    "harness": "run-harness-orchestrator",
+    "jss-genr": "run-jss-orchestrator",
 }
 CHAPT_ASSIGNEES = {
     "chapt-worker", "chapt-worker-glm-1", "chapt-worker-glm-2", "chapt-reviewer",
@@ -310,6 +323,20 @@ CHAPT_ASSIGNEES = {
 HARNESS_ASSIGNEES = {
     "harness-worker", "harness-worker-glm-1", "harness-worker-glm-2", "harness-reviewer",
 }
+JSS_ASSIGNEES = {
+    "jss-worker", "jss-worker-glm-1", "jss-worker-glm-2", "jss-reviewer",
+}
+JSS_CARD_KIND = re.compile(r"(?m)^Card kind EXACT (repository|writing-round)\.$")
+JSS_WRITE_TARGETS = re.compile(r"(?m)^Write targets EXACT ([^\n]+)\.$")
+JSS_WRITE_TARGET = re.compile(
+    r"^(?:companies/([a-z0-9][a-z0-9-]*)/[A-Za-z0-9._/-]+\.md|profile/(?:facts|voice)\.md)$")
+# jss-genr defines its own executable checks in addition to the generic forms.
+JSS_TEST_COMMAND_LINE = re.compile(
+    r"(?im)^\s*(?:[-*]\s+)?`{0,3}\s*(?:"
+    r"python3?\s+tools/charcount\.py\s+\S.*|"
+    r"make\s+(?:-C\s+resume\s+)?(?:qa|pdf(?:-kr|-en)?)\b.*|"
+    r"node\s+(?:resume/)?qa-resume\.mjs\b.*)\s*`{0,3}\s*$"
+)
 TEST_COMMAND_LINE = re.compile(
     r"(?im)^\s*(?:[-*]\s+)?`{0,3}\s*(?:"
     r"go\s+test\b.*|pytest\b.*|npm\s+(?:test\b.*|run\s+\S+.*)|"
@@ -357,8 +384,8 @@ def frontend_path_allowed(path):
 
 def check_project_isolation(errors, fleets, observed=None):
     """Validate the hard board/repository/profile mapping for concurrent projects."""
-    if not isinstance(fleets, dict) or set(fleets) != {"jobcron", "cha-pt", "harness"}:
-        fail(errors, "project isolation mapping must contain exactly jobcron, cha-pt, and harness")
+    if not isinstance(fleets, dict) or set(fleets) != set(PROJECT_REPOSITORY_ALLOWLISTS):
+        fail(errors, "project isolation mapping must contain exactly jobcron, cha-pt, harness, and jss-genr")
         return
     seen_profiles, seen_boards, seen_repos, seen_ports = set(), set(), set(), set()
     for project, fleet in fleets.items():
@@ -387,8 +414,8 @@ def check_project_isolation(errors, fleets, observed=None):
                 project != "cha-pt" or frontend_project != "cha-pt-frontend"
                 or "/Users/chanbla11mit/projects/cha-pt-frontend" not in repos):
             fail(errors, f"project frontend mapping malformed: {project}")
-        if (project == "harness" and port is not None) or (
-                project != "harness" and
+        if (project in PROJECTS_WITHOUT_PREVIEW_PORT and port is not None) or (
+                project not in PROJECTS_WITHOUT_PREVIEW_PORT and
                 (not isinstance(port, int) or not 1024 <= port <= 65535)):
             fail(errors, f"project isolation preview port invalid: {project}")
         if any(not isinstance(profile, str) or not profile for profile in profiles):
@@ -424,7 +451,7 @@ PROJECT_REPAIR_POLICY = {
     "max_approaches": 3,
     "max_attempts_per_approach": 3,
     "max_infrastructure_retries_per_attempt": 1,
-    "project_boards": ["jobcron", "cha-pt", "harness"],
+    "project_boards": ["jobcron", "cha-pt", "harness", "jss-genr"],
 }
 
 
@@ -803,6 +830,48 @@ def check_chapt_card_contract(errors, tasks):
                 fail(errors, f"Cha PT card contract drift {task_id}: frontend authorization contract missing")
 
 
+def project_card_test_section(body):
+    """Text of the first Tests/Verification heading section, or an empty string."""
+    headings = list(re.finditer(r"(?m)^(#{1,4})\s+([^\n]+)\n", body))
+    for index, heading in enumerate(headings):
+        if not re.search(r"(?i)(?:test|verification)", heading.group(2)):
+            continue
+        level = len(heading.group(1))
+        end = len(body)
+        for later in headings[index + 1:]:
+            if len(later.group(1)) <= level:
+                end = later.start()
+                break
+        return body[heading.end():end]
+    return ""
+
+
+def check_isolated_card(errors, task, label, repository, assignees, reviewer, test_patterns):
+    """Shared single-repository card contract; returns (task_id, body)."""
+    task_id = task.get("id") if isinstance(task.get("id"), str) else "<unknown>"
+    body = task.get("body") if isinstance(task.get("body"), str) else ""
+    repository_declared = re.search(
+        r"(?:^|[.!?;]\s+)Repository\s+" + re.escape(repository) + r"\s+ONLY\b", body)
+    if not repository_declared:
+        fail(errors, f"{label} card contract drift {task_id}: expected exact repository")
+    expected_workspace = f"{repository}/.worktrees/{task_id}"
+    if task.get("workspace_kind") != "worktree" or task.get("workspace_path") != expected_workspace:
+        fail(errors, f"{label} card contract drift {task_id}: isolated worktree mismatch")
+    if not re.search(r"(?:^|[.!?]\s+)Baseline EXACT\s+[0-9a-f]{40}\b", body):
+        fail(errors, f"{label} card contract drift {task_id}: exact baseline missing")
+    test_section = project_card_test_section(body)
+    if not test_section or not any(pattern.search(test_section) for pattern in test_patterns):
+        fail(errors, f"{label} card contract drift {task_id}: explicit test contract missing")
+    if task.get("assignee") not in assignees:
+        fail(errors, f"{label} card contract drift {task_id}: {label} worker assignment invalid")
+    reviewer_declared = re.search(
+        r"(?im)^\s*(?:Independent reviewer(?: EXACT)?|Reviewer EXACT)\s+"
+        + re.escape(reviewer) + r"\b", body)
+    if not reviewer_declared:
+        fail(errors, f"{label} card contract drift {task_id}: independent review contract missing")
+    return task_id, body
+
+
 def check_harness_card_contract(errors, tasks):
     """Every open Harness card fails closed on its isolated execution contract."""
     if not isinstance(tasks, list):
@@ -815,39 +884,49 @@ def check_harness_card_contract(errors, tasks):
             continue
         if task.get("board") != "harness":
             continue
-        task_id = task.get("id") if isinstance(task.get("id"), str) else "<unknown>"
-        body = task.get("body") if isinstance(task.get("body"), str) else ""
-        repository_declared = re.search(
-            r"(?:^|[.!?;]\s+)Repository\s+" + re.escape(repository) + r"\s+ONLY\b", body)
-        if not repository_declared:
-            fail(errors, f"Harness card contract drift {task_id}: expected exact repository")
-        expected_workspace = f"{repository}/.worktrees/{task_id}"
-        if task.get("workspace_kind") != "worktree" or task.get("workspace_path") != expected_workspace:
-            fail(errors, f"Harness card contract drift {task_id}: isolated worktree mismatch")
-        if not re.search(r"(?:^|[.!?]\s+)Baseline EXACT\s+[0-9a-f]{40}\b", body):
-            fail(errors, f"Harness card contract drift {task_id}: exact baseline missing")
-        headings = list(re.finditer(r"(?m)^(#{1,4})\s+([^\n]+)\n", body))
-        test_section = ""
-        for index, heading in enumerate(headings):
-            if not re.search(r"(?i)(?:test|verification)", heading.group(2)):
-                continue
-            level = len(heading.group(1))
-            end = len(body)
-            for later in headings[index + 1:]:
-                if len(later.group(1)) <= level:
-                    end = later.start()
-                    break
-            test_section = body[heading.end():end]
-            break
-        if not test_section or not TEST_COMMAND_LINE.search(test_section):
-            fail(errors, f"Harness card contract drift {task_id}: explicit test contract missing")
-        if task.get("assignee") not in HARNESS_ASSIGNEES:
-            fail(errors, f"Harness card contract drift {task_id}: Harness worker assignment invalid")
-        reviewer_declared = re.search(
-            r"(?im)^\s*(?:Independent reviewer(?: EXACT)?|Reviewer EXACT)\s+"
-            r"harness-reviewer\b", body)
-        if not reviewer_declared:
-            fail(errors, f"Harness card contract drift {task_id}: independent review contract missing")
+        check_isolated_card(errors, task, "Harness", repository, HARNESS_ASSIGNEES,
+                            "harness-reviewer", (TEST_COMMAND_LINE,))
+
+
+def jss_write_targets_valid(declaration):
+    """Writing-round targets: concrete relative files under one company folder or profile facts/voice."""
+    targets = [item.strip() for item in declaration.split(",")]
+    slugs = set()
+    for target in targets:
+        match = JSS_WRITE_TARGET.fullmatch(target)
+        parts = PurePosixPath(target).parts
+        if (not match or str(PurePosixPath(target)) != target
+                or "." in parts or ".." in parts):
+            return False
+        if match.group(1):
+            slugs.add(match.group(1))
+    return bool(targets) and len(slugs) <= 1
+
+
+def check_jss_card_contract(errors, tasks):
+    """Every open jss-genr card fails closed on its repository and card-kind contract."""
+    if not isinstance(tasks, list):
+        fail(errors, "jss-genr card contract observation malformed")
+        return
+    repository = PROJECT_REPOSITORY_ALLOWLISTS["jss-genr"][0]
+    for task in tasks:
+        if not isinstance(task, dict):
+            fail(errors, "jss-genr card contract observation malformed")
+            continue
+        if task.get("board") != "jss-genr":
+            continue
+        task_id, body = check_isolated_card(
+            errors, task, "jss-genr", repository, JSS_ASSIGNEES, "jss-reviewer",
+            (TEST_COMMAND_LINE, JSS_TEST_COMMAND_LINE))
+        kinds = JSS_CARD_KIND.findall(body)
+        targets = JSS_WRITE_TARGETS.findall(body)
+        if len(kinds) != 1:
+            fail(errors, f"jss-genr card contract drift {task_id}: card kind declaration missing or ambiguous")
+        elif kinds[0] == "repository" and targets:
+            fail(errors, f"jss-genr card contract drift {task_id}: repository card declares write targets")
+        elif kinds[0] == "writing-round" and (
+                len(targets) != 1 or not jss_write_targets_valid(targets[0])):
+            fail(errors, f"jss-genr card contract drift {task_id}: writing-round write targets invalid")
 
 
 def observe_open_chapt_cards(errors, runner=run):
@@ -1295,6 +1374,7 @@ def main():
         check_project_repair_policy(errors, project_repair_policy, observed.get("project_repair_policy"))
         project_cards = observed.get("project_repair_cards")
         check_harness_card_contract(errors, project_cards)
+        check_jss_card_contract(errors, project_cards)
         check_project_repair_cards(errors, project_cards, warnings)
         check_profile_souls(errors, profile_souls, observed.get("profile_soul_hashes"))
         check_repository_policies(errors, repository_policies,
@@ -1404,12 +1484,7 @@ def main():
                     if projects.returncode or observed_projects != expected_projects:
                         fail(errors, f"Hermes project allowlist drift {profile}: expected "
                                      f"{sorted(expected_projects)}, actual {sorted(observed_projects)}")
-            launcher_name = {
-                "jobcron": "run-jobcron-orchestrator",
-                "cha-pt": "run-chapt-orchestrator",
-                "harness": "run-harness-orchestrator",
-            }[project]
-            launcher = ROOT / "scripts" / launcher_name
+            launcher = ROOT / "scripts" / PROJECT_LAUNCHERS[project]
             launcher_text = launcher.read_text() if launcher.is_file() else ""
             if (not launcher.is_file() or not os.access(launcher, os.X_OK)
                     or f"HERMES_KANBAN_BOARD={fleet['board']}" not in launcher_text
@@ -1419,6 +1494,7 @@ def main():
         check_chapt_card_contract(errors, observe_open_chapt_cards(errors))
         project_cards = observe_open_project_cards(errors)
         check_harness_card_contract(errors, project_cards)
+        check_jss_card_contract(errors, project_cards)
         check_project_repair_cards(errors, project_cards, warnings)
         deployed_hashes = {}
         for entry in snapshot["skill"]["shared_skills"]:

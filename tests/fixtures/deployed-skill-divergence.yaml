@@ -27,7 +27,12 @@
     "harness-worker": "gpt-6.1-sol",
     "harness-worker-glm-1": "glm-5.3",
     "harness-worker-glm-2": "glm-5.3",
-    "harness-reviewer": "gpt-6-astra"
+    "harness-reviewer": "gpt-6-astra",
+    "jss-orchestrator": "claude-opus-5-5",
+    "jss-worker": "claude-opus-5-5",
+    "jss-worker-glm-1": "glm-5.3",
+    "jss-worker-glm-2": "glm-5.3",
+    "jss-reviewer": "claude-fable-5-1"
   },
   "profile_providers": {
     "default": "openai-codex",
@@ -57,7 +62,12 @@
     "harness-worker": "openai-codex",
     "harness-worker-glm-1": "zai",
     "harness-worker-glm-2": "zai",
-    "harness-reviewer": "openai-codex"
+    "harness-reviewer": "openai-codex",
+    "jss-orchestrator": "claude-subscription",
+    "jss-worker": "claude-subscription",
+    "jss-worker-glm-1": "zai",
+    "jss-worker-glm-2": "zai",
+    "jss-reviewer": "claude-subscription"
   },
   "plugins": {
     "default": {
@@ -159,6 +169,24 @@
     },
     "harness-reviewer": {
       "hermes-terminal-outcome-notification": "disabled     git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification"
+    },
+    "jss-orchestrator": {
+      "hermes-terminal-outcome-notification": "disabled     git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification"
+    },
+    "jss-worker": {
+      "hermes-terminal-outcome-notification": "disabled     git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification",
+      "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail"
+    },
+    "jss-worker-glm-1": {
+      "hermes-terminal-outcome-notification": "disabled     git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification",
+      "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail"
+    },
+    "jss-worker-glm-2": {
+      "hermes-terminal-outcome-notification": "disabled     git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification",
+      "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail"
+    },
+    "jss-reviewer": {
+      "hermes-terminal-outcome-notification": "disabled     git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification"
     }
   },
   "dispatch_profiles": [
@@ -175,7 +203,11 @@
     "harness-worker",
     "harness-worker-glm-1",
     "harness-worker-glm-2",
-    "harness-reviewer"
+    "harness-reviewer",
+    "jss-worker",
+    "jss-worker-glm-1",
+    "jss-worker-glm-2",
+    "jss-reviewer"
   ],
   "kanban": {
     "max_in_progress": null,
@@ -196,6 +228,10 @@
         "scripts/set-active-lanes.py": "157419c7c190b0a9f647271f7bd3839182f2e9324f8f9d74e43ec0553a5b77df"
       },
       "harness-orchestrator": {
+        "SKILL.md": "cf6e716aa46ba88e9e1f6b26310b28d353cdca74dbdc6cf987a14970ddbc51ef",
+        "scripts/set-active-lanes.py": "157419c7c190b0a9f647271f7bd3839182f2e9324f8f9d74e43ec0553a5b77df"
+      },
+      "jss-orchestrator": {
         "SKILL.md": "cf6e716aa46ba88e9e1f6b26310b28d353cdca74dbdc6cf987a14970ddbc51ef",
         "scripts/set-active-lanes.py": "157419c7c190b0a9f647271f7bd3839182f2e9324f8f9d74e43ec0553a5b77df"
       }
@@ -257,6 +293,15 @@
       },
       "harness-worker-glm-2": {
         "SKILL.md": "a017ca2b203644ce6d5bd688c0b06875bbbe3908fe9dc6212ff39098ab53d794"
+      },
+      "jss-worker": {
+        "SKILL.md": "a017ca2b203644ce6d5bd688c0b06875bbbe3908fe9dc6212ff39098ab53d794"
+      },
+      "jss-worker-glm-1": {
+        "SKILL.md": "a017ca2b203644ce6d5bd688c0b06875bbbe3908fe9dc6212ff39098ab53d794"
+      },
+      "jss-worker-glm-2": {
+        "SKILL.md": "a017ca2b203644ce6d5bd688c0b06875bbbe3908fe9dc6212ff39098ab53d794"
       }
     },
     "simplification-review": {
@@ -315,6 +360,15 @@
         "SKILL.md": "d058cd37b2cf161097dfc51eafd373414603f5feb22ff22e8fe1e198679edb47"
       },
       "harness-worker-glm-2": {
+        "SKILL.md": "d058cd37b2cf161097dfc51eafd373414603f5feb22ff22e8fe1e198679edb47"
+      },
+      "jss-worker": {
+        "SKILL.md": "d058cd37b2cf161097dfc51eafd373414603f5feb22ff22e8fe1e198679edb47"
+      },
+      "jss-worker-glm-1": {
+        "SKILL.md": "d058cd37b2cf161097dfc51eafd373414603f5feb22ff22e8fe1e198679edb47"
+      },
+      "jss-worker-glm-2": {
         "SKILL.md": "d058cd37b2cf161097dfc51eafd373414603f5feb22ff22e8fe1e198679edb47"
       }
     },
@@ -560,6 +614,11 @@
       "repo": "harness",
       "content": "Status: operational; attended live rollout verified.",
       "record": "# Hermes local harness adoption\n\nAdapter: `/Users/chanbla11mit/hermes-local-harness/docs/specs/261004-concurrent-project-fleets.md`.\n\nStatus: operational; attended live rollout verified. Board `harness` is rooted solely at `/Users/chanbla11mit/hermes-local-harness` and routes only through `harness-orchestrator`, the worker pool (`harness-worker`, `harness-worker-glm-1`, `harness-worker-glm-2`), and `harness-reviewer`. The orchestrator and primary worker use `openai-codex/gpt-6.1-sol`; both GLM workers use `zai/glm-5.3`; the reviewer uses `openai-codex/gpt-6-astra`. Fresh inference probes succeeded for all five profiles.\n\nHarness work is local-only by default. Local commits are permitted only in isolated task worktrees. Pushes, PRs, live profile or skill deployment, board or gateway changes, credentials, production/cloud mutations, and other external writes require separate explicit human authorization. `docs/bugs/` entries are evidence and triage input, not automatic implementation authorization. The harness orchestrator may not autonomously modify or deploy its own active live policy; repository policy changes require same-card `harness-reviewer` review, and live rollout is separately attended.\n"
+    },
+    {
+      "repo": "jss-genr",
+      "content": "**This repo is pushed publicly.**",
+      "record": "# jss-genr adoption\n\nAdapter: `/Users/chanbla11mit/projects/jss-genr/CLAUDE.md` (the repository's own agent rules, adopted unchanged; this fleet never writes it outside an owner-scoped repository card). The verifier's adapter marker is the repository's public-push privacy boundary.\n\nStatus: defined in repository source; live setup pending. Board `jss-genr` is rooted solely at `/Users/chanbla11mit/projects/jss-genr` and routes only through `jss-orchestrator`, the worker pool (`jss-worker`, `jss-worker-glm-1`, `jss-worker-glm-2`), and `jss-reviewer`. The orchestrator and primary worker use `claude-subscription/claude-opus-5-5`; both GLM workers use `zai/glm-5.3` (the owner accepted that GLM workers may read the personal data); the reviewer uses `claude-subscription/claude-fable-5-1`. There is no preview-port contract. Launch the controller with `scripts/run-jss-orchestrator`.\n\nTwo card kinds, declared on every card: repository cards (`tools/`, `resume/` HTML/PDF build and QA, `guides/`, `CLAUDE.md`, `README.md`) work in an isolated worktree with executable tests, one local candidate commit, same-card `jss-reviewer` review, and controller local integration; writing-round cards (\uc790\uae30\uc18c\uac1c\uc11c Workflow A rounds, resume or portfolio copy rounds) use the worktree only as the dispatch workspace and create only their declared new numbered files under `companies/<slug>/drafts/` in the main checkout, with no commit. Existing drafts are never overwritten or deleted.\n\nPrivacy is a hard gate: nothing from `profile/`, `companies/`, or `resume/resources/` is copied into tracked files, commits, card bodies, comments, handoffs, or Telegram summaries beyond the company slug and file names. The repository has a public GitHub remote; the fleet never pushes, opens PRs, deploys, submits applications, or logs in to job sites. Writes to the separate portfolio site repository (`make sync-site`, `tools/check-materials.py --sync`), installs, credentials, and live profile, skill, board, or gateway changes require separate explicit owner authorization.\n\nGT dependency: none.\n"
     }
   ],
   "terminal_notification_runtime": {
@@ -589,6 +648,9 @@
     },
     "harness-orchestrator": {
       "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md": "ecf1ff7eff2024bedd23c7025c980405e004b81ccc2a866d57e2219bb5e49cd1"
+    },
+    "jss-orchestrator": {
+      "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md": "b7c14cf169aa166b3d5dd711b4abf60f6818fd641c0250deb8f14d5b0d41b624"
     }
   },
   "terminal_retry_policy": {
@@ -665,6 +727,21 @@
         "harness-worker-glm-1",
         "harness-worker-glm-2"
       ]
+    },
+    "jss-genr": {
+      "board": "jss-genr",
+      "repository": "/Users/chanbla11mit/projects/jss-genr",
+      "repositories": [
+        "/Users/chanbla11mit/projects/jss-genr"
+      ],
+      "orchestrator": "jss-orchestrator",
+      "worker": "jss-worker",
+      "reviewer": "jss-reviewer",
+      "workers": [
+        "jss-worker",
+        "jss-worker-glm-1",
+        "jss-worker-glm-2"
+      ]
     }
   },
   "profile_approval_modes": {
@@ -695,7 +772,12 @@
     "harness-worker": "off",
     "harness-worker-glm-1": "off",
     "harness-worker-glm-2": "off",
-    "harness-reviewer": "off"
+    "harness-reviewer": "off",
+    "jss-orchestrator": "off",
+    "jss-worker": "off",
+    "jss-worker-glm-1": "off",
+    "jss-worker-glm-2": "off",
+    "jss-reviewer": "off"
   },
   "profile_soul_hashes": {
     "chapt-orchestrator": "6cad04cc2a650ba78fea836aa124b4edb7e8c102da30120fb1bb80a41a610b52",
@@ -707,7 +789,12 @@
     "harness-worker": "8ee6127b833f8278b3ed3932aa05c77cac917ee8391ccc633474b4ce8fc1ef61",
     "harness-worker-glm-1": "1d08b686385ea599cadcaabbfd39ecc9065ae9ec1863859d4fdbc53c3193a708",
     "harness-worker-glm-2": "1d08b686385ea599cadcaabbfd39ecc9065ae9ec1863859d4fdbc53c3193a708",
-    "harness-reviewer": "1f5b2755d75f77f99a757eb8cb7bfdc67cd24887bfbb91815a71f8edbf24b613"
+    "harness-reviewer": "1f5b2755d75f77f99a757eb8cb7bfdc67cd24887bfbb91815a71f8edbf24b613",
+    "jss-orchestrator": "a5b62eeca704b5042038fe0bae42be4360bb1153a873f72c82de759ba7097c18",
+    "jss-worker": "a3c4e1fe3881c0ed9eedb8b7c258c3fa399328e26e3a18703cf4ce22b3a7e2f4",
+    "jss-worker-glm-1": "49ac6c88e3f11b9dec5aa0e1473e886da52e8293893989df1c436164c6b75738",
+    "jss-worker-glm-2": "cae153fb7575b11d82c54d1da6062b5c2b1f4dc124239fb100aecf1af53e18bc",
+    "jss-reviewer": "393f09a3a86276f6a28a42d1ae940f61276ab34db0d66dc253380bb7fc0d33e1"
   },
   "repository_policy_hashes": {
     "cha-pt-frontend": "113b81fd55294cfc3057f66163e1745d590f520003997d36c85b46c938342817"
@@ -721,7 +808,8 @@
     "project_boards": [
       "jobcron",
       "cha-pt",
-      "harness"
+      "harness",
+      "jss-genr"
     ]
   },
   "project_repair_cards": []
