@@ -81,8 +81,10 @@ class StreamAuditClientTests(unittest.TestCase):
         self.assertEqual((record["session_id"], record["model"], record["cli_version"]), ("sess-1____x", MODEL, "2.1.283"))
         self.assertEqual(record["error"], {"class": "ProviderError", "message": "duplicate streamed message"})
         self.assertIn("created_at", record)
-        self.assertEqual([a["stage"] for a in record["audit"]], ["launch", "user_input", "init"])
+        self.assertEqual([a["stage"] for a in record["audit"]], ["launch", "user_input", "init", "second_message"])
         self.assertEqual(record["audit"][2], {"stage": "init", "model": MODEL, "tool_count": 0})
+        self.assertEqual({k: record["audit"][3][k] for k in ("outcome", "row", "relation", "first_stop")},
+                         {"outcome": "fail", "row": "complete_not_replay", "relation": "extends_previous", "first_stop": "end_turn"})
         stream = record["stream"]
         self.assertEqual(stream["drain"]["ended"], "complete")
         # The drain stops once the second message ends; the turn's result is not awaited.
@@ -91,7 +93,8 @@ class StreamAuditClientTests(unittest.TestCase):
         self.assertEqual({k: first[k] for k in ("id", "model", "stop_reason", "stopped", "restart", "streamed_text",
                                                 "forwarded_chars", "text_chars", "text_sha256", "blocks")},
                          {"id": "msg_dup_1", "model": MODEL, "stop_reason": "end_turn", "stopped": True, "restart": False,
-                          "streamed_text": True, "forwarded_chars": len(DUPLICATE_FIRST), "text_chars": len(DUPLICATE_FIRST),
+                          # Held whole: nothing of a message reaches Hermes before it is final and decided.
+                          "streamed_text": False, "forwarded_chars": 0, "text_chars": len(DUPLICATE_FIRST),
                           "text_sha256": hashlib.sha256(DUPLICATE_FIRST.encode()).hexdigest(),
                           "blocks": [{"index": 0, "type": "text"}]})
         self.assertEqual(first["events"], [["message_start", 1], ["content_block_start", 1], ["content_block_delta", 1],
@@ -110,21 +113,12 @@ class StreamAuditClientTests(unittest.TestCase):
                           "same_id_as_previous": False, "same_model_as_previous": True})
         self.assertNotIn(DUPLICATE_FIRST, path.read_text())
 
-    def test_b_runtime_retry_after_streamed_text_writes_an_audit_and_raises_the_original_error(self):
-        chunks = []
-        with self.assertRaisesRegex(client.ProviderError, r"^runtime retried a reply after part of it had streamed$"):
-            for chunk in self.request("__retry_after_text__", stream=True):
-                chunks.append(chunk)
-        self.assertEqual("".join(getattr(c.choices[0].delta, "content", None) or "" for c in chunks), "Half")
-        _, record = self.only_audit()
-        self.assertEqual(record["error"]["message"], "runtime retried a reply after part of it had streamed")
-        first, second = record["stream"]["messages"]
-        self.assertEqual((first["stopped"], first["error_type"], first["streamed_text"], first["forwarded_chars"]),
-                         (False, "overloaded_error", True, 4))
-        self.assertEqual((second["restart"], second["restarts"], second["streamed_text"], second["relation_to_previous"]),
-                         (True, 1, False, "extends_previous"))
-        self.assertEqual(record["stream"]["restarts"], 1)
-        self.assertIn(["system:api_retry", 1], record["stream"]["runtime_events"])
+    def test_b_runtime_retry_after_text_is_no_longer_a_failure_since_partial_text_is_never_forwarded(self):
+        chunks = list(self.request("__retry_after_text__", stream=True))
+        self.assertEqual("".join(getattr(c.choices[0].delta, "content", None) or "" for c in chunks), "Half a reply.")
+        self.assertEqual(chunks[-1].choices[0].finish_reason, "stop")
+        self.assertEqual([a for a in self.c.audit if a["stage"] == "runtime_retry"], [{"stage": "runtime_retry", "number": 1}])
+        self.assertEqual(self.audits(), [])
 
     def test_b_other_stream_loop_failures_also_write_an_audit(self):
         for trigger, error in (("__malformed_event__", "malformed runtime event or unexpected subagent"),
@@ -175,7 +169,8 @@ class StreamAuditClientTests(unittest.TestCase):
                           "HERMES_CLAUDE_SUBSCRIPTION_TOKEN_FILE", "CLAUDE_CODE_OAUTH_TOKEN", "arguments", "Synthetic system"):
             with self.subTest(forbidden=forbidden):
                 self.assertNotIn(forbidden, text)
-        self.assertEqual([a["stage"] for a in record["audit"]], ["launch", "rebuild", "init"])
+        self.assertEqual([a["stage"] for a in record["audit"]], ["launch", "rebuild", "init", "second_message"])
+        self.assertEqual(record["audit"][3]["row"], "tool_use_without_internal_step")
         self.assertEqual(record["audit"][1]["skipped_leading"], 0)
         first, second = record["stream"]["messages"]
         self.assertEqual([b["type"] for b in first["blocks"]], ["thinking", "text", "tool_use"])

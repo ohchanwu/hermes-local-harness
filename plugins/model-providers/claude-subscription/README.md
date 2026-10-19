@@ -132,18 +132,27 @@ contains no filesystem/shell/tool implementation. Duplicate/replayed IDs,
 missing/mismatched results and changed prefixes are errors. Multi-step tool use
 is supported without a step cap.
 
-Streaming text comes from actual runtime deltas. Tool-call name/identity and
-argument fragments are emitted only after the whole message and MCP invocation
-match, so Hermes cannot act on a partial tool message. Terminal finish
-reasons are `tool_calls`, `stop` or `length`, with available per-message usage.
+Streaming text is the runtime's own deltas, but each message is held whole: its
+text reaches Hermes only once the message is final (parked for its tool calls, or
+ended by the turn's result). Tool-call name/identity and argument fragments are
+emitted only after the whole message and MCP invocation match, so Hermes cannot
+act on a partial tool message. Terminal finish reasons are `tool_calls`, `stop`
+or `length`, with available per-message usage.
 When an API call fails mid-reply (a stream `error` event, such as overload),
-the CLI retries it and streams the reply again from `message_start`. Before any
-reply text has reached Hermes, the provider discards the partial message and
-continues (audit stage `runtime_retry`). After visible text has streamed, Hermes
-already holds that text, so the request fails; Hermes keeps the partial reply and
-does not retry it.
-When the stream itself fails (duplicate streamed message, retry after streamed
-text, event outside a message, invalid block, snapshot mismatch, malformed or
+the CLI retries it and streams the reply again from `message_start`. Nothing of
+the unfinished message has reached Hermes, so the provider drops it and
+continues (audit stage `runtime_retry`).
+When a second message streams after one has completed, `second_message.py`
+decides deterministically (audit stage `second_message`, with its outcome and
+row): keep the first when the second is an exact replay; append when the first
+was cut off (`max_tokens`) and the second continues it; keep the last when the
+first stopped for `tool_use` and the CLI answered exactly those calls itself
+(`user` tool_result events) without asking Hermes over MCP, so the second is the
+real reply (the first's text is kept, its unrun calls are dropped and can never
+be parked later). Anything else, or more than four such messages in one request,
+fails as `duplicate streamed message` with a stream audit.
+When the stream itself fails (an undecidable second message, event outside a
+message, invalid block, snapshot mismatch, malformed or
 unknown runtime event), the client first reads the rest of the current message
 briefly into memory only (never to Hermes), then writes one owner-only (0600)
 file `$HERMES_HOME/sessions/stream_audit_<session>_<YYYYMMDD_HHMMSS_ffffff>.json`

@@ -28,7 +28,7 @@ from .compat import CHILD_ENV, CLI_FLAGS, CLI_SETTING, TOKEN_FD_VARIABLE, TOKEN_
 from .errors import ProviderError
 from .history import History
 from .runtime import Runtime
-from . import stream_audit
+from . import second_message, stream_audit
 from .stream_events import Message
 from .transcript import render_restored
 from .translate import convert_tools, record, usage
@@ -38,6 +38,7 @@ __all__ = ["ClaudeSubscriptionClient", "Bridge", "ProviderError", "History", "Me
 
 log = logging.getLogger(__name__)
 OUTPUT_FLOOR = 4096
+MAX_SECOND_MESSAGES = 4  # decided follow-on messages per request before the stream counts as runaway
 
 
 def owner_only(info):
@@ -411,7 +412,13 @@ class ClaudeSubscriptionClient:
                 else:
                     self.audit.append({"stage": "user_input", "number": self._inputs})
             served = served_names(self._model)
+            # Every message is held whole: Hermes receives text only once the message is final
+            # (parked for its tool calls, or ended by the turn's result), so a retried or second
+            # message can still be decided without Hermes holding text that is later dropped.
             message = Message(served)
+            follower = None    # a message streamed after `message` completed, held until it completes
+            requested = False  # the CLI had asked over MCP for one of `message`'s calls when it began
+            decisions = 0
             stream_log = stream_audit.StreamLog()  # this request's events, persisted if the stream fails
             restarts = 0
             while True:
@@ -427,7 +434,7 @@ class ClaudeSubscriptionClient:
                         self._awaiting.remove(call)
                         self._deliver(pending["rpc_id"], call["id"], self._queued.pop(call["id"]))
                         continue
-                if message.done and message.calls:
+                if message.done and message.calls and follower is None:
                     if self._bridge is not None and not self._bridge.calls:
                         self._bridge.require_open()
                     if self._bridge is not None and self._bridge.calls:
@@ -450,6 +457,7 @@ class ClaudeSubscriptionClient:
                         self.audit.append({"stage": "tool_parked", "tool_use_id": first["id"], "rpc_id": pending["rpc_id"],
                                            "name": first["name"], "arguments": first["arguments"], "model": self._model,
                                            "calls": len(calls)})
+                        yield from self._flush(message)
                         for index, (call, plain) in enumerate(zip(calls, bare)):
                             yield self._chunk(message, {"tool_calls": [{"index": index, "id": call["id"], "type": "function",
                                                           "function": {"name": plain["name"], "arguments": ""}}]})
@@ -491,20 +499,36 @@ class ClaudeSubscriptionClient:
                         error = ProviderError("model event before verified initialization")
                         self._persist_stream_audit(stream_log, error, runtime, obj)
                         raise error
+                    event = obj.get("event") if kind == "stream_event" else None
+                    if message.done and follower is None and isinstance(event, dict) and event.get("type") == "message_start":
+                        # Any MCP request queued now is for `message`: the new one has no complete call yet.
+                        requested = self._bridge is not None and any(
+                            (PREFIX + pending.get("name", ""), pending.get("arguments")) == (c["name"], c["arguments"])
+                            for pending in self._bridge.calls for c in message.calls)
+                        follower = Message(served)
+                    target = follower or message
+                    before = target.restarts
                     try:
-                        deltas = message.feed(obj)
+                        target.feed(obj)  # held, not yielded: see _flush
                     except ProviderError as exc:
                         self._persist_stream_audit(stream_log, exc, runtime, obj)
                         raise
-                    stream_log.observe(obj, forwarded=True)
-                    for delta in deltas:
-                        yield self._chunk(message, delta)
-                    if message.restarts > restarts:
-                        restarts = message.restarts
+                    stream_log.observe(obj)
+                    if target.restarts > before:
+                        restarts += 1
                         self.audit.append({"stage": "runtime_retry", "number": restarts})
-                        log.warning("claude-subscription: the Claude CLI retried a failed API call before any reply text")
+                        log.warning("claude-subscription: the Claude CLI retried a failed API call; the partial message was dropped")
+                    if follower is not None and follower.done:
+                        decisions += 1
+                        message = self._second_message(message, follower, requested, decisions, stream_log, runtime, obj)
+                        follower, requested = None, False
+                elif kind == "user":
+                    # Tool results the runtime fed back. After a delivery they precede the next message;
+                    # while a message is current they are the CLI answering its calls without Hermes.
+                    (follower or message).observe_user(obj)
                 elif kind == "result":
-                    if not message.done or message.calls or obj.get("is_error") or obj.get("subtype") != "success" or obj.get("permission_denials"):
+                    if (not message.done or message.calls or follower is not None or obj.get("is_error")
+                            or obj.get("subtype") != "success" or obj.get("permission_denials")):
                         raise ProviderError("runtime quota/refusal/permission/turn error or incomplete result")
                     if type(obj.get("num_turns")) is not int or obj["num_turns"] < 0:
                         raise ProviderError("invalid runtime turn count")
@@ -519,12 +543,13 @@ class ClaudeSubscriptionClient:
                     self._last_response = record({"id": message.id, "object": "chat.completion", "created": int(time.time()),
                         "model": self._model, "choices": [{"index": 0, "message": {**assistant, "tool_calls": None}, "finish_reason": finish}],
                         "usage": usage(message.usage), "runtime_metadata": {"usage": obj.get("usage"), "modelUsage": meta}})
+                    yield from self._flush(message)
                     yield self._chunk(message, {}, finish=finish, token_usage=usage(message.usage))
                     return
                 elif kind == "rate_limit_event":
                     if obj.get("rate_limit_info", {}).get("status") == "rejected":
                         raise ProviderError("runtime subscription rate limit rejected; no retry or substitute")
-                elif kind not in ("system", "user"):
+                elif kind != "system":
                     error = ProviderError("unknown runtime event")
                     self._persist_stream_audit(stream_log, error, runtime, obj, observed=True)
                     raise error
@@ -534,6 +559,55 @@ class ClaudeSubscriptionClient:
         except BaseException:
             self.cancel()
             raise
+
+    def _flush(self, message):
+        """Hand Hermes a final message's text, in the deltas it streamed in."""
+        yield self._chunk(message, {"role": "assistant"})
+        for delta in message.deltas:
+            yield self._chunk(message, delta)
+
+    def _second_message(self, first, second, requested, decisions, stream_log, runtime, failed):
+        """Resolve a message that followed a completed one (second_message.decide); FAIL raises after the audit.
+
+        Nothing of either has reached Hermes yet (whole-message buffering), so forwarding is never a reason to fail.
+        """
+        if decisions > MAX_SECOND_MESSAGES:
+            outcome, row = second_message.FAIL, "too_many_messages"
+        else:
+            outcome, row = second_message.decide(first.facts(), second.facts(), answered=first.answered,
+                                                 requested=requested, forwarded=False)
+        dropped = second if outcome == second_message.KEEP_FIRST else None
+        self.audit.append({"stage": "second_message", "outcome": outcome, "row": row, "number": decisions,
+                           "first_id": first.id, "second_id": second.id, "first_stop": first.stop, "second_stop": second.stop,
+                           "relation": stream_audit.relation(first.text, second.text), "same_model": first.model == second.model,
+                           "first_calls": len(first.calls), "second_calls": len(second.calls), "answered": len(first.answered),
+                           "answered_errors": first.answered_errors, "requested": requested,
+                           "dropped_text_chars": len(dropped.text) if dropped else 0,
+                           "dropped_calls": len(dropped.calls) if dropped else len(first.calls) if outcome == second_message.KEEP_LAST else 0})
+        if outcome == second_message.FAIL:
+            error = ProviderError("duplicate streamed message")
+            self._persist_stream_audit(stream_log, error, runtime, failed, observed=True)
+            raise error
+        log.warning("claude-subscription: a second streamed message was resolved as %s (%s)", outcome, row)
+        if outcome == second_message.KEEP_FIRST:
+            return first
+        if outcome == second_message.KEEP_LAST:
+            # Hermes never saw or ran the first message's calls; they can never be parked later.
+            # Its visible text is kept ahead of the second's (as text blocks of one message are), not dropped.
+            self._seen_ids.update(c["id"] for c in first.calls)
+            second.stream_id = first.stream_id
+            second.text, second.deltas = first.text + second.text, first.deltas + second.deltas
+            return second
+        added = second_message.appended_text(first.text, second.text)
+        first.text += added
+        first.deltas.extend([{"content": added}] if added else [])
+        first.calls, first.stop = second.calls, second.stop
+        first.answered, first.answered_errors = second.answered, second.answered_errors
+        merged = {**first.usage, **second.usage}
+        if type(first.usage.get("output_tokens")) is int and type(second.usage.get("output_tokens")) is int:
+            merged["output_tokens"] = first.usage["output_tokens"] + second.usage["output_tokens"]
+        first.usage = merged
+        return first
 
     def _persist_stream_audit(self, stream_log, error, runtime, failed, *, observed=False):
         """Write this request's stream audit; the caller then raises the original error unchanged.

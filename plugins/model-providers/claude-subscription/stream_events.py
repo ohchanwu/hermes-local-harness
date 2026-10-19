@@ -5,10 +5,15 @@ from .errors import ProviderError
 
 
 class Message:
-    """One real streamed assistant message, not a canned completion rechunked."""
+    """One real streamed assistant message, not a canned completion rechunked.
+
+    feed() returns this message's deltas and also keeps them in `deltas`; the client
+    holds them until the message is final, so nothing of it reaches Hermes earlier.
+    """
     def __init__(self, served):
         self.served = served
         self.id = None
+        self.model = None
         self.blocks = {}
         self.text = ""
         self.stop = None
@@ -16,12 +21,34 @@ class Message:
         self.snapshot = []  # content blocks from the runtime's per-block assistant snapshots
         self.usage = {}
         self.calls = []  # every tool call in this message, in order; Hermes runs them as one batch
-        self.streamed_text = False  # visible text already handed to Hermes, which keeps it
+        self.deltas = []  # text deltas in order, held by the client until the message is final
+        self.answered = []  # tool_use ids the runtime itself answered (user tool_result events)
+        self.answered_errors = 0  # how many of those it marked is_error
         self.stream_id = None       # the first message id, kept for every chunk across restarts
         self.interrupted = None     # error type of a mid-stream API failure
         self.restarts = 0
 
+    def facts(self):
+        """The fields second_message.decide() compares."""
+        return {"id": self.id, "model": self.model, "stop": self.stop, "text": self.text,
+                "calls": [{"id": c["id"], "name": c["name"], "arguments": c["arguments"]} for c in self.calls]}
+
+    def observe_user(self, obj):
+        """Record tool results the runtime fed back itself while this message was current."""
+        if self.id is None:
+            return  # before any message: results Hermes delivered for an earlier turn
+        content = obj.get("message", {}).get("content") if isinstance(obj.get("message"), dict) else None
+        for item in content if isinstance(content, list) else ():
+            if isinstance(item, dict) and item.get("type") == "tool_result" and isinstance(item.get("tool_use_id"), str):
+                self.answered.append(item["tool_use_id"])
+                self.answered_errors += item.get("is_error") is True
+
     def feed(self, obj):
+        deltas = self._feed(obj)
+        self.deltas.extend(d for d in deltas if "content" in d)
+        return deltas
+
+    def _feed(self, obj):
         kind = obj.get("type")
         if kind == "assistant":
             msg = obj.get("message", {})
@@ -49,14 +76,14 @@ class Message:
             restart = self.id is not None
             if restart:
                 # The CLI retries a failed API call itself and streams the reply again from the start.
+                # Nothing of an unfinished message has reached Hermes, so the partial one is dropped.
                 if self.done:
-                    raise ProviderError("duplicate streamed message")
-                if self.streamed_text:
-                    raise ProviderError("runtime retried a reply after part of it had streamed")
+                    raise ProviderError("duplicate streamed message")  # the client decides second messages
                 restarts, stream_id = self.restarts + 1, self.stream_id
                 self.__init__(self.served)
                 self.restarts, self.stream_id = restarts, stream_id
             self.id = msg["id"]
+            self.model = msg["model"]
             self.stream_id = self.stream_id or self.id
             self.usage.update(msg.get("usage") or {})
             return [] if restart else [{"role": "assistant"}]
@@ -83,7 +110,6 @@ class Message:
                 raise ProviderError("unsupported runtime content block")
             if block.get("type") == "text" and block.get("text"):
                 self.text += block["text"]
-                self.streamed_text = self.streamed_text or bool(block["text"].strip())
                 return [{"content": block["text"]}]
         elif event == "content_block_delta":
             block = self.blocks.get(index)
@@ -99,7 +125,6 @@ class Message:
                 if delta.get("type") != "text_delta" or not isinstance(delta.get("text"), str):
                     raise ProviderError("invalid text delta")
                 self.text += delta["text"]
-                self.streamed_text = self.streamed_text or bool(delta["text"].strip())
                 return [{"content": delta["text"]}]
             if delta.get("type") not in ("thinking_delta", "signature_delta"):
                 raise ProviderError("unsupported thinking delta")

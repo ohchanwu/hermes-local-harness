@@ -31,6 +31,9 @@ AUDIT_FIELDS = {
     "tool_parked": ("tool_use_id", "rpc_id", "name", "model", "calls"),
     "result_delivered": ("tool_use_id", "rpc_id", "text_sha256"),
     "result_returned": ("rpc_id", "tool_use_id"), "result": ("num_turns",),
+    "second_message": ("outcome", "row", "number", "first_id", "second_id", "first_stop", "second_stop", "relation",
+                       "same_model", "first_calls", "second_calls", "answered", "answered_errors", "requested",
+                       "dropped_text_chars", "dropped_calls"),
 }
 
 

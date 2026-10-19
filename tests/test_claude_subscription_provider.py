@@ -854,10 +854,13 @@ class ClientTests(unittest.TestCase):
         with self.assertRaisesRegex(client.ProviderError, 'snapshot outside its streamed message'):
             self.request('__cli_retry_late_snapshot__')
 
-    def test_cli_retry_after_reply_text_streamed_fails(self):
-        with self.assertRaisesRegex(client.ProviderError, 'after part of it had streamed'):
-            list(self.request('__cli_retry_after_text__', stream=True))
-        self.assertTrue(self.c._runtime.cleanup['group_absent'])
+    def test_cli_retry_after_reply_text_is_transparent_because_messages_are_held_whole(self):
+        # Partial text of an unfinished message never reaches Hermes, so a retry drops it cleanly.
+        chunks = list(self.request('__cli_retry_after_text__', stream=True))
+        self.assertEqual(''.join(getattr(c.choices[0].delta, 'content', None) or '' for c in chunks), 'RETRIED')
+        self.assertEqual(chunks[-1].choices[0].finish_reason, 'stop')
+        self.assertEqual([a for a in self.c.audit if a['stage'] == 'runtime_retry'], [{'stage': 'runtime_retry', 'number': 1}])
+        self.assertFalse(self.c.is_closed())
 
     def test_unknown_stream_event_is_named_and_error_needs_a_restart(self):
         with self.assertRaisesRegex(client.ProviderError, 'unknown assistant stream event: mystery_event'):
