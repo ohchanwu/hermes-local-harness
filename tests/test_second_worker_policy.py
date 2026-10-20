@@ -36,6 +36,9 @@ RELATIVE = "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md"
 PROFILE_SKILLS = {
     prefix: ROOT / "policies/profile-skills" / f"{prefix}-orchestrator" / RELATIVE for prefix in FLEETS.values()
 }
+# The jobcron-orchestrator profile-only reference file, declared as a second
+# tracked-source override when t_b6d0e590 adopted the live jobcron drift.
+JOBCRON_REFERENCE = "autonomous-ai-agents/multi-agent-coding-orchestrator/references/kanban-triage-phase-routing.md"
 SHARED_SKILL = ROOT / "skills/multi-agent-coding-orchestrator/SKILL.md"
 VERSIONS = {
     PROFILE_SKILLS["jobcron"]: "0.6.9-jobcron.4",
@@ -336,8 +339,14 @@ class Pins(unittest.TestCase):
         overrides = self.snapshot["skill"]["profile_local_skill_overrides"]
         for prefix, path in PROFILE_SKILLS.items():
             profile = f"{prefix}-orchestrator"
-            self.assertEqual(overrides[profile], {RELATIVE: "tracked-source"})
+            want = {RELATIVE: "tracked-source"}
+            if profile == "jobcron-orchestrator":
+                want[JOBCRON_REFERENCE] = "tracked-source"
+            self.assertEqual(overrides[profile], want)
             self.assertEqual(verifier.local_override_expected(profile, RELATIVE, "tracked-source"), sha(path))
+        reference = ROOT / "policies/profile-skills/jobcron-orchestrator" / JOBCRON_REFERENCE
+        self.assertEqual(verifier.local_override_expected("jobcron-orchestrator", JOBCRON_REFERENCE, "tracked-source"),
+                         sha(reference))
         shared = next(e for e in self.snapshot["skill"]["shared_skills"] if e["name"] == "multi-agent-coding-orchestrator")
         self.assertEqual(shared["version"], "0.6.10")
         self.assertEqual(verifier.shared_skill_expected(shared)["SKILL.md"], sha(SHARED_SKILL))
