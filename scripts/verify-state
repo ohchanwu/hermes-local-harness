@@ -510,6 +510,7 @@ PROJECT_REPOSITORY_ALLOWLISTS = {
     "cha-pt": [
         "/Users/chanbla11mit/projects/cha-pt",
         "/Users/chanbla11mit/projects/cha-pt-frontend",
+        "/Users/chanbla11mit/projects/cha-webpt-website-sync",
     ],
     "harness": ["/Users/chanbla11mit/hermes-local-harness"],
     "jss-genr": ["/Users/chanbla11mit/projects/jss-genr"],
@@ -562,6 +563,11 @@ LEGACY_CHAPT_TEST_CONTRACTS = {
     ),
 }
 FRONTEND_PROJECT_DECLARATION = "Frontend project EXACT cha-pt-frontend."
+FRONTEND_REPOSITORY = "/Users/chanbla11mit/projects/cha-pt-frontend"
+# Ray's scraper repository (docs/specs/261020-chapt-scraper-repository-scope-and-push.md).
+SCRAPER_REPOSITORY = "/Users/chanbla11mit/projects/cha-webpt-website-sync"
+SCRAPER_PROJECT = "cha-webpt-website-sync"
+SCRAPER_PROJECT_LINE = re.compile(r"(?m)^Scraper project EXACT cha-webpt-website-sync\.$")
 FRONTEND_EXTERNAL_WRITE_DECLARATION = (
     "External writes PROHIBITED without separate explicit human authorization on this card."
 )
@@ -623,6 +629,11 @@ def check_project_isolation(errors, fleets, observed=None):
                 project != "cha-pt" or frontend_project != "cha-pt-frontend"
                 or "/Users/chanbla11mit/projects/cha-pt-frontend" not in repos):
             fail(errors, f"project frontend mapping malformed: {project}")
+        scraper_project = fleet.get("scraper_project")
+        if (scraper_project is not None or project == "cha-pt") and (
+                project != "cha-pt" or scraper_project != SCRAPER_PROJECT
+                or SCRAPER_REPOSITORY not in repos):
+            fail(errors, f"project scraper mapping malformed: {project}")
         if (project in PROJECTS_WITHOUT_PREVIEW_PORT and port is not None) or (
                 project not in PROJECTS_WITHOUT_PREVIEW_PORT and
                 (not isinstance(port, int) or not 1024 <= port <= 65535)):
@@ -1038,6 +1049,14 @@ def check_chapt_card_contract(errors, tasks):
                     or EXTERNAL_ACTION_MENTION.search(
                         body.replace(FRONTEND_EXTERNAL_WRITE_DECLARATION, "", 1))):
                 fail(errors, f"Cha PT card contract drift {task_id}: frontend authorization contract missing")
+        if repo == SCRAPER_REPOSITORY and (task.get("project_id") != SCRAPER_PROJECT
+                                           or task.get("board", "cha-pt") != "cha-pt"
+                                           or not SCRAPER_PROJECT_LINE.search(body)):
+            fail(errors, f"Cha PT card contract drift {task_id}: scraper project contract missing")
+        # Only scraper-repository cards may carry the scraper project or its declaration.
+        if repo != SCRAPER_REPOSITORY and (task.get("project_id") == SCRAPER_PROJECT
+                                           or SCRAPER_PROJECT_LINE.search(body)):
+            fail(errors, f"Cha PT card contract drift {task_id}: scraper project on non-scraper repository")
 
 
 def project_card_test_section(body):
@@ -1768,22 +1787,25 @@ def main():
                 tools = json_config(profile, "platform_toolsets.cli")
                 if tools != expected_tools:
                     fail(errors, f"project toolset drift {profile}: expected {expected_tools!r}")
-            frontend_project = fleet.get("frontend_project")
-            if frontend_project:
-                shown = run("hermes", "-p", fleet["orchestrator"], "project", "show", frontend_project)
-                frontend_repo = "/Users/chanbla11mit/projects/cha-pt-frontend"
+            # Alternate-root Hermes projects (frontend, scraper), each owned by the orchestrator only.
+            alternate_projects = {fleet[key]: repo for key, repo in (
+                ("frontend_project", FRONTEND_REPOSITORY), ("scraper_project", SCRAPER_REPOSITORY))
+                if fleet.get(key)}
+            for alternate_project, alternate_repo in alternate_projects.items():
+                shown = run("hermes", "-p", fleet["orchestrator"], "project", "show", alternate_project)
                 folder_paths = re.findall(r"^\s+[ *]\s+(/.+)$", shown.stdout, re.MULTILINE)
-                if (shown.returncode or f"{frontend_project}  [" not in shown.stdout
+                if (shown.returncode or f"{alternate_project}  [" not in shown.stdout
                         or f"  board:   {fleet['board']}" not in shown.stdout
-                        or f"  primary: {frontend_repo}" not in shown.stdout
-                        or folder_paths != [frontend_repo]):
-                    fail(errors, f"Hermes project drift {frontend_project}: expected board {fleet['board']} "
-                                 f"with sole primary folder {frontend_repo}")
+                        or f"  primary: {alternate_repo}" not in shown.stdout
+                        or folder_paths != [alternate_repo]):
+                    fail(errors, f"Hermes project drift {alternate_project}: expected board {fleet['board']} "
+                                 f"with sole primary folder {alternate_repo}")
+            if alternate_projects:
                 for profile in project_profiles:
                     projects = run("hermes", "-p", profile, "project", "list", "--all")
                     observed_projects = set(re.findall(
                         r"^\s*\*?\s*([a-z0-9][a-z0-9-]*)\s+", projects.stdout, re.MULTILINE))
-                    expected_projects = {frontend_project} if profile == fleet["orchestrator"] else set()
+                    expected_projects = set(alternate_projects) if profile == fleet["orchestrator"] else set()
                     if projects.returncode or observed_projects != expected_projects:
                         fail(errors, f"Hermes project allowlist drift {profile}: expected "
                                      f"{sorted(expected_projects)}, actual {sorted(observed_projects)}")

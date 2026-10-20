@@ -1,0 +1,168 @@
+#!/usr/bin/env python3
+"""Controller-only, per-SHA owner-approved push of a reviewed commit to the
+scraper repository's main (docs/specs/261020-chapt-scraper-repository-scope-and-push.md).
+
+    chapt-push-scraper-main --card <cha-pt task id> --sha <40-hex> --approval '<owner message verbatim>'
+
+Every refusal exits nonzero before any git write. The command line can only use
+the constants below; tests inject a config (temp checkout, local bare remote,
+stub card) through push_scraper_main().
+"""
+import argparse
+import json
+import os
+import re
+import subprocess
+import sys
+
+CHECKOUT = "/Users/chanbla11mit/projects/cha-webpt-website-sync"
+REMOTE = "git@github.com:raysong-sudo/cha-webpt-website-sync.git"
+BOARD = "cha-pt"
+PROJECT = "cha-webpt-website-sync"
+CONTROLLER = "chapt-orchestrator"
+REVIEWER = "chapt-reviewer"
+MAIN = "refs/heads/main"
+DISPATCH_MARKERS = ("HERMES_KANBAN_TASK", "HERMES_KANBAN_WORKSPACE")
+CARD_ID = re.compile(r"t_[0-9a-z]+")
+SHA40 = re.compile(r"[0-9a-f]{40}")
+HEX_TOKEN = re.compile(r"(?<!\w)[0-9a-fA-F]{7,}(?!\w)")
+MAIN_WORD = re.compile(r"(?i)\bmain\b")
+# Straight or typographic apostrophe in "Ray's"; chr() keeps this file ASCII.
+REPO_REFERENCE = re.compile("(?i)cha-webpt-website-sync|scraper|\\bray['" + chr(0x2019) + "]s\\b")
+CANDIDATE_KEYS = ("candidate", "candidate_commit", "commit")
+
+
+class Refused(Exception):
+    pass
+
+
+def subprocess_runner(args):
+    return subprocess.run(args, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+
+def hermes_card(card_id, runner=subprocess_runner):
+    shown = runner(("hermes", "kanban", "--board", BOARD, "show", card_id, "--json"))
+    if shown.returncode:
+        raise Refused(f"cannot read card {card_id} on board {BOARD}")
+    try:
+        return json.loads(shown.stdout)
+    except json.JSONDecodeError:
+        raise Refused(f"cannot parse card {card_id} on board {BOARD}") from None
+
+
+def default_config():
+    """The only configuration the command line can use."""
+    return {"checkout": CHECKOUT, "remote": REMOTE, "board": BOARD, "project": PROJECT,
+            "load_card": hermes_card, "runner": subprocess_runner}
+
+
+def check_environment(environ):
+    if any(name in environ for name in DISPATCH_MARKERS):
+        raise Refused("dispatched Kanban tasks (workers, reviewers) never push; controller chat only")
+    home = environ.get("HERMES_HOME", "").rstrip("/")
+    profile = environ.get("HERMES_PROFILE")
+    if not home.endswith("/profiles/" + CONTROLLER) or (profile and profile != CONTROLLER):
+        raise Refused(f"only the {CONTROLLER} profile may push the scraper repository")
+
+
+def check_approval(approval, sha):
+    if not approval or not MAIN_WORD.search(approval):
+        raise Refused("owner approval must name main")
+    if not REPO_REFERENCE.search(approval):
+        raise Refused("owner approval must name the scraper repository")
+    tokens = [token.lower() for token in HEX_TOKEN.findall(approval)]
+    others = [token for token in tokens if not sha.startswith(token)]
+    if others:
+        raise Refused(f"owner approval names another SHA: {others[0]}")
+    if not tokens:
+        raise Refused("owner approval must name the exact reviewed SHA (at least 7 hex characters)")
+
+
+def check_card(config, card_id, sha):
+    payload = config["load_card"](card_id)
+    task = payload.get("task", payload) if isinstance(payload, dict) else None
+    if not isinstance(task, dict) or task.get("id") != card_id:
+        raise Refused(f"card {card_id} not found")
+    runs = payload.get("runs", task.get("runs"))
+    if task.get("board", config["board"]) != BOARD:
+        raise Refused(f"card {card_id} is not on board {BOARD}")
+    if task.get("project_id") != PROJECT:
+        raise Refused(f"card {card_id} is not in project {PROJECT}")
+    if task.get("status") != "done":
+        raise Refused(f"card {card_id} is not done")
+    reviews = [run for run in runs or () if isinstance(run, dict)
+               and run.get("profile") == REVIEWER and run.get("outcome") == "completed"]
+    if not reviews:
+        raise Refused(f"card {card_id} has no completed {REVIEWER} run")
+    latest = max(reviews, key=lambda run: (run.get("ended_at") or 0, run.get("id") or 0))
+    metadata = latest.get("metadata") if isinstance(latest.get("metadata"), dict) else {}
+    recorded = [metadata[key] for key in CANDIDATE_KEYS if key in metadata]
+    if not recorded or any(value != sha for value in recorded):
+        raise Refused(f"latest {REVIEWER} approval on {card_id} is not for {sha}")
+
+
+def git(config, *args):
+    return config["runner"](("git", "-C", config["checkout"], *args))
+
+
+def push_scraper_main(config, card_id, sha, approval, environ, out=sys.stdout):
+    """Return the exit status; print every refusal or result to out."""
+    try:
+        check_environment(environ)
+        if not isinstance(sha, str) or not SHA40.fullmatch(sha):
+            raise Refused("--sha must be a full 40-character lowercase hex commit")
+        if not isinstance(card_id, str) or not CARD_ID.fullmatch(card_id):
+            raise Refused("--card must be a Kanban task id")
+        check_approval(approval, sha)
+        check_card(config, card_id, sha)
+        remote = config["remote"]
+        origin = git(config, "remote", "get-url", "origin")
+        if origin.returncode or origin.stdout.strip() != remote:
+            raise Refused(f"checkout origin is not EXACT {remote}")
+        rewrites = git(config, "config", "--get-regexp", r"^url\.")
+        if rewrites.stdout.strip():
+            raise Refused("a url.*.insteadOf rewrite would change the push target")
+        kind = git(config, "cat-file", "-t", sha)
+        if kind.returncode or kind.stdout.strip() != "commit":
+            raise Refused(f"{sha} is not a local commit")
+        fetched = git(config, "fetch", "--no-tags", remote, MAIN)
+        if fetched.returncode:
+            raise Refused(f"fetch of remote main failed: {fetched.stderr.strip()}")
+        head = git(config, "rev-parse", "--verify", "FETCH_HEAD^{commit}")
+        remote_main = head.stdout.strip()
+        if head.returncode or not SHA40.fullmatch(remote_main):
+            raise Refused("cannot resolve fetched remote main")
+        if remote_main == sha:
+            print(f"nothing to push: remote main is already {sha}", file=out)
+            return 0
+        if git(config, "merge-base", "--is-ancestor", remote_main, sha).returncode:
+            raise Refused(f"remote main {remote_main} is not an ancestor of {sha}; "
+                          "stop and report (no rebase, merge or retry)")
+    except Refused as refusal:
+        print(f"REFUSED: {refusal}", file=out)
+        return 1
+    # push.followTags=false keeps tags out even if the owner's git config enables it.
+    pushed = config["runner"](("git", "-c", "push.followTags=false", "-C", config["checkout"],
+                               "push", remote, f"{sha}:{MAIN}"))
+    if pushed.returncode:
+        print(f"PUSH REJECTED (not retried):\n{pushed.stderr.strip()}", file=out)
+        return 1
+    readback = config["runner"](("git", "-C", config["checkout"], "ls-remote", remote, MAIN))
+    print(f"pushed {sha} to {remote} {MAIN}\nls-remote: {readback.stdout.strip()}", file=out)
+    if readback.returncode or readback.stdout.split()[:1] != [sha]:
+        print("READBACK MISMATCH: remote main does not equal the pushed SHA", file=out)
+        return 1
+    return 0
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--card", required=True)
+    parser.add_argument("--sha", required=True)
+    parser.add_argument("--approval", required=True, help="owner message verbatim")
+    args = parser.parse_args(argv)
+    return push_scraper_main(default_config(), args.card, args.sha, args.approval, os.environ)
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -22,6 +22,8 @@ Run autonomous Jobcron, Cha PT, and harness campaigns concurrently without cross
   - primary/default repository: `/Users/chanbla11mit/projects/cha-pt`
   - additional authorized repository: `/Users/chanbla11mit/projects/cha-pt-frontend`
   - frontend Hermes project: `cha-pt-frontend`, with the frontend repository as its sole primary folder and `cha-pt` as its board
+  - additional authorized repository: `/Users/chanbla11mit/projects/cha-webpt-website-sync` (Ray's scraper repository; added 2026-10-20 by `docs/specs/261020-chapt-scraper-repository-scope-and-push.md`)
+  - scraper Hermes project: `cha-webpt-website-sync`, with the scraper repository as its sole primary folder and `cha-pt` as its board
   - orchestrator: `chapt-orchestrator` — `openai-codex/gpt-6.1-sol`
   - worker pool: `chapt-worker` — `openai-codex/gpt-6.1-sol`; `chapt-worker-glm-1` and `chapt-worker-glm-2` — `zai/glm-5.3`
   - reviewer: `chapt-reviewer` — `openai-codex/gpt-6-astra`
@@ -74,7 +76,7 @@ hermes kanban --board cha-pt list
 hermes kanban --board harness list
 ```
 
-Every coding card must use a repository-owned board worktree, identify its exact repository and protected baseline, state an explicit proportional test contract, assign only a worker from the matching project pool, and request only the matching reviewer on the same card. A frontend card must set `project: cha-pt-frontend`; a backend card must not. Sol is the routine bounded lane; GLM Full is preferred for large-context, repo-wide, long-horizon, multimodal, visual, or broadly specified work. Review revisions return to the same assignee unless a capability-bound continuation card explicitly preserves lineage and evidence.
+Every coding card must use a repository-owned board worktree, identify its exact repository and protected baseline, state an explicit proportional test contract, assign only a worker from the matching project pool, and request only the matching reviewer on the same card. A frontend card must set `project: cha-pt-frontend` and a scraper card `project: cha-webpt-website-sync`; a backend card sets neither. Sol is the routine bounded lane; GLM Full is preferred for large-context, repo-wide, long-horizon, multimodal, visual, or broadly specified work. Review revisions return to the same assignee unless a capability-bound continuation card explicitly preserves lineage and evidence.
 
 ## Upgrade and rollback
 

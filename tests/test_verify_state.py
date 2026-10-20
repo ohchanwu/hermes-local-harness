@@ -232,8 +232,10 @@ assert roster["project_fleets"]["harness"] == {
 assert roster["project_fleets"]["cha-pt"]["repositories"] == [
     "/Users/chanbla11mit/projects/cha-pt",
     "/Users/chanbla11mit/projects/cha-pt-frontend",
+    "/Users/chanbla11mit/projects/cha-webpt-website-sync",
 ]
 assert roster["project_fleets"]["cha-pt"]["frontend_project"] == "cha-pt-frontend"
+assert roster["project_fleets"]["cha-pt"]["scraper_project"] == "cha-webpt-website-sync"
 snapshot = json.loads((ROOT / "snapshots" / "sanitized-current-state.yaml").read_text())
 project_repair_policy = {
     "version": "bounded-convergence-v1",
