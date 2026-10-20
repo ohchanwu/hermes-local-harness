@@ -723,19 +723,19 @@
     "jss-worker-glm-2": "off"
   },
   "profile_soul_hashes": {
-    "chapt-orchestrator": "ab656c3f088006c6c69d72ee3e2e13830a5c509c48d76c910d1e7e40a93c1127",
-    "chapt-worker": "cff6cd2e699d34100d525d0b3c358e12a6ad219acb86cbc7581468d88f956ca2",
-    "chapt-worker-2": "cff6cd2e699d34100d525d0b3c358e12a6ad219acb86cbc7581468d88f956ca2",
-    "chapt-reviewer": "52fd8994366b1ab01f1a3db5e9c3267e21065b520cf956187ab398cdc31746b1",
-    "harness-orchestrator": "8b9a3e7f66d57a9367a416f74a025babd7e0578be885657db4c9f29d2a6ab1fd",
-    "harness-worker": "8ee6127b833f8278b3ed3932aa05c77cac917ee8391ccc633474b4ce8fc1ef61",
-    "harness-worker-2": "8ee6127b833f8278b3ed3932aa05c77cac917ee8391ccc633474b4ce8fc1ef61",
-    "harness-reviewer": "d46167c337aedb0ee3ac4246a6ba9420f484e336f3084ec843efc2c97d76cf66",
-    "jobcron-orchestrator": "3bd62ad5483cfcffd8f00a06f34fd1f3b471928e636a3c93b9b62e2a579fd713",
-    "jss-orchestrator": "baaa1d11afd866a63b84dd95446b79fb24602e6873730dc79941234d2e046e77",
-    "jss-worker": "c53c3147dc2b6979312208cacf37aad80f627f8fbaada2094439eefc9d77af32",
-    "jss-worker-2": "c53c3147dc2b6979312208cacf37aad80f627f8fbaada2094439eefc9d77af32",
-    "jss-reviewer": "6d20c970e3775a3888731c3330928ea9f24ed8c40d8a5a742e59170091fb7334"
+    "chapt-orchestrator": "06e68f4e75d99bfdf7a4e5eb1f1f4ffa8c3a4ccb51dd36da2a6423764730b9d6",
+    "chapt-worker": "2c6ff8e3669d92ade11e17585617298f506df3d76419844e2f3eb7d56d61bae7",
+    "chapt-worker-2": "2c6ff8e3669d92ade11e17585617298f506df3d76419844e2f3eb7d56d61bae7",
+    "chapt-reviewer": "e2c132301890733d85f8a09a9c037eb09221c740319afaaae70769107244ebdb",
+    "harness-orchestrator": "fa5c430cf9db34da64b5fc5c7609f4c16a6e1b8dd1d153bc3057fbac7ec1a413",
+    "harness-worker": "6092dc450693b37c441f25c3998e989f161dd0266cbe7cf87d3cccc214f9ee53",
+    "harness-worker-2": "6092dc450693b37c441f25c3998e989f161dd0266cbe7cf87d3cccc214f9ee53",
+    "harness-reviewer": "343b968109028bc504ec024af1dd5101ce4d498eb22a5cb9646149ec60f7c211",
+    "jobcron-orchestrator": "9124a006cc3e7e7b77875a947593e6491c300a079239379953bf285fce999e02",
+    "jss-orchestrator": "4d6e0736e5ecbfaa94f2c2cee235b85dc8bab3839f7b62f10ebca48d8df2e592",
+    "jss-worker": "cc0c68296eba80371bfca434030db69476f7a57394e84a86f21e1cf5a22c9ca5",
+    "jss-worker-2": "cc0c68296eba80371bfca434030db69476f7a57394e84a86f21e1cf5a22c9ca5",
+    "jss-reviewer": "6d59dda4f71bd06e1a20e5f32b8114c323738c443b74abea61dbae68e0d15dec"
   },
   "repository_policy_hashes": {
     "cha-pt-frontend": "113b81fd55294cfc3057f66163e1745d590f520003997d36c85b46c938342817"

@@ -444,6 +444,39 @@ def check_profile_souls(errors, expected, observed=None):
         fail(errors, f"unexpected profile SOUL observation: {profile}")
 
 
+WRITING_RULES_POLICY = "policies/writing-rules.md"
+
+
+def writing_rules_block():
+    """Full bytes of the tracked writing-rules policy, or None when missing, unreadable or empty."""
+    try:
+        block = (ROOT / WRITING_RULES_POLICY).read_bytes()
+    except OSError:
+        return None
+    return block if block.strip() else None
+
+
+def check_writing_rules(errors, *, live=False):
+    """Every profile SOUL carries the whole writing-rules policy as one exact byte
+    substring; keywords or a partial block are not enough. live=False checks the
+    tracked sources (both modes); live=True reads the live copies (live mode only).
+    A fixture observes live SOULs by hash: check_profile_souls requires each to equal
+    its tracked source, and this check requires that source to carry the block."""
+    block = writing_rules_block()
+    if block is None:
+        if not live:
+            fail(errors, f"writing rules policy missing or unreadable: {WRITING_RULES_POLICY}")
+        return
+    for profile, entry in PROFILE_SOUL_PATHS.items():
+        path = Path(entry["live"]) if live else ROOT / entry["source"]
+        try:
+            content = path.read_bytes()
+        except OSError:
+            content = b""
+        if block not in content:
+            fail(errors, f"writing rules missing from {'live' if live else 'tracked'} SOUL {profile}")
+
+
 REPOSITORY_POLICY_MARKERS = {
     "cha-pt-frontend": [
         "## Frontend-owner editable paths",
@@ -1596,6 +1629,7 @@ def main():
     if snapshot.get("profile_souls") != profile_souls:
         fail(errors, "profile SOUL snapshot drift")
     check_profile_souls(errors, profile_souls)
+    check_writing_rules(errors)
     repository_policies = roster.get("repository_policies", {})
     if snapshot.get("repository_policies") != repository_policies:
         fail(errors, "repository policy snapshot drift")
@@ -1851,6 +1885,7 @@ def main():
             observed_souls[profile] = (
                 hashlib.sha256(candidate.read_bytes()).hexdigest() if candidate.is_file() else None)
         check_profile_souls(errors, profile_souls, observed_souls)
+        check_writing_rules(errors, live=True)
         observed_repository_policies = {}
         for name, entry in repository_policies.items():
             candidate = Path(entry["path"])

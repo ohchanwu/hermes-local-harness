@@ -211,6 +211,10 @@ class PolicyText(unittest.TestCase):
         self.assertEqual(text.count(JOBCRON_SOUL_EDIT[0]), 1)
         self.assertNotIn(b"glm", text.lower())
         self.assertIn(b"assign same-card review only to `jobcron-reviewer`", text)
+        # t_a1208da3 appended the writing rules (the upstream copy ended without LF).
+        appended = b"\n\n" + (ROOT / "policies/writing-rules.md").read_bytes()
+        self.assertTrue(text.endswith(appended))
+        text = text[:-len(appended)]
         # Every other byte is the upstream live SOUL, verbatim.
         self.assertEqual(sha_bytes(text.replace(*JOBCRON_SOUL_EDIT, 1)), JOBCRON_SOUL_UPSTREAM_SHA256)
 
