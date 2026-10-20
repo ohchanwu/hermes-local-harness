@@ -28,7 +28,8 @@
       "timeout",
       "context_exhaustion"
     ],
-    "terminal_assignee": "worker-astra"
+    "terminal_assignee": "worker-astra",
+    "terminal_assignee_lifecycle": "retired"
   },
   "escalation_rungs": [
     "flash",
@@ -95,26 +96,21 @@
       "jss-orchestrator",
       "jss-worker",
       "jss-worker-2",
-      "jss-reviewer"
+      "jss-reviewer",
+      "jobcron-worker-glm-1",
+      "jobcron-worker-glm-2",
+      "chapt-worker-glm-1",
+      "chapt-worker-glm-2",
+      "harness-worker-glm-1",
+      "harness-worker-glm-2",
+      "jss-worker-glm-1",
+      "jss-worker-glm-2"
     ]
   },
   "dispatch_pool": {
-    "implementation_allowlist": [
-      "worker-flash-1",
-      "worker-flash-2",
-      "worker-flash-3",
-      "worker-luna-1",
-      "worker-luna-2"
-    ],
-    "dispatch_allowlist": [
-      "worker-flash-1",
-      "worker-flash-2",
-      "worker-flash-3",
-      "worker-luna-1",
-      "worker-luna-2",
-      "reviewer-sol"
-    ],
-    "reviewer_outside_budget": "reviewer-sol"
+    "implementation_allowlist": [],
+    "dispatch_allowlist": [],
+    "reviewer_outside_budget": null
   },
   "automatic_decomposition": false,
   "revision_limits": {
@@ -129,8 +125,8 @@
     {
       "name": "default",
       "role": "orchestrator",
-      "model": "gpt-5.6-sol",
-      "provider": "openai-codex",
+      "model": "claude-opus-5-5",
+      "provider": "claude-subscription",
       "installed": true,
       "dispatch_eligible": false,
       "in_dispatch_pool": false,
@@ -147,8 +143,8 @@
     {
       "name": "advisor",
       "role": "advisor",
-      "model": "gpt-5.6-sol",
-      "provider": "openai-codex",
+      "model": "claude-fable-5-1",
+      "provider": "claude-subscription",
       "installed": true,
       "dispatch_eligible": false,
       "in_dispatch_pool": false,
@@ -166,9 +162,11 @@
       "model": "gpt-5.6-sol",
       "provider": "openai-codex",
       "installed": true,
-      "dispatch_eligible": true,
-      "in_dispatch_pool": true,
-      "lifecycle": "active",
+      "dispatch_eligible": false,
+      "in_dispatch_pool": false,
+      "lifecycle": "retired",
+      "lifecycle_before_retirement": "active",
+      "retired_on": "2026-10-18",
       "concurrency_limit": 1,
       "required_plugins": [
         "hermes-terminal-outcome-notification"
@@ -184,9 +182,11 @@
       "model": "glm-5.3-flash",
       "provider": "zai",
       "installed": true,
-      "dispatch_eligible": true,
-      "in_dispatch_pool": true,
-      "lifecycle": "active",
+      "dispatch_eligible": false,
+      "in_dispatch_pool": false,
+      "lifecycle": "retired",
+      "lifecycle_before_retirement": "active",
+      "retired_on": "2026-10-18",
       "concurrency_limit": 1,
       "required_plugins": [
         "hermes-terminal-outcome-notification"
@@ -205,9 +205,11 @@
       "model": "glm-5.3-flash",
       "provider": "zai",
       "installed": true,
-      "dispatch_eligible": true,
-      "in_dispatch_pool": true,
-      "lifecycle": "active",
+      "dispatch_eligible": false,
+      "in_dispatch_pool": false,
+      "lifecycle": "retired",
+      "lifecycle_before_retirement": "active",
+      "retired_on": "2026-10-18",
       "concurrency_limit": 1,
       "required_plugins": [
         "hermes-terminal-outcome-notification"
@@ -226,9 +228,11 @@
       "model": "glm-5.3-flash",
       "provider": "zai",
       "installed": true,
-      "dispatch_eligible": true,
-      "in_dispatch_pool": true,
-      "lifecycle": "active",
+      "dispatch_eligible": false,
+      "in_dispatch_pool": false,
+      "lifecycle": "retired",
+      "lifecycle_before_retirement": "active",
+      "retired_on": "2026-10-18",
       "concurrency_limit": 1,
       "required_plugins": [
         "hermes-terminal-outcome-notification"
@@ -247,9 +251,11 @@
       "model": "gpt-5.6-luna",
       "provider": "openai-codex",
       "installed": true,
-      "dispatch_eligible": true,
-      "in_dispatch_pool": true,
-      "lifecycle": "active",
+      "dispatch_eligible": false,
+      "in_dispatch_pool": false,
+      "lifecycle": "retired",
+      "lifecycle_before_retirement": "active",
+      "retired_on": "2026-10-18",
       "concurrency_limit": 1,
       "required_plugins": [
         "hermes-terminal-outcome-notification"
@@ -268,9 +274,11 @@
       "model": "gpt-5.6-luna",
       "provider": "openai-codex",
       "installed": true,
-      "dispatch_eligible": true,
-      "in_dispatch_pool": true,
-      "lifecycle": "active",
+      "dispatch_eligible": false,
+      "in_dispatch_pool": false,
+      "lifecycle": "retired",
+      "lifecycle_before_retirement": "active",
+      "retired_on": "2026-10-18",
       "concurrency_limit": 1,
       "required_plugins": [
         "hermes-terminal-outcome-notification"
@@ -289,9 +297,11 @@
       "model": "gpt-5.6-terra",
       "provider": "openai-codex",
       "installed": true,
-      "dispatch_eligible": true,
+      "dispatch_eligible": false,
       "in_dispatch_pool": false,
-      "lifecycle": "active",
+      "lifecycle": "retired",
+      "lifecycle_before_retirement": "active",
+      "retired_on": "2026-10-18",
       "concurrency_limit": 1,
       "required_plugins": [
         "hermes-terminal-outcome-notification"
@@ -310,9 +320,11 @@
       "model": "glm-5.3",
       "provider": "zai",
       "installed": true,
-      "dispatch_eligible": true,
+      "dispatch_eligible": false,
       "in_dispatch_pool": false,
-      "lifecycle": "active",
+      "lifecycle": "retired",
+      "lifecycle_before_retirement": "active",
+      "retired_on": "2026-10-18",
       "concurrency_limit": 1,
       "required_plugins": [
         "hermes-terminal-outcome-notification"
@@ -331,9 +343,11 @@
       "model": "gpt-5.6-sol",
       "provider": "openai-codex",
       "installed": true,
-      "dispatch_eligible": true,
+      "dispatch_eligible": false,
       "in_dispatch_pool": false,
-      "lifecycle": "active",
+      "lifecycle": "retired",
+      "lifecycle_before_retirement": "active",
+      "retired_on": "2026-10-18",
       "concurrency_limit": 1,
       "required_plugins": [
         "hermes-terminal-outcome-notification"
@@ -352,9 +366,11 @@
       "model": "gpt-6-astra",
       "provider": "openai-codex",
       "installed": true,
-      "dispatch_eligible": true,
+      "dispatch_eligible": false,
       "in_dispatch_pool": false,
-      "lifecycle": "active",
+      "lifecycle": "retired",
+      "lifecycle_before_retirement": "active",
+      "retired_on": "2026-10-18",
       "concurrency_limit": 1,
       "required_plugins": [
         "hermes-terminal-outcome-notification"
@@ -375,7 +391,9 @@
       "installed": true,
       "dispatch_eligible": false,
       "in_dispatch_pool": false,
-      "lifecycle": "dormant-spare",
+      "lifecycle": "retired",
+      "lifecycle_before_retirement": "dormant-spare",
+      "retired_on": "2026-10-18",
       "concurrency_limit": 1,
       "required_plugins": [],
       "modes": [],
@@ -389,8 +407,8 @@
     {
       "name": "jobcron-orchestrator",
       "role": "project orchestrator",
-      "model": "gpt-6.1-sol",
-      "provider": "openai-codex",
+      "model": "claude-opus-5-5",
+      "provider": "claude-subscription",
       "installed": true,
       "dispatch_eligible": false,
       "in_dispatch_pool": false,
@@ -411,8 +429,8 @@
     {
       "name": "jobcron-worker",
       "role": "project implementation",
-      "model": "gpt-6.1-sol",
-      "provider": "openai-codex",
+      "model": "claude-opus-5-5",
+      "provider": "claude-subscription",
       "installed": true,
       "dispatch_eligible": true,
       "in_dispatch_pool": true,
@@ -457,8 +475,8 @@
     {
       "name": "jobcron-reviewer",
       "role": "project independent reviewer",
-      "model": "gpt-6-astra",
-      "provider": "openai-codex",
+      "model": "claude-fable-5-1",
+      "provider": "claude-subscription",
       "installed": true,
       "dispatch_eligible": true,
       "in_dispatch_pool": true,
@@ -479,8 +497,8 @@
     {
       "name": "chapt-orchestrator",
       "role": "project orchestrator",
-      "model": "gpt-6.1-sol",
-      "provider": "openai-codex",
+      "model": "claude-opus-5-5",
+      "provider": "claude-subscription",
       "installed": true,
       "dispatch_eligible": false,
       "in_dispatch_pool": false,
@@ -501,8 +519,8 @@
     {
       "name": "chapt-worker",
       "role": "project implementation",
-      "model": "gpt-6.1-sol",
-      "provider": "openai-codex",
+      "model": "claude-opus-5-5",
+      "provider": "claude-subscription",
       "installed": true,
       "dispatch_eligible": true,
       "in_dispatch_pool": true,
@@ -547,8 +565,8 @@
     {
       "name": "chapt-reviewer",
       "role": "project independent reviewer",
-      "model": "gpt-6-astra",
-      "provider": "openai-codex",
+      "model": "claude-fable-5-1",
+      "provider": "claude-subscription",
       "installed": true,
       "dispatch_eligible": true,
       "in_dispatch_pool": true,
@@ -569,8 +587,8 @@
     {
       "name": "harness-orchestrator",
       "role": "project orchestrator",
-      "model": "gpt-6.1-sol",
-      "provider": "openai-codex",
+      "model": "claude-opus-5-5",
+      "provider": "claude-subscription",
       "installed": true,
       "dispatch_eligible": false,
       "in_dispatch_pool": false,
@@ -591,8 +609,8 @@
     {
       "name": "harness-worker",
       "role": "project implementation",
-      "model": "gpt-6.1-sol",
-      "provider": "openai-codex",
+      "model": "claude-opus-5-5",
+      "provider": "claude-subscription",
       "installed": true,
       "dispatch_eligible": true,
       "in_dispatch_pool": true,
@@ -637,8 +655,8 @@
     {
       "name": "harness-reviewer",
       "role": "project independent reviewer",
-      "model": "gpt-6-astra",
-      "provider": "openai-codex",
+      "model": "claude-fable-5-1",
+      "provider": "claude-subscription",
       "installed": true,
       "dispatch_eligible": true,
       "in_dispatch_pool": true,
@@ -745,6 +763,182 @@
       "installed_disabled_plugins": [
         "hermes-terminal-outcome-notification"
       ]
+    },
+    {
+      "name": "jobcron-worker-glm-1",
+      "role": "project implementation",
+      "model": "glm-5.3",
+      "provider": "zai",
+      "installed": true,
+      "dispatch_eligible": false,
+      "in_dispatch_pool": false,
+      "lifecycle": "retired",
+      "lifecycle_before_retirement": "project-active",
+      "retired_on": "2026-10-18",
+      "concurrency_limit": 1,
+      "modes": [
+        "project-isolated",
+        "jobcron"
+      ],
+      "toolsets": "implementation",
+      "credential_required": true,
+      "credential_present": null,
+      "required_plugins": [],
+      "installed_disabled_plugins": []
+    },
+    {
+      "name": "jobcron-worker-glm-2",
+      "role": "project implementation",
+      "model": "glm-5.3",
+      "provider": "zai",
+      "installed": true,
+      "dispatch_eligible": false,
+      "in_dispatch_pool": false,
+      "lifecycle": "retired",
+      "lifecycle_before_retirement": "project-active",
+      "retired_on": "2026-10-18",
+      "concurrency_limit": 1,
+      "modes": [
+        "project-isolated",
+        "jobcron"
+      ],
+      "toolsets": "implementation",
+      "credential_required": true,
+      "credential_present": null,
+      "required_plugins": [],
+      "installed_disabled_plugins": []
+    },
+    {
+      "name": "chapt-worker-glm-1",
+      "role": "project implementation",
+      "model": "glm-5.3",
+      "provider": "zai",
+      "installed": true,
+      "dispatch_eligible": false,
+      "in_dispatch_pool": false,
+      "lifecycle": "retired",
+      "lifecycle_before_retirement": "project-active",
+      "retired_on": "2026-10-18",
+      "concurrency_limit": 1,
+      "modes": [
+        "project-isolated",
+        "cha-pt"
+      ],
+      "toolsets": "implementation",
+      "credential_required": true,
+      "credential_present": null,
+      "required_plugins": [],
+      "installed_disabled_plugins": []
+    },
+    {
+      "name": "chapt-worker-glm-2",
+      "role": "project implementation",
+      "model": "glm-5.3",
+      "provider": "zai",
+      "installed": true,
+      "dispatch_eligible": false,
+      "in_dispatch_pool": false,
+      "lifecycle": "retired",
+      "lifecycle_before_retirement": "project-active",
+      "retired_on": "2026-10-18",
+      "concurrency_limit": 1,
+      "modes": [
+        "project-isolated",
+        "cha-pt"
+      ],
+      "toolsets": "implementation",
+      "credential_required": true,
+      "credential_present": null,
+      "required_plugins": [],
+      "installed_disabled_plugins": []
+    },
+    {
+      "name": "harness-worker-glm-1",
+      "role": "project implementation",
+      "model": "glm-5.3",
+      "provider": "zai",
+      "installed": true,
+      "dispatch_eligible": false,
+      "in_dispatch_pool": false,
+      "lifecycle": "retired",
+      "lifecycle_before_retirement": "project-active",
+      "retired_on": "2026-10-18",
+      "concurrency_limit": 1,
+      "modes": [
+        "project-isolated",
+        "harness"
+      ],
+      "toolsets": "implementation",
+      "credential_required": true,
+      "credential_present": null,
+      "required_plugins": [],
+      "installed_disabled_plugins": []
+    },
+    {
+      "name": "harness-worker-glm-2",
+      "role": "project implementation",
+      "model": "glm-5.3",
+      "provider": "zai",
+      "installed": true,
+      "dispatch_eligible": false,
+      "in_dispatch_pool": false,
+      "lifecycle": "retired",
+      "lifecycle_before_retirement": "project-active",
+      "retired_on": "2026-10-18",
+      "concurrency_limit": 1,
+      "modes": [
+        "project-isolated",
+        "harness"
+      ],
+      "toolsets": "implementation",
+      "credential_required": true,
+      "credential_present": null,
+      "required_plugins": [],
+      "installed_disabled_plugins": []
+    },
+    {
+      "name": "jss-worker-glm-1",
+      "role": "project implementation",
+      "model": "glm-5.3",
+      "provider": "zai",
+      "installed": true,
+      "dispatch_eligible": false,
+      "in_dispatch_pool": false,
+      "lifecycle": "retired",
+      "lifecycle_before_retirement": "project-active",
+      "retired_on": "2026-10-18",
+      "concurrency_limit": 1,
+      "modes": [
+        "project-isolated",
+        "jss-genr"
+      ],
+      "toolsets": "implementation",
+      "credential_required": true,
+      "credential_present": null,
+      "required_plugins": [],
+      "installed_disabled_plugins": []
+    },
+    {
+      "name": "jss-worker-glm-2",
+      "role": "project implementation",
+      "model": "glm-5.3",
+      "provider": "zai",
+      "installed": true,
+      "dispatch_eligible": false,
+      "in_dispatch_pool": false,
+      "lifecycle": "retired",
+      "lifecycle_before_retirement": "project-active",
+      "retired_on": "2026-10-18",
+      "concurrency_limit": 1,
+      "modes": [
+        "project-isolated",
+        "jss-genr"
+      ],
+      "toolsets": "implementation",
+      "credential_required": true,
+      "credential_present": null,
+      "required_plugins": [],
+      "installed_disabled_plugins": []
     }
   ],
   "project_fleets": {

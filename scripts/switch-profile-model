@@ -7,8 +7,13 @@
 
 Backs up the profile's config.yaml first, then uses `hermes config set` for
 model.provider, model.default, model.base_url and every auxiliary helper task.
+It also updates the profile's model/provider expectation in the roster.yaml of
+the repository checkout it runs from (or --roster), so scripts/verify-state does
+not go stale; that roster change must then be committed. --dry-run prints both
+the live and the roster changes and writes nothing.
 """
 import argparse
+import json
 import re
 import shutil
 import subprocess
@@ -54,6 +59,15 @@ def set_dispatch(config, profile, action):
     config.write_text(text[:match.start()] + block + text[match.end():])
 
 
+def roster_change(roster_path, profile):
+    """(roster, entry, old) for the profile's roster entry, or None when not declared."""
+    roster = json.loads(roster_path.read_text())  # roster.yaml is JSON, as verify-state reads it
+    entry = next((p for p in roster.get("profiles", []) if p.get("name") == profile), None)
+    if entry is None:
+        return None
+    return roster, entry, (entry.get("model"), entry.get("provider"))
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     parser.add_argument("--profile", required=True, help="profile name, or 'default' for ~/.hermes itself")
@@ -62,6 +76,8 @@ def main(argv=None):
     parser.add_argument("--dispatch", choices=("add", "remove"), help="change the profile's Kanban dispatch membership")
     parser.add_argument("--home-root", type=Path, default=Path.home() / ".hermes")
     parser.add_argument("--hermes", default=str(Path.home() / ".hermes/hermes-agent/.hermes/bin/hermes"))
+    parser.add_argument("--roster", type=Path, default=Path(__file__).resolve().parents[1] / "roster.yaml",
+                        help="repository roster.yaml to keep in step (default: this checkout's)")
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args(argv)
     if "/" in args.profile or args.profile in {"", ".", ".."}:
@@ -70,11 +86,23 @@ def main(argv=None):
     config = home / "config.yaml"
     if not config.is_file():
         parser.error(f"no config at {config}")
+    if not args.roster.is_file():
+        parser.error(f"no roster at {args.roster}")
     pairs = settings(args.to, args.model)
+    provider, model = pairs[0][1], pairs[1][1]
+    change = roster_change(args.roster, args.profile)
+    if change is None:
+        roster_note = f"roster: {args.profile} is not declared in {args.roster}; no roster change"
+    else:
+        old_model, old_provider = change[2]
+        roster_note = (f"roster: {args.roster} {args.profile} model {old_model} -> {model}, "
+                       f"provider {old_provider} -> {provider}")
     prefix = [args.hermes] + ([] if args.profile == "default" else ["-p", args.profile])
     if args.dry_run:
+        print("live:")
         for key, value in pairs:
             print(" ".join(prefix + ["config", "set", key, value]))
+        print(roster_note + " (dry run: nothing written)")
         return 0
     backup = config.with_name(f"config.yaml.pre-switch-{time.strftime('%Y%m%d-%H%M%S')}")
     shutil.copy2(config, backup)
@@ -83,6 +111,15 @@ def main(argv=None):
     if args.dispatch:
         set_dispatch(args.home_root / "config.yaml", args.profile, args.dispatch)
     print(f"{args.profile}: {args.to} ({pairs[1][1]}); helpers on {pairs[4][1]}; backup {backup.name}")
+    if change is not None:
+        roster, entry, _ = change
+        entry["model"], entry["provider"] = model, provider
+        args.roster.write_text(json.dumps(roster, indent=2) + "\n")
+        print(roster_note)
+        print("commit the roster.yaml change (and keep it inside the owner model policy), "
+              "or scripts/verify-state reports model drift")
+    else:
+        print(roster_note)
     if TARGETS[args.to][0] == "claude-subscription":
         print("needs the claude-subscription plugin and HERMES_CLAUDE_SUBSCRIPTION_CLI / _TOKEN_FILE in the "
               "profile's .env (see plugins/model-providers/claude-subscription/README.md)")

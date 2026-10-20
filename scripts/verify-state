@@ -200,22 +200,89 @@ PROFILE_SOUL_PATHS = {
     )
 }
 # Fleet GLM workers retired 2026-10-18 (procedures/switching-hermes-models.md).
-# They stay installed but inert: a dormant extra at most, never dispatchable.
+# The owner kept them installed (2026-10-19): roster.yaml carries each one with
+# lifecycle "retired". This constant is the floor: none of them may lose that
+# lifecycle, and none may ever be dispatchable.
 RETIRED_PROFILES = (
     "jobcron-worker-glm-1", "jobcron-worker-glm-2",
     "chapt-worker-glm-1", "chapt-worker-glm-2",
     "harness-worker-glm-1", "harness-worker-glm-2",
     "jss-worker-glm-1", "jss-worker-glm-2",
 )
+RETIRED_LIFECYCLE = "retired"
+# Owner model policy (2026-10-19) for every non-retired roster profile: one
+# provider; Opus for orchestrators, workers and default/helpers, Fable for
+# reviewers and the advisor. Retired profiles keep their historical models.
+MODEL_POLICY_PROVIDER = "claude-subscription"
+MODEL_POLICY_BY_ROLE = {
+    "orchestrator": "claude-opus-5-5",
+    "project orchestrator": "claude-opus-5-5",
+    "project implementation": "claude-opus-5-5",
+    "implementation": "claude-opus-5-5",
+    "advisor": "claude-fable-5-1",
+    "independent reviewer": "claude-fable-5-1",
+    "project independent reviewer": "claude-fable-5-1",
+}
 
 
-def check_retired_dispatch(errors, label, profiles):
-    """A retired profile must never reappear in a dispatch or approval list."""
+def roster_retired(roster):
+    """Names of roster profiles with the retired lifecycle, plus the GLM floor."""
+    profiles = roster.get("profiles", []) if isinstance(roster, dict) else []
+    names = {p.get("name") for p in profiles
+             if isinstance(p, dict) and p.get("lifecycle") == RETIRED_LIFECYCLE}
+    return tuple(sorted(names | set(RETIRED_PROFILES)))
+
+
+def check_retired_dispatch(errors, label, profiles, retired=None):
+    """A retired profile must never reappear in a dispatch list."""
     if not isinstance(profiles, list):
         return
-    for name in RETIRED_PROFILES:
+    for name in (RETIRED_PROFILES if retired is None else retired):
         if name in profiles:
             fail(errors, f"retired profile back in {label}: {name}")
+
+
+def check_retired_profiles(errors, roster):
+    """Retired profiles stay declared, inert and out of every dispatch pool."""
+    profiles = {p.get("name"): p for p in roster.get("profiles", []) if isinstance(p, dict)}
+    for name in RETIRED_PROFILES:
+        if profiles.get(name, {}).get("lifecycle") != RETIRED_LIFECYCLE:
+            fail(errors, f"retired profile lifecycle drift {name}: expected {RETIRED_LIFECYCLE}")
+    retired = roster_retired(roster)
+    pool = roster.get("dispatch_pool") if isinstance(roster.get("dispatch_pool"), dict) else {}
+    pools = {
+        "dispatch_pool.implementation_allowlist": pool.get("implementation_allowlist"),
+        "dispatch_pool.dispatch_allowlist": pool.get("dispatch_allowlist"),
+        "dispatch_pool.reviewer_outside_budget": [pool.get("reviewer_outside_budget")],
+        "project_dispatch_allowlist": roster.get("project_dispatch_allowlist"),
+    }
+    for project, fleet in (roster.get("project_fleets") or {}).items():
+        if isinstance(fleet, dict):
+            pools[f"project fleet {project}"] = [fleet.get("orchestrator"), fleet.get("worker"),
+                                                 fleet.get("reviewer"), *(fleet.get("workers") or [])]
+    for name in retired:
+        profile = profiles.get(name)
+        if profile is None:
+            continue
+        if profile.get("dispatch_eligible") is not False or profile.get("in_dispatch_pool") is not False:
+            fail(errors, f"retired profile dispatchable {name}: dispatch_eligible and in_dispatch_pool must be false")
+    for label, listing in pools.items():
+        check_retired_dispatch(errors, label, listing, retired)
+
+
+def check_model_policy(errors, roster):
+    """Desired models of non-retired profiles must follow the owner model policy, so
+    a stale or out-of-policy expectation cannot be adopted silently."""
+    for profile in roster.get("profiles", []):
+        if not isinstance(profile, dict) or profile.get("lifecycle") == RETIRED_LIFECYCLE:
+            continue
+        name = profile.get("name")
+        want = MODEL_POLICY_BY_ROLE.get(profile.get("role"))
+        if want is None:
+            fail(errors, f"roster model policy drift {name}: role {profile.get('role')!r} has no model policy")
+        elif profile.get("model") != want or profile.get("provider") != MODEL_POLICY_PROVIDER:
+            fail(errors, f"roster model policy drift {name}: expected {want} on {MODEL_POLICY_PROVIDER}, "
+                         f"declared {profile.get('model')} on {profile.get('provider')}")
 
 
 def check_fleet_dispatch(errors, label, fleets, profiles, exact=False):
@@ -789,6 +856,7 @@ def observe_open_project_cards(errors, runner=run):
                 payload = json.loads(shown.stdout) if not shown.returncode else {}
                 card = payload.get("task", payload)
                 comments = payload.get("comments", []) if isinstance(payload, dict) else []
+                runs = payload.get("runs") if isinstance(payload, dict) else None
             except (json.JSONDecodeError, AttributeError):
                 card = {}
             if not isinstance(card, dict) or card.get("id") != summary["id"]:
@@ -797,6 +865,7 @@ def observe_open_project_cards(errors, runner=run):
             card = dict(card)
             card["board"] = board
             card["comments"] = comments
+            card["runs"] = runs
             cards.append(card)
         if malformed:
             continue
@@ -820,8 +889,7 @@ def check_chapt_card_contract(errors, tasks):
             fail(errors, f"Cha PT card contract drift {task_id}: expected exactly one repository")
             continue
         repo = repositories[0]
-        expected_workspace = f"{repo}/.worktrees/{task_id}"
-        if task.get("workspace_kind") != "worktree" or task.get("workspace_path") != expected_workspace:
+        if not isolated_workspace_valid(task, repo, task_id):
             fail(errors, f"Cha PT card contract drift {task_id}: isolated worktree mismatch")
         if not re.search(r"(?:^|[.!?]\s+)Baseline EXACT\s+[0-9a-f]{40}\b", body):
             fail(errors, f"Cha PT card contract drift {task_id}: exact baseline missing")
@@ -881,6 +949,24 @@ def project_card_test_section(body):
     return ""
 
 
+# Before the first claim Hermes records a worktree card's workspace_path as the
+# repository root; the dispatcher creates .worktrees/<ID> only when a worker claims it.
+NEVER_CLAIMED_STATUSES = {"triage", "todo", "ready", "blocked"}
+
+
+def isolated_workspace_valid(task, repository, task_id):
+    """Exact .worktrees/<ID>, or the repository root for a card never claimed:
+    no run recorded (an observed empty runs list) and a pre-claim status."""
+    if task.get("workspace_kind") != "worktree":
+        return False
+    workspace = task.get("workspace_path")
+    if workspace == f"{repository}/.worktrees/{task_id}":
+        return True
+    runs = task.get("runs")
+    return (workspace == repository and isinstance(runs, list) and not runs
+            and task.get("status") in NEVER_CLAIMED_STATUSES and not task.get("started_at"))
+
+
 def check_isolated_card(errors, task, label, repository, assignees, reviewer, test_patterns):
     """Shared single-repository card contract; returns (task_id, body)."""
     task_id = task.get("id") if isinstance(task.get("id"), str) else "<unknown>"
@@ -889,8 +975,7 @@ def check_isolated_card(errors, task, label, repository, assignees, reviewer, te
         r"(?:^|[.!?;]\s+)Repository\s+" + re.escape(repository) + r"\s+ONLY\b", body)
     if not repository_declared:
         fail(errors, f"{label} card contract drift {task_id}: expected exact repository")
-    expected_workspace = f"{repository}/.worktrees/{task_id}"
-    if task.get("workspace_kind") != "worktree" or task.get("workspace_path") != expected_workspace:
+    if not isolated_workspace_valid(task, repository, task_id):
         fail(errors, f"{label} card contract drift {task_id}: isolated worktree mismatch")
     if not re.search(r"(?:^|[.!?]\s+)Baseline EXACT\s+[0-9a-f]{40}\b", body):
         fail(errors, f"{label} card contract drift {task_id}: exact baseline missing")
@@ -1002,12 +1087,13 @@ def observe_open_chapt_cards(errors, runner=run):
         try:
             payload = json.loads(shown.stdout) if not shown.returncode else {}
             task = payload.get("task", payload)
+            runs = payload.get("runs") if isinstance(payload, dict) else None
         except (json.JSONDecodeError, AttributeError):
             task = {}
         if not isinstance(task, dict) or task.get("id") != summary.get("id"):
             fail(errors, f"unable to read Cha PT card contract {summary.get('id', '<unknown>')}")
         else:
-            cards.append(task)
+            cards.append(dict(task, runs=runs))
     return cards
 
 
@@ -1053,8 +1139,12 @@ def check_terminal_notification_deployment(errors, roster, snapshot):
     except (OSError, json.JSONDecodeError) as exc:
         fail(errors, f"malformed terminal notification deployment matrix: {exc}")
         return
+    # Retired default-board profiles stay installed with their producer plugin
+    # unchanged, so the authorized producer set is fixed by the pre-retirement
+    # lifecycle.
     expected = [p["name"] for p in roster.get("profiles", [])
-                if p["lifecycle"] == "active" and p["role"] != "advisor"]
+                if p.get("lifecycle_before_retirement", p["lifecycle"]) == "active"
+                and p["role"] != "advisor"]
     terminal = snapshot.get("terminal_notification", {})
     plugin = snapshot.get("plugins", {}).get("hermes-terminal-outcome-notification", {})
     if matrix.get("plugin") != "hermes-terminal-outcome-notification" or matrix.get("status") != "authorized":
@@ -1105,6 +1195,12 @@ def check_terminal_retry_policy(errors, roster, observed=None):
         fail(errors, "terminal retry policy missing human/infrastructure exclusion")
     if policy.get("terminal_assignee") != "worker-astra":
         fail(errors, "terminal retry terminal assignee drift")
+    # The legacy opt-in names a GPT-era profile retired 2026-10-18: the policy must
+    # say so explicitly, matching the assignee's roster lifecycle.
+    assignee = next((p for p in roster.get("profiles", []) if isinstance(p, dict)
+                     and p.get("name") == policy.get("terminal_assignee")), None)
+    if assignee is None or policy.get("terminal_assignee_lifecycle") != assignee.get("lifecycle"):
+        fail(errors, "terminal retry terminal assignee lifecycle drift")
     if observed is not None:
         if "terminal_retry_policy" not in observed:
             fail(errors, "incomplete fixture: missing required section 'terminal_retry_policy'")
@@ -1391,9 +1487,12 @@ def main():
     expected_local_overrides = snapshot["skill"].get("profile_local_skill_overrides", {})
     check_profile_local_skill_overrides(errors, expected_local_overrides)
     dispatch_profiles = snapshot["kanban"]["dispatch_profiles"]
-    check_retired_dispatch(errors, "desired dispatch_profiles", dispatch_profiles)
-    check_retired_dispatch(errors, "project_dispatch_allowlist", roster.get("project_dispatch_allowlist"))
-    check_retired_dispatch(errors, "approval policy profiles", approval_profiles)
+    # Retired profiles stay in the roster (and so in the approval list, whose
+    # mode is still verified) but never in a dispatch list or pool.
+    retired = roster_retired(roster)
+    check_retired_profiles(errors, roster)
+    check_model_policy(errors, roster)
+    check_retired_dispatch(errors, "desired dispatch_profiles", dispatch_profiles, retired)
     fleets = snapshot.get("project_isolation")
     check_fleet_dispatch(errors, "desired dispatch_profiles", fleets, dispatch_profiles)
     check_fleet_dispatch(errors, "project_dispatch_allowlist", fleets,
@@ -1433,7 +1532,7 @@ def main():
                 fail(errors, f"concurrency/dispatch drift kanban.{key}: expected {want!r}, actual {kanban[key]!r}")
         if "dispatch_profiles" in observed and observed["dispatch_profiles"] != dispatch_profiles:
             fail(errors, f"dispatch drift: expected {dispatch_profiles}, actual {observed['dispatch_profiles']}")
-        check_retired_dispatch(errors, "dispatch_profiles", observed.get("dispatch_profiles"))
+        check_retired_dispatch(errors, "dispatch_profiles", observed.get("dispatch_profiles"), retired)
         check_fleet_dispatch(errors, "dispatch_profiles", fleets, observed.get("dispatch_profiles"))
         models = observed.get("profile_models", {})
         providers = observed.get("profile_providers", {})
@@ -1531,7 +1630,7 @@ def main():
             if actual is UNREADABLE or actual != want:
                 fail(errors, f"concurrency/dispatch drift kanban.{key}: expected {want!r}, actual {'<unreadable>' if actual is UNREADABLE else actual!r}")
             if key == "dispatch_profiles":
-                check_retired_dispatch(errors, "kanban.dispatch_profiles", actual)
+                check_retired_dispatch(errors, "kanban.dispatch_profiles", actual, retired)
                 check_fleet_dispatch(errors, "kanban.dispatch_profiles", fleets, actual)
         inherited_db_pin = os.environ.get("HERMES_KANBAN_DB", "").strip()
         launchd_db_pin = run("launchctl", "getenv", "HERMES_KANBAN_DB")

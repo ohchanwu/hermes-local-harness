@@ -30,7 +30,15 @@
     "jss-orchestrator",
     "jss-worker",
     "jss-worker-2",
-    "jss-reviewer"
+    "jss-reviewer",
+    "jobcron-worker-glm-1",
+    "jobcron-worker-glm-2",
+    "chapt-worker-glm-1",
+    "chapt-worker-glm-2",
+    "harness-worker-glm-1",
+    "harness-worker-glm-2",
+    "jss-worker-glm-1",
+    "jss-worker-glm-2"
   ],
   "approvals": {
     "mode": "off",
@@ -63,7 +71,15 @@
       "jss-orchestrator",
       "jss-worker",
       "jss-worker-2",
-      "jss-reviewer"
+      "jss-reviewer",
+      "jobcron-worker-glm-1",
+      "jobcron-worker-glm-2",
+      "chapt-worker-glm-1",
+      "chapt-worker-glm-2",
+      "harness-worker-glm-1",
+      "harness-worker-glm-2",
+      "jss-worker-glm-1",
+      "jss-worker-glm-2"
     ]
   },
   "managed_profile_settings": {
@@ -85,8 +101,6 @@
     "max_in_progress": null,
     "max_in_progress_per_profile": 1,
     "dispatch_profiles": [
-      "worker-astra",
-      "reviewer-sol",
       "jobcron-worker",
       "jobcron-reviewer",
       "chapt-worker",
