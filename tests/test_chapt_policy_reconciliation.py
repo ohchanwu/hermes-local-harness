@@ -20,7 +20,28 @@ PRE_RETIREMENT_SHA256 = "e60d361a5d41f0c864ce1796d107e38a995df76e9449037cb01ed44
 PRE_LEGACY_LANE_SHA256 = "b6b80cef78fbcade77043e05de07a0382c0e1e94c705180c89869287f9696892"
 PRE_SECOND_WORKER_SHA256 = "ff0a7f380f77ede2e429c497329fea3a4660889a5dc2801e4072cb62bb66a0c2"
 PRE_SCRAPER_SHA256 = "c963e090ef2f19929b01a8cd3581f1b6e87501d6371439e27e3e7573469fdf62"
-MERGED_SHA256 = "f95f1441f0c9c689d36b4756e465c9d088346f72d589b0ecfbf7281773020138"
+PRE_CARD_CREATION_SHA256 = "f95f1441f0c9c689d36b4756e465c9d088346f72d589b0ecfbf7281773020138"
+MERGED_SHA256 = "5e3869b816966691f585d9ed6e3eb099e28bf4e7e8ff24d00636fa97a785095f"
+# The card-creation change (t_b6d0e590, no version bump) replaces exactly Card
+# Setup steps 1 and 4; reversing both recovers the reviewed scraper-scope bytes.
+# tests/test_orchestrator_card_creation_policy.py checks the new wording.
+CARD_CREATION_EDITS = (
+    (b"1. Create it with the kanban_create tool: `kanban_create(..., board: cha-pt, initial_status: blocked)`. "
+     b"The card is created blocked, so it cannot be dispatched before setup is complete, and its notification "
+     b"subscription exists from creation. Create cards only with the kanban_create tool, never with "
+     b"`hermes kanban --board cha-pt create`. The tool auto-subscribes this session to the card with delivery_mode "
+     b"notify+wake, the owner's user ID, and this profile as notifier_profile, so completion, review-request, and "
+     b"block events wake this orchestrator and ping the owner. The CLI create command does not subscribe, and a "
+     b"manual notify-subscribe without flags defaults to notify with no user ID, which wakes nobody. This caused "
+     b"the 2026-10-20 stalls of the JSS and Jobcron orchestrators.\n",
+     b"1. Create it with `hermes kanban --board cha-pt create ... --initial-status blocked` before any notification "
+     b"subscription exists.\n"),
+    (b"4. Confirm the kanban_create result reports subscribed: true. Only if it does not, repair the subscription "
+     b"with: hermes kanban --board cha-pt notify-subscribe <id> --platform telegram --chat-id <owner chat> "
+     b"--user-id <owner user> --chat-type dm --notifier-profile chapt-orchestrator --delivery-mode notify+wake. "
+     b"Re-running notify-subscribe updates an existing row, so this command also upgrades a wrongly subscribed card.\n",
+     b"4. Subscribe the callback with `hermes kanban --board cha-pt notify-subscribe`.\n"),
+)
 # The scraper-repository scope (t_b04aef1d, no version bump) changes exactly
 # these bytes and adds one paragraph; reversing both recovers the reviewed
 # 0.6.7-chapt.4 bytes. tests/test_chapt_scraper_scope.py checks the new wording.
@@ -142,7 +163,12 @@ class ChaptPolicyReconciliationTests(unittest.TestCase):
         # Invert the 0.6.7-chapt.4 second worker, the 0.6.7-chapt.3 legacy-lane
         # note, then the 0.6.7-chapt.2 GLM worker retirement.
         original = self.source
-        # Invert the scraper-repository scope first: drop its one paragraph.
+        # Invert the card-creation change first: restore Card Setup steps 1 and 4.
+        for new, old in CARD_CREATION_EDITS:
+            self.assertEqual(original.count(new), 1, new)
+            original = original.replace(new, old, 1)
+        self.assertEqual(digest(original), PRE_CARD_CREATION_SHA256)
+        # Then invert the scraper-repository scope: drop its one paragraph.
         self.assertEqual(original.count(SCRAPER_PARAGRAPH_START), 1)
         prefix, rest = original.split(SCRAPER_PARAGRAPH_START, 1)
         self.assertTrue(prefix.endswith(b"\n\n"))

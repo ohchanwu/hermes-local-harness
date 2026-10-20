@@ -227,7 +227,7 @@ def check_skill(errors, deployed_hashes, retired=()):
             if profile not in entry["deploy_profiles"]:
                 fail(errors, f"unexpected deployed skill copy: {name} {profile}")
                 continue
-            owned = {rel for rel in expected
+            owned = {rel for rel in set(expected) | set(observed or {})
                      if any(f"/{path}".endswith(f"/{name}/{rel}") for path in local_overrides.get(profile, {}))}
             for rel, want in sorted(expected.items()):
                 if rel in owned:
@@ -237,7 +237,9 @@ def check_skill(errors, deployed_hashes, retired=()):
                     fail(errors, f"deployed skill copy missing: {name} {profile}/{rel}")
                 elif actual != want:
                     fail(errors, f"deployed skill hash mismatch: {name} {profile}/{rel}")
-            for rel in sorted(set((observed or {})) - set(expected)):
+            # A file that a profile-local override declares (for example a profile-only
+            # reference file) is checked by check_profile_local_skill_overrides.
+            for rel in sorted(set((observed or {})) - set(expected) - owned):
                 fail(errors, f"unexpected deployed skill file: {name} {profile}/{rel}")
 
 

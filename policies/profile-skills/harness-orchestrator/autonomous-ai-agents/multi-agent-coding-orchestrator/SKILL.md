@@ -61,10 +61,10 @@ Use `kanban_create(..., board: harness)` only after validating the complete cont
 
 Set up a card without a setup-only hold:
 
-1. Create it with `hermes kanban --board harness create ... --initial-status blocked` before any notification subscription exists.
+1. Create it with the kanban_create tool: `kanban_create(..., board: harness, initial_status: blocked)`. The card is created blocked, so it cannot be dispatched before setup is complete, and its notification subscription exists from creation. Create cards only with the kanban_create tool, never with `hermes kanban --board harness create`. The tool auto-subscribes this session to the card with delivery_mode notify+wake, the owner's user ID, and this profile as notifier_profile, so completion, review-request, and block events wake this orchestrator and ping the owner. The CLI create command does not subscribe, and a manual notify-subscribe without flags defaults to notify with no user ID, which wakes nobody. This caused the 2026-10-20 stalls of the JSS and Jobcron orchestrators.
 2. Read the new ID and write the exact ID, worktree path, and branch into the body.
 3. Pin `refs/harness/baselines/<ID>` to the baseline.
-4. Subscribe the callback with `hermes kanban --board harness notify-subscribe`.
+4. Confirm the kanban_create result reports subscribed: true. Only if it does not, repair the subscription with: hermes kanban --board harness notify-subscribe <id> --platform telegram --chat-id <owner chat> --user-id <owner user> --chat-type dm --notifier-profile harness-orchestrator --delivery-mode notify+wake. Re-running notify-subscribe updates an existing row, so this command also upgrades a wrongly subscribed card.
 5. Unblock the card so it becomes `ready`.
 
 Never claim a card and `kanban_block` it as a setup hold. The worker's first action verifies `$HERMES_KANBAN_TASK`, worktree path, branch, and baseline, and it blocks only on a real mismatch.

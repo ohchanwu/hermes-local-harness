@@ -89,10 +89,10 @@ class FleetAutonomyPolicy(unittest.TestCase):
             with self.subTest(board=board):
                 setup = section(self.raw[board], "Card Setup")
                 order = [
-                    f"`hermes kanban --board {board} create ... --initial-status blocked` before any notification subscription exists",
+                    f"`kanban_create(..., board: {board}, initial_status: blocked)`",
                     "write the exact ID, worktree path, and branch into the body",
                     "Pin the approved baseline commit for that exact card before dispatch",
-                    f"`hermes kanban --board {board} notify-subscribe`",
+                    "Confirm the kanban_create result reports subscribed: true.",
                     "Unblock the card so it becomes `ready`",
                 ]
                 positions = [setup.find(marker) for marker in order]

@@ -222,6 +222,36 @@ class DerivedExpectations(unittest.TestCase):
         self.assertEqual((code, fails), (1, {f"profile-local skill override drift: harness-orchestrator/{RELATIVE}"}),
                          output)
 
+    def test_declared_profile_only_reference_file_is_checked_by_the_override(self):
+        # t_b6d0e590 adopted the live jobcron-orchestrator reference file as a tracked
+        # profile-local override; the shared-skill check must not call it unexpected.
+        reference = "references/kanban-triage-phase-routing.md"
+        declared = f"autonomous-ai-agents/multi-agent-coding-orchestrator/{reference}"
+        overrides = self.snapshot["skill"]["profile_local_skill_overrides"]["jobcron-orchestrator"]
+        self.assertEqual(overrides[declared], "tracked-source")
+        deployed = self.clean["skill_files"]["multi-agent-coding-orchestrator"]["jobcron-orchestrator"]
+        self.assertEqual(deployed[reference],
+                         self.verifier.local_override_expected("jobcron-orchestrator", declared, "tracked-source"))
+        # Drift in the deployed reference file is reported once, by the override check.
+        fixture = copy.deepcopy(self.clean)
+        fixture["skill_files"]["multi-agent-coding-orchestrator"]["jobcron-orchestrator"][reference] = "8" * 64
+        fixture["profile_local_skill_overrides"]["jobcron-orchestrator"][declared] = "8" * 64
+        code, fails, output = run_main(ROOT, fixture)
+        self.assertEqual((code, fails), (1, {f"profile-local skill override drift: jobcron-orchestrator/{declared}"}),
+                         output)
+        # Without the declaration and tracked source, the same deployed file is unexpected again.
+        with TempTree() as root:
+            (root / "policies/profile-skills/jobcron-orchestrator" / declared).unlink()
+            snapshot = load(root / "snapshots/sanitized-current-state.yaml")
+            del snapshot["skill"]["profile_local_skill_overrides"]["jobcron-orchestrator"][declared]
+            write(root / "snapshots/sanitized-current-state.yaml", snapshot)
+            fixture = copy.deepcopy(self.clean)
+            del fixture["profile_local_skill_overrides"]["jobcron-orchestrator"][declared]
+            code, fails, output = run_main(root, fixture)
+        self.assertEqual((code, fails), (1, {
+            f"unexpected deployed skill file: multi-agent-coding-orchestrator jobcron-orchestrator/{reference}"}),
+            output)
+
     # (d)
     def test_retired_profile_divergence_is_excluded_live_profile_is_not(self):
         for name in ("worker-flash-1", "worker-sol", "worker-astra"):

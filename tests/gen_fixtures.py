@@ -76,6 +76,12 @@ def skill_files_map():
                 owned = [want for path, want in overrides.get(profile, {}).items()
                          if f"/{path}".endswith(f"/{entry['name']}/{rel}")]
                 files[rel] = owned[0] if owned else sha(ROOT / entry["source"] / rel)
+            # A profile-only file that an override declares inside this skill's tree
+            # (for example a reference file) is deployed in the same directory.
+            marker = f"/{entry['name']}/"
+            for path, want in overrides.get(profile, {}).items():
+                if marker in f"/{path}":
+                    files.setdefault(f"/{path}".split(marker, 1)[1], want)
             result[entry["name"]][profile] = files
     return result
 

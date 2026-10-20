@@ -342,7 +342,11 @@ class RoleContracts(unittest.TestCase):
         ])
 
     def test_skill_board_pinning_and_no_foreign_fleets(self):
-        lower = self.skill_raw.lower()
+        # The one sentence that records the 2026-10-20 stalls (t_b6d0e590) names the
+        # Jobcron orchestrator as history only; it routes no work to that fleet.
+        history = "This caused the 2026-10-20 stalls of the JSS and Jobcron orchestrators."
+        self.assertEqual(self.skill_raw.count(history), 1)
+        lower = self.skill_raw.replace(history, "").lower()
         for foreign in ("jobcron", "cha-pt", "chapt-", "harness-orchestrator", "harness-worker",
                         "harness-reviewer", "board: harness", "--board harness"):
             self.assertNotIn(foreign, lower)
@@ -355,10 +359,10 @@ class RoleContracts(unittest.TestCase):
     def test_skill_required_rules(self):
         setup = flat(self.skill_raw.split("## Card Setup", 1)[1].split("\n## ", 1)[0])
         order = [
-            "`hermes kanban --board jss-genr create ... --initial-status blocked` before any notification subscription exists",
+            "`kanban_create(..., board: jss-genr, initial_status: blocked)`",
             "write the exact ID, worktree path, and branch into the body",
             "Pin `refs/jss-genr/baselines/<ID>`",
-            "`hermes kanban --board jss-genr notify-subscribe`",
+            "Confirm the kanban_create result reports subscribed: true.",
             "Unblock the card so it becomes `ready`",
         ]
         positions = [setup.find(marker) for marker in order]

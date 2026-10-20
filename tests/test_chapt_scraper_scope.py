@@ -16,6 +16,7 @@ import unittest
 from unittest.mock import patch
 
 from incident_recovery_verify_fixture import ROOT, load_verifier
+from test_chapt_policy_reconciliation import CARD_CREATION_EDITS
 
 BASELINE = "7a4ed4bbb75a9680e11e5fdb70b60268f9a6eaff"
 SCRAPER = "/Users/chanbla11mit/projects/cha-webpt-website-sync"
@@ -506,7 +507,13 @@ class PolicyText(unittest.TestCase):
         expected_removed.update({SKILLS[0]: 3, SKILLS[1]: 4})
         for path, count in expected_removed.items():
             base = self.baseline_text(path).split("\n\n")
-            new = self.text(path).split("\n\n")
+            current = self.text(path)
+            if path == SKILLS[1]:
+                # Reverse the later card-creation change (t_b6d0e590) to Card Setup steps 1 and 4.
+                for changed, previous in CARD_CREATION_EDITS:
+                    self.assertEqual(current.count(changed.decode()), 1)
+                    current = current.replace(changed.decode(), previous.decode(), 1)
+            new = current.split("\n\n")
             removed = [paragraph for paragraph in base if paragraph not in new]
             with self.subTest(path=path.relative_to(ROOT)):
                 self.assertEqual(len(removed), count)

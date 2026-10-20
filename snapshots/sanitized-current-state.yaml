@@ -348,7 +348,8 @@
         "software-development/test-driven-development/SKILL.md": "9e9a4bb630506f4f3b4ff19cca80bb464e57db19b8a175959388d2112fc096ff"
       },
       "jobcron-orchestrator": {
-        "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md": "tracked-source"
+        "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md": "tracked-source",
+        "autonomous-ai-agents/multi-agent-coding-orchestrator/references/kanban-triage-phase-routing.md": "tracked-source"
       },
       "chapt-orchestrator": {
         "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md": "tracked-source"

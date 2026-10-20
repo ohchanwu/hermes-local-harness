@@ -44,10 +44,10 @@ class HarnessAutonomyPolicy(unittest.TestCase):
     def test_rule1_card_setup_without_setup_hold(self):
         setup = section(self.raw, "Card Setup")
         order = [
-            "`hermes kanban --board harness create ... --initial-status blocked` before any notification subscription exists",
+            "`kanban_create(..., board: harness, initial_status: blocked)`",
             "write the exact ID, worktree path, and branch into the body",
             "Pin `refs/harness/baselines/<ID>`",
-            "`hermes kanban --board harness notify-subscribe`",
+            "Confirm the kanban_create result reports subscribed: true.",
             "Unblock the card so it becomes `ready`",
         ]
         positions = [setup.find(marker) for marker in order]

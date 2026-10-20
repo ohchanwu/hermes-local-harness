@@ -215,19 +215,20 @@
         "scripts/set-active-lanes.py": "157419c7c190b0a9f647271f7bd3839182f2e9324f8f9d74e43ec0553a5b77df"
       },
       "jobcron-orchestrator": {
-        "SKILL.md": "fe96e5b7831d73427a906081de9ea603e7094fe89a8f52f1092bd02cc70dca92",
-        "scripts/set-active-lanes.py": "157419c7c190b0a9f647271f7bd3839182f2e9324f8f9d74e43ec0553a5b77df"
+        "SKILL.md": "ff3e828ac4a5c0efd078f158b674c38776ec8868f76394e3568a0bc87eda155a",
+        "scripts/set-active-lanes.py": "157419c7c190b0a9f647271f7bd3839182f2e9324f8f9d74e43ec0553a5b77df",
+        "references/kanban-triage-phase-routing.md": "07ac6133486f3c155f36fccb08eec294ebd048b535df98c2546b0e036c8a221d"
       },
       "chapt-orchestrator": {
-        "SKILL.md": "f95f1441f0c9c689d36b4756e465c9d088346f72d589b0ecfbf7281773020138",
+        "SKILL.md": "5e3869b816966691f585d9ed6e3eb099e28bf4e7e8ff24d00636fa97a785095f",
         "scripts/set-active-lanes.py": "157419c7c190b0a9f647271f7bd3839182f2e9324f8f9d74e43ec0553a5b77df"
       },
       "harness-orchestrator": {
-        "SKILL.md": "d91b241db42b2a5125cad3e07fc67b1f51fe7fb16bfd86bf5175fade258c55aa",
+        "SKILL.md": "c1e78607948f4d0c890ef86afb2fe63f3898efe35d8c413ec225147c99d8f17c",
         "scripts/set-active-lanes.py": "157419c7c190b0a9f647271f7bd3839182f2e9324f8f9d74e43ec0553a5b77df"
       },
       "jss-orchestrator": {
-        "SKILL.md": "866092ee8d63646658f1f90af6efa684e580f234add9ca3d5f374b2086bf4a62",
+        "SKILL.md": "589ca4a53186e13726d4f77a6a647a36559fa8795dbc7682000007114211b5e6",
         "scripts/set-active-lanes.py": "157419c7c190b0a9f647271f7bd3839182f2e9324f8f9d74e43ec0553a5b77df"
       }
     },
@@ -584,16 +585,17 @@
       "software-development/test-driven-development/SKILL.md": "9e9a4bb630506f4f3b4ff19cca80bb464e57db19b8a175959388d2112fc096ff"
     },
     "jobcron-orchestrator": {
-      "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md": "fe96e5b7831d73427a906081de9ea603e7094fe89a8f52f1092bd02cc70dca92"
+      "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md": "ff3e828ac4a5c0efd078f158b674c38776ec8868f76394e3568a0bc87eda155a",
+      "autonomous-ai-agents/multi-agent-coding-orchestrator/references/kanban-triage-phase-routing.md": "07ac6133486f3c155f36fccb08eec294ebd048b535df98c2546b0e036c8a221d"
     },
     "chapt-orchestrator": {
-      "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md": "f95f1441f0c9c689d36b4756e465c9d088346f72d589b0ecfbf7281773020138"
+      "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md": "5e3869b816966691f585d9ed6e3eb099e28bf4e7e8ff24d00636fa97a785095f"
     },
     "harness-orchestrator": {
-      "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md": "d91b241db42b2a5125cad3e07fc67b1f51fe7fb16bfd86bf5175fade258c55aa"
+      "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md": "c1e78607948f4d0c890ef86afb2fe63f3898efe35d8c413ec225147c99d8f17c"
     },
     "jss-orchestrator": {
-      "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md": "866092ee8d63646658f1f90af6efa684e580f234add9ca3d5f374b2086bf4a62"
+      "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md": "589ca4a53186e13726d4f77a6a647a36559fa8795dbc7682000007114211b5e6"
     }
   },
   "terminal_retry_policy": {
