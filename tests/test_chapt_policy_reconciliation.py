@@ -9,6 +9,9 @@ import json
 from pathlib import Path
 import unittest
 
+import test_orchestrator_skill_terminology as terminology
+from test_orchestrator_skill_terminology import CHAPT, reverse_terminology_edits
+
 ROOT = Path(__file__).resolve().parents[1]
 RELATIVE = "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md"
 SOURCE = ROOT / "policies/profile-skills/chapt-orchestrator" / RELATIVE
@@ -21,7 +24,11 @@ PRE_LEGACY_LANE_SHA256 = "b6b80cef78fbcade77043e05de07a0382c0e1e94c705180c898692
 PRE_SECOND_WORKER_SHA256 = "ff0a7f380f77ede2e429c497329fea3a4660889a5dc2801e4072cb62bb66a0c2"
 PRE_SCRAPER_SHA256 = "c963e090ef2f19929b01a8cd3581f1b6e87501d6371439e27e3e7573469fdf62"
 PRE_CARD_CREATION_SHA256 = "f95f1441f0c9c689d36b4756e465c9d088346f72d589b0ecfbf7281773020138"
-MERGED_SHA256 = "5e3869b816966691f585d9ed6e3eb099e28bf4e7e8ff24d00636fa97a785095f"
+PRE_TERMINOLOGY_SHA256 = terminology.PRE_TERMINOLOGY_SHA256[CHAPT]
+MERGED_SHA256 = "432fe0e129378fc4620820a0aa17327e1ac88d9e57df84f10c8f303b42e46d44"
+# The model-name and wording change (t_c836d2a4, no version bump) is listed in
+# tests/test_orchestrator_skill_terminology.py; reversing it recovers the
+# card-creation bytes (PRE_TERMINOLOGY_SHA256).
 # The card-creation change (t_b6d0e590, no version bump) replaces exactly Card
 # Setup steps 1 and 4; reversing both recovers the reviewed scraper-scope bytes.
 # tests/test_orchestrator_card_creation_policy.py checks the new wording.
@@ -162,8 +169,10 @@ class ChaptPolicyReconciliationTests(unittest.TestCase):
         self.assertEqual(self.source.count(b"version: 0.6.7-chapt.4\n"), 1)
         # Invert the 0.6.7-chapt.4 second worker, the 0.6.7-chapt.3 legacy-lane
         # note, then the 0.6.7-chapt.2 GLM worker retirement.
-        original = self.source
-        # Invert the card-creation change first: restore Card Setup steps 1 and 4.
+        # Invert the model-name and wording change first.
+        original = reverse_terminology_edits(CHAPT, self.source)
+        self.assertEqual(digest(original), PRE_TERMINOLOGY_SHA256)
+        # Then invert the card-creation change: restore Card Setup steps 1 and 4.
         for new, old in CARD_CREATION_EDITS:
             self.assertEqual(original.count(new), 1, new)
             original = original.replace(new, old, 1)
@@ -211,8 +220,11 @@ class ChaptPolicyReconciliationTests(unittest.TestCase):
         self.assertEqual(digest(self.source), MERGED_SHA256)
 
     def test_upgrade_selection_is_byte_unchanged(self):
-        section = self.source.split(b"## Routine upgrade selection", 1)[1].split(b"\n## ", 1)[0]
+        # Unchanged apart from the one t_c836d2a4 wording edit in this section.
+        original = reverse_terminology_edits(CHAPT, self.source)
+        section = original.split(b"## Routine upgrade selection", 1)[1].split(b"\n## ", 1)[0]
         self.assertEqual(digest(section), UPGRADE_SHA256)
+        section = self.source.split(b"## Routine upgrade selection", 1)[1].split(b"\n## ", 1)[0]
         self.assertIn(b"independent review of the exact saved plan before apply", section)
         self.assertIn(b"separately from owner authorization", section)
         self.assertIn(b"not an extra gate for unchanged-platform app-only updates", section)

@@ -27,9 +27,9 @@ Do not use this procedure for a simple question that needs no repository change 
 
 Project-isolated fleets:
 
-- Jobcron board `jobcron`: `jobcron-orchestrator` (`gpt-6.1-sol`); implementation workers `jobcron-worker` (`gpt-6.1-sol`) and `jobcron-worker-2` (`claude-opus-5-5`); independent `jobcron-reviewer` (`gpt-6-astra`). Repository root: `/Users/chanbla11mit/projects/jobcron`; preview port: `17777`.
-- Cha PT board `cha-pt`: `chapt-orchestrator` (`gpt-6.1-sol`); implementation workers `chapt-worker` (`gpt-6.1-sol`) and `chapt-worker-2` (`claude-opus-5-5`); independent `chapt-reviewer` (`gpt-6-astra`). Repository allowlist (exactly three): `/Users/chanbla11mit/projects/cha-pt`, `/Users/chanbla11mit/projects/cha-pt-frontend`, and `/Users/chanbla11mit/projects/cha-webpt-website-sync`; primary board root `/Users/chanbla11mit/projects/cha-pt`; frontend Hermes project `cha-pt-frontend`; scraper Hermes project `cha-webpt-website-sync`; backend preview port: `18080`.
-- Harness board `harness`: `harness-orchestrator` (`gpt-6.1-sol`); implementation workers `harness-worker` (`gpt-6.1-sol`) and `harness-worker-2` (`claude-opus-5-5`); independent `harness-reviewer` (`gpt-6-astra`). Sole repository/default workdir: `/Users/chanbla11mit/hermes-local-harness`.
+- Jobcron board `jobcron`: `jobcron-orchestrator` (`claude-opus-5-5`); implementation workers `jobcron-worker` (`claude-opus-5-5`) and `jobcron-worker-2` (`claude-opus-5-5`); independent `jobcron-reviewer` (`claude-fable-5-1`). Repository root: `/Users/chanbla11mit/projects/jobcron`; preview port: `17777`.
+- Cha PT board `cha-pt`: `chapt-orchestrator` (`claude-opus-5-5`); implementation workers `chapt-worker` (`claude-opus-5-5`) and `chapt-worker-2` (`claude-opus-5-5`); independent `chapt-reviewer` (`claude-fable-5-1`). Repository allowlist (exactly three): `/Users/chanbla11mit/projects/cha-pt`, `/Users/chanbla11mit/projects/cha-pt-frontend`, and `/Users/chanbla11mit/projects/cha-webpt-website-sync`; primary board root `/Users/chanbla11mit/projects/cha-pt`; frontend Hermes project `cha-pt-frontend`; scraper Hermes project `cha-webpt-website-sync`; backend preview port: `18080`.
+- Harness board `harness`: `harness-orchestrator` (`claude-opus-5-5`); implementation workers `harness-worker` (`claude-opus-5-5`) and `harness-worker-2` (`claude-opus-5-5`); independent `harness-reviewer` (`claude-fable-5-1`). Sole repository/default workdir: `/Users/chanbla11mit/hermes-local-harness`.
 
 Each project profile has an independent Hermes home, memory, sessions, and fixed terminal root. Named boards provide separate databases, logs, attachments, and workspaces. A project orchestrator may assign only its matching workers and reviewer. Every card is pinned to one exact repository, repository-owned isolated worktree, protected baseline, and explicit test contract. A task or callback with a mismatched board, profile, repository, workspace, baseline, or test contract is invalid and must be blocked before file access or mutation.
 
@@ -58,20 +58,9 @@ Each approach object has exactly `approach_id`, `strategy`, `strategy_sha256`, `
 - Exhausting three approaches always human-blocks under `bounded-convergence-v1`. Further work requires a newly authorized policy version or explicit amended limits on the exact card; retain the complete prior history rather than resetting v1.
 - An approach stop is not a campaign stop. The orchestrator may autonomously reassess and continue within the remaining budget, but user stop, product decisions, credentials/MFA, prohibited or external writes, unsafe state, capability boundaries, and policy/legal/security decisions still human-block immediately.
 
-Legacy/default-board control profiles remain installed for rollback and existing history:
+Legacy/default-board lanes are retired and inert: the GLM Flash and GLM-full workers were archived on 2026-10-18 and the GPT Luna, Terra, Sol and Astra workers and `reviewer-sol` were retired the same day. Never assign, escalate, or route review to them. Archived copies are in `~/.hermes/profile-exports/`; restore one only per `procedures/switching-hermes-models.md`.
 
-- `default`: legacy `gpt-5.6-sol` orchestrator and user-facing profile.
-- `reviewer-sol`: legacy `gpt-5.6-sol` independent reviewer.
 - `advisor`: read/analyze advisor; not a Kanban implementation lane.
-
-Legacy/default-board implementation profiles, in escalation order:
-
-1. `worker-flash-1`, `worker-flash-2`, `worker-flash-3`: Z.AI `glm-5.3-flash`.
-2. `worker-luna-1`, `worker-luna-2`: OpenAI Codex `gpt-5.6-luna`.
-3. `worker-terra-1`: OpenAI Codex `gpt-5.6-terra`.
-4. `worker-glm-full`: Z.AI `glm-5.3`.
-5. `worker-sol`: OpenAI Codex `gpt-5.6-sol`.
-6. `worker-astra`: OpenAI Codex `gpt-6-astra`.
 
 Keep `worker-terra-2` installed but dormant as a rollback/spare lane. It is outside the active legacy roster unless the human changes the policy.
 
@@ -253,7 +242,7 @@ Harness-board work is local-only by default. Local commits are permitted in isol
 
 Do not invent campaign deadlines, latest-start cutoffs, authorization expiry, full-path timing admission tests, or aggregate session/CI elapsed-time caps merely to make work feel bounded. Exact-scope authorization remains valid until completion of its approved effects, owner revocation, relevant invalidating state change, or a real external constraint. Preserve provider-issued credential expiry, maintenance windows, per-operation timeouts, hung-process watchdogs, retry backoff, cleanup, worker runtime caps, and minimum stability-observation periods as technical controls; never silently promote them into campaign authority.
 
-Do not create campaign-wide protected-read or credential-acquisition ceilings, reserved-slot arithmetic, or approval amendments whose only purpose is increasing an aggregate count. Acquire a credential or secret bundle once per execution session when practical, securely reuse it, and reacquire normally after provider expiry under the same identity and scope. Permit at most one retry after a proven pre-provider/no-submission failure; an ambiguous provider response stops for reconciliation. Keep value-blind audit events and narrowly justified per-operation request/poll caps, but do not use their campaign-wide total as an authorization gate.
+Do not create campaign-wide protected-read or credential-acquisition ceilings, reserved-slot arithmetic, or approval amendments whose only purpose is increasing an aggregate count. Acquire a credential or secret bundle once per execution session when practical, securely reuse it, and reacquire normally after provider expiry under the same identity and scope. Permit at most one retry after a proven pre-provider/no-submission failure; an ambiguous provider response stops for reconciliation. Keep audit events that record no secret or identifying values and narrowly justified per-operation request/poll caps, but do not use their campaign-wide total as an authorization gate.
 
 Judge controls by total system risk. Extra ledgers, envelopes, counters, reviews, artifacts, and exception paths are not inherently safer; require each control to address a named threat with decision value greater than its complexity, delay, and failure surface. Prefer the simplest observable boundary that preserves authorization, data safety, recovery, and independent review.
 
@@ -265,7 +254,7 @@ For app-only updates, reuse accepted unchanged platform/topology/security/recove
 
 For first launch or changed infrastructure requiring a plan, retain independent review of the exact saved plan before apply in concise next-action guidance, separately from owner authorization for that apply. Name both remaining dependencies even during local readiness; this is not an extra gate for unchanged-platform app-only updates with no infrastructure plan to apply.
 
-Separate reusable platform evidence, new-release evidence and current execution prerequisites. Identify the whole dependent credential/capability sequence value-blind before an execution window or prerequisite refs, including later host-management access; guessed names/reservations are not readiness and acquisition is not paperwork. Preserve credential/MFA, exact actor/target/scope, fresh dependent observation, external read/write, stop, ambiguity reconciliation and independent implementation-review gates. Apply the existing evidence-expiry and technical timing rules below, not new counters or campaign deadlines.
+Separate reusable platform evidence, new-release evidence and current execution prerequisites. Identify the whole dependent credential/capability sequence, recording names and order only, never values, before an execution window or prerequisite refs, including later host-management access; guessed names/reservations are not readiness and acquisition is not paperwork. Preserve credential/MFA, exact actor/target/scope, fresh dependent observation, external read/write, stop, ambiguity reconciliation and independent implementation-review gates. Apply the existing evidence-expiry and technical timing rules below, not new counters or campaign deadlines.
 
 Derive the concise next useful authorized action from current verified state. Missing prose for a verified reversible step calls for guarded one-time guidance, not a new campaign/proof packet. Image publication alone does not supply host replacement: report the missing step without claiming deployment or silently building automation.
 
@@ -379,7 +368,7 @@ Estimate the whole worker attempt, not just editing time: repository discovery, 
 
 ## Review Contract
 
-Every code change requires independent board-designated review before local integration. Project boards use Astra reviewers; the legacy board uses `reviewer-sol`. Inspect the specification, actual diff and commit, repository context, prior rung history, and test evidence. Do not edit implementation code.
+Every code change requires independent board-designated review before local integration. Project boards use their board's designated reviewer (`jobcron-reviewer`, `chapt-reviewer`, `harness-reviewer`); the legacy reviewer `reviewer-sol` was retired on 2026-10-18. Inspect the specification, actual diff and commit, repository context, prior rung history, and test evidence. Do not edit implementation code.
 
 Approve only when acceptance criteria pass and no material correctness, security, regression, or scope defect remains. Every non-approval must name the verdict, attribution, rung, revision count, findings, evidence, required next action, and whether continuation or a clean restart is safer.
 
@@ -423,7 +412,7 @@ Before declaring the harness or an autonomous workstream complete, verify:
 - Every active profile returns its configured model identity on a fresh inference probe.
 - The dispatch allowlist contains each project's workers and reviewer plus the intended legacy lanes, excludes project orchestrators, and has no project card assigned outside its project tuple.
 - Boards `jobcron`, `cha-pt`, and `harness` resolve only their declared repository/workspace allowlists.
-- Fresh project profile sessions have separate state homes and return `gpt-6.1-sol` for orchestrator/worker and `gpt-6-astra` for reviewer.
+- Fresh project profile sessions have separate state homes and return `claude-opus-5-5` for orchestrator/worker and `claude-fable-5-1` for reviewer.
 - No running implementation profile was removed during a lane swap.
 - Reviews can start while five implementation profiles are running.
 - Every code change reaches independent review before integration.

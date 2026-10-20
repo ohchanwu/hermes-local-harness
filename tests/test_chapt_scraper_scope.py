@@ -17,6 +17,7 @@ from unittest.mock import patch
 
 from incident_recovery_verify_fixture import ROOT, load_verifier
 from test_chapt_policy_reconciliation import CARD_CREATION_EDITS
+from test_orchestrator_skill_terminology import TERMINOLOGY_EDITS, reverse_terminology_edits
 
 BASELINE = "7a4ed4bbb75a9680e11e5fdb70b60268f9a6eaff"
 SCRAPER = "/Users/chanbla11mit/projects/cha-webpt-website-sync"
@@ -510,6 +511,10 @@ class PolicyText(unittest.TestCase):
         for path, count in expected_removed.items():
             base = self.baseline_text(path).split("\n\n")
             current = self.text(path)
+            relative = str(path.relative_to(ROOT))
+            if relative in TERMINOLOGY_EDITS:
+                # Reverse the later model-name and wording change (t_c836d2a4).
+                current = reverse_terminology_edits(relative, current)
             if path == SKILLS[1]:
                 # Reverse the later card-creation change (t_b6d0e590) to Card Setup steps 1 and 4.
                 for changed, previous in CARD_CREATION_EDITS:

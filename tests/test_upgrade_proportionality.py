@@ -132,7 +132,8 @@ class UpgradeProportionalityTests(unittest.TestCase):
             sections.append(section)
             for clause in ("production-deployment", "Release change selection", "application-only", "migration-bearing",
                            "infrastructure-changing", "first launch", "mixed", "unchanged platform",
-                           "new-release evidence", "current execution prerequisites", "value-blind", "missing prose",
+                           "new-release evidence", "current execution prerequisites",
+                           "recording names and order only, never values", "missing prose",
                            "host replacement", "stale writable database"):
                 self.assertIn(clause.lower(), section.lower())
         self.assertTrue(all(section == sections[0] for section in sections))

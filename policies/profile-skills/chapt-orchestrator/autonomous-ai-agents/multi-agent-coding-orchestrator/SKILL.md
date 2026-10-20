@@ -31,8 +31,8 @@ Do not use this procedure for a simple question that needs no repository change 
 
 Project-isolated fleets:
 
-- Jobcron board `jobcron`: `jobcron-orchestrator` (`gpt-6.1-sol`); implementation workers `jobcron-worker` (`gpt-6.1-sol`) and `jobcron-worker-2` (`claude-opus-5-5`); independent `jobcron-reviewer` (`gpt-6-astra`). Repository root: `/Users/chanbla11mit/projects/jobcron`; preview port: `17777`.
-- Cha PT board `cha-pt`: `chapt-orchestrator` (`gpt-6.1-sol`); implementation workers `chapt-worker` (`gpt-6.1-sol`) and `chapt-worker-2` (`claude-opus-5-5`); independent `chapt-reviewer` (`gpt-6-astra`). Repository allowlist (exactly three): `/Users/chanbla11mit/projects/cha-pt`, `/Users/chanbla11mit/projects/cha-pt-frontend`, and `/Users/chanbla11mit/projects/cha-webpt-website-sync`; primary board root `/Users/chanbla11mit/projects/cha-pt`; frontend Hermes project `cha-pt-frontend`; scraper Hermes project `cha-webpt-website-sync`; backend preview port: `18080`.
+- Jobcron board `jobcron`: `jobcron-orchestrator` (`claude-opus-5-5`); implementation workers `jobcron-worker` (`claude-opus-5-5`) and `jobcron-worker-2` (`claude-opus-5-5`); independent `jobcron-reviewer` (`claude-fable-5-1`). Repository root: `/Users/chanbla11mit/projects/jobcron`; preview port: `17777`.
+- Cha PT board `cha-pt`: `chapt-orchestrator` (`claude-opus-5-5`); implementation workers `chapt-worker` (`claude-opus-5-5`) and `chapt-worker-2` (`claude-opus-5-5`); independent `chapt-reviewer` (`claude-fable-5-1`). Repository allowlist (exactly three): `/Users/chanbla11mit/projects/cha-pt`, `/Users/chanbla11mit/projects/cha-pt-frontend`, and `/Users/chanbla11mit/projects/cha-webpt-website-sync`; primary board root `/Users/chanbla11mit/projects/cha-pt`; frontend Hermes project `cha-pt-frontend`; scraper Hermes project `cha-webpt-website-sync`; backend preview port: `18080`.
 
 Each project profile has an independent Hermes home, memory, sessions, and fixed terminal root. Named boards provide separate databases, logs, attachments, and workspaces. A project orchestrator may assign only its matching workers and reviewer. Every card is pinned to one exact repository, repository-owned isolated worktree, protected baseline, and explicit test contract. A task or callback with a mismatched board, profile, repository, workspace, baseline, or test contract is invalid and must be blocked before file access or mutation.
 
@@ -243,7 +243,7 @@ Within those boundaries, execute safe, bounded blocker recovery and the next use
 
 Do not invent campaign deadlines, latest-start cutoffs, authorization expiry, full-path timing admission tests, or aggregate session/CI elapsed-time caps merely to make work feel bounded. Exact-scope authorization remains valid until completion of its approved effects, owner revocation, relevant invalidating state change, or a real external constraint. Preserve provider-issued credential expiry, maintenance windows, per-operation timeouts, hung-process watchdogs, retry backoff, cleanup, worker runtime caps, and minimum stability-observation periods as technical controls; never silently promote them into campaign authority.
 
-Do not create campaign-wide protected-read or credential-acquisition ceilings, reserved-slot arithmetic, or approval amendments whose only purpose is increasing an aggregate count. Acquire a credential or secret bundle once per execution session when practical, securely reuse it, and reacquire normally after provider expiry under the same identity and scope. Permit at most one retry after a proven pre-provider/no-submission failure; an ambiguous provider response stops for reconciliation. Keep value-blind audit events and narrowly justified per-operation request/poll caps, but do not use their campaign-wide total as an authorization gate.
+Do not create campaign-wide protected-read or credential-acquisition ceilings, reserved-slot arithmetic, or approval amendments whose only purpose is increasing an aggregate count. Acquire a credential or secret bundle once per execution session when practical, securely reuse it, and reacquire normally after provider expiry under the same identity and scope. Permit at most one retry after a proven pre-provider/no-submission failure; an ambiguous provider response stops for reconciliation. Keep audit events that record no secret or identifying values and narrowly justified per-operation request/poll caps, but do not use their campaign-wide total as an authorization gate.
 
 Judge controls by total system risk. Extra ledgers, envelopes, counters, reviews, artifacts, and exception paths are not inherently safer; require each control to address a named threat with decision value greater than its complexity, delay, and failure surface. Prefer the simplest observable boundary that preserves authorization, data safety, recovery, and independent review.
 
@@ -255,7 +255,7 @@ For app-only updates, reuse accepted unchanged platform/topology/security/recove
 
 For first launch or changed infrastructure requiring a plan, retain independent review of the exact saved plan before apply in concise next-action guidance, separately from owner authorization for that apply. Name both remaining dependencies even during local readiness; this is not an extra gate for unchanged-platform app-only updates with no infrastructure plan to apply.
 
-Separate reusable platform evidence, new-release evidence and current execution prerequisites. Identify the whole dependent credential/capability sequence value-blind before an execution window or prerequisite refs, including later host-management access; guessed names/reservations are not readiness and acquisition is not paperwork. Preserve credential/MFA, exact actor/target/scope, fresh dependent observation, external read/write, stop, ambiguity reconciliation and independent implementation-review gates. Apply the existing evidence-expiry and technical timing rules below, not new counters or campaign deadlines.
+Separate reusable platform evidence, new-release evidence and current execution prerequisites. Identify the whole dependent credential/capability sequence, recording names and order only, never values, before an execution window or prerequisite refs, including later host-management access; guessed names/reservations are not readiness and acquisition is not paperwork. Preserve credential/MFA, exact actor/target/scope, fresh dependent observation, external read/write, stop, ambiguity reconciliation and independent implementation-review gates. Apply the existing evidence-expiry and technical timing rules below, not new counters or campaign deadlines.
 
 Derive the concise next useful authorized action from current verified state. Missing prose for a verified reversible step calls for guarded one-time guidance, not a new campaign/proof packet. Image publication alone does not supply host replacement: report the missing step without claiming deployment or silently building automation.
 
@@ -410,7 +410,7 @@ No numeric caps on harmless actions: local reads, local tests, and anonymous pub
 
 ## Review Contract
 
-Every code change requires independent board-designated review before local integration. Project boards use Astra reviewers; the legacy board uses `reviewer-sol`. Inspect the specification, actual diff and commit, repository context, prior rung history, and test evidence. Do not edit implementation code.
+Every code change requires independent board-designated review before local integration. Project boards use their board's designated reviewer (`jobcron-reviewer`, `chapt-reviewer`); the legacy reviewer `reviewer-sol` was retired on 2026-10-18. Inspect the specification, actual diff and commit, repository context, prior rung history, and test evidence. Do not edit implementation code.
 
 Approve only when acceptance criteria pass and no material correctness, security, regression, or scope defect remains. Every non-approval must name the verdict, attribution, rung, revision count, findings, evidence, required next action, and whether continuation or a clean restart is safer.
 
@@ -475,7 +475,7 @@ Before declaring the harness or an autonomous workstream complete, verify:
 - Every active profile returns its configured model identity on a fresh inference probe.
 - The dispatch allowlist contains each project's workers and reviewer plus the intended legacy lanes, excludes project orchestrators, and has no project card assigned outside its project tuple.
 - Board `jobcron` resolves only the Jobcron repository/workspaces and board `cha-pt` only the Cha PT repository/workspaces.
-- Fresh project profile sessions have separate state homes and return `gpt-6.1-sol` for orchestrator/worker and `gpt-6-astra` for reviewer.
+- Fresh project profile sessions have separate state homes and return `claude-opus-5-5` for orchestrator/worker and `claude-fable-5-1` for reviewer.
 - No running implementation profile was removed during a lane swap.
 - Reviews can start while five implementation profiles are running.
 - Every code change reaches independent review before integration.

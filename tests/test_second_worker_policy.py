@@ -288,7 +288,7 @@ class PolicyText(unittest.TestCase):
             text = path.read_text()
             self.assertIn("Each project has two implementation workers.", text)
             for prefix in fleets:
-                self.assertIn(f"implementation workers `{prefix}-worker` (`gpt-6.1-sol`) and "
+                self.assertIn(f"implementation workers `{prefix}-worker` (`claude-opus-5-5`) and "
                               f"`{prefix}-worker-2` (`claude-opus-5-5`);", text)
 
     def test_current_state_docs_list_both_workers(self):
