@@ -44,11 +44,13 @@ TABLE = [
     ("cut off, second continues with a call", msg("m1", "max_tokens", "Part"), msg("m2", "tool_use", " more.", ["t2"]), {},
      APPEND, "continuation"),
     ("internal step precedes the real reply (the live audits)", TOOL_1, msg("m2", "tool_use", "", ["t2"]),
-     {"answered": ["t1"]}, KEEP_LAST, "internal_step"),
-    ("internal step, then a text reply", TOOL_1, msg("m2", "end_turn", "Answer."), {"answered": ["t1"]},
+     {"answered": ["t1"], "errored": ["t1"]}, KEEP_LAST, "internal_step"),
+    ("internal step, then a text reply", TOOL_1, msg("m2", "end_turn", "Answer."), {"answered": ["t1"], "errored": ["t1"]},
      KEEP_LAST, "internal_step"),
     ("internal step for two parallel calls", msg("m1", "tool_use", "", ["t1", "t1b"]), msg("m2", "tool_use", "", ["t2"]),
-     {"answered": ["t1b", "t1"]}, KEEP_LAST, "internal_step"),
+     {"answered": ["t1b", "t1"], "errored": ["t1", "t1b"]}, KEEP_LAST, "internal_step"),
+    ("internal step, the same call rejected twice", TOOL_1, msg("m2", "tool_use", "", ["t2"]),
+     {"answered": ["t1", "t1"], "errored": ["t1", "t1"]}, KEEP_LAST, "internal_step"),
     # Every FAIL fallback:
     ("model changed", msg("m1", "end_turn", "Done."), msg("m2", "end_turn", "Done.", model="other"), {}, FAIL, "model_changed"),
     ("first stop unknown", msg("m1", "refusal", "x"), msg("m2", "end_turn", "x"), {}, FAIL, "unknown_stop"),
@@ -80,6 +82,21 @@ TABLE = [
      {"answered": ["t1"], "forwarded": True}, FAIL, "internal_step_after_forwarding"),
     ("internal step, second reuses a call id", TOOL_1, msg("m2", "tool_use", "", ["t2", "t1"]), {"answered": ["t1"]},
      FAIL, "internal_step_reused_call"),
+    # The runtime's own answers must all be rejections (built-in tools are off); anything else may have run.
+    ("internal step, one success among several answers", msg("m1", "tool_use", "", ["t1", "t1b", "t1c"]),
+     msg("m2", "tool_use", "", ["t2"]), {"answered": ["t1", "t1b", "t1c"], "errored": ["t1", "t1c"]},
+     FAIL, "internal_step_non_error_result"),
+    ("internal step, is_error missing (no error evidence)", TOOL_1, msg("m2", "tool_use", "", ["t2"]),
+     {"answered": ["t1"]}, FAIL, "internal_step_non_error_result"),
+    ("internal step, the same call answered as error and as success", TOOL_1, msg("m2", "tool_use", "", ["t2"]),
+     {"answered": ["t1", "t1"], "errored": ["t1"]}, FAIL, "internal_step_non_error_result"),
+    ("internal step, one call's error counted for another's success", msg("m1", "tool_use", "", ["t1", "t1b"]),
+     msg("m2", "tool_use", "", ["t2"]), {"answered": ["t1", "t1b"], "errored": ["t1", "t1"]},
+     FAIL, "internal_step_non_error_result"),
+    ("internal step, error evidence for a call never answered", TOOL_1, msg("m2", "tool_use", "", ["t2"]),
+     {"answered": ["t1"], "errored": ["t1", "tx"]}, FAIL, "internal_step_non_error_result"),
+    ("non-error answer, but an earlier row still decides", TOOL_1, msg("m2", "tool_use", "", ["t2"]),
+     {"answered": ["t1"], "requested": True}, FAIL, "internal_step_after_mcp_request"),
 ]
 
 
@@ -118,6 +135,16 @@ class ForwardingTests(unittest.TestCase):
         self.assertEqual(deltas, [{"content": "Hi"}])
         self.assertFalse(message.done)
         self.assertEqual(message.deltas, [{"content": "Hi"}])
+
+    def test_only_results_marked_is_error_exactly_true_count_as_errors_per_id(self):
+        message = stream_events.Message({MODEL})
+        message.feed({"type": "stream_event", "event": {"type": "message_start", "message": {"id": "m1", "model": MODEL}}})
+        marks = [("t1", {"is_error": True}), ("t2", {"is_error": False}), ("t3", {}), ("t4", {"is_error": "true"}),
+                 ("t5", {"is_error": 1}), ("t1", {"is_error": False})]
+        message.observe_user({"type": "user", "message": {"role": "user", "content": [
+            {"type": "tool_result", "tool_use_id": id_, "content": "synthetic", **mark} for id_, mark in marks]}})
+        self.assertEqual(message.answered, ["t1", "t2", "t3", "t4", "t5", "t1"])
+        self.assertEqual(message.errored, ["t1"])
 
 
 class ClientTests(unittest.TestCase):
@@ -226,6 +253,50 @@ class ClientTests(unittest.TestCase):
                 self.assertEqual(record["audit"][-1]["row"], row)
                 self.assertTrue(all(m["forwarded_chars"] == 0 for m in record["stream"]["messages"]))
 
+    def test_internal_step_with_a_non_error_runtime_answer_fails_with_an_audit_and_forwards_nothing(self):
+        for prompt, errors in (("__internal_step_success__", 0), ("__internal_step_unmarked__", 0),
+                               ("__internal_step_mixed__", 1)):
+            with self.subTest(prompt):
+                for path in self.audits():
+                    path.unlink()
+                self.c.close()
+                self.c = client.ClaudeSubscriptionClient(command=provider.SYNTHETIC_CLI)
+                self.addCleanup(self.c.close)
+                chunks = []
+                with self.assertRaisesRegex(client.ProviderError, r"^duplicate streamed message$"):
+                    for chunk in self.request(prompt, tools=[TOOL], stream=True):
+                        chunks.append(chunk)
+                self.assertEqual(chunks, [])
+                self.assertIsNone(self.c._pending)
+                self.assertFalse(any(a["stage"] in ("tool_parked", "result_delivered") for a in self.c.audit))
+                self.assertEqual(self.decisions(), [(FAIL, "internal_step_non_error_result")])
+                entry = next(a for a in self.c.audit if a["stage"] == "second_message")
+                self.assertEqual((entry["answered"], entry["answered_errors"], entry["requested"], entry["dropped_calls"]),
+                                 (1 + errors, errors, False, 0))
+                [path] = self.audits()
+                record = json.loads(path.read_text())
+                self.assertEqual(record["audit"][-1]["row"], "internal_step_non_error_result")
+                self.assertEqual(record["audit"][-1]["answered_errors"], errors)
+                self.assertTrue(all(m["forwarded_chars"] == 0 for m in record["stream"]["messages"]))
+
+    def test_a_continuation_carries_its_per_id_error_evidence_into_the_kept_message(self):
+        response = self.request("__chained_step_rejected__", tools=[TOOL])
+        self.assertEqual(response.choices[0].message.content, "Part more.Answer.")
+        self.assertEqual(self.decisions(), [(APPEND, "continuation"), (KEEP_LAST, "internal_step")])
+        steps = [a for a in self.c.audit if a["stage"] == "second_message"]
+        self.assertEqual([(a["answered"], a["answered_errors"]) for a in steps], [(0, 0), (1, 1)])
+        self.c.close()
+        self.c = client.ClaudeSubscriptionClient(command=provider.SYNTHETIC_CLI)
+        self.addCleanup(self.c.close)
+        chunks = []
+        with self.assertRaisesRegex(client.ProviderError, r"^duplicate streamed message$"):
+            for chunk in self.request("__chained_step_success__", tools=[TOOL], stream=True):
+                chunks.append(chunk)
+        self.assertEqual(chunks, [])
+        self.assertEqual(self.decisions(), [(APPEND, "continuation"), (FAIL, "internal_step_non_error_result")])
+        [path] = self.audits()
+        self.assertEqual(json.loads(path.read_text())["audit"][-1]["row"], "internal_step_non_error_result")
+
 
 def synthetic_runtime(argv):
     """Inert event producer for second-message shapes; never an installed runtime."""
@@ -237,7 +308,7 @@ def synthetic_runtime(argv):
         print(json.dumps(obj), flush=True)
     def ev(kind, **kwargs):
         emit({"type": "stream_event", "event": {"type": kind, **kwargs}})
-    def message(message_id, blocks, stop="end_turn", answered=()):
+    def message(message_id, blocks, stop="end_turn", answered=(), marks=None):
         ev("message_start", message={"id": message_id, "model": model, "usage": {"input_tokens": 1}})
         for index, value in enumerate(blocks):
             if value["type"] == "text":
@@ -249,9 +320,10 @@ def synthetic_runtime(argv):
                 ev("content_block_delta", index=index, delta={"type": "input_json_delta", "partial_json": json.dumps(value["input"])})
             emit({"type": "assistant", "message": {"id": message_id, "model": model, "content": [value], "usage": {"output_tokens": 1}}})
             ev("content_block_stop", index=index)
-        for tool_use_id in answered:  # the CLI answers a call itself, as in the live audits
+        for number, tool_use_id in enumerate(answered):  # the CLI answers a call itself, as in the live audits
+            mark = {"is_error": True} if marks is None else marks[number]  # the live audits: always a rejection
             emit({"type": "user", "message": {"role": "user", "content": [
-                {"type": "tool_result", "tool_use_id": tool_use_id, "content": "synthetic error", "is_error": True}]}})
+                {"type": "tool_result", "tool_use_id": tool_use_id, "content": "synthetic answer", **mark}]}})
         ev("message_delta", delta={"stop_reason": stop}, usage={"output_tokens": 2})
         ev("message_stop")
     def result():
@@ -287,6 +359,21 @@ def synthetic_runtime(argv):
         elif prompt == "__internal_step_text__":
             message("msg_t1", [text("Checking."), call("toolu_rejected", "/synthetic/rejected")], "tool_use", ["toolu_rejected"])
             message("msg_t2", [text("Answer.")])
+            result()
+        elif prompt in ("__internal_step_success__", "__internal_step_unmarked__", "__internal_step_mixed__"):
+            # The runtime answered the call itself but not with a rejection: something may have run.
+            answered, marks = {"__internal_step_success__": (["toolu_ran"], [{"is_error": False}]),
+                               "__internal_step_unmarked__": (["toolu_ran"], [{}]),
+                               "__internal_step_mixed__": (["toolu_ran", "toolu_ran"], [{"is_error": True}, {}])}[prompt]
+            message("msg_s1", [text("Checking."), call("toolu_ran", "/synthetic/ran")], "tool_use", answered, marks)
+            message("msg_s2", [text("Answer.")])
+            result()
+        elif prompt in ("__chained_step_rejected__", "__chained_step_success__"):
+            # A cut-off message, its continuation with a call the runtime answers itself, then the reply.
+            mark = {"is_error": prompt == "__chained_step_rejected__"}
+            message("msg_k1", [text("Part")], "max_tokens")
+            message("msg_k2", [text(" more."), call("toolu_k", "/synthetic/k")], "tool_use", ["toolu_k"], [mark])
+            message("msg_k3", [text("Answer.")])
             result()
         elif prompt == "__replay__":
             message("msg_r1", [text("Same.")])

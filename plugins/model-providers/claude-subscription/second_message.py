@@ -6,6 +6,8 @@ and `calls` (tool calls as `id`, `name`, `arguments`). The evidence between them
 
 - `answered`: tool_use ids the runtime itself answered with a tool_result (a `user`
   event) after the first message's tool calls and before the second message began;
+- `errored`: the tool_use id of each of those tool_results whose `is_error` was exactly
+  true, one entry per result as in `answered`;
 - `requested`: whether the CLI asked Hermes, over MCP, for one of the first message's
   calls before the second message began;
 - `forwarded`: whether any of the first message already reached Hermes.
@@ -20,11 +22,16 @@ Rows, first match wins; anything else is FAIL, and the caller persists the strea
   keep_last/internal_step first stopped for tool_use, the runtime answered exactly its
                           calls without Hermes (none was requested over MCP, nothing of
                           the first was forwarded), second is a new id on the same model
-                          with only new tool-call ids. Hermes never ran the first
-                          message's calls; the second is the reply to their results.
+                          with only new tool-call ids, and every one of those answers
+                          was an error (built-in tools are off, so the runtime can only
+                          reject); any other answer fails as internal_step_non_error_result.
+                          Hermes never ran the first message's calls; the second is
+                          the reply to their results.
                           The client keeps the first's visible text ahead of the
                           second's and drops only the calls the runtime answered.
 """
+from collections import Counter
+
 from .stream_audit import relation
 
 APPEND, KEEP_FIRST, KEEP_LAST, FAIL = "append", "keep_first", "keep_last", "fail"
@@ -35,8 +42,10 @@ def identity(calls):
     return [(c["id"], c["name"], c["arguments"]) for c in calls]
 
 
-def decide(first, second, *, answered=(), requested=False, forwarded=False):
+def decide(first, second, *, answered=(), errored=(), requested=False, forwarded=False):
     """Return (outcome, row). Row names are identifiers, recorded in the client audit."""
+    # Per result and per id: a repeated or extra result cannot stand in for another's error.
+    every_answer_errored = Counter(answered) == Counter(errored)
     answered = set(answered)
     first_ids = {c["id"] for c in first["calls"]}
     if first["model"] != second["model"]:
@@ -66,6 +75,8 @@ def decide(first, second, *, answered=(), requested=False, forwarded=False):
         return FAIL, "internal_step_after_forwarding"
     if first_ids & {c["id"] for c in second["calls"]}:
         return FAIL, "internal_step_reused_call"
+    if not every_answer_errored:
+        return FAIL, "internal_step_non_error_result"
     return KEEP_LAST, "internal_step"
 
 

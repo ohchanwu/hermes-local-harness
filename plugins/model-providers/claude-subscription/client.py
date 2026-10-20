@@ -575,13 +575,13 @@ class ClaudeSubscriptionClient:
             outcome, row = second_message.FAIL, "too_many_messages"
         else:
             outcome, row = second_message.decide(first.facts(), second.facts(), answered=first.answered,
-                                                 requested=requested, forwarded=False)
+                                                 errored=first.errored, requested=requested, forwarded=False)
         dropped = second if outcome == second_message.KEEP_FIRST else None
         self.audit.append({"stage": "second_message", "outcome": outcome, "row": row, "number": decisions,
                            "first_id": first.id, "second_id": second.id, "first_stop": first.stop, "second_stop": second.stop,
                            "relation": stream_audit.relation(first.text, second.text), "same_model": first.model == second.model,
                            "first_calls": len(first.calls), "second_calls": len(second.calls), "answered": len(first.answered),
-                           "answered_errors": first.answered_errors, "requested": requested,
+                           "answered_errors": len(first.errored), "requested": requested,
                            "dropped_text_chars": len(dropped.text) if dropped else 0,
                            "dropped_calls": len(dropped.calls) if dropped else len(first.calls) if outcome == second_message.KEEP_LAST else 0})
         if outcome == second_message.FAIL:
@@ -602,7 +602,7 @@ class ClaudeSubscriptionClient:
         first.text += added
         first.deltas.extend([{"content": added}] if added else [])
         first.calls, first.stop = second.calls, second.stop
-        first.answered, first.answered_errors = second.answered, second.answered_errors
+        first.answered, first.errored = second.answered, second.errored
         merged = {**first.usage, **second.usage}
         if type(first.usage.get("output_tokens")) is int and type(second.usage.get("output_tokens")) is int:
             merged["output_tokens"] = first.usage["output_tokens"] + second.usage["output_tokens"]

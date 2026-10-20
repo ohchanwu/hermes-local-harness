@@ -23,7 +23,7 @@ class Message:
         self.calls = []  # every tool call in this message, in order; Hermes runs them as one batch
         self.deltas = []  # text deltas in order, held by the client until the message is final
         self.answered = []  # tool_use ids the runtime itself answered (user tool_result events)
-        self.answered_errors = 0  # how many of those it marked is_error
+        self.errored = []  # per such result marked is_error exactly true, its tool_use id
         self.stream_id = None       # the first message id, kept for every chunk across restarts
         self.interrupted = None     # error type of a mid-stream API failure
         self.restarts = 0
@@ -41,7 +41,8 @@ class Message:
         for item in content if isinstance(content, list) else ():
             if isinstance(item, dict) and item.get("type") == "tool_result" and isinstance(item.get("tool_use_id"), str):
                 self.answered.append(item["tool_use_id"])
-                self.answered_errors += item.get("is_error") is True
+                if item.get("is_error") is True:
+                    self.errored.append(item["tool_use_id"])
 
     def feed(self, obj):
         deltas = self._feed(obj)

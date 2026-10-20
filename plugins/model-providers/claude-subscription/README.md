@@ -149,8 +149,11 @@ was cut off (`max_tokens`) and the second continues it; keep the last when the
 first stopped for `tool_use` and the CLI answered exactly those calls itself
 (`user` tool_result events) without asking Hermes over MCP, so the second is the
 real reply (the first's text is kept, its unrun calls are dropped and can never
-be parked later). Anything else, or more than four such messages in one request,
-fails as `duplicate streamed message` with a stream audit.
+be parked later). Each of those answers must be a rejection (`is_error` exactly
+true; built-in tools are off), else row `internal_step_non_error_result` fails,
+since something may have run outside Hermes. Anything else, or more than four
+such messages in one request, fails as `duplicate streamed message` with a
+stream audit.
 When the stream itself fails (an undecidable second message, event outside a
 message, invalid block, snapshot mismatch, malformed or
 unknown runtime event), the client first reads the rest of the current message
