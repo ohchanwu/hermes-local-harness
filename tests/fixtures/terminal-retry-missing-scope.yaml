@@ -226,7 +226,7 @@
         "scripts/set-active-lanes.py": "157419c7c190b0a9f647271f7bd3839182f2e9324f8f9d74e43ec0553a5b77df"
       },
       "jss-orchestrator": {
-        "SKILL.md": "0b5d6aeb5459b197d07da79398f9d97f2d23814ea1d6291a993a8c2dbf2c1edd",
+        "SKILL.md": "866092ee8d63646658f1f90af6efa684e580f234add9ca3d5f374b2086bf4a62",
         "scripts/set-active-lanes.py": "157419c7c190b0a9f647271f7bd3839182f2e9324f8f9d74e43ec0553a5b77df"
       }
     },
@@ -590,7 +590,7 @@
       "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md": "d91b241db42b2a5125cad3e07fc67b1f51fe7fb16bfd86bf5175fade258c55aa"
     },
     "jss-orchestrator": {
-      "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md": "0b5d6aeb5459b197d07da79398f9d97f2d23814ea1d6291a993a8c2dbf2c1edd"
+      "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md": "866092ee8d63646658f1f90af6efa684e580f234add9ca3d5f374b2086bf4a62"
     }
   },
   "terminal_retry_policy": {
@@ -727,7 +727,7 @@
     "harness-worker-2": "8ee6127b833f8278b3ed3932aa05c77cac917ee8391ccc633474b4ce8fc1ef61",
     "harness-reviewer": "d46167c337aedb0ee3ac4246a6ba9420f484e336f3084ec843efc2c97d76cf66",
     "jobcron-orchestrator": "3bd62ad5483cfcffd8f00a06f34fd1f3b471928e636a3c93b9b62e2a579fd713",
-    "jss-orchestrator": "74b1248127cb5f5674c5649bba9bd2cd61e0cfa2f064395fec97058c537ddf23",
+    "jss-orchestrator": "baaa1d11afd866a63b84dd95446b79fb24602e6873730dc79941234d2e046e77",
     "jss-worker": "c53c3147dc2b6979312208cacf37aad80f627f8fbaada2094439eefc9d77af32",
     "jss-worker-2": "c53c3147dc2b6979312208cacf37aad80f627f8fbaada2094439eefc9d77af32",
     "jss-reviewer": "6d20c970e3775a3888731c3330928ea9f24ed8c40d8a5a742e59170091fb7334"

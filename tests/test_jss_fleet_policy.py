@@ -24,6 +24,10 @@ ORCH, WORKER, WORKER2, REVIEWER = (
     "jss-orchestrator", "jss-worker", "jss-worker-2", "jss-reviewer")
 JSS = (ORCH, WORKER, WORKER2, REVIEWER)
 WORKERS = (WORKER, WORKER2)
+# Retired from dispatch but still deployed; their SOULs are tracked sources too.
+GLM_WORKERS = ("jss-worker-glm-1", "jss-worker-glm-2")
+NON_ORCH_SOULS = (WORKER, WORKER2, REVIEWER, *GLM_WORKERS)
+SITE = "/Users/chanbla11mit/mystuff/projects/ohchanwu.dev"
 FLEETS = {"jobcron", "cha-pt", "harness", "jss-genr"}
 RELATIVE = "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md"
 SKILL = ROOT / "policies/profile-skills" / ORCH / RELATIVE
@@ -406,6 +410,117 @@ class RoleContracts(unittest.TestCase):
         observed = next(item for item in clean["adapters"] if item["repo"] == "jss-genr")
         # The fixture carries only the public marker line, never other jss-genr content.
         self.assertEqual(observed, {"repo": "jss-genr", "content": adapter["marker"], "record": text})
+
+
+def section(raw, title):
+    return flat(raw.split(f"\n## {title}\n", 1)[1].split("\n## ", 1)[0])
+
+
+class StandingExceptions(unittest.TestCase):
+    """Owner decisions 2026-10-18 (portfolio push) and 2026-10-20 ("grant"): the orchestrator
+    SOUL and skill alone carry them; every other jss SOUL keeps no exception."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.orch = flat(soul_path(ORCH).read_text())
+        cls.others = {profile: flat(soul_path(profile).read_text()) for profile in NON_ORCH_SOULS}
+        cls.skill_raw = SKILL.read_text()
+
+    def test_orchestrator_soul_portfolio_exception_and_guardrails(self):
+        limits = self.orch.split("The repository has a public remote", 1)[1]
+        for marker in (
+                "and nothing is ever pushed. Never push, use `gh`, open a PR, deploy",
+                "or perform another external write without explicit owner authorization.",
+                "Sole standing exception (owner decision, 2026-10-18): when the owner says \"update my portfolio\", "
+                "that message authorizes the site change it describes, reviewed site cards, and your own non-force "
+                f"`git push origin main` of the reviewed, locally integrated commits in `{SITE}`; it covers nothing "
+                "else (no other repository or remote, no force push, no deployment-setting, Terraform, or state "
+                "change, no untracked files)."):
+            self.assertIn(marker, limits)
+        # The exception follows, and never replaces, the general no-push rule.
+        self.assertLess(limits.find("nothing is ever pushed"), limits.find("Sole standing exception"))
+        self.assertEqual(self.orch.count("update my portfolio"), 1)
+
+    def test_skill_portfolio_exception_and_guardrails(self):
+        scope = section(self.skill_raw, "Hard Scope")
+        for marker in (
+                "nothing is ever pushed",
+                "Sole push exception (owner decision, 2026-10-18; this case alone): an owner message saying "
+                "\"update my portfolio\" authorizes (a) the site change it describes, (b) reviewed site cards that "
+                f"write to `{SITE}` (record the triggering message and date on the card), and (c) the controller's "
+                "own `git push origin main` of the reviewed commits after local integration there",
+                "`git -C <site> log origin/main..main` shows only the reviewed commits",
+                "the diff carries no `profile/`, `companies/`, or `resume/resources/` content",
+                "no untracked file (`terraform.tfstate`, `.terraform/`, `docs/` drafts) is staged",
+                "Never force-push, push the jss-genr repository, push another branch or remote, use `gh`, "
+                "or change deployment settings or Terraform state.",
+                "Workers never push.",
+                "Anything outside this case still needs explicit owner authorization."):
+            self.assertIn(marker, scope)
+        self.assertEqual(self.skill_raw.count("update my portfolio"), 2)
+        self.assertIn("- external writes (push, PR, deploy, application submission, portfolio-site sync), "
+                      "except the \"update my portfolio\" site push in Hard Scope", self.skill_raw)
+
+    def test_orchestrator_soul_protected_file_exception_and_guardrails(self):
+        role = self.orch.split("Load and follow `multi-agent-coding-orchestrator` before routing work.", 1)[1]
+        role = role.split("Every card declares exactly one kind.", 1)[0]
+        for marker in (
+                "do not edit repository files or write drafts yourself.",
+                "Sole edit exception (owner decision, 2026-10-20, \"grant\"): when a dispatched worker cannot get "
+                "Hermes's protected-file approval for `AGENTS.md` or `CLAUDE.md`, the worker posts the exact "
+                "replacement lines on its card and stops; you apply only those lines, only inside that card's own "
+                "`.worktrees/<id>`, only with the file `patch` tool so the owner approves each write through the "
+                "Telegram prompt, then unblock the worker to commit, test, and request `jss-reviewer` review.",
+                "Never write these files through terminal, scripts, or `execute_code`, never in the main checkout, "
+                "and never beyond the card's posted lines; workers never bypass the prompt either."):
+            self.assertIn(marker, role)
+        self.assertEqual(self.orch.count("\"grant\""), 1)
+
+    def test_skill_protected_file_exception_and_guardrails(self):
+        role = section(self.skill_raw, "Role Separation")
+        for marker in (
+                "Protected-instruction-file exception (owner decision, 2026-10-20, \"grant\")",
+                "For repository `AGENTS.md` or `CLAUDE.md` only:",
+                "1. The worker posts the exact replacement lines on its card, does not write the file, and blocks "
+                "`needs_input`.",
+                "2. The controller applies exactly those lines with the file `patch` tool inside that card's "
+                "`.worktrees/<id>`, so the owner gets a Telegram Approve prompt for each write. Denied or timed "
+                "out: stop and tell the owner; never retry another way.",
+                "3. The controller comments what it applied and unblocks the card; the worker commits, tests, and "
+                "requests `jss-reviewer` review, which checks the applied lines against the posted text.",
+                "Never write these files through terminal, scripts, or `execute_code` (controller or workers), "
+                "never in the main checkout, never beyond the posted lines.",
+                "workers never bypass the protected-file prompt; they post the lines and block."):
+            self.assertIn(marker, role)
+        self.assertEqual(self.skill_raw.count("Protected-instruction-file exception"), 1)
+
+    def test_no_other_jss_soul_carries_an_exception(self):
+        for profile, body in self.others.items():
+            with self.subTest(profile=profile):
+                for marker in ("update my portfolio", "ohchanwu.dev", "git push", "Sole standing exception",
+                               "Sole edit exception", "\"grant\"", "Protected-instruction-file", "2026-10-20"):
+                    self.assertNotIn(marker, body)
+                self.assertIn("push", body.lower())
+                self.assertIn("without explicit owner authorization", body)
+
+    def test_glm_souls_track_live_worker_contract(self):
+        # Same privacy line as every other worker/reviewer; no stale "beyond the company slug" wording.
+        line = ("Card bodies, comments, handoffs, and memory may contain it (owner decision, 2026-10-18), "
+                "because the board and memory stay local")
+        worker_paragraph = next(p for p in soul_path(WORKER).read_text().split("\n\n") if "Privacy is a hard gate" in p)
+        for profile, body in self.others.items():
+            with self.subTest(profile=profile):
+                self.assertEqual(body.count("Privacy is a hard gate"), 1)
+                self.assertIn(line, body)
+                self.assertNotIn("beyond the company slug", body)
+                if profile != REVIEWER:
+                    self.assertIn(worker_paragraph, soul_path(profile).read_text())
+        for profile in GLM_WORKERS:
+            with self.subTest(profile=profile):
+                body = self.others[profile]
+                self.assertIn("Accept only a dispatcher-assigned card on board `jss-genr`", body)
+                self.assertIn(PRIVACY_FORBID[WORKER], body)
+                self.assertIn("Do not commit.", body)
 
 
 def card(body, **changes):

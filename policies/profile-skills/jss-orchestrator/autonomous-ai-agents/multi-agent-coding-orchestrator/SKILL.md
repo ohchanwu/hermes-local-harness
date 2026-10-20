@@ -25,6 +25,7 @@ Coordinate work for board `jss-genr` and repository `/Users/chanbla11mit/project
 - The implementation workers are `jss-worker` and `jss-worker-2`.
 - The sole independent reviewer is `jss-reviewer`.
 - The repository has a public GitHub remote, and nothing is ever pushed. Never run `git push` or `gh`, open a PR, deploy, submit an application, or log in to a job site. Posting text and 문항 come from the owner.
+- Sole push exception (owner decision, 2026-10-18; this case alone): an owner message saying "update my portfolio" authorizes (a) the site change it describes, (b) reviewed site cards that write to `/Users/chanbla11mit/mystuff/projects/ohchanwu.dev` (record the triggering message and date on the card), and (c) the controller's own `git push origin main` of the reviewed commits after local integration there, without another prompt. Before pushing: `git -C <site> log origin/main..main` shows only the reviewed commits, the diff carries no `profile/`, `companies/`, or `resume/resources/` content, and no untracked file (`terraform.tfstate`, `.terraform/`, `docs/` drafts) is staged. Never force-push, push the jss-genr repository, push another branch or remote, use `gh`, or change deployment settings or Terraform state. Workers never push. Anything outside this case still needs explicit owner authorization.
 - Credentials, installs or downloads (`npm install`, `make setup`, pip), live profile, skill, board, or gateway changes, and other external writes require separate explicit owner authorization.
 
 If any board, repository, card-kind, profile, worktree, baseline, write-target, test-contract, or reviewer boundary is absent or inconsistent, stop before file access or mutation.
@@ -61,6 +62,14 @@ Writing-round card: 자기소개서 Workflow A rounds and resume or portfolio co
 ## Role Separation
 
 The orchestrator plans, creates and routes cards, validates boundaries, monitors runs, integrates approved repository commits, relays owner decisions, and reports milestones. It does not edit repository files or write drafts.
+
+Protected-instruction-file exception (owner decision, 2026-10-20, "grant"): a dispatched worker's Hermes approval prompt for `AGENTS.md`/`CLAUDE.md`/`SOUL.md` has no human channel and times out. For repository `AGENTS.md` or `CLAUDE.md` only:
+
+1. The worker posts the exact replacement lines on its card, does not write the file, and blocks `needs_input`.
+2. The controller applies exactly those lines with the file `patch` tool inside that card's `.worktrees/<id>`, so the owner gets a Telegram Approve prompt for each write. Denied or timed out: stop and tell the owner; never retry another way.
+3. The controller comments what it applied and unblocks the card; the worker commits, tests, and requests `jss-reviewer` review, which checks the applied lines against the posted text.
+
+Never write these files through terminal, scripts, or `execute_code` (controller or workers), never in the main checkout, never beyond the posted lines. Every card that may touch `AGENTS.md` or `CLAUDE.md` must say so: workers never bypass the protected-file prompt; they post the lines and block.
 
 Workers do only the assigned card: repository changes in the isolated worktree, or new round files in the main checkout. They request same-card review.
 
@@ -163,7 +172,7 @@ Never ask the owner about:
 
 Ask only for:
 
-- external writes (push, PR, deploy, application submission, portfolio-site sync)
+- external writes (push, PR, deploy, application submission, portfolio-site sync), except the "update my portfolio" site push in Hard Scope
 - credentials, MFA, or job-site logins
 - installs or downloads
 - live profile, skill, policy, board, or gateway changes
