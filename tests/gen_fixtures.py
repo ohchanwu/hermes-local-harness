@@ -1,11 +1,28 @@
 import copy
+import hashlib
 import json
 from pathlib import Path
 
+ROOT = Path(__file__).resolve().parents[1]
 fx = Path(__file__).resolve().parent / "fixtures"
 clean = json.loads((fx / "clean.yaml").read_text())
-desired = json.loads((Path(__file__).resolve().parents[1] / "snapshots" / "sanitized-current-state.yaml").read_text())
-roster = json.loads((Path(__file__).resolve().parents[1] / "roster.yaml").read_text())
+desired = json.loads((ROOT / "snapshots" / "sanitized-current-state.yaml").read_text())
+roster = json.loads((ROOT / "roster.yaml").read_text())
+TRACKED_SOURCE = "tracked-source"
+
+
+def sha(path):
+    return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+
+
+# Observed hashes of a correctly deployed fleet are the bytes of the tracked
+# sources (desired state carries no hash pins where a tracked source exists).
+def override_hashes():
+    """profile -> {path: sha} of correctly deployed profile-local overrides."""
+    return {profile: {path: (sha(ROOT / "policies" / "profile-skills" / profile / path)
+                             if declared == TRACKED_SOURCE else declared)
+                      for path, declared in files.items()}
+            for profile, files in desired["skill"]["profile_local_skill_overrides"].items()}
 
 IMPL = ["worker-flash-1", "worker-flash-2", "worker-flash-3", "worker-luna-1", "worker-luna-2",
         "worker-terra-1", "worker-terra-2", "worker-glm-full", "worker-sol", "worker-astra",
@@ -47,16 +64,25 @@ def base_plugins():
 
 
 def skill_files_map():
-    """skill -> profile -> {rel: sha}, per the desired deploy_profiles matrix."""
-    return {entry["name"]: {profile: copy.deepcopy(entry["files"])
-                            for profile in entry["deploy_profiles"]}
-            for entry in desired["skill"]["shared_skills"]}
+    """skill -> profile -> {rel: sha}, per the desired deploy_profiles matrix; a file a
+    profile-local override owns carries that override's bytes."""
+    overrides = override_hashes()
+    result = {}
+    for entry in desired["skill"]["shared_skills"]:
+        result[entry["name"]] = {}
+        for profile in entry["deploy_profiles"]:
+            files = {}
+            for rel in entry["files"]:
+                owned = [want for path, want in overrides.get(profile, {}).items()
+                         if f"/{path}".endswith(f"/{entry['name']}/{rel}")]
+                files[rel] = owned[0] if owned else sha(ROOT / entry["source"] / rel)
+            result[entry["name"]][profile] = files
+    return result
 
 
 def set_skill_files(d):
     d["skill_files"] = skill_files_map()
-    d["profile_local_skill_overrides"] = copy.deepcopy(
-        desired["skill"]["profile_local_skill_overrides"])
+    d["profile_local_skill_overrides"] = override_hashes()
 
 
 clean["profile_models"] = {profile["name"]: profile["model"] for profile in roster["profiles"]}
@@ -73,7 +99,7 @@ clean["project_isolation"] = copy.deepcopy(desired["project_isolation"])
 clean["project_repair_policy"] = copy.deepcopy(desired["project_repair_policy"])
 clean["project_repair_cards"] = []
 clean["profile_soul_hashes"] = {
-    profile: entry["sha256"] for profile, entry in desired["profile_souls"].items()}
+    profile: sha(ROOT / entry["source"]) for profile, entry in desired["profile_souls"].items()}
 clean["repository_policy_hashes"] = {
     name: entry["sha256"] for name, entry in desired["repository_policies"].items()}
 harness_adoption = (Path(__file__).resolve().parents[1] / "adoption" / "harness.md").read_text()
@@ -234,7 +260,8 @@ write("frontend-repository-policy-drift.yaml", delta(frontend_repository_policy_
 
 def skill_missing(d):
     set_skill_files(d)
-    del d["skill_files"]["minimal-implementation"]["worker-terra-2"]
+    # Retired profiles are excluded from deployment checks, so the missing copy is a live one.
+    del d["skill_files"]["minimal-implementation"]["harness-worker-2"]
 
 
 write("skill-deployment-missing.yaml", delta(skill_missing))
@@ -242,7 +269,7 @@ write("skill-deployment-missing.yaml", delta(skill_missing))
 
 def supporting_file_drift(d):
     set_skill_files(d)
-    d["skill_files"]["production-deployment"]["worker-astra"]["references/release-ci-portability.md"] = "0" * 64
+    d["skill_files"]["production-deployment"]["jobcron-worker"]["references/release-ci-portability.md"] = "0" * 64
 
 
 write("deployment-skill-supporting-file-drift.yaml", delta(supporting_file_drift))

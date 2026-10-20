@@ -187,8 +187,9 @@ class ChaptPolicyReconciliationTests(unittest.TestCase):
 
     def test_single_desired_override_pin_and_additive_provenance(self):
         overrides = self.skill["profile_local_skill_overrides"]["chapt-orchestrator"]
-        self.assertEqual(overrides, {RELATIVE: MERGED_SHA256})
-        self.assertEqual(overrides[RELATIVE], digest(self.source))
+        # The declaration names the tracked source; its bytes are the merged result.
+        self.assertEqual(overrides, {RELATIVE: "tracked-source"})
+        self.assertEqual(digest(self.source), MERGED_SHA256)
         provenance = self.skill["source_pin_provenance"]
         self.assertEqual(provenance["baseline"], "84d91a7ba698d38bb31c5b80e04dea0dd002d15f")
         self.assertEqual(provenance["upgrade_proportionality"]["baseline"], "fdc59293262e15c0376cfaa9f25244e7c317fc58")

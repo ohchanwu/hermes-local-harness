@@ -276,16 +276,22 @@ class Pins(unittest.TestCase):
 
     def test_pins_equal_tracked_bytes(self):
         self.assertEqual(self.snapshot["profile_souls"], self.roster["profile_souls"])
+        # Expectations are derived from the tracked bytes (t_76a2134d): no hand pins.
+        verifier = load_verifier()
         for profile, entry in self.roster["profile_souls"].items():
             with self.subTest(soul=profile):
-                self.assertEqual(entry["sha256"], sha(ROOT / entry["source"]))
+                self.assertNotIn("sha256", entry)
+                self.assertEqual(verifier.profile_soul_expected(entry), sha(ROOT / entry["source"]))
         overrides = self.snapshot["skill"]["profile_local_skill_overrides"]
         for profile, path in PROFILE_SKILLS.items():
             with self.subTest(skill=profile):
-                self.assertEqual(overrides[profile], {RELATIVE: sha(path)})
+                self.assertEqual(overrides[profile], {RELATIVE: verifier.TRACKED_SOURCE})
+                self.assertEqual(verifier.local_override_expected(profile, RELATIVE, overrides[profile][RELATIVE]),
+                                 sha(path))
         shared = next(e for e in self.snapshot["skill"]["shared_skills"] if e["name"] == "multi-agent-coding-orchestrator")
         self.assertEqual(shared["version"], "0.6.10")
-        for rel, want in shared["files"].items():
+        self.assertEqual(shared["source"], "skills/multi-agent-coding-orchestrator")
+        for rel, want in verifier.shared_skill_expected(shared).items():
             self.assertEqual(want, sha(SHARED_SKILL.parent / rel))
         provenance = self.snapshot["skill"]["source_pin_provenance"]["glm_worker_retirement"]
         self.assertEqual(provenance["baseline"], "1799a9b728681c3672fc29239dff9bf5564280f4")
@@ -303,20 +309,20 @@ class Pins(unittest.TestCase):
         self.assertEqual(entry, {
             "source": "policies/profile-souls/jobcron-orchestrator/SOUL.md",
             "live": JOBCRON_SOUL_LIVE,
-            "sha256": sha(JOBCRON_SOUL),
         })
         self.assertEqual(self.snapshot["profile_souls"]["jobcron-orchestrator"], entry)
         verifier = load_verifier()
         self.assertEqual(verifier.PROFILE_SOUL_PATHS["jobcron-orchestrator"],
                          {"source": entry["source"], "live": entry["live"]})
         self.assertEqual(quiet(verifier.check_profile_souls, self.roster["profile_souls"]), [])
-        drifted = {profile: soul["sha256"] for profile, soul in self.roster["profile_souls"].items()}
+        self.assertEqual(verifier.profile_soul_expected(entry), sha(JOBCRON_SOUL))
+        drifted = {profile: sha(ROOT / soul["source"]) for profile, soul in self.roster["profile_souls"].items()}
         drifted["jobcron-orchestrator"] = JOBCRON_SOUL_UPSTREAM_SHA256  # the undeployed live GLM pool
         self.assertEqual(quiet(verifier.check_profile_souls, self.roster["profile_souls"], drifted),
                          ["profile SOUL drift jobcron-orchestrator"])
 
     def test_fixture_pins_and_observations(self):
-        souls = {profile: entry["sha256"] for profile, entry in self.roster["profile_souls"].items()}
+        souls = {profile: sha(ROOT / entry["source"]) for profile, entry in self.roster["profile_souls"].items()}
         for fixture in sorted((ROOT / "tests/fixtures").glob("*.yaml")):
             data = load(fixture)
             if fixture.name == "incomplete-empty.yaml":

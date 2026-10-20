@@ -728,9 +728,9 @@ assert roster["profile_souls"] == json.loads(
 errors = []
 with redirect_stdout(io.StringIO()):
     verify_state.check_profile_souls(errors, roster["profile_souls"], {
-        profile: entry["sha256"] for profile, entry in roster["profile_souls"].items()})
+        profile: verify_state.profile_soul_expected(entry) for profile, entry in roster["profile_souls"].items()})
 assert errors == [], errors
-drifted_souls = {profile: entry["sha256"] for profile, entry in roster["profile_souls"].items()}
+drifted_souls = {profile: verify_state.profile_soul_expected(entry) for profile, entry in roster["profile_souls"].items()}
 drifted_souls["chapt-reviewer"] = "0" * 64
 errors = []
 with redirect_stdout(io.StringIO()):
@@ -748,7 +748,7 @@ check("--fixture", str(FIXTURES / "terminal-retry-missing-human-gate.yaml"), cod
 check("--fixture", str(FIXTURES / "ponytail-enabled-drift.yaml"), code=1, text="must be disabled")
 # absent required-disabled Ponytail fails with its own diagnostic
 check("--fixture", str(FIXTURES / "ponytail-absent-drift.yaml"), code=1, text="required-disabled ponytail absent")
-# a missing per-profile deployed copy fails (dormant profile included)
+# a missing per-profile deployed copy of a non-retired profile fails
 check("--fixture", str(FIXTURES / "skill-deployment-missing.yaml"), code=1, text="deployed skill copy missing")
 # a supporting file in either deployment skill is part of the deployed tree contract
 check("--fixture", str(FIXTURES / "deployment-skill-supporting-file-drift.yaml"), code=1,
@@ -756,15 +756,18 @@ check("--fixture", str(FIXTURES / "deployment-skill-supporting-file-drift.yaml")
 # Astra's intentional local learned-skill overrides are declared rather than normalized into fleet drift.
 check("--fixture", str(FIXTURES / "astra-local-override.yaml"))
 local_overrides = json.loads((ROOT / "snapshots/sanitized-current-state.yaml").read_text())["skill"]["profile_local_skill_overrides"]
+observed_overrides = {profile: {rel: verify_state.local_override_expected(profile, rel, declared)
+                                for rel, declared in files.items()}
+                      for profile, files in local_overrides.items()}
 errors = []
 with redirect_stdout(io.StringIO()):
-    verify_state.check_profile_local_skill_overrides(errors, local_overrides, local_overrides)
+    verify_state.check_profile_local_skill_overrides(errors, local_overrides, observed_overrides)
 assert errors == [], errors
 for profile in ("jobcron-orchestrator", "chapt-orchestrator", "harness-orchestrator"):
-    rel, want = next(iter(local_overrides[profile].items()))
+    rel, declared = next(iter(local_overrides[profile].items()))
     tracked = ROOT / "policies" / "profile-skills" / profile / rel
-    assert tracked.is_file()
-    assert hashlib.sha256(tracked.read_bytes()).hexdigest() == want
+    assert tracked.is_file() and declared == verify_state.TRACKED_SOURCE
+    assert hashlib.sha256(tracked.read_bytes()).hexdigest() == observed_overrides[profile][rel]
 
 harness_launcher = (ROOT / "scripts" / "run-harness-orchestrator")
 assert harness_launcher.is_file()

@@ -215,19 +215,19 @@
         "scripts/set-active-lanes.py": "157419c7c190b0a9f647271f7bd3839182f2e9324f8f9d74e43ec0553a5b77df"
       },
       "jobcron-orchestrator": {
-        "SKILL.md": "c17d4c5499fcedcc809c4429e0ff11e537488fc17deb32774b31680b3ca1c3c5",
+        "SKILL.md": "fe96e5b7831d73427a906081de9ea603e7094fe89a8f52f1092bd02cc70dca92",
         "scripts/set-active-lanes.py": "157419c7c190b0a9f647271f7bd3839182f2e9324f8f9d74e43ec0553a5b77df"
       },
       "chapt-orchestrator": {
-        "SKILL.md": "c17d4c5499fcedcc809c4429e0ff11e537488fc17deb32774b31680b3ca1c3c5",
+        "SKILL.md": "c963e090ef2f19929b01a8cd3581f1b6e87501d6371439e27e3e7573469fdf62",
         "scripts/set-active-lanes.py": "157419c7c190b0a9f647271f7bd3839182f2e9324f8f9d74e43ec0553a5b77df"
       },
       "harness-orchestrator": {
-        "SKILL.md": "c17d4c5499fcedcc809c4429e0ff11e537488fc17deb32774b31680b3ca1c3c5",
+        "SKILL.md": "d91b241db42b2a5125cad3e07fc67b1f51fe7fb16bfd86bf5175fade258c55aa",
         "scripts/set-active-lanes.py": "157419c7c190b0a9f647271f7bd3839182f2e9324f8f9d74e43ec0553a5b77df"
       },
       "jss-orchestrator": {
-        "SKILL.md": "c17d4c5499fcedcc809c4429e0ff11e537488fc17deb32774b31680b3ca1c3c5",
+        "SKILL.md": "0b5d6aeb5459b197d07da79398f9d97f2d23814ea1d6291a993a8c2dbf2c1edd",
         "scripts/set-active-lanes.py": "157419c7c190b0a9f647271f7bd3839182f2e9324f8f9d74e43ec0553a5b77df"
       }
     },

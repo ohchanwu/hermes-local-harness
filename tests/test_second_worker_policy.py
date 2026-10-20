@@ -315,29 +315,32 @@ class Pins(unittest.TestCase):
                 self.assertEqual(souls[second], {
                     "source": f"policies/profile-souls/{second}/SOUL.md",
                     "live": f"/Users/chanbla11mit/.hermes/profiles/{second}/SOUL.md",
-                    "sha256": sha(soul(second)),
                 })
-                self.assertEqual(souls[second]["sha256"], souls[profile]["sha256"])
+                self.assertEqual(sha(soul(second)), sha(soul(profile)))
         for name in ("jobcron-worker", "jobcron-worker-2"):
             self.assertNotIn(name, souls)
             self.assertFalse(soul(name).exists())
         verifier = load_verifier()
         self.assertEqual(quiet(verifier.check_profile_souls, souls), [])
-        observed = {profile: entry["sha256"] for profile, entry in souls.items()}
+        observed = {profile: sha(ROOT / entry["source"]) for profile, entry in souls.items()}
         observed["harness-worker-2"] = "0" * 64
         self.assertEqual(quiet(verifier.check_profile_souls, souls, observed),
                          ["profile SOUL drift harness-worker-2"])
 
     def test_every_pin_equals_tracked_bytes(self):
+        # Expectations are derived from the tracked bytes (t_76a2134d): no hand pins.
+        verifier = load_verifier()
         for profile, entry in self.roster["profile_souls"].items():
             with self.subTest(soul=profile):
-                self.assertEqual(entry["sha256"], sha(ROOT / entry["source"]))
+                self.assertEqual(verifier.profile_soul_expected(entry), sha(ROOT / entry["source"]))
         overrides = self.snapshot["skill"]["profile_local_skill_overrides"]
         for prefix, path in PROFILE_SKILLS.items():
-            self.assertEqual(overrides[f"{prefix}-orchestrator"], {RELATIVE: sha(path)})
+            profile = f"{prefix}-orchestrator"
+            self.assertEqual(overrides[profile], {RELATIVE: "tracked-source"})
+            self.assertEqual(verifier.local_override_expected(profile, RELATIVE, "tracked-source"), sha(path))
         shared = next(e for e in self.snapshot["skill"]["shared_skills"] if e["name"] == "multi-agent-coding-orchestrator")
         self.assertEqual(shared["version"], "0.6.10")
-        self.assertEqual(shared["files"]["SKILL.md"], sha(SHARED_SKILL))
+        self.assertEqual(verifier.shared_skill_expected(shared)["SKILL.md"], sha(SHARED_SKILL))
         provenance = self.snapshot["skill"]["source_pin_provenance"]["second_worker"]
         self.assertEqual(provenance["baseline"], "8d660578bedca672f71460222a73215272e136f7")
         self.assertEqual(provenance["protected_reference"], "refs/harness/baselines/t_b12ba0d9")
@@ -353,7 +356,7 @@ class Pins(unittest.TestCase):
                     self.assertEqual(data["project_isolation"][project]["workers"], pool)
                 for profile in PINNED_WORKERS:
                     self.assertEqual(data["profile_soul_hashes"][f"{profile}-2"],
-                                     self.roster["profile_souls"][profile]["sha256"])
+                                     sha(ROOT / self.roster["profile_souls"][profile]["source"]))
                 for name in SECOND:
                     self.assertIn(name, data["dispatch_profiles"])
                     if fixture.name != "incomplete-omits-profile.yaml":

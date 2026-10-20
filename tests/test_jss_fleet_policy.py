@@ -161,16 +161,20 @@ class FleetDesiredState(unittest.TestCase):
                 entry = souls[profile]
                 self.assertEqual(entry["source"], f"policies/profile-souls/{profile}/SOUL.md")
                 self.assertEqual(entry["live"], f"/Users/chanbla11mit/.hermes/profiles/{profile}/SOUL.md")
-                self.assertEqual(entry["sha256"], sha(ROOT / entry["source"]))
+                self.assertNotIn("sha256", entry)  # derived from the tracked source at check time
+                self.assertEqual(self.verifier.profile_soul_expected(entry), sha(ROOT / entry["source"]))
                 self.assertEqual(self.verifier.PROFILE_SOUL_PATHS[profile],
                                  {"source": entry["source"], "live": entry["live"]})
         override = self.snapshot["skill"]["profile_local_skill_overrides"][ORCH]
-        self.assertEqual(override, {RELATIVE: sha(SKILL)})
+        self.assertEqual(override, {RELATIVE: self.verifier.TRACKED_SOURCE})
+        self.assertEqual(self.verifier.local_override_expected(ORCH, RELATIVE, override[RELATIVE]), sha(SKILL))
+        # A hand pin beside a tracked source is a duplicate that could go stale.
         errors = []
         with redirect_stdout(io.StringIO()):
             self.verifier.check_profile_local_skill_overrides(
                 errors, {ORCH: {RELATIVE: "0" * 64}})
-        self.assertEqual(errors, [f"tracked profile-local skill override hash mismatch: {ORCH}/{RELATIVE}"])
+        self.assertIn(f"duplicated profile-local skill override pin: {ORCH}/{RELATIVE} "
+                      f"(a tracked source exists; declare 'tracked-source')", errors)
 
     def test_fixture_pins_match_tracked_bytes(self):
         souls = {profile: sha(soul_path(profile)) for profile in JSS}

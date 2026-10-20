@@ -170,7 +170,8 @@ class HarnessAutonomyPolicy(unittest.TestCase):
         actual = hashlib.sha256(SKILL.read_bytes()).hexdigest()
         snapshot = json.loads((ROOT / "snapshots/sanitized-current-state.yaml").read_text())
         overrides = snapshot["skill"]["profile_local_skill_overrides"]
-        self.assertEqual(overrides["harness-orchestrator"][RELATIVE], actual)
+        # Expected bytes are derived from the tracked source (no hand pin).
+        self.assertEqual(overrides["harness-orchestrator"][RELATIVE], "tracked-source")
         unpinned = set()
         for path in sorted((ROOT / "tests/fixtures").glob("*.yaml")):
             data = json.loads(path.read_text())

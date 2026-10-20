@@ -161,7 +161,8 @@ class SoulPins(unittest.TestCase):
             self.assertIn(profile, snapshot)
         for profile, entry in snapshot.items():
             with self.subTest(profile=profile):
-                self.assertEqual(entry["sha256"], sha(ROOT / entry["source"]))
+                self.assertNotIn("sha256", entry)  # derived from the tracked source at check time
+                self.assertTrue((ROOT / entry["source"]).is_file())
 
     def test_fixture_pins(self):
         pins = {p: sha(ROOT / f"policies/profile-souls/{p}/SOUL.md") for p in ("harness-reviewer", "chapt-reviewer")}

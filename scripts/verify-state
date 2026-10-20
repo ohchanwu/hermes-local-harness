@@ -1,5 +1,20 @@
 #!/usr/bin/env python3
-"""Read-only verification for the local Hermes harness."""
+"""Read-only verification for the local Hermes harness.
+
+Derived expectations (t_76a2134d). Shared skills (skills/), profile-local skill
+overrides (policies/profile-skills/<profile>/) and profile SOULs
+(policies/profile-souls/<profile>/SOUL.md) have no hand-written sha256 pins:
+the snapshot and roster declare only structure (which files each profile must
+carry, and where), and the expected bytes are hashed from the tracked source at
+check time. Trade-off: the reviewed repository is the truth, so a reviewed
+policy change can no longer leave a stale pin behind, and a pin no longer
+double-checks the tracked file. What remains is the live-vs-repository
+comparison, which stays strict: a deployed copy that differs from its tracked
+source FAILs until it is redeployed, or until a reviewed card adopts the live
+content into the repository. A hash pin is only legal where no tracked source
+exists (worker-astra's learned overrides, external repository policies).
+Retired roster profiles are excluded from shared-skill deployment checks.
+"""
 import argparse
 import hashlib
 import json
@@ -115,76 +130,167 @@ def check_plugins(errors, warnings, profile, expected, observed_plugins, pinned_
                 warnings.append(f"dormant unexpected plugin {profile}: {name}")
 
 
-def check_skill(errors, deployed_hashes):
-    """deployed_hashes: {skill: {profile: {rel: sha-or-None}}} of deployed copies, or None to check tracked only."""
+TRACKED_SOURCE = "tracked-source"  # override declaration: expected bytes are the tracked source
+SHA256_HEX = re.compile(r"[0-9a-f]{64}")
+
+
+def sha256_file(path):
+    """sha256 of a file's bytes, or None when it is not a regular file."""
+    path = Path(path)
+    return hashlib.sha256(path.read_bytes()).hexdigest() if path.is_file() else None
+
+
+def relative_file_path(value):
+    """A normalized relative POSIX file path with no traversal."""
+    if not isinstance(value, str) or not value or value.startswith("/") or "\\" in value:
+        return False
+    candidate = PurePosixPath(value)
+    return str(candidate) == value and not {".", ".."} & set(candidate.parts)
+
+
+def tree_files(root):
+    """Relative paths of every regular file under root, excluding __pycache__."""
+    root = Path(root)
+    if not root.is_dir():
+        return []
+    return sorted(str(path.relative_to(root)) for path in root.rglob("*")
+                  if path.is_file() and "__pycache__" not in path.relative_to(root).parts)
+
+
+def shared_skill_expected(entry):
+    """{rel: expected sha} of one shared skill, hashed from its tracked source now (None if absent)."""
+    return {rel: sha256_file(ROOT / entry["source"] / rel) for rel in entry["files"]}
+
+
+def local_override_expected(profile, path, declared):
+    """Expected sha of a profile-local override: the tracked source, or a pin where none exists."""
+    if declared == TRACKED_SOURCE:
+        return sha256_file(ROOT / "policies" / "profile-skills" / profile / path)
+    return declared
+
+
+def deployed_skill_root(path, profile):
+    """Deployed tree of a shared skill: each profile has its own isolated skill home;
+    the default profile's home is ~/.hermes itself."""
+    if profile == "default":
+        return Path(path.replace("/profiles/<profile>", "", 1))
+    return Path(path.replace("<profile>", profile))
+
+
+def shared_skill_declaration_valid(entry):
+    """Structure only: a tracked source under skills/ and a file list; hash pins are malformed."""
+    if not isinstance(entry, dict):
+        return False
+    files, source = entry.get("files"), entry.get("source")
+    return (isinstance(entry.get("name"), str) and relative_file_path(source)
+            and source.startswith("skills/") and isinstance(entry.get("path"), str)
+            and "<profile>" in entry["path"] and isinstance(entry.get("deploy_profiles"), list)
+            and isinstance(files, list) and files and len(set(files)) == len(files)
+            and all(relative_file_path(rel) for rel in files))
+
+
+def check_skill(errors, deployed_hashes, retired=()):
+    """deployed_hashes: {skill: {profile: {rel: sha-or-None}}} of deployed copies, or None to check tracked only.
+
+    Expected bytes come from each skill's tracked source. Retired roster profiles
+    are excluded from deployment checks; a file a profile-local override declares
+    is owned by check_profile_local_skill_overrides; any other copy must equal
+    the tracked source exactly."""
     skill = load(ROOT / "snapshots/sanitized-current-state.yaml")["skill"]
     local_overrides = skill.get("profile_local_skill_overrides", {})
-    tracked_dir = {
-        "multi-agent-coding-orchestrator": ROOT / "skills/multi-agent-coding-orchestrator",
-        "minimal-implementation": ROOT / "skills/minimal-implementation",
-        "simplification-review": ROOT / "skills/simplification-review",
-        "production-deployment": ROOT / "skills/devops/production-deployment",
-        "production-deployment-planning": ROOT / "skills/devops/production-deployment-planning",
-    }
     for entry in skill["shared_skills"]:
+        if not shared_skill_declaration_valid(entry):
+            label = entry.get("name") if isinstance(entry, dict) else entry
+            fail(errors, f"malformed shared skill declaration: {label!r} "
+                         "(expected a tracked skills/ source and a file list, no hash pins)")
+            continue
         name = entry["name"]
-        for rel, want in sorted(entry["files"].items()):
-            tracked = tracked_dir[name] / rel
-            if not tracked.is_file():
+        expected = shared_skill_expected(entry)
+        for rel, want in sorted(expected.items()):
+            if want is None:
                 fail(errors, f"missing tracked skill file: {name}/{rel}")
-            elif hashlib.sha256(tracked.read_bytes()).hexdigest() != want:
-                fail(errors, f"tracked skill hash mismatch: {name}/{rel}")
-        version_file = tracked_dir[name] / "SKILL.md"
+        for rel in tree_files(ROOT / entry["source"]):
+            if rel not in expected:
+                fail(errors, f"undeclared tracked skill file: {name}/{rel}")
+        version_file = ROOT / entry["source"] / "SKILL.md"
         if version_file.is_file() and "version: " + entry["version"] not in version_file.read_text():
             fail(errors, f"shared skill version mismatch: {name}")
         if deployed_hashes is None:
             continue
         observed_profiles = deployed_hashes.get(name, {})
         for profile in entry["deploy_profiles"]:
-            if profile not in observed_profiles:
+            if profile not in retired and profile not in observed_profiles:
                 fail(errors, f"deployed skill copy missing: {name} {profile}")
         for profile, observed in sorted(observed_profiles.items()):
-            for rel, want in sorted(entry["files"].items()):
+            if profile in retired:
+                continue
+            if profile not in entry["deploy_profiles"]:
+                fail(errors, f"unexpected deployed skill copy: {name} {profile}")
+                continue
+            owned = {rel for rel in expected
+                     if any(f"/{path}".endswith(f"/{name}/{rel}") for path in local_overrides.get(profile, {}))}
+            for rel, want in sorted(expected.items()):
+                if rel in owned:
+                    continue
                 actual = (observed or {}).get(rel)
-                if actual == want:
-                    continue
-                override_suffix = f"/{name}/{rel}"
-                override_hashes = [sha for path, sha in local_overrides.get(profile, {}).items()
-                                   if f"/{path}".endswith(override_suffix)]
-                if actual is not None and actual in override_hashes:
-                    continue
                 if actual is None:
                     fail(errors, f"deployed skill copy missing: {name} {profile}/{rel}")
-                else:
+                elif actual != want:
                     fail(errors, f"deployed skill hash mismatch: {name} {profile}/{rel}")
-            for rel in sorted(set((observed or {})) - set(entry["files"])):
+            for rel in sorted(set((observed or {})) - set(expected)):
                 fail(errors, f"unexpected deployed skill file: {name} {profile}/{rel}")
 
 
 def check_profile_local_skill_overrides(errors, expected, observed=None):
-    """Local overrides are explicit, hash-pinned, and never shared-skill deployment drift."""
+    """Local overrides are explicit and never shared-skill deployment drift. A file with a
+    tracked source under policies/profile-skills/<profile>/ is declared TRACKED_SOURCE and
+    its expected bytes are that source; a sha256 pin is legal only where none exists.
+    observed: {profile: {path: sha-or-None}} of the live copies, or None for desired only."""
     if not isinstance(expected, dict):
         fail(errors, "malformed profile-local skill overrides")
         return
+    # Existence is decided by listing the tracked tree, never by probing a declared path.
+    tracked_root = ROOT / "policies" / "profile-skills"
+    tracked = ({entry.name: set(tree_files(entry)) for entry in tracked_root.iterdir() if entry.is_dir()}
+               if tracked_root.is_dir() else {})
+    expected_hashes = {}
     for profile, files in expected.items():
         if not isinstance(profile, str) or not isinstance(files, dict) or not files:
             fail(errors, f"malformed profile-local skill override: {profile!r}")
             continue
-        for path, want in files.items():
-            if (not isinstance(path, str) or path.startswith("/") or ".." in Path(path).parts
-                    or not Path(path).name or not isinstance(want, str)
-                    or not re.fullmatch(r"[0-9a-f]{64}", want)):
+        for path, declared in files.items():
+            if not relative_file_path(path):
                 fail(errors, f"malformed profile-local skill override path: {profile}/{path!r}")
                 continue
-            tracked = ROOT / "policies" / "profile-skills" / profile / path
-            if profile in ("jobcron-orchestrator", "chapt-orchestrator", "harness-orchestrator",
-                           "jss-orchestrator"):
-                if not tracked.is_file():
+            has_source = path in tracked.get(profile, set())
+            if declared == TRACKED_SOURCE:
+                if not has_source:
                     fail(errors, f"missing tracked profile-local skill override: {profile}/{path}")
-                elif hashlib.sha256(tracked.read_bytes()).hexdigest() != want:
-                    fail(errors, f"tracked profile-local skill override hash mismatch: {profile}/{path}")
-    if observed is not None and observed != expected:
+                    continue
+            elif isinstance(declared, str) and SHA256_HEX.fullmatch(declared):
+                if has_source:
+                    fail(errors, f"duplicated profile-local skill override pin: {profile}/{path} "
+                                 f"(a tracked source exists; declare {TRACKED_SOURCE!r})")
+                    continue
+            else:
+                fail(errors, f"malformed profile-local skill override path: {profile}/{path!r}")
+                continue
+            expected_hashes.setdefault(profile, {})[path] = local_override_expected(profile, path, declared)
+    for profile, paths in sorted(tracked.items()):
+        for path in sorted(paths):
+            if not isinstance(expected.get(profile), dict) or expected[profile].get(path) != TRACKED_SOURCE:
+                fail(errors, f"undeclared tracked profile-local skill override: {profile}/{path}")
+    if observed is None:
+        return
+    if (not isinstance(observed, dict) or set(observed) != set(expected)
+            or any(not isinstance(observed[p], dict) or set(observed[p]) != set(expected[p] or {})
+                   for p in observed if isinstance(expected.get(p), dict))):
         fail(errors, "profile-local skill override declaration drift")
+        return
+    for profile, files in sorted(expected_hashes.items()):
+        for path, want in sorted(files.items()):
+            if observed[profile].get(path) != want:
+                fail(errors, f"profile-local skill override drift: {profile}/{path}")
 
 
 PROFILE_SOUL_PATHS = {
@@ -300,31 +406,32 @@ def check_fleet_dispatch(errors, label, fleets, profiles, exact=False):
                 fail(errors, f"unexpected profile in {label}: {name}")
 
 
+def profile_soul_expected(entry):
+    """Expected live SOUL sha: the tracked source's bytes, hashed now (None if absent)."""
+    return sha256_file(ROOT / entry["source"])
+
+
 def check_profile_souls(errors, expected, observed=None):
-    """Profile role contracts are tracked, hash-pinned, and deployed verbatim."""
+    """Profile role contracts are tracked and deployed verbatim. The declaration names only
+    source and live paths; the expected hash is derived from the tracked source, so a
+    hand-written sha256 pin is malformed."""
     if not isinstance(expected, dict) or set(expected) != set(PROFILE_SOUL_PATHS):
         fail(errors, "profile SOUL policy missing")
         return
     expected_hashes = {}
     for profile, entry in expected.items():
-        if not isinstance(profile, str) or not isinstance(entry, dict):
-            fail(errors, f"malformed profile SOUL policy: {profile!r}")
+        if not isinstance(entry, dict) or set(entry) != {"source", "live"}:
+            fail(errors, f"malformed profile SOUL policy: {profile} (declare only source and live; "
+                         "the expected hash is derived from the tracked source)")
             continue
-        source, live, want = entry.get("source"), entry.get("live"), entry.get("sha256")
-        source_path = ROOT / source if isinstance(source, str) else None
-        if (not isinstance(source, str) or source.startswith("/") or ".." in Path(source).parts
-                or not isinstance(live, str) or not Path(live).is_absolute()
-                or not isinstance(want, str) or not re.fullmatch(r"[0-9a-f]{64}", want)):
-            fail(errors, f"malformed profile SOUL policy: {profile}")
-            continue
-        if {"source": source, "live": live} != PROFILE_SOUL_PATHS[profile]:
+        if entry != PROFILE_SOUL_PATHS[profile]:
             fail(errors, f"profile SOUL path drift {profile}")
             continue
-        expected_hashes[profile] = want
-        if not source_path.is_file():
+        want = profile_soul_expected(entry)
+        if want is None:
             fail(errors, f"missing tracked profile SOUL: {profile}")
-        elif hashlib.sha256(source_path.read_bytes()).hexdigest() != want:
-            fail(errors, f"tracked profile SOUL hash mismatch: {profile}")
+            continue
+        expected_hashes[profile] = want
     if observed is None:
         return
     if not isinstance(observed, dict):
@@ -333,7 +440,7 @@ def check_profile_souls(errors, expected, observed=None):
     for profile, want in expected_hashes.items():
         if observed.get(profile) != want:
             fail(errors, f"profile SOUL drift {profile}")
-    for profile in sorted(set(observed) - set(expected_hashes)):
+    for profile in sorted(set(observed) - set(expected)):
         fail(errors, f"unexpected profile SOUL observation: {profile}")
 
 
@@ -1589,7 +1696,7 @@ def main():
                 check_extra(errors, warnings, name, profile.get("status", "stopped"), dispatch_profiles)
         check_profile_local_skill_overrides(errors, expected_local_overrides,
                                             observed.get("profile_local_skill_overrides"))
-        check_skill(errors, observed.get("skill_files", {}))
+        check_skill(errors, observed.get("skill_files", {}), retired)
         check_adoption(errors, observed.get("adapters", []))
     else:
         check_repository_policies(errors, repository_policies)
@@ -1694,19 +1801,19 @@ def main():
         check_project_repair_cards(errors, project_cards, warnings)
         deployed_hashes = {}
         for entry in snapshot["skill"]["shared_skills"]:
+            if not isinstance(entry, dict) or not shared_skill_declaration_valid(entry):
+                continue  # check_skill reports the malformed declaration
             deployed_hashes[entry["name"]] = {}
             for profile in entry["deploy_profiles"]:
-                deployed_hashes[entry["name"]][profile] = {}
-                deployed_root = Path(entry["path"].replace("<profile>", profile))
+                if profile in retired:
+                    continue  # retired profiles are excluded from deployment checks
+                deployed_root = deployed_skill_root(entry["path"], profile)
                 if deployed_root.is_dir():
-                    for deployed in deployed_root.rglob("*"):
-                        if deployed.is_file() and "__pycache__" not in deployed.relative_to(deployed_root).parts:
-                            deployed_hashes[entry["name"]][profile][str(deployed.relative_to(deployed_root))] = (
-                                hashlib.sha256(deployed.read_bytes()).hexdigest())
+                    deployed_hashes[entry["name"]][profile] = {
+                        rel: sha256_file(deployed_root / rel) for rel in tree_files(deployed_root)}
                 else:
-                    for rel in entry["files"]:
-                        deployed_hashes[entry["name"]][profile][rel] = None
-        check_skill(errors, deployed_hashes)
+                    deployed_hashes[entry["name"]][profile] = {rel: None for rel in entry["files"]}
+        check_skill(errors, deployed_hashes, retired)
         observed_local_overrides = {}
         for profile, files in expected_local_overrides.items():
             observed_local_overrides[profile] = {}

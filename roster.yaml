@@ -1019,68 +1019,55 @@
   "profile_souls": {
     "chapt-orchestrator": {
       "source": "policies/profile-souls/chapt-orchestrator/SOUL.md",
-      "live": "/Users/chanbla11mit/.hermes/profiles/chapt-orchestrator/SOUL.md",
-      "sha256": "8ad31689d6c74fd17ebc77596f0389ae112ac1fe6e8f5d7e605ad6a17389f2c2"
+      "live": "/Users/chanbla11mit/.hermes/profiles/chapt-orchestrator/SOUL.md"
     },
     "chapt-worker": {
       "source": "policies/profile-souls/chapt-worker/SOUL.md",
-      "live": "/Users/chanbla11mit/.hermes/profiles/chapt-worker/SOUL.md",
-      "sha256": "6bd46152500f54f4955b657d80a20f31db27f2d3162845fd8194436e03c5b5ab"
+      "live": "/Users/chanbla11mit/.hermes/profiles/chapt-worker/SOUL.md"
     },
     "chapt-worker-2": {
       "source": "policies/profile-souls/chapt-worker-2/SOUL.md",
-      "live": "/Users/chanbla11mit/.hermes/profiles/chapt-worker-2/SOUL.md",
-      "sha256": "6bd46152500f54f4955b657d80a20f31db27f2d3162845fd8194436e03c5b5ab"
+      "live": "/Users/chanbla11mit/.hermes/profiles/chapt-worker-2/SOUL.md"
     },
     "chapt-reviewer": {
       "source": "policies/profile-souls/chapt-reviewer/SOUL.md",
-      "live": "/Users/chanbla11mit/.hermes/profiles/chapt-reviewer/SOUL.md",
-      "sha256": "0b5f4e69cbb1ea449ad8da2311705f5e1954f59564fa42f1773f0e0bf570066f"
+      "live": "/Users/chanbla11mit/.hermes/profiles/chapt-reviewer/SOUL.md"
     },
     "harness-orchestrator": {
       "source": "policies/profile-souls/harness-orchestrator/SOUL.md",
-      "live": "/Users/chanbla11mit/.hermes/profiles/harness-orchestrator/SOUL.md",
-      "sha256": "8b9a3e7f66d57a9367a416f74a025babd7e0578be885657db4c9f29d2a6ab1fd"
+      "live": "/Users/chanbla11mit/.hermes/profiles/harness-orchestrator/SOUL.md"
     },
     "harness-worker": {
       "source": "policies/profile-souls/harness-worker/SOUL.md",
-      "live": "/Users/chanbla11mit/.hermes/profiles/harness-worker/SOUL.md",
-      "sha256": "8ee6127b833f8278b3ed3932aa05c77cac917ee8391ccc633474b4ce8fc1ef61"
+      "live": "/Users/chanbla11mit/.hermes/profiles/harness-worker/SOUL.md"
     },
     "harness-worker-2": {
       "source": "policies/profile-souls/harness-worker-2/SOUL.md",
-      "live": "/Users/chanbla11mit/.hermes/profiles/harness-worker-2/SOUL.md",
-      "sha256": "8ee6127b833f8278b3ed3932aa05c77cac917ee8391ccc633474b4ce8fc1ef61"
+      "live": "/Users/chanbla11mit/.hermes/profiles/harness-worker-2/SOUL.md"
     },
     "harness-reviewer": {
       "source": "policies/profile-souls/harness-reviewer/SOUL.md",
-      "live": "/Users/chanbla11mit/.hermes/profiles/harness-reviewer/SOUL.md",
-      "sha256": "d46167c337aedb0ee3ac4246a6ba9420f484e336f3084ec843efc2c97d76cf66"
+      "live": "/Users/chanbla11mit/.hermes/profiles/harness-reviewer/SOUL.md"
     },
     "jobcron-orchestrator": {
       "source": "policies/profile-souls/jobcron-orchestrator/SOUL.md",
-      "live": "/Users/chanbla11mit/.hermes/profiles/jobcron-orchestrator/SOUL.md",
-      "sha256": "3bd62ad5483cfcffd8f00a06f34fd1f3b471928e636a3c93b9b62e2a579fd713"
+      "live": "/Users/chanbla11mit/.hermes/profiles/jobcron-orchestrator/SOUL.md"
     },
     "jss-orchestrator": {
       "source": "policies/profile-souls/jss-orchestrator/SOUL.md",
-      "live": "/Users/chanbla11mit/.hermes/profiles/jss-orchestrator/SOUL.md",
-      "sha256": "74b1248127cb5f5674c5649bba9bd2cd61e0cfa2f064395fec97058c537ddf23"
+      "live": "/Users/chanbla11mit/.hermes/profiles/jss-orchestrator/SOUL.md"
     },
     "jss-worker": {
       "source": "policies/profile-souls/jss-worker/SOUL.md",
-      "live": "/Users/chanbla11mit/.hermes/profiles/jss-worker/SOUL.md",
-      "sha256": "c53c3147dc2b6979312208cacf37aad80f627f8fbaada2094439eefc9d77af32"
+      "live": "/Users/chanbla11mit/.hermes/profiles/jss-worker/SOUL.md"
     },
     "jss-worker-2": {
       "source": "policies/profile-souls/jss-worker-2/SOUL.md",
-      "live": "/Users/chanbla11mit/.hermes/profiles/jss-worker-2/SOUL.md",
-      "sha256": "c53c3147dc2b6979312208cacf37aad80f627f8fbaada2094439eefc9d77af32"
+      "live": "/Users/chanbla11mit/.hermes/profiles/jss-worker-2/SOUL.md"
     },
     "jss-reviewer": {
       "source": "policies/profile-souls/jss-reviewer/SOUL.md",
-      "live": "/Users/chanbla11mit/.hermes/profiles/jss-reviewer/SOUL.md",
-      "sha256": "6d20c970e3775a3888731c3330928ea9f24ed8c40d8a5a742e59170091fb7334"
+      "live": "/Users/chanbla11mit/.hermes/profiles/jss-reviewer/SOUL.md"
     }
   },
   "repository_policies": {

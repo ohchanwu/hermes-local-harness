@@ -236,9 +236,9 @@ class FleetAutonomyPolicy(unittest.TestCase):
         overrides = snapshot["skill"]["profile_local_skill_overrides"]
         profile_for = {"jobcron": "jobcron-orchestrator", "cha-pt": "chapt-orchestrator"}
         for board, profile in profile_for.items():
-            actual = hashlib.sha256(SKILLS[board].read_bytes()).hexdigest()
             with self.subTest(board=board):
-                self.assertEqual(overrides[profile][RELATIVE], actual)
+                # Expected bytes are derived from the tracked source (no hand pin).
+                self.assertEqual(overrides[profile][RELATIVE], "tracked-source")
         unpinned = set()
         for path in sorted((ROOT / "tests/fixtures").glob("*.yaml")):
             data = json.loads(path.read_text())

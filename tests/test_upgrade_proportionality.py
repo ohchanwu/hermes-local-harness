@@ -173,13 +173,16 @@ class UpgradeProportionalityTests(unittest.TestCase):
         for name, path in (("production-deployment", DEPLOYMENT), ("multi-agent-coding-orchestrator", SHARED)):
             entry = next(item for item in skill["shared_skills"] if item["name"] == name)
             content = (ROOT / path).read_bytes()
-            self.assertEqual(entry["files"]["SKILL.md"], hashlib.sha256(content).hexdigest())
+            # Desired state names the tracked source; the expected hash is derived from it.
+            self.assertEqual(entry["source"] + "/SKILL.md", str(path))
+            self.assertIn("SKILL.md", entry["files"])
             version = re.search(r"^version: (.+)$", content.decode(), re.M)
             assert version is not None
             self.assertEqual(entry["version"], version.group(1))
         for profile, path in OVERRIDES.items():
-            actual = hashlib.sha256((ROOT / path).read_bytes()).hexdigest()
-            self.assertEqual(skill["profile_local_skill_overrides"][profile]["autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md"], actual)
+            relative = "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md"
+            self.assertEqual(str(path), f"policies/profile-skills/{profile}/{relative}")
+            self.assertEqual(skill["profile_local_skill_overrides"][profile][relative], "tracked-source")
         provenance = skill["source_pin_provenance"]
         self.assertEqual(provenance["baseline"], "84d91a7ba698d38bb31c5b80e04dea0dd002d15f")
         self.assertIn("t_acef09b6", provenance["prior_observed_bindings"])
