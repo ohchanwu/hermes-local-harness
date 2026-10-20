@@ -278,13 +278,14 @@ class PushHelper(GitSandbox):
         super().setUp()
         self.helper = exec_module("chapt_push_scraper_main", HELPER)
         self.calls = []
-        self.card = {"task": {"id": "t_scr1", "project_id": PROJECT, "status": "done"},
+        self.card = {"task": {"id": "t_scr1", "project_id": "p_scr1", "status": "done"},
                      "runs": [{"id": 1, "profile": "chapt-worker", "outcome": "completed",
                                "metadata": {"commit": self.head}},
                               {"id": 2, "profile": "chapt-reviewer", "outcome": "completed",
                                "metadata": {"candidate": self.head}}]}
         self.config = {"checkout": self.checkout, "remote": self.remote, "board": "cha-pt",
-                       "project": PROJECT, "load_card": self.load_card, "runner": self.runner}
+                       "project": PROJECT, "load_card": self.load_card,
+                       "load_project_id": {PROJECT: "p_scr1"}.get, "runner": self.runner}
 
     def tearDown(self):
         # Nothing ever targets a non-temp remote or checkout.
@@ -355,6 +356,7 @@ class PushHelper(GitSandbox):
         task, runs = self.card["task"], self.card["runs"]
         for field, value, reason in (("project_id", "cha-pt-frontend", "not in project"),
                                      ("project_id", None, "not in project"),
+                                     ("project_id", PROJECT, "not in project"),
                                      ("board", "jobcron", "not on board"), ("status", "review", "not done"),
                                      ("id", "t_other", "not found")):
             with self.subTest(field=field, value=value):

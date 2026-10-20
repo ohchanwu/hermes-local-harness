@@ -50,10 +50,20 @@ def hermes_card(card_id, runner=subprocess_runner):
         raise Refused(f"cannot parse card {card_id} on board {BOARD}") from None
 
 
+def hermes_project_id(slug, runner=subprocess_runner):
+    """Kanban stores a project's id (p_...), not its slug, in a card's project_id."""
+    shown = runner(("hermes", "project", "show", slug))
+    first = shown.stdout.splitlines()[0].split() if shown.stdout.strip() else []
+    if shown.returncode or len(first) != 2 or first[0] != slug or not re.fullmatch(r"\[p_[0-9a-z]+\]", first[1]):
+        raise Refused(f"cannot resolve the id of project {slug}")
+    return first[1][1:-1]
+
+
 def default_config():
     """The only configuration the command line can use."""
     return {"checkout": CHECKOUT, "remote": REMOTE, "board": BOARD, "project": PROJECT,
-            "load_card": hermes_card, "runner": subprocess_runner}
+            "load_card": hermes_card, "load_project_id": hermes_project_id,
+            "runner": subprocess_runner}
 
 
 def check_environment(environ):
@@ -86,7 +96,7 @@ def check_card(config, card_id, sha):
     runs = payload.get("runs", task.get("runs"))
     if task.get("board", config["board"]) != BOARD:
         raise Refused(f"card {card_id} is not on board {BOARD}")
-    if task.get("project_id") != PROJECT:
+    if task.get("project_id") != config["load_project_id"](PROJECT):
         raise Refused(f"card {card_id} is not in project {PROJECT}")
     if task.get("status") != "done":
         raise Refused(f"card {card_id} is not done")
