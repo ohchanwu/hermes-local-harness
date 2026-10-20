@@ -507,13 +507,15 @@ class ClaudeSubscriptionClient:
                             for pending in self._bridge.calls for c in message.calls)
                         follower = Message(served)
                     target = follower or message
-                    before = target.restarts
+                    before, finished = target.restarts, target.done
                     try:
                         target.feed(obj)  # held, not yielded: see _flush
                     except ProviderError as exc:
                         self._persist_stream_audit(stream_log, exc, runtime, obj)
                         raise
                     stream_log.observe(obj)
+                    for accepted in target.escapes if target.done and not finished else ():
+                        self.audit.append({"stage": "snapshot_unicode_escape_accepted", **accepted})
                     if target.restarts > before:
                         restarts += 1
                         self.audit.append({"stage": "runtime_retry", "number": restarts})

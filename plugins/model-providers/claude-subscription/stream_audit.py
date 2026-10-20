@@ -37,6 +37,7 @@ AUDIT_FIELDS = {
     "second_message": ("outcome", "row", "number", "first_id", "second_id", "first_stop", "second_stop", "relation",
                        "same_model", "first_calls", "second_calls", "answered", "answered_errors", "requested",
                        "dropped_text_chars", "dropped_calls"),
+    "snapshot_unicode_escape_accepted": ("index", "decoded"),  # plus bounded key names, never values
 }
 
 
@@ -74,6 +75,8 @@ def sanitize(entry):
     out = {"stage": stage, **{k: scalar(entry.get(k)) for k in AUDIT_FIELDS[stage] if k in entry}}
     if stage == "init" and isinstance(entry.get("tools"), list):
         out["tool_count"] = len(entry["tools"])
+    if stage == "snapshot_unicode_escape_accepted" and isinstance(entry.get("keys"), list):
+        out["keys"], out["keys_truncated"] = only_keys(entry["keys"])
     if stage == "result":
         out["usage"] = numbers(entry.get("usage"))
         meta = entry.get("modelUsage")

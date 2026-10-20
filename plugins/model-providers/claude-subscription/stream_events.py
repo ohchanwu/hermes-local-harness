@@ -1,7 +1,77 @@
 """Parser for one streamed runtime assistant message."""
 import json
+import re
 
 from .errors import ProviderError
+
+# A literal backslash-u-four-hex sequence inside a string value, or a high+low surrogate pair written as two.
+# \x5c is the backslash, spelled so that this source never holds such a sequence itself.
+_ESCAPE = re.compile(r"\x5cu([dD][89abAB][0-9a-fA-F]{2})\x5cu([dD][c-fC-F][0-9a-fA-F]{2})|\x5cu([0-9a-fA-F]{4})")
+
+
+def _decode_escapes(text):
+    """`text` with each literal backslash-u sequence replaced by the character it denotes, and how many were.
+
+    A pair of sequences for a high and a low surrogate becomes one character; a lone surrogate sequence stays.
+    """
+    count = 0
+    def replace(match):
+        nonlocal count
+        high, low, single = match.groups()
+        if single is None:
+            count += 1
+            return chr(0x10000 + ((int(high, 16) - 0xD800) << 10) + (int(low, 16) - 0xDC00))
+        if 0xD800 <= int(single, 16) <= 0xDFFF:
+            return match.group(0)
+        count += 1
+        return chr(int(single, 16))
+    return _ESCAPE.sub(replace, text), count
+
+
+def _escape_match(streamed, shown):
+    """Decoded sequences if `shown` is `streamed` with only its literal backslash-u sequences decoded, else None.
+
+    The CLI snapshot decodes such a sequence inside a string value one extra time; the streamed fragments
+    are the faithful version. Equal values match as today; unequal ones must be strings, or lists/objects
+    of identical structure and keys whose unequal strings each decode exactly to the snapshot's.
+    """
+    if streamed == shown:
+        return 0
+    if isinstance(streamed, str) and isinstance(shown, str):
+        decoded, count = _decode_escapes(streamed)
+        return count if count and decoded == shown else None
+    if isinstance(streamed, dict) and isinstance(shown, dict) and streamed.keys() == shown.keys():
+        parts = [_escape_match(streamed[k], shown[k]) for k in streamed]
+    elif isinstance(streamed, list) and isinstance(shown, list) and len(streamed) == len(shown):
+        parts = [_escape_match(a, b) for a, b in zip(streamed, shown)]
+    else:
+        return None
+    return None if None in parts else sum(parts)
+
+
+def escape_accepted(calls, tools):
+    """Per call accepted only for the snapshot's extra backslash-u decoding: index, key names, sequence count.
+
+    None unless every call has an equal id and name and the same key set, and each unequal call differs
+    in exactly that way.
+    """
+    if len(calls) != len(tools):
+        return None
+    accepted = []
+    for index, (call, tool) in enumerate(zip(calls, tools)):
+        streamed, shown = call["arguments"], tool.get("input")
+        if call["id"] != tool.get("id") or call["name"] != tool.get("name"):
+            return None
+        if streamed == shown:
+            continue
+        if not isinstance(streamed, dict) or not isinstance(shown, dict) or streamed.keys() != shown.keys():
+            return None
+        keys = [k for k in streamed if streamed[k] != shown[k]]
+        counts = [_escape_match(streamed[k], shown[k]) for k in keys]
+        if None in counts:
+            return None
+        accepted.append({"index": index, "keys": sorted(keys), "decoded": sum(counts)})
+    return accepted
 
 
 def mismatch(text, kind, streamed, snapshot):
@@ -34,6 +104,7 @@ class Message:
         self.deltas = []  # text deltas in order, held by the client until the message is final
         self.answered = []  # tool_use ids the runtime itself answered (user tool_result events)
         self.errored = []  # per such result marked is_error exactly true, its tool_use id
+        self.escapes = []  # calls accepted despite the snapshot's extra backslash-u decoding (escape_accepted)
         self.stream_id = None       # the first message id, kept for every chunk across restarts
         self.interrupted = None     # error type of a mid-stream API failure
         self.restarts = 0
@@ -165,7 +236,11 @@ class Message:
             tools = [b for b in self.snapshot if b.get("type") == "tool_use"]
             expected = [{"type": "tool_use", "id": c["id"], "name": c["name"], "input": c["arguments"]} for c in self.calls]
             if [{k: b.get(k) for k in ("type", "id", "name", "input")} for b in tools] != expected:
-                raise mismatch("stream/snapshot tool identity or arguments mismatch", "tool_use", self.calls, tools)
+                # Hermes still runs the streamed arguments; the client audits each accepted call.
+                accepted = escape_accepted(self.calls, tools)
+                if accepted is None:
+                    raise mismatch("stream/snapshot tool identity or arguments mismatch", "tool_use", self.calls, tools)
+                self.escapes = accepted
             self.done = True
         else:
             raise ProviderError(f"unknown assistant stream event: {str(event)[:40]}")
