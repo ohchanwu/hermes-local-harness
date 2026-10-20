@@ -415,9 +415,11 @@
       "repository": "/Users/chanbla11mit/projects/cha-pt",
       "repositories": [
         "/Users/chanbla11mit/projects/cha-pt",
-        "/Users/chanbla11mit/projects/cha-pt-frontend"
+        "/Users/chanbla11mit/projects/cha-pt-frontend",
+        "/Users/chanbla11mit/projects/cha-webpt-website-sync"
       ],
       "frontend_project": "cha-pt-frontend",
+      "scraper_project": "cha-webpt-website-sync",
       "orchestrator": "chapt-orchestrator",
       "worker": "chapt-worker",
       "reviewer": "chapt-reviewer",

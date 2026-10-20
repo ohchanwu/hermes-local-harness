@@ -1,0 +1,64 @@
+#!/usr/bin/env python3
+"""pre-push hook for the Cha PT scraper clone (cha-webpt-website-sync).
+
+Installed as a copy into /Users/chanbla11mit/projects/cha-webpt-website-sync/.git/hooks/pre-push
+(procedures/manual-apply.md 8b). Spec: docs/specs/261020-chapt-scraper-repository-scope-and-push.md.
+
+Refuses every push from a dispatched Kanban task (HERMES_KANBAN_TASK or
+HERMES_KANBAN_WORKSPACE set: any worker or reviewer), from any Hermes profile
+other than chapt-orchestrator, and every update other than a fast-forward of
+refs/heads/main: deletes, tags, other refs, creation of main, and
+non-fast-forwards. The controller's per-SHA approval and reviewer checks live
+in scripts/chapt-push-scraper-main; this hook is only the local backstop.
+"""
+import os
+import subprocess
+import sys
+
+ZERO = "0" * 40
+DISPATCH_MARKERS = ("HERMES_KANBAN_TASK", "HERMES_KANBAN_WORKSPACE")
+CONTROLLER = "chapt-orchestrator"
+
+
+def refuse(message):
+    print(f"pre-push REFUSED: {message}", file=sys.stderr)
+    return 1
+
+
+def git(*args):
+    return subprocess.run(("git", *args), text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+
+def main():
+    # A dispatched task's terminal may carry HERMES_KANBAN_WORKSPACE without
+    # HERMES_KANBAN_TASK, so either marker refuses.
+    if any(name in os.environ for name in DISPATCH_MARKERS):
+        return refuse("dispatched Kanban tasks (workers, reviewers) never push this repository")
+    home, profile = os.environ.get("HERMES_HOME"), os.environ.get("HERMES_PROFILE")
+    if (home and not home.rstrip("/").endswith("/profiles/" + CONTROLLER)) or (
+            profile and profile != CONTROLLER):
+        return refuse(f"only {CONTROLLER} (or the owner outside Hermes) pushes this repository")
+    for line in sys.stdin.read().splitlines():
+        if not line.strip():
+            continue
+        fields = line.split()
+        if len(fields) != 4:
+            return refuse(f"unexpected pre-push input: {line!r}")
+        _local_ref, local_sha, remote_ref, remote_sha = fields
+        if remote_ref != "refs/heads/main":
+            return refuse(f"only refs/heads/main may be pushed, not {remote_ref}")
+        if local_sha == ZERO:
+            return refuse("deleting refs/heads/main is not allowed")
+        if remote_sha == ZERO:
+            return refuse("remote refs/heads/main is absent; only a fast-forward of an existing main is allowed")
+        kind = git("cat-file", "-t", local_sha)
+        if kind.returncode or kind.stdout.strip() != "commit":
+            return refuse(f"{local_sha} is not a local commit")
+        ancestor = git("merge-base", "--is-ancestor", remote_sha, local_sha)
+        if ancestor.returncode:
+            return refuse(f"not a fast-forward of refs/heads/main ({remote_sha} -> {local_sha})")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

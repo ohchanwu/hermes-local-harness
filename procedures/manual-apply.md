@@ -211,7 +211,7 @@ Disable `hermes-terminal-outcome-notification` on project profiles: its legacy s
 
 Launch controllers only through `scripts/run-jobcron-orchestrator`, `scripts/run-chapt-orchestrator`, and `scripts/run-harness-orchestrator`; these set the per-process board pin before starting the profile.
 
-Cha PT uses one board with two repository-specific worktree roots. Keep the board default and all three profile `terminal.cwd` values at `/Users/chanbla11mit/projects/cha-pt`. Create the frontend project only in the `chapt-orchestrator` profile; do not run `project bind-board` afterward because that command would replace the board default workdir:
+Cha PT uses one board with three repository-specific worktree roots. Keep the board default and all three profile `terminal.cwd` values at `/Users/chanbla11mit/projects/cha-pt`. Create the frontend and scraper projects only in the `chapt-orchestrator` profile; do not run `project bind-board` afterward because that command would replace the board default workdir:
 
     hermes -p chapt-orchestrator project create "Cha PT Frontend" \
       /Users/chanbla11mit/projects/cha-pt-frontend \
@@ -219,6 +219,20 @@ Cha PT uses one board with two repository-specific worktree roots. Keep the boar
       --primary /Users/chanbla11mit/projects/cha-pt-frontend \
       --board cha-pt
     hermes -p chapt-orchestrator project show cha-pt-frontend
+    hermes -p chapt-orchestrator project create "Cha WebPT Website Sync" \
+      /Users/chanbla11mit/projects/cha-webpt-website-sync \
+      --slug cha-webpt-website-sync \
+      --primary /Users/chanbla11mit/projects/cha-webpt-website-sync \
+      --board cha-pt
+    hermes -p chapt-orchestrator project show cha-webpt-website-sync
+
+The scraper checkout `/Users/chanbla11mit/projects/cha-webpt-website-sync` must have origin EXACT `git@github.com:raysong-sudo/cha-webpt-website-sync.git`. Install the tracked worker/reviewer push refusal as its `pre-push` hook (a copy, never a symlink), and confirm no `core.hooksPath` override would bypass it:
+
+    test -z "$(git -C /Users/chanbla11mit/projects/cha-webpt-website-sync config --get core.hooksPath)"
+    install -m 0755 policies/repository-hooks/cha-webpt-website-sync/pre-push /Users/chanbla11mit/projects/cha-webpt-website-sync/.git/hooks/pre-push
+    cmp policies/repository-hooks/cha-webpt-website-sync/pre-push /Users/chanbla11mit/projects/cha-webpt-website-sync/.git/hooks/pre-push
+
+The hook refuses every push while `HERMES_KANBAN_TASK` or `HERMES_KANBAN_WORKSPACE` is set (any dispatched worker or reviewer) or from a Hermes profile other than `chapt-orchestrator`, and any update other than a fast-forward of `refs/heads/main`. Only `chapt-orchestrator` pushes, through `scripts/chapt-push-scraper-main --card <id> --sha <sha> --approval '<owner message verbatim>'`, after a per-push owner approval naming the repository, `main` and that exact reviewed SHA. The helper refuses unless `HERMES_HOME` ends in `profiles/chapt-orchestrator`, `HERMES_PROFILE` (when set) is `chapt-orchestrator`, and neither `HERMES_KANBAN_TASK` nor `HERMES_KANBAN_WORKSPACE` is set.
 
 Deploy the exact tracked Cha PT role contracts; never patch the live copies directly:
 
@@ -234,7 +248,7 @@ Deploy the exact tracked harness role contracts only during a separately authori
 
 The harness fleet is local-only by default. Isolated task worktrees may contain local commits, but pushes, PRs, live policy/profile deployment, board or gateway changes, credentials, production/cloud mutations, and external writes require separate explicit human authorization. `docs/bugs/` entries are evidence and triage input, not automatic implementation authorization. Repository policy changes require same-card `harness-reviewer` review before integration; live rollout remains separate and attended.
 
-Every Cha PT card must name exactly one authorized repository, its repository-owned isolated worktree, the protected baseline commit, and the explicit test contract. Frontend cards set `project: cha-pt-frontend` and obey `/Users/chanbla11mit/projects/cha-pt-frontend/AGENTS.md`; protected paths, credentials, pushes, PRs, previews, deployments, production/cloud changes, and other external writes retain their separate human approval gates. Split cross-repository work into linked cards. Do not rewrite or broaden existing cards, including P4 campaign cards.
+Every Cha PT card must name exactly one authorized repository, its repository-owned isolated worktree, the protected baseline commit, and the explicit test contract. Scraper cards set `project: cha-webpt-website-sync` and declare `Scraper project EXACT cha-webpt-website-sync.`; their workers and reviewer stay local-only. Frontend cards set `project: cha-pt-frontend` and obey `/Users/chanbla11mit/projects/cha-pt-frontend/AGENTS.md`; protected paths, credentials, pushes, PRs, previews, deployments, production/cloud changes, and other external writes retain their separate human approval gates. Split cross-repository work into linked cards. Do not rewrite or broaden existing cards, including P4 campaign cards.
 
 After clearing the launchd pin, restart the default gateway once from a separate shell. Do not restart it from a gateway-owned agent process: the restart terminates that process before it can verify completion. Normal topology rollback may restore the legacy pin with `launchctl setenv HERMES_KANBAN_DB /Users/chanbla11mit/.hermes/kanban.db` only if named-board dispatch has first been paused or retired.
 

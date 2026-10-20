@@ -19,7 +19,25 @@ UPGRADE_SHA256 = "0e9c5f1f07e50dd3653fc51ffba481427bb237d5805d3213aa209169ac64cd
 PRE_RETIREMENT_SHA256 = "e60d361a5d41f0c864ce1796d107e38a995df76e9449037cb01ed44714b846d7"
 PRE_LEGACY_LANE_SHA256 = "b6b80cef78fbcade77043e05de07a0382c0e1e94c705180c89869287f9696892"
 PRE_SECOND_WORKER_SHA256 = "ff0a7f380f77ede2e429c497329fea3a4660889a5dc2801e4072cb62bb66a0c2"
-MERGED_SHA256 = "c963e090ef2f19929b01a8cd3581f1b6e87501d6371439e27e3e7573469fdf62"
+PRE_SCRAPER_SHA256 = "c963e090ef2f19929b01a8cd3581f1b6e87501d6371439e27e3e7573469fdf62"
+MERGED_SHA256 = "f95f1441f0c9c689d36b4756e465c9d088346f72d589b0ecfbf7281773020138"
+# The scraper-repository scope (t_b04aef1d, no version bump) changes exactly
+# these bytes and adds one paragraph; reversing both recovers the reviewed
+# 0.6.7-chapt.4 bytes. tests/test_chapt_scraper_scope.py checks the new wording.
+SCRAPER_EDITS = (
+    (b"Repository allowlist (exactly three): `/Users/chanbla11mit/projects/cha-pt`, "
+     b"`/Users/chanbla11mit/projects/cha-pt-frontend`, and `/Users/chanbla11mit/projects/cha-webpt-website-sync`; "
+     b"primary board root `/Users/chanbla11mit/projects/cha-pt`; frontend Hermes project `cha-pt-frontend`; "
+     b"scraper Hermes project `cha-webpt-website-sync`;",
+     b"Repository allowlist: `/Users/chanbla11mit/projects/cha-pt` and `/Users/chanbla11mit/projects/cha-pt-frontend`; "
+     b"primary board root `/Users/chanbla11mit/projects/cha-pt`; frontend Hermes project `cha-pt-frontend`;"),
+    (b"### Cha PT multi-repository routing\n", b"### Cha PT dual-repository routing\n"),
+    (b"in any of the three allowlisted Cha PT repositories,", b"in either allowlisted Cha PT repository,"),
+    (b"(`/Users/chanbla11mit/projects/cha-pt`, a `cha-pt-frontend` project worktree, or a "
+     b"`cha-webpt-website-sync` project worktree)",
+     b"(`/Users/chanbla11mit/projects/cha-pt` or a `cha-pt-frontend` project worktree)"),
+)
+SCRAPER_PARAGRAPH_START = b"Scraper cards for `/Users/chanbla11mit/projects/cha-webpt-website-sync`"
 # The 0.6.7-chapt.4 second-worker addition (t_b12ba0d9) changes exactly these
 # bytes; reversing them recovers the reviewed 0.6.7-chapt.3 bytes.
 SECOND_WORKER_EDITS = (
@@ -124,6 +142,15 @@ class ChaptPolicyReconciliationTests(unittest.TestCase):
         # Invert the 0.6.7-chapt.4 second worker, the 0.6.7-chapt.3 legacy-lane
         # note, then the 0.6.7-chapt.2 GLM worker retirement.
         original = self.source
+        # Invert the scraper-repository scope first: drop its one paragraph.
+        self.assertEqual(original.count(SCRAPER_PARAGRAPH_START), 1)
+        prefix, rest = original.split(SCRAPER_PARAGRAPH_START, 1)
+        self.assertTrue(prefix.endswith(b"\n\n"))
+        original = prefix + rest.split(b"\n\n", 1)[1]
+        for new, old in SCRAPER_EDITS:
+            self.assertEqual(original.count(new), 1, new)
+            original = original.replace(new, old, 1)
+        self.assertEqual(digest(original), PRE_SCRAPER_SHA256)
         for new, old in SECOND_WORKER_EDITS:
             self.assertEqual(original.count(new), 1, new)
             original = original.replace(new, old, 1)

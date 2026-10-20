@@ -210,7 +210,7 @@
   "skill_files": {
     "multi-agent-coding-orchestrator": {
       "default": {
-        "SKILL.md": "c17d4c5499fcedcc809c4429e0ff11e537488fc17deb32774b31680b3ca1c3c5",
+        "SKILL.md": "ee8adf5fb1d92be6e72fa1b2615e5c9cf688df288c2c761161cb8e583052db7f",
         "scripts/set-active-lanes.py": "157419c7c190b0a9f647271f7bd3839182f2e9324f8f9d74e43ec0553a5b77df"
       },
       "jobcron-orchestrator": {
@@ -218,7 +218,7 @@
         "scripts/set-active-lanes.py": "157419c7c190b0a9f647271f7bd3839182f2e9324f8f9d74e43ec0553a5b77df"
       },
       "chapt-orchestrator": {
-        "SKILL.md": "c963e090ef2f19929b01a8cd3581f1b6e87501d6371439e27e3e7573469fdf62",
+        "SKILL.md": "f95f1441f0c9c689d36b4756e465c9d088346f72d589b0ecfbf7281773020138",
         "scripts/set-active-lanes.py": "157419c7c190b0a9f647271f7bd3839182f2e9324f8f9d74e43ec0553a5b77df"
       },
       "harness-orchestrator": {
@@ -584,7 +584,7 @@
       "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md": "fe96e5b7831d73427a906081de9ea603e7094fe89a8f52f1092bd02cc70dca92"
     },
     "chapt-orchestrator": {
-      "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md": "c963e090ef2f19929b01a8cd3581f1b6e87501d6371439e27e3e7573469fdf62"
+      "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md": "f95f1441f0c9c689d36b4756e465c9d088346f72d589b0ecfbf7281773020138"
     },
     "harness-orchestrator": {
       "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md": "d91b241db42b2a5125cad3e07fc67b1f51fe7fb16bfd86bf5175fade258c55aa"
@@ -641,9 +641,11 @@
       "repositories": [
         "/Users/chanbla11mit/projects/cha-pt",
         "/Users/chanbla11mit/projects/cha-pt-frontend",
+        "/Users/chanbla11mit/projects/cha-webpt-website-sync",
         "/Users/chanbla11mit/projects/not-authorized"
       ],
       "frontend_project": "cha-pt-frontend",
+      "scraper_project": "cha-webpt-website-sync",
       "orchestrator": "chapt-orchestrator",
       "worker": "chapt-worker",
       "reviewer": "chapt-reviewer",
@@ -722,10 +724,10 @@
     "jss-worker-glm-2": "off"
   },
   "profile_soul_hashes": {
-    "chapt-orchestrator": "8ad31689d6c74fd17ebc77596f0389ae112ac1fe6e8f5d7e605ad6a17389f2c2",
-    "chapt-worker": "6bd46152500f54f4955b657d80a20f31db27f2d3162845fd8194436e03c5b5ab",
-    "chapt-worker-2": "6bd46152500f54f4955b657d80a20f31db27f2d3162845fd8194436e03c5b5ab",
-    "chapt-reviewer": "0b5f4e69cbb1ea449ad8da2311705f5e1954f59564fa42f1773f0e0bf570066f",
+    "chapt-orchestrator": "ab656c3f088006c6c69d72ee3e2e13830a5c509c48d76c910d1e7e40a93c1127",
+    "chapt-worker": "cff6cd2e699d34100d525d0b3c358e12a6ad219acb86cbc7581468d88f956ca2",
+    "chapt-worker-2": "cff6cd2e699d34100d525d0b3c358e12a6ad219acb86cbc7581468d88f956ca2",
+    "chapt-reviewer": "52fd8994366b1ab01f1a3db5e9c3267e21065b520cf956187ab398cdc31746b1",
     "harness-orchestrator": "8b9a3e7f66d57a9367a416f74a025babd7e0578be885657db4c9f29d2a6ab1fd",
     "harness-worker": "8ee6127b833f8278b3ed3932aa05c77cac917ee8391ccc633474b4ce8fc1ef61",
     "harness-worker-2": "8ee6127b833f8278b3ed3932aa05c77cac917ee8391ccc633474b4ce8fc1ef61",
