@@ -21,6 +21,8 @@ EXPECTED = {
     "incomplete-empty.yaml": (1, "incomplete fixture"),
     "deployed-skill-divergence.yaml": (1, "deployed skill hash mismatch"),
 }
+# The environment variables that gettext.find() reads to choose a message language.
+LOCALE_VARIABLES = ("LANGUAGE", "LC_ALL", "LC_MESSAGES", "LANG")
 
 
 class BoundaryError(RuntimeError):
@@ -57,6 +59,13 @@ class LocalReads:
             raise BoundaryError("out-of-root or undeclared resource access forbidden")
 
     def __enter__(self):
+        # argparse translates its headings through gettext; when a locale variable names a
+        # language other than C, gettext.find() checks translation files under the Python
+        # installation, outside the root. Remove those variables for the guarded run instead
+        # of allowing those paths; patch.dict restores os.environ on exit, also after an error.
+        self.stack.enter_context(patch.dict(os.environ))
+        for name in LOCALE_VARIABLES:
+            os.environ.pop(name, None)
         for owner, name in ((builtins, "open"), (io, "open"), (os, "open")):
             original = getattr(owner, name)
             def opened(path, *args, _original=original, _os_open=owner is os, **kwargs):
