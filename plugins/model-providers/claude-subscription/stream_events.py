@@ -4,6 +4,16 @@ import json
 from .errors import ProviderError
 
 
+def mismatch(text, kind, streamed, snapshot):
+    """The unchanged error, carrying both compared sides in memory only.
+
+    stream_audit.snapshot_mismatch() turns them into a content-free classification.
+    """
+    error = ProviderError(text)
+    error.snapshot_sides = (kind, streamed, snapshot)
+    return error
+
+
 class Message:
     """One real streamed assistant message, not a canned completion rechunked.
 
@@ -151,11 +161,11 @@ class Message:
                 raise ProviderError("stream/snapshot block mismatch")
             text = "".join(b.get("text", "") for b in self.snapshot if b.get("type") == "text")
             if text != self.text:
-                raise ProviderError("stream/snapshot content mismatch")
+                raise mismatch("stream/snapshot content mismatch", "text", self.text, text)
             tools = [b for b in self.snapshot if b.get("type") == "tool_use"]
             expected = [{"type": "tool_use", "id": c["id"], "name": c["name"], "input": c["arguments"]} for c in self.calls]
             if [{k: b.get(k) for k in ("type", "id", "name", "input")} for b in tools] != expected:
-                raise ProviderError("stream/snapshot tool identity or arguments mismatch")
+                raise mismatch("stream/snapshot tool identity or arguments mismatch", "tool_use", self.calls, tools)
             self.done = True
         else:
             raise ProviderError(f"unknown assistant stream event: {str(event)[:40]}")

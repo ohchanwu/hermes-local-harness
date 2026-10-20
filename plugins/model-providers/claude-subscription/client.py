@@ -625,7 +625,7 @@ class ClaudeSubscriptionClient:
             session = self._scope[-1] if self._scope else None
             record = stream_audit.payload(error, session, self._model,
                                           version_text(self._cli_version) if self._cli_version else None,
-                                          self.audit, stream_log)
+                                          self.audit, stream_log, declared={PREFIX + t["name"] for t in self._tools or ()})
             path = stream_audit.write(self._home, session, record)
         except Exception as exc:
             log.warning("claude-subscription stream failed (%s); stream audit not written (%s)", error, type(exc).__name__)

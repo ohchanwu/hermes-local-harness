@@ -3,7 +3,9 @@
 Reply text is held in memory only, to compute its length, hash and relation to the
 previous message. The file holds allowlisted fields: event types, identifiers,
 counts, hashes and relations. It never holds text, thinking, tool arguments or
-results, prompts, environment, paths or credentials.
+results, prompts, environment, paths or credentials. A stream/snapshot mismatch adds a
+classification of the two compared sides (key names, types, lengths, hashes, character
+classes at the first difference), never their values.
 """
 import datetime
 import hashlib
@@ -14,6 +16,7 @@ from pathlib import Path
 import re
 import tempfile
 import time
+import unicodedata
 
 SCHEMA_VERSION = 1
 MAX_MESSAGES = 32    # per request
@@ -266,13 +269,122 @@ class StreamLog:
                 "runtime_events_truncated": self.events.dropped, "drain": self.drained}
 
 
-def payload(error, session_id, model, cli_version, audit, stream_log):
+MAX_MISMATCH_CALLS, MAX_MISMATCH_KEYS, MAX_ONLY_KEYS = 20, 50, 20
+TYPES = {dict: "object", list: "array", str: "string", bool: "boolean", int: "integer", float: "number", type(None): "null"}
+
+
+def kind_of(value):
+    return TYPES.get(type(value), "<other>")
+
+
+def canonical(value):
+    return json.dumps(value, sort_keys=True, ensure_ascii=True)
+
+
+def strict_equal(a, b):
+    """Equal with equal JSON types throughout, so 1 and 1.0 (equal to Python's ==) differ here."""
+    if type(a) is not type(b):
+        return False
+    if isinstance(a, dict):
+        return a.keys() == b.keys() and all(strict_equal(a[k], b[k]) for k in a)
+    if isinstance(a, list):
+        return len(a) == len(b) and all(strict_equal(x, y) for x, y in zip(a, b))
+    return a == b
+
+
+def character(text, index):
+    """Only the class of one character, never the character or its code point."""
+    if index >= len(text):
+        return None
+    char = text[index]
+    category = unicodedata.category(char)
+    return {"category": category, "ascii": ord(char) < 128, "surrogate": category == "Cs", "control": category == "Cc"}
+
+
+def string_difference(stream, snapshot):
+    index = common_prefix(stream, snapshot)
+    return {"first_difference": index,
+            "prefix": "stream" if index == len(stream) else "snapshot" if index == len(snapshot) else None,
+            "stream_char": character(stream, index), "snapshot_char": character(snapshot, index)}
+
+
+def key_name(key):
+    return label(key[:40], 40) if isinstance(key, str) else "<other>"
+
+
+def compare_value(key, stream, snapshot):
+    out = {"key": key_name(key), "stream_type": kind_of(stream), "snapshot_type": kind_of(snapshot)}
+    forms = [canonical(v) for v in (stream, snapshot)]
+    out.update(stream_length=len(stream) if isinstance(stream, str) else len(forms[0]),
+               snapshot_length=len(snapshot) if isinstance(snapshot, str) else len(forms[1]),
+               equal=strict_equal(stream, snapshot), equal_canonical=json.loads(forms[0]) == json.loads(forms[1]),
+               stream_sha256=hashlib.sha256(forms[0].encode()).hexdigest(),
+               snapshot_sha256=hashlib.sha256(forms[1].encode()).hexdigest())
+    if isinstance(stream, str) and isinstance(snapshot, str) and stream != snapshot:
+        out.update(string_difference(stream, snapshot))
+    return out
+
+
+def only_keys(keys):
+    names = sorted(key_name(k) for k in keys)
+    return names[:MAX_ONLY_KEYS], max(0, len(names) - MAX_ONLY_KEYS)
+
+
+def declared_name(name, declared):
+    return name if isinstance(name, str) and name in declared else "<undeclared>"
+
+
+def compare_call(index, stream, snapshot, declared):
+    """One streamed call (id, name, arguments, fragments) against one snapshot tool_use block; either may be absent."""
+    sides = [(c.get("id"), c.get("name"), c.get(key)) if isinstance(c, dict) else (None, None, None)
+             for c, key in ((stream, "arguments"), (snapshot, "input"))]
+    (stream_id, stream_name, stream_input), (snapshot_id, snapshot_name, snapshot_input) = sides
+    fragments = stream.get("fragments") or [] if isinstance(stream, dict) else []
+    out = {"index": index, "id_equal": stream is not None and snapshot is not None and stream_id == snapshot_id,
+           "name_equal": stream is not None and snapshot is not None and stream_name == snapshot_name,
+           "stream_name": None if stream is None else declared_name(stream_name, declared),
+           "snapshot_name": None if snapshot is None else declared_name(snapshot_name, declared),
+           "stream_input_type": "<missing>" if stream is None else kind_of(stream_input),
+           "snapshot_input_type": "<missing>" if snapshot is None else kind_of(snapshot_input),
+           "fragments": len(fragments), "fragment_chars": sum(len(f) for f in fragments)}
+    if isinstance(stream_input, dict) and isinstance(snapshot_input, dict):
+        out["only_in_stream"], out["only_in_stream_truncated"] = only_keys(stream_input.keys() - snapshot_input.keys())
+        out["only_in_snapshot"], out["only_in_snapshot_truncated"] = only_keys(snapshot_input.keys() - stream_input.keys())
+        common = sorted(stream_input.keys() & snapshot_input.keys())
+        out["keys"] = [compare_value(k, stream_input[k], snapshot_input[k]) for k in common[:MAX_MISMATCH_KEYS]]
+        out["keys_truncated"] = max(0, len(common) - MAX_MISMATCH_KEYS)
+    return out
+
+
+def snapshot_mismatch(kind, streamed, snapshot, declared=()):
+    """Classify a stream/snapshot difference by identity, type, length, hash and character class; no content."""
+    if kind == "text":
+        forms = [canonical(t) for t in (streamed, snapshot)]
+        return {"kind": "text", "stream_chars": len(streamed), "snapshot_chars": len(snapshot),
+                "stream_sha256": hashlib.sha256(forms[0].encode()).hexdigest(),
+                "snapshot_sha256": hashlib.sha256(forms[1].encode()).hexdigest(), **string_difference(streamed, snapshot)}
+    count = max(len(streamed), len(snapshot))
+    return {"kind": "tool_use", "streamed_calls": len(streamed), "snapshot_tool_uses": len(snapshot),
+            "calls": [compare_call(i, streamed[i] if i < len(streamed) else None,
+                                   snapshot[i] if i < len(snapshot) else None, set(declared))
+                      for i in range(min(count, MAX_MISMATCH_CALLS))],
+            "calls_truncated": max(0, count - MAX_MISMATCH_CALLS)}
+
+
+def payload(error, session_id, model, cli_version, audit, stream_log, declared=()):
     entries = list(audit)[-MAX_AUDIT:]
-    return {"schema_version": SCHEMA_VERSION, "created_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
-            "session_id": session_label(session_id), "model": label(model, 80), "cli_version": label(cli_version, 40),
-            "error": {"class": type(error).__name__, "message": str(error)[:500]},
-            "audit": [sanitize(e) for e in entries], "audit_truncated": len(audit) - len(entries),
-            "stream": stream_log.report()}
+    record = {"schema_version": SCHEMA_VERSION, "created_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+              "session_id": session_label(session_id), "model": label(model, 80), "cli_version": label(cli_version, 40),
+              "error": {"class": type(error).__name__, "message": str(error)[:500]},
+              "audit": [sanitize(e) for e in entries], "audit_truncated": len(audit) - len(entries),
+              "stream": stream_log.report()}
+    sides = getattr(error, "snapshot_sides", None)
+    if sides is not None:
+        try:
+            record["snapshot_mismatch"] = snapshot_mismatch(*sides, declared=declared)
+        except Exception as exc:  # the classification must never cost the rest of the record
+            record["snapshot_mismatch"] = {"classification_failed": type(exc).__name__}
+    return record
 
 
 def _stamp():
