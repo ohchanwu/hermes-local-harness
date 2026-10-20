@@ -132,8 +132,12 @@ class DesiredState(unittest.TestCase):
     def test_no_glm_worker_reintroduced(self):
         for name in SECOND:
             self.assertIsNone(GLM_NAME.search(name))
-        self.assertNotIn("worker-glm-", json.dumps(self.roster).replace("worker-glm-full", ""))
-        for listing in (self.names, self.roster["project_dispatch_allowlist"],
+        # Owner decision 2026-10-19: the GLM workers stay declared, but only as retired.
+        for name in GLM:
+            self.assertEqual(self.profiles[name]["lifecycle"], "retired")
+            self.assertFalse(self.profiles[name]["dispatch_eligible"])
+            self.assertFalse(self.profiles[name]["in_dispatch_pool"])
+        for listing in (self.roster["project_dispatch_allowlist"],
                         self.snapshot["kanban"]["dispatch_profiles"], list(self.roster["profile_souls"])):
             self.assertEqual([name for name in listing if name in GLM], [])
         self.assertEqual(set(load_verifier().RETIRED_PROFILES), set(GLM))

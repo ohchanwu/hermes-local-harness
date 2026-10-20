@@ -475,8 +475,9 @@ project_workers = ("jobcron-worker", "jobcron-worker-2", "chapt-worker", "chapt-
                    "harness-worker", "harness-worker-2")
 for profile in (*project_workers, "jobcron-reviewer", "chapt-reviewer", "harness-reviewer"):
     assert roster_profiles[profile]["dispatch_eligible"]
-for profile in verify_state.RETIRED_PROFILES:
-    assert profile not in roster_profiles
+for profile in verify_state.RETIRED_PROFILES:  # kept installed, retired (owner 2026-10-19)
+    assert roster_profiles[profile]["lifecycle"] == "retired"
+    assert not roster_profiles[profile]["dispatch_eligible"]
 for profile in ("jobcron-orchestrator", *project_workers, "jobcron-reviewer",
                 "chapt-orchestrator", "chapt-reviewer",
                 "harness-orchestrator", "harness-reviewer"):

@@ -31,10 +31,14 @@ class SwitchTests(unittest.TestCase):
         self.fake.write_text(f"#!{sys.executable}\nimport json, sys\n"
                              f"open({str(self.calls)!r}, 'a').write(json.dumps(sys.argv[1:]) + '\\n')\n")
         self.fake.chmod(0o700)
+        # A temporary roster copy: the repository roster.yaml is never written by tests.
+        self.roster = self.root / "roster.yaml"
+        self.roster.write_text((ROOT / "roster.yaml").read_text())
 
     def run_switch(self, *args):
         with redirect_stdout(io.StringIO()) as out:
-            code = switch.main(["--home-root", str(self.root), "--hermes", str(self.fake), *args])
+            code = switch.main(["--home-root", str(self.root), "--hermes", str(self.fake),
+                                "--roster", str(self.roster), *args])
         return code, out.getvalue()
 
     def calls_made(self):
@@ -69,10 +73,31 @@ class SwitchTests(unittest.TestCase):
         self.assertNotIn("worker-sol", text)
         self.assertIn("  auto_decompose: false", text)
 
+    def roster_entry(self, name):
+        return next(p for p in json.loads(self.roster.read_text())["profiles"] if p["name"] == name)
+
+    def test_switch_updates_the_roster_copy_and_says_to_commit(self):
+        (self.root / "profiles/harness-reviewer").mkdir(parents=True)
+        (self.root / "profiles/harness-reviewer/config.yaml").write_text("model:\n  default: x\n")
+        code, out = self.run_switch("--profile", "harness-reviewer", "--to", "claude-opus")
+        self.assertEqual(code, 0)
+        entry = self.roster_entry("harness-reviewer")
+        self.assertEqual((entry["model"], entry["provider"]), ("claude-opus-5-5", "claude-subscription"))
+        self.assertIn("commit the roster.yaml change", out)
+        # Only that entry's model/provider changed; the format stays JSON with indent 2.
+        expected = json.loads((ROOT / "roster.yaml").read_text())
+        for profile in expected["profiles"]:
+            if profile["name"] == "harness-reviewer":
+                profile.update(model="claude-opus-5-5", provider="claude-subscription")
+        self.assertEqual(self.roster.read_text(), json.dumps(expected, indent=2) + "\n")
+
     def test_dry_run_changes_nothing(self):
         code, out = self.run_switch("--profile", "worker-sol", "--to", "glm", "--dry-run")
         self.assertEqual(code, 0)
         self.assertIn("model.provider zai", out)
+        self.assertIn("roster: ", out)
+        self.assertIn("worker-sol model gpt-5.6-sol -> glm-5.3, provider openai-codex -> zai (dry run", out)
+        self.assertEqual(self.roster.read_text(), (ROOT / "roster.yaml").read_text())
         self.assertFalse(self.calls.exists())
         self.assertEqual(list((self.root / "profiles/worker-sol").glob("config.yaml.pre-switch-*")), [])
 

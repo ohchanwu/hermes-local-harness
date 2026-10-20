@@ -90,10 +90,18 @@ class DesiredState(unittest.TestCase):
         cls.verifier = load_verifier()
 
     def test_no_glm_worker_in_any_roster_list(self):
-        names = [profile["name"] for profile in self.roster["profiles"]]
+        # Owner decision 2026-10-19: keep the GLM workers and mark them retired.
+        # They are declared roster profiles (and so in the approval list) with
+        # the retired lifecycle, and appear in no dispatch list, pool or fleet.
+        profiles = {profile["name"]: profile for profile in self.roster["profiles"]}
+        for name in GLM:
+            with self.subTest(retired=name):
+                self.assertEqual(profiles[name]["lifecycle"], "retired")
+                self.assertEqual(profiles[name]["retired_on"], "2026-10-18")
+                self.assertFalse(profiles[name]["dispatch_eligible"])
+                self.assertFalse(profiles[name]["in_dispatch_pool"])
+                self.assertIn(name, self.roster["approval_policy"]["profiles"])
         lists = {
-            "profiles": names,
-            "approval_policy": self.roster["approval_policy"]["profiles"],
             "project_dispatch_allowlist": self.roster["project_dispatch_allowlist"],
             "implementation_allowlist": self.roster["dispatch_pool"]["implementation_allowlist"],
             "dispatch_allowlist": self.roster["dispatch_pool"]["dispatch_allowlist"],
@@ -104,12 +112,11 @@ class DesiredState(unittest.TestCase):
         for label, listing in lists.items():
             with self.subTest(list=label):
                 self.assertEqual([name for name in listing if name in GLM], [])
-        self.assertNotIn("worker-glm-", json.dumps(self.roster).replace("worker-glm-full", ""))
+        self.assertEqual(quiet(self.verifier.check_retired_profiles, self.roster), [])
 
     def test_no_glm_worker_in_snapshot(self):
+        self.assertEqual(self.snapshot["profiles"], [p["name"] for p in self.roster["profiles"]])
         lists = {
-            "profiles": self.snapshot["profiles"],
-            "approvals": self.snapshot["approvals"]["profiles"],
             "dispatch_profiles": self.snapshot["kanban"]["dispatch_profiles"],
             "profile_souls": list(self.snapshot["profile_souls"]),
         }
@@ -321,9 +328,13 @@ class Pins(unittest.TestCase):
                 self.assertEqual(data["profile_soul_hashes"], want)
                 for profile, path in PROFILE_SKILLS.items():
                     self.assertEqual(data["profile_local_skill_overrides"][profile][RELATIVE], sha(path))
-                observed = {key: data[key] for key in ("profile_models", "profile_providers", "plugins",
-                                                       "skill_files", "project_isolation")}
+                # Retired GLM workers are observed installed profiles (owner decision
+                # 2026-10-19) but never carry a skill deployment or a fleet slot.
+                observed = {key: data[key] for key in ("skill_files", "project_isolation")}
                 self.assertIsNone(GLM_NAME.search(json.dumps(observed)))
+                if "profile_models" in data:
+                    self.assertEqual({n: data["profile_models"].get(n) for n in GLM},
+                                     {n: "glm-5.3" for n in GLM})
                 dispatch = [name for name in data["dispatch_profiles"] if name in GLM]
                 self.assertEqual(dispatch, ["harness-worker-glm-1"] if fixture.name == RETIREMENT_FIXTURE else [])
 
