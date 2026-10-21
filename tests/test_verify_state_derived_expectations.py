@@ -186,15 +186,21 @@ class DerivedExpectations(unittest.TestCase):
                     handle.write("\nReviewed policy change.\n")
             code, fails, output = run_main(root, self.clean_hashes)  # live still has the old bytes
             entry = next(e for e in self.snapshot["skill"]["shared_skills"] if e["name"] == "production-deployment")
+            # A profile whose production-deployment SKILL.md is a declared profile-local
+            # override (jobcron-orchestrator since t_a65417ef) is compared with that
+            # override's tracked source, so a shared-source edit does not make it stale.
+            overridden = {profile for profile, files in self.snapshot["skill"]["profile_local_skill_overrides"].items()
+                          if "devops/production-deployment/SKILL.md" in files}
+            self.assertEqual(overridden, {"jobcron-orchestrator"})
             stale = {f"deployed skill hash mismatch: production-deployment {profile}/SKILL.md"
-                     for profile in entry["deploy_profiles"] if profile not in self.retired}
+                     for profile in entry["deploy_profiles"] if profile not in self.retired | overridden}
             # Tracked side stays green: only the live-vs-repository comparison is red.
             self.assertEqual(code, 1, output)
             self.assertEqual(fails, stale | {
                 "profile SOUL drift harness-reviewer",
                 f"profile-local skill override drift: harness-orchestrator/{RELATIVE}",
             })
-            self.assertEqual(len(stale), 12)
+            self.assertEqual(len(stale), 11)
             # Redeploying the changed sources (new observation, still no pin edit) is green.
             code, fails, output = run_main(root, redeployed(tree_verifier(root), self.clean))
             self.assertEqual((code, fails), (0, set()), output)

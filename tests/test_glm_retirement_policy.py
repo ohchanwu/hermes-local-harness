@@ -37,6 +37,10 @@ PROFILE_SKILLS = {
 # The jobcron-orchestrator profile-only reference file, declared as a second
 # tracked-source override when t_b6d0e590 adopted the live jobcron drift.
 JOBCRON_REFERENCE = "autonomous-ai-agents/multi-agent-coding-orchestrator/references/kanban-triage-phase-routing.md"
+# The jobcron-orchestrator production-deployment files, declared as tracked-source
+# overrides when t_a65417ef merged the shared 0.2.5 source with the live-only text.
+JOBCRON_PRODUCTION_DEPLOYMENT = ("devops/production-deployment/SKILL.md",
+                                 "devops/production-deployment/references/release-ci-portability.md")
 SHARED_SKILL = ROOT / "skills/multi-agent-coding-orchestrator/SKILL.md"
 VERSIONS = {
     PROFILE_SKILLS["jobcron-orchestrator"]: "0.6.9-jobcron.4",
@@ -297,6 +301,8 @@ class Pins(unittest.TestCase):
                 want = {RELATIVE: verifier.TRACKED_SOURCE}
                 if profile == "jobcron-orchestrator":
                     want[JOBCRON_REFERENCE] = verifier.TRACKED_SOURCE
+                    for override in JOBCRON_PRODUCTION_DEPLOYMENT:
+                        want[override] = verifier.TRACKED_SOURCE
                 self.assertEqual(overrides[profile], want)
                 self.assertEqual(verifier.local_override_expected(profile, RELATIVE, overrides[profile][RELATIVE]),
                                  sha(path))

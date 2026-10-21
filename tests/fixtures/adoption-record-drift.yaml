@@ -573,7 +573,9 @@
     },
     "jobcron-orchestrator": {
       "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md": "tracked-source",
-      "autonomous-ai-agents/multi-agent-coding-orchestrator/references/kanban-triage-phase-routing.md": "tracked-source"
+      "autonomous-ai-agents/multi-agent-coding-orchestrator/references/kanban-triage-phase-routing.md": "tracked-source",
+      "devops/production-deployment/SKILL.md": "tracked-source",
+      "devops/production-deployment/references/release-ci-portability.md": "tracked-source"
     },
     "chapt-orchestrator": {
       "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md": "tracked-source"
