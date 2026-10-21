@@ -13,6 +13,10 @@ comparison, which stays strict: a deployed copy that differs from its tracked
 source FAILs until it is redeployed, or until a reviewed card adopts the live
 content into the repository. A hash pin is only legal where no tracked source
 exists (worker-astra's learned overrides, external repository policies).
+A fixture likewise stores no copy of a tracked-source hash: it records an
+observed copy that equals its tracked source as "tracked-source", which fixture
+mode alone resolves to the tracked source's sha256 at check time
+(resolve_fixture_tracked_sources). Live mode always hashes the live files.
 Retired roster profiles are excluded from shared-skill deployment checks.
 """
 import argparse
@@ -406,6 +410,63 @@ def check_fleet_dispatch(errors, label, fleets, profiles, exact=False):
         for name in profiles:
             if name not in wanted:
                 fail(errors, f"unexpected profile in {label}: {name}")
+
+
+def resolve_fixture_tracked_sources(observed, snapshot):
+    """Fixture mode only. A fixture records an observed hash as TRACKED_SOURCE when the
+    observed copy equals its tracked source; this replaces each such value with the
+    sha256 of that tracked source, hashed now, so a fixture holds no copy of a
+    tracked-source hash. Sections: skill_files, profile_local_skill_overrides,
+    profile_soul_hashes. A value with no resolvable tracked source stays TRACKED_SOURCE,
+    which is not a sha256 hex digest, so it never equals an expected hash and the
+    comparison fails. Live mode never calls this function: a live observation is
+    always a sha256 hex digest of the live file or None."""
+    local_overrides = snapshot["skill"].get("profile_local_skill_overrides", {})
+    if not isinstance(local_overrides, dict):
+        local_overrides = {}
+    tracked_root = ROOT / "policies" / "profile-skills"
+    tracked = ({entry.name: set(tree_files(entry)) for entry in tracked_root.iterdir() if entry.is_dir()}
+               if tracked_root.is_dir() else {})
+
+    def override_source(profile, path):
+        if path in tracked.get(profile, set()):
+            return sha256_file(tracked_root / profile / path)
+        return None
+
+    def resolved(value, source_hash):
+        return source_hash if value == TRACKED_SOURCE and source_hash is not None else value
+
+    skills = {entry["name"]: entry for entry in snapshot["skill"]["shared_skills"]
+              if shared_skill_declaration_valid(entry)}
+    for name, profiles in observed.get("skill_files", {}).items():
+        entry = skills.get(name)
+        if entry is None or not isinstance(profiles, dict):
+            continue
+        for profile, files in profiles.items():
+            if not isinstance(files, dict):
+                continue
+            declared = local_overrides.get(profile)
+            declared = declared if isinstance(declared, dict) else {}
+            for rel, value in files.items():
+                if value != TRACKED_SOURCE or not isinstance(rel, str):
+                    continue
+                owned = [path for path in declared if f"/{path}".endswith(f"/{name}/{rel}")]
+                if owned:
+                    source_hash = override_source(profile, owned[0])
+                elif rel in entry["files"]:
+                    source_hash = sha256_file(ROOT / entry["source"] / rel)
+                else:
+                    source_hash = None
+                files[rel] = resolved(value, source_hash)
+    for profile, files in observed.get("profile_local_skill_overrides", {}).items():
+        if not isinstance(files, dict):
+            continue
+        for path, value in files.items():
+            files[path] = resolved(value, override_source(profile, path))
+    souls = observed.get("profile_soul_hashes", {})
+    for profile, value in souls.items():
+        entry = PROFILE_SOUL_PATHS.get(profile)
+        souls[profile] = resolved(value, sha256_file(ROOT / entry["source"]) if entry else None)
 
 
 def profile_soul_expected(entry):
@@ -1684,6 +1745,7 @@ def main():
         if any(not isinstance(adapter, dict) for adapter in observed.get("adapters", [])):
             fail(errors, "malformed fixture: section 'adapters' expected observation mappings")
             return 2
+        resolve_fixture_tracked_sources(observed, snapshot)
         kanban = observed.get("kanban", {})
         for key, want in snapshot["kanban"].items():
             if key == "dispatch_profiles":

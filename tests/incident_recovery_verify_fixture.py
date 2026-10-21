@@ -7,6 +7,7 @@ commands and sockets are forbidden. Wrapper exit is distinct from verifier exit.
 import builtins
 from contextlib import ExitStack, redirect_stdout
 import io
+import json
 import os
 from pathlib import Path
 import socket
@@ -35,6 +36,17 @@ def load_verifier():
     module.__file__ = str(source)
     exec(compile(source.read_text(), str(source), "exec"), module.__dict__)
     return module
+
+
+def resolved_fixture(path):
+    """Fixture data as verify-state fixture mode compares it: each observed value
+    recorded as "tracked-source" is replaced by the sha256 of its tracked source.
+    Reads only the fixture and tracked repository files."""
+    data = json.loads(Path(path).read_text())
+    if isinstance(data, dict):
+        snapshot = json.loads((ROOT / "snapshots/sanitized-current-state.yaml").read_text())
+        load_verifier().resolve_fixture_tracked_sources(data, snapshot)
+    return data
 
 
 class LocalReads:

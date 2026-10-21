@@ -112,6 +112,10 @@ class DerivedExpectations(unittest.TestCase):
         cls.snapshot = load(ROOT / "snapshots/sanitized-current-state.yaml")
         cls.verifier = tree_verifier(ROOT)
         cls.retired = set(cls.verifier.roster_retired(cls.roster))
+        # clean.yaml records "tracked-source" for each copy equal to its tracked source;
+        # this is the same observation with the hashes of the unmodified tracked sources.
+        cls.clean_hashes = copy.deepcopy(cls.clean)
+        cls.verifier.resolve_fixture_tracked_sources(cls.clean_hashes, cls.snapshot)
 
     # (a)
     def test_clean_fixture_passes(self):
@@ -180,7 +184,7 @@ class DerivedExpectations(unittest.TestCase):
                         f"policies/profile-skills/harness-orchestrator/{RELATIVE}"):
                 with open(root / rel, "a") as handle:
                     handle.write("\nReviewed policy change.\n")
-            code, fails, output = run_main(root, self.clean)  # live still has the old bytes
+            code, fails, output = run_main(root, self.clean_hashes)  # live still has the old bytes
             entry = next(e for e in self.snapshot["skill"]["shared_skills"] if e["name"] == "production-deployment")
             stale = {f"deployed skill hash mismatch: production-deployment {profile}/SKILL.md"
                      for profile in entry["deploy_profiles"] if profile not in self.retired}
@@ -193,6 +197,9 @@ class DerivedExpectations(unittest.TestCase):
             self.assertEqual(len(stale), 12)
             # Redeploying the changed sources (new observation, still no pin edit) is green.
             code, fails, output = run_main(root, redeployed(tree_verifier(root), self.clean))
+            self.assertEqual((code, fails), (0, set()), output)
+            # The committed clean fixture needs no edit either: "tracked-source" follows the source.
+            code, fails, output = run_main(root, self.clean)
             self.assertEqual((code, fails), (0, set()), output)
 
     # (c)
@@ -229,7 +236,7 @@ class DerivedExpectations(unittest.TestCase):
         declared = f"autonomous-ai-agents/multi-agent-coding-orchestrator/{reference}"
         overrides = self.snapshot["skill"]["profile_local_skill_overrides"]["jobcron-orchestrator"]
         self.assertEqual(overrides[declared], "tracked-source")
-        deployed = self.clean["skill_files"]["multi-agent-coding-orchestrator"]["jobcron-orchestrator"]
+        deployed = self.clean_hashes["skill_files"]["multi-agent-coding-orchestrator"]["jobcron-orchestrator"]
         self.assertEqual(deployed[reference],
                          self.verifier.local_override_expected("jobcron-orchestrator", declared, "tracked-source"))
         # Drift in the deployed reference file is reported once, by the override check.

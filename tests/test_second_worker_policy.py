@@ -17,7 +17,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from incident_recovery_verify_fixture import LocalReads, ROOT, load_verifier
+from incident_recovery_verify_fixture import LocalReads, ROOT, load_verifier, resolved_fixture
 
 FLEETS = {"jobcron": "jobcron", "cha-pt": "chapt", "harness": "harness", "jss-genr": "jss"}
 POOLS = {project: [f"{prefix}-worker", f"{prefix}-worker-2"] for project, prefix in FLEETS.items()}
@@ -45,7 +45,10 @@ VERSIONS = {
     PROFILE_SKILLS["chapt"]: "0.6.7-chapt.4",
     PROFILE_SKILLS["harness"]: "0.6.7-harness.3",
     PROFILE_SKILLS["jss"]: "0.6.7-jss.5",
-    SHARED_SKILL: "0.6.10",
+    # The shared skill's version is recorded in the snapshot; read it rather than copy it.
+    SHARED_SKILL: next(entry["version"] for entry in json.loads(
+        (ROOT / "snapshots/sanitized-current-state.yaml").read_text())["skill"]["shared_skills"]
+        if entry["name"] == "multi-agent-coding-orchestrator"),
 }
 PINNED_WORKERS = ("chapt-worker", "harness-worker", "jss-worker")  # jobcron-worker has no tracked SOUL
 
@@ -96,11 +99,14 @@ class DesiredState(unittest.TestCase):
             with self.subTest(profile=second):
                 self.assertEqual(self.names.index(second), self.names.index(first) + 1)
                 entry = self.profiles[second]
-                self.assertEqual((entry["model"], entry["provider"]), ("claude-opus-5-5", "claude-subscription"))
+                # Owner model policy for the role, as verify-state records it (no model name copied here).
+                policy = load_verifier()
+                self.assertEqual((entry["model"], entry["provider"]),
+                                 (policy.MODEL_POLICY_BY_ROLE[entry["role"]], policy.MODEL_POLICY_PROVIDER))
                 self.assertTrue(entry["dispatch_eligible"])
                 self.assertTrue(entry["in_dispatch_pool"])
                 expected = dict(self.profiles[first], name=second,
-                                model="claude-opus-5-5", provider="claude-subscription")
+                                model=entry["model"], provider=entry["provider"])
                 self.assertEqual(entry, expected)
 
     def test_every_list_names_both_workers(self):
@@ -219,10 +225,11 @@ class FixtureMode(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.clean = load(ROOT / "tests/fixtures/clean.yaml")
+        cls.models = {profile["name"]: profile["model"] for profile in load(ROOT / "roster.yaml")["profiles"]}
 
     def test_clean_observes_both_workers_and_is_green(self):
         for name in SECOND:
-            self.assertEqual(self.clean["profile_models"][name], "claude-opus-5-5")
+            self.assertEqual(self.clean["profile_models"][name], self.models[name])
             self.assertIn(name, self.clean["dispatch_profiles"])
         code, output = fixture_main(self.clean)
         self.assertEqual(code, 0, output)
@@ -251,7 +258,8 @@ class FixtureMode(unittest.TestCase):
         fixture["profile_models"]["harness-worker-2"] = "gpt-6.1-sol"
         code, output = fixture_main(fixture)
         self.assertEqual(code, 1, output)
-        self.assertIn("FAIL: model drift harness-worker-2: expected claude-opus-5-5, actual gpt-6.1-sol", output)
+        self.assertIn(f"FAIL: model drift harness-worker-2: expected {self.models['harness-worker-2']}, "
+                      "actual gpt-6.1-sol", output)
 
     def test_retired_glm_dispatch_stays_red(self):
         fixture = copy.deepcopy(self.clean)
@@ -287,9 +295,10 @@ class PolicyText(unittest.TestCase):
                              (SHARED_SKILL, ("jobcron", "chapt", "harness"))):
             text = path.read_text()
             self.assertIn("Each project has two implementation workers.", text)
+            models = {profile["name"]: profile["model"] for profile in load(ROOT / "roster.yaml")["profiles"]}
             for prefix in fleets:
-                self.assertIn(f"implementation workers `{prefix}-worker` (`claude-opus-5-5`) and "
-                              f"`{prefix}-worker-2` (`claude-opus-5-5`);", text)
+                self.assertIn(f"implementation workers `{prefix}-worker` (`{models[f'{prefix}-worker']}`) and "
+                              f"`{prefix}-worker-2` (`{models[f'{prefix}-worker-2']}`);", text)
 
     def test_current_state_docs_list_both_workers(self):
         for rel, prefix in (("adoption/cha-pt.md", "chapt"), ("adoption/jobcron.md", "jobcron"),
@@ -348,7 +357,7 @@ class Pins(unittest.TestCase):
         self.assertEqual(verifier.local_override_expected("jobcron-orchestrator", JOBCRON_REFERENCE, "tracked-source"),
                          sha(reference))
         shared = next(e for e in self.snapshot["skill"]["shared_skills"] if e["name"] == "multi-agent-coding-orchestrator")
-        self.assertEqual(shared["version"], "0.6.10")
+        self.assertRegex(SHARED_SKILL.read_text(), rf"(?m)^version: {re.escape(shared['version'])}$")
         self.assertEqual(verifier.shared_skill_expected(shared)["SKILL.md"], sha(SHARED_SKILL))
         provenance = self.snapshot["skill"]["source_pin_provenance"]["second_worker"]
         self.assertEqual(provenance["baseline"], "8d660578bedca672f71460222a73215272e136f7")
@@ -359,7 +368,7 @@ class Pins(unittest.TestCase):
         for fixture in sorted((ROOT / "tests/fixtures").glob("*.yaml")):
             if fixture.name == "incomplete-empty.yaml":
                 continue
-            data = load(fixture)
+            data = resolved_fixture(fixture)  # "tracked-source" resolved as verify-state does
             with self.subTest(fixture=fixture.name):
                 for project, pool in POOLS.items():
                     self.assertEqual(data["project_isolation"][project]["workers"], pool)
@@ -369,7 +378,8 @@ class Pins(unittest.TestCase):
                 for name in SECOND:
                     self.assertIn(name, data["dispatch_profiles"])
                     if fixture.name != "incomplete-omits-profile.yaml":
-                        self.assertEqual(data["profile_models"][name], "claude-opus-5-5")
+                        self.assertEqual(data["profile_models"][name],
+                                         next(p["model"] for p in self.roster["profiles"] if p["name"] == name))
 
 
 if __name__ == "__main__":

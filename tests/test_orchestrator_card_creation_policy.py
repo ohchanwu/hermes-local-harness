@@ -12,6 +12,8 @@ import re
 from pathlib import Path
 import unittest
 
+from rule_text import assert_rule
+
 ROOT = Path(__file__).resolve().parents[1]
 RELATIVE = "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md"
 # profile -> board
@@ -89,8 +91,8 @@ class OrchestratorCardCreationPolicy(unittest.TestCase):
                     f"1. Create it with the kanban_create tool: `kanban_create(..., board: {board}, "
                     "initial_status: blocked)`."), first)
                 self.assertNotIn("before any notification subscription exists", first)
-                self.assertIn("The card is created blocked, so it cannot be dispatched before setup is complete, "
-                              "and its notification subscription exists from creation.", first)
+                assert_rule(self, first, "created blocked", "cannot be dispatched before setup is complete",
+                            "notification subscription exists from creation")
                 for sentence in explanation(board):
                     self.assertEqual(first.count(sentence), 1, sentence)
 

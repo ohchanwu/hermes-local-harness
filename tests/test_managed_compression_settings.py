@@ -25,9 +25,10 @@ SETTINGS = {
 }
 FIXTURES = ROOT / "tests/fixtures"
 DRIFT_MESSAGES = [
-    "FAIL: managed setting drift advisor compression.threshold_tokens: expected 150000, actual 200000",
+    "FAIL: managed setting drift advisor compression.threshold_tokens: "
+    f"expected {SETTINGS['compression.threshold_tokens']!r}, actual 200000",
     "FAIL: managed setting drift harness-orchestrator compression.idle_compact_after_seconds: "
-    "expected 3600, actual <unreadable>",
+    f"expected {SETTINGS['compression.idle_compact_after_seconds']!r}, actual <unreadable>",
 ]
 
 
@@ -132,7 +133,7 @@ class FixtureVerifierTests(unittest.TestCase):
                 self.assertIn(f"FAIL: managed setting drift default {key}: expected {SETTINGS[key]!r}, "
                               "actual <unreadable>", failures)
             self.assertIn("FAIL: managed setting drift chapt-orchestrator compression.min_tail_user_messages: "
-                          "expected 3, actual '3'", failures)
+                          f"expected {SETTINGS['compression.min_tail_user_messages']!r}, actual '3'", failures)
             self.assertEqual(len(failures), len(SETTINGS) + 1, output)
 
 
@@ -177,8 +178,9 @@ class CheckFunctionTests(unittest.TestCase):
                                  for profile in PROFILES for key in SETTINGS])
         self.assertEqual(errors, [
             "managed setting drift jobcron-orchestrator compression.proactive_prune_tokens: "
-            "expected 100000, actual <unreadable>",
-            "managed setting drift default compression.threshold_tokens: expected 150000, actual 90000",
+            f"expected {SETTINGS['compression.proactive_prune_tokens']!r}, actual <unreadable>",
+            "managed setting drift default compression.threshold_tokens: "
+            f"expected {SETTINGS['compression.threshold_tokens']!r}, actual 90000",
         ])
         with patch.dict(self.verifier.__dict__, {
                 "run": lambda *args: subprocess.CompletedProcess(args, 0, json.dumps(SETTINGS[args[-1]]), "")}):

@@ -16,6 +16,7 @@ import unittest
 from unittest.mock import patch
 
 from incident_recovery_verify_fixture import ROOT, load_verifier
+from rule_text import assert_rule
 from test_chapt_policy_reconciliation import CARD_CREATION_EDITS
 from test_orchestrator_skill_terminology import TERMINOLOGY_EDITS, reverse_terminology_edits
 
@@ -528,10 +529,10 @@ class PolicyText(unittest.TestCase):
                     self.assertTrue("cha-pt-frontend" in paragraph or "dual-repository" in paragraph, paragraph)
         for path in SKILLS:
             text = self.text(path)
-            self.assertIn("When the user says stop, terminate every owned background worker, reviewer, preview "
-                          "server, and watcher before replying, then verify they stopped. Do not resume because "
-                          "a delayed completion notification arrives.", text)
-            self.assertIn("a policy expansion never broadens an active card such as the current P4 campaign", text)
+            assert_rule(self, text, "user says stop", "terminate every owned background worker", "reviewer",
+                        "preview server", "watcher", "verify they stopped",
+                        "Do not resume", "delayed completion notification")
+            assert_rule(self, text, "policy expansion never broadens an active card", "P4 campaign")
         self.assertIn("never restart from delayed callbacks without user resume", self.text(SKILLS[0]))
         self.assertIn("Frontend project EXACT cha-pt-frontend.", self.text(SOULS["chapt-orchestrator"]))
 

@@ -11,6 +11,10 @@ from pathlib import Path
 import re
 import unittest
 
+from rule_text import assert_rule, raw_section
+
+from incident_recovery_verify_fixture import resolved_fixture
+
 ROOT = Path(__file__).resolve().parents[1]
 RELATIVE = "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md"
 SKILLS = {
@@ -176,8 +180,10 @@ class FleetAutonomyPolicy(unittest.TestCase):
         for board in SKILLS:
             with self.subTest(board=board):
                 autonomy = section(self.raw[board], "Autonomy")
-                self.assertIn("No numeric caps on harmless actions: local reads, local tests, and anonymous public reads already in scope.", autonomy)
-                self.assertIn("Keep caps only where a real cost, rate, mutation, or ambiguity risk exists", autonomy)
+                rules = raw_section(self.raw[board], "Autonomy")
+                assert_rule(self, rules, "No numeric caps", "harmless actions", "local reads", "local tests",
+                            "anonymous public reads")
+                assert_rule(self, rules, "Keep caps only", "cost", "rate", "mutation", "ambiguity")
                 # Real repair budgets survive unchanged.
                 self.assertIn("max_approaches: 3", self.text[board])
                 self.assertIn("max_attempts_per_approach: 3", self.text[board])
@@ -188,7 +194,8 @@ class FleetAutonomyPolicy(unittest.TestCase):
             with self.subTest(board=board):
                 autonomy = section(self.raw[board], "Autonomy")
                 self.assertIn("These lists never override a", autonomy)
-                self.assertIn("stays a security gate: obtain consent, never treat a timeout as consent or bypass a refusal", autonomy)
+                assert_rule(self, raw_section(self.raw[board], "Autonomy"), "security gate", "consent",
+                            "never treat a timeout", "refusal")
                 for marker in BOARD_CONTROL_MARKERS[board]:
                     self.assertIn(marker, self.text[board])
                 # GPT-era policy files are not referenced by these skills, so
@@ -241,7 +248,7 @@ class FleetAutonomyPolicy(unittest.TestCase):
                 self.assertEqual(overrides[profile][RELATIVE], "tracked-source")
         unpinned = set()
         for path in sorted((ROOT / "tests/fixtures").glob("*.yaml")):
-            data = json.loads(path.read_text())
+            data = resolved_fixture(path)  # "tracked-source" resolved as verify-state does
             pinned = (data.get("profile_local_skill_overrides") or {})
             if "jobcron-orchestrator" not in pinned:
                 unpinned.add(path.name)

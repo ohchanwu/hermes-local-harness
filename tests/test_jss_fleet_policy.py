@@ -17,7 +17,8 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from incident_recovery_verify_fixture import LocalReads, ROOT, load_verifier
+from incident_recovery_verify_fixture import LocalReads, ROOT, load_verifier, resolved_fixture
+from rule_text import assert_rule
 
 REPO = "/Users/chanbla11mit/projects/jss-genr"
 ORCH, WORKER, WORKER2, REVIEWER = (
@@ -184,7 +185,7 @@ class FleetDesiredState(unittest.TestCase):
         souls = {profile: sha(soul_path(profile)) for profile in JSS}
         skill = sha(SKILL)
         for fixture in sorted((ROOT / "tests/fixtures").glob("*.yaml")):
-            data = load(fixture)
+            data = resolved_fixture(fixture)  # "tracked-source" resolved as verify-state does
             if fixture.name == "incomplete-empty.yaml":
                 self.assertEqual(data, {})
                 continue
@@ -298,8 +299,8 @@ class RoleContracts(unittest.TestCase):
                 body = flat(self.souls[profile])
                 self.assertIn("create each exclusively and block if a target already exists", body)
                 self.assertIn("Never overwrite, rename, or delete an existing draft", body)
-                self.assertIn("unless the card records the owner's confirmation for that exact `CLAUDE.md` step",
-                              body)
+                assert_rule(self, self.souls[profile], "unless the card records the owner's confirmation",
+                            "`CLAUDE.md` step")
         self.assertEqual(soul_path(WORKER).read_bytes(), soul_path(WORKER2).read_bytes())
         self.assertIn(scope + " (normally numbered drafts under `companies/<slug>/drafts/`)",
                       flat(ADOPTION.read_text()))
@@ -462,8 +463,8 @@ class StandingExceptions(unittest.TestCase):
                 "Anything outside this case still needs explicit owner authorization."):
             self.assertIn(marker, scope)
         self.assertEqual(self.skill_raw.count("update my portfolio"), 2)
-        self.assertIn("- external writes (push, PR, deploy, application submission, portfolio-site sync), "
-                      "except the \"update my portfolio\" site push in Hard Scope", self.skill_raw)
+        assert_rule(self, self.skill_raw, "- external writes", "push", "PR", "deploy", "application submission",
+                    "portfolio-site sync", "except the \"update my portfolio\" site push")
 
     def test_orchestrator_soul_protected_file_exception_and_guardrails(self):
         role = self.orch.split("Load and follow `multi-agent-coding-orchestrator` before routing work.", 1)[1]

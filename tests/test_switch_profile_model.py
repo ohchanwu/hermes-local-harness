@@ -60,10 +60,12 @@ class SwitchTests(unittest.TestCase):
         self.run_switch("--profile", "default", "--to", "claude-fable")
         calls = self.calls_made()
         self.assertTrue(all(c[0] == "config" for c in calls))
-        self.assertIn(["config", "set", "model.default", "claude-fable-5-1"], calls)
+        _, _, fable_model, helper_model = switch.TARGETS["claude-fable"]
+        self.assertIn(["config", "set", "model.default", fable_model], calls)
         helpers = [c for c in calls if c[2].startswith("auxiliary.") and c[2].endswith(".model")]
         self.assertEqual(len(helpers), 16)
-        self.assertTrue(all(c[3] == "claude-opus-5-5" for c in helpers))
+        self.assertTrue(all(c[3] == helper_model for c in helpers))
+        self.assertNotEqual(helper_model, fable_model)  # the helpers keep their own model
 
     def test_dispatch_add_and_remove(self):
         self.run_switch("--profile", "worker-sol", "--to", "gpt", "--dispatch", "add")
@@ -82,13 +84,14 @@ class SwitchTests(unittest.TestCase):
         code, out = self.run_switch("--profile", "harness-reviewer", "--to", "claude-opus")
         self.assertEqual(code, 0)
         entry = self.roster_entry("harness-reviewer")
-        self.assertEqual((entry["model"], entry["provider"]), ("claude-opus-5-5", "claude-subscription"))
+        provider, _, model, _ = switch.TARGETS["claude-opus"]
+        self.assertEqual((entry["model"], entry["provider"]), (model, provider))
         self.assertIn("commit the roster.yaml change", out)
         # Only that entry's model/provider changed; the format stays JSON with indent 2.
         expected = json.loads((ROOT / "roster.yaml").read_text())
         for profile in expected["profiles"]:
             if profile["name"] == "harness-reviewer":
-                profile.update(model="claude-opus-5-5", provider="claude-subscription")
+                profile.update(model=model, provider=provider)
         self.assertEqual(self.roster.read_text(), json.dumps(expected, indent=2) + "\n")
 
     def test_dry_run_changes_nothing(self):
@@ -96,7 +99,10 @@ class SwitchTests(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertIn("model.provider zai", out)
         self.assertIn("roster: ", out)
-        self.assertIn("worker-sol model gpt-5.6-sol -> glm-5.3, provider openai-codex -> zai (dry run", out)
+        before = self.roster_entry("worker-sol")
+        provider, _, model, _ = switch.TARGETS["glm"]
+        self.assertIn(f"worker-sol model {before['model']} -> {model}, provider {before['provider']} -> {provider} "
+                      "(dry run", out)
         self.assertEqual(self.roster.read_text(), (ROOT / "roster.yaml").read_text())
         self.assertFalse(self.calls.exists())
         self.assertEqual(list((self.root / "profiles/worker-sol").glob("config.yaml.pre-switch-*")), [])

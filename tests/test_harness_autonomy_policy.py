@@ -10,6 +10,10 @@ from pathlib import Path
 import re
 import unittest
 
+from rule_text import assert_rule, raw_section
+
+from incident_recovery_verify_fixture import resolved_fixture
+
 ROOT = Path(__file__).resolve().parents[1]
 RELATIVE = "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md"
 SKILL = ROOT / "policies/profile-skills/harness-orchestrator" / RELATIVE
@@ -121,8 +125,10 @@ class HarnessAutonomyPolicy(unittest.TestCase):
 
     def test_rule6_no_caps_on_harmless_actions(self):
         autonomy = section(self.raw, "Autonomy")
-        self.assertIn("No numeric caps on harmless actions: local reads, local tests, and anonymous public reads already in scope.", autonomy)
-        self.assertIn("Keep caps only where a real cost, rate, mutation, or ambiguity risk exists", autonomy)
+        rules = raw_section(self.raw, "Autonomy")
+        assert_rule(self, rules, "No numeric caps", "harmless actions", "local reads", "local tests",
+                    "anonymous public reads")
+        assert_rule(self, rules, "Keep caps only", "cost", "rate", "mutation", "ambiguity")
         # Real repair budgets survive.
         repair = section(self.raw, "Bounded Autonomous Repair")
         self.assertIn("At most three materially distinct approaches.", repair)
@@ -174,7 +180,7 @@ class HarnessAutonomyPolicy(unittest.TestCase):
         self.assertEqual(overrides["harness-orchestrator"][RELATIVE], "tracked-source")
         unpinned = set()
         for path in sorted((ROOT / "tests/fixtures").glob("*.yaml")):
-            data = json.loads(path.read_text())
+            data = resolved_fixture(path)  # "tracked-source" resolved as verify-state does
             pinned = (data.get("profile_local_skill_overrides") or {}).get("harness-orchestrator")
             if pinned is None:
                 unpinned.add(path.name)

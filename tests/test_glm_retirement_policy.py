@@ -19,7 +19,8 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from incident_recovery_verify_fixture import LocalReads, ROOT, load_verifier
+from incident_recovery_verify_fixture import LocalReads, ROOT, load_verifier, resolved_fixture
+from rule_text import assert_rule
 
 FLEETS = {"jobcron": "jobcron", "cha-pt": "chapt", "harness": "harness", "jss-genr": "jss"}
 GLM = tuple(f"{prefix}-worker-glm-{n}" for prefix in FLEETS.values() for n in (1, 2))
@@ -236,7 +237,7 @@ class PolicyText(unittest.TestCase):
                                "Never assign, escalate, or route review to them.",
                                "`~/.hermes/profile-exports/`", "`procedures/switching-hermes-models.md`"):
                     self.assertIn(marker, note)
-                self.assertIn("\n- `advisor`: read/analyze advisor; not a Kanban implementation lane.\n", text)
+                assert_rule(self, text, "- `advisor`:", "not a Kanban implementation lane")
                 self.assertNotIn("`default`: legacy", text)
                 self.assertNotIn("rollback/spare lane", text)
 
@@ -272,7 +273,8 @@ class PolicyText(unittest.TestCase):
                        "They are inert.", "exclude `.env` and `auth.json`"):
             self.assertIn(marker, section)
         self.assertIn("Every provider stays switchable", text)
-        self.assertIn("`glm`: `zai`, default `glm-5.3`.", text)
+        provider, _, model = switch_module().TARGETS["glm"][:3]
+        self.assertIn(f"`glm`: `{provider}`, default `{model}`.", text)
 
 
 class Pins(unittest.TestCase):
@@ -338,7 +340,7 @@ class Pins(unittest.TestCase):
     def test_fixture_pins_and_observations(self):
         souls = {profile: sha(ROOT / entry["source"]) for profile, entry in self.roster["profile_souls"].items()}
         for fixture in sorted((ROOT / "tests/fixtures").glob("*.yaml")):
-            data = load(fixture)
+            data = resolved_fixture(fixture)  # "tracked-source" resolved as verify-state does
             if fixture.name == "incomplete-empty.yaml":
                 continue
             with self.subTest(fixture=fixture.name):
@@ -354,7 +356,7 @@ class Pins(unittest.TestCase):
                 self.assertIsNone(GLM_NAME.search(json.dumps(observed)))
                 if "profile_models" in data:
                     self.assertEqual({n: data["profile_models"].get(n) for n in GLM},
-                                     {n: "glm-5.3" for n in GLM})
+                                     {p["name"]: p["model"] for p in self.roster["profiles"] if p["name"] in GLM})
                 dispatch = [name for name in data["dispatch_profiles"] if name in GLM]
                 self.assertEqual(dispatch, ["harness-worker-glm-1"] if fixture.name == RETIREMENT_FIXTURE else [])
 
@@ -399,6 +401,15 @@ class FixtureMode(unittest.TestCase):
             self.assertIn(f"WARN: dormant unexpected profile: {name}", output.getvalue())
 
 
+def switch_module():
+    loader = importlib.machinery.SourceFileLoader("switch_profile_model_note", str(ROOT / "scripts/switch-profile-model"))
+    spec = importlib.util.spec_from_loader(loader.name, loader)
+    assert spec is not None
+    module = importlib.util.module_from_spec(spec)
+    loader.exec_module(module)
+    return module
+
+
 class SwitchStillSupportsGlm(unittest.TestCase):
     def test_switch_profile_model_accepts_to_glm(self):
         loader = importlib.machinery.SourceFileLoader("switch_profile_model_glm", str(ROOT / "scripts/switch-profile-model"))
@@ -417,7 +428,7 @@ class SwitchStillSupportsGlm(unittest.TestCase):
                                     "--dry-run"])
             self.assertEqual(code, 0)
             self.assertIn("config set model.provider zai", out.getvalue())
-            self.assertIn("config set model.default glm-5.3", out.getvalue())
+            self.assertIn(f"config set model.default {switch.TARGETS['glm'][2]}", out.getvalue())
             self.assertEqual(sorted(p.name for p in (root / "profiles/harness-worker-glm-1").iterdir()),
                              ["config.yaml"])
 

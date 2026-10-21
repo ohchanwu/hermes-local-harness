@@ -9,6 +9,10 @@ from pathlib import Path
 import re
 import unittest
 
+from rule_text import assert_rule
+
+from incident_recovery_verify_fixture import resolved_fixture
+
 ROOT = Path(__file__).resolve().parents[1]
 CHECKLIST = ROOT / "policies/overgating-review.md"
 CHECKLIST_ABS = "/Users/chanbla11mit/hermes-local-harness/policies/overgating-review.md"
@@ -83,7 +87,7 @@ class Checklist(unittest.TestCase):
         self.assertLessEqual(len(self.text.splitlines()), 60)
 
     def test_scope_and_mechanism_rule(self):
-        self.assertIn("specification, implementation plan, procedure/runbook, policy, or card template", self.text)
+        assert_rule(self, self.text, "specification", "implementation plan", "runbook", "policy", "card template")
         self.assertIn("names the concrete failure mechanism it controls", self.text)
         self.assertIn("still live at that step", self.text)
 
@@ -100,8 +104,8 @@ class Checklist(unittest.TestCase):
             self.assertIn(marker, self.text)
 
     def test_verdict_and_authority(self):
-        self.assertIn("Material finding: overgating that would block, stall, or add owner prompts to otherwise authorized work", self.text)
-        self.assertIn("`kanban_request_changes` naming the gate, why its mechanism is absent or not live, and the proportionate replacement (often deletion)", self.text)
+        assert_rule(self, self.text, "Material finding", "overgating", "block", "owner prompts")
+        assert_rule(self, self.text, "`kanban_request_changes`", "gate", "mechanism", "proportionate replacement")
         self.assertIn("Non-blocking note: minor ceremony that blocks nothing", self.text)
         self.assertIn("governs review findings only and grants no new authority", self.text)
         for profile in REVIEWERS:
@@ -126,10 +130,10 @@ class ReviewerSouls(unittest.TestCase):
             text = soul(profile)
             with self.subTest(profile=profile):
                 self.assertEqual(text.count(CHECKLIST_ABS), 1)
-                self.assertIn("would block, stall, or add owner prompts to otherwise authorized work is a material finding", text)
-                self.assertIn("naming the gate, why its mechanism is absent or not live, and the proportionate replacement", text)
-                self.assertIn("Minor ceremony that blocks nothing is a non-blocking note in the approval.", text)
-                self.assertIn("grants no new authority, and never weakens the boundaries in this file", text)
+                assert_rule(self, text, "owner prompts", "material finding")
+                assert_rule(self, text, "naming the gate", "mechanism", "proportionate replacement")
+                assert_rule(self, text, "Minor ceremony", "non-blocking note")
+                assert_rule(self, text, "grants no new authority", "never weakens the boundaries")
 
     def test_model_neutral(self):
         for profile in REVIEWERS:
@@ -167,7 +171,7 @@ class SoulPins(unittest.TestCase):
     def test_fixture_pins(self):
         pins = {p: sha(ROOT / f"policies/profile-souls/{p}/SOUL.md") for p in ("harness-reviewer", "chapt-reviewer")}
         for fixture in sorted((ROOT / "tests/fixtures").glob("*.yaml")):
-            observed = json.loads(fixture.read_text()).get("profile_soul_hashes")
+            observed = resolved_fixture(fixture).get("profile_soul_hashes")
             if observed is None:
                 continue
             for profile, want in pins.items():

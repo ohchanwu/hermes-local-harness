@@ -1,5 +1,4 @@
 import copy
-import hashlib
 import json
 from pathlib import Path
 
@@ -11,17 +10,14 @@ roster = json.loads((ROOT / "roster.yaml").read_text())
 TRACKED_SOURCE = "tracked-source"
 
 
-def sha(path):
-    return hashlib.sha256(Path(path).read_bytes()).hexdigest()
-
-
 # Observed hashes of a correctly deployed fleet are the bytes of the tracked
 # sources (desired state carries no hash pins where a tracked source exists).
+# A fixture stores no copy of such a hash: it records TRACKED_SOURCE, which
+# verify-state fixture mode resolves to the tracked source's sha256 at run time.
+# Only a hash with no tracked source (worker-astra's pins) is written as a hash.
 def override_hashes():
-    """profile -> {path: sha} of correctly deployed profile-local overrides."""
-    return {profile: {path: (sha(ROOT / "policies" / "profile-skills" / profile / path)
-                             if declared == TRACKED_SOURCE else declared)
-                      for path, declared in files.items()}
+    """profile -> {path: TRACKED_SOURCE or pin} of correctly deployed profile-local overrides."""
+    return {profile: dict(files)
             for profile, files in desired["skill"]["profile_local_skill_overrides"].items()}
 
 IMPL = ["worker-flash-1", "worker-flash-2", "worker-flash-3", "worker-luna-1", "worker-luna-2",
@@ -64,7 +60,7 @@ def base_plugins():
 
 
 def skill_files_map():
-    """skill -> profile -> {rel: sha}, per the desired deploy_profiles matrix; a file a
+    """skill -> profile -> {rel: TRACKED_SOURCE or pin}, per the desired deploy_profiles matrix; a file a
     profile-local override owns carries that override's bytes."""
     overrides = override_hashes()
     result = {}
@@ -75,7 +71,7 @@ def skill_files_map():
             for rel in entry["files"]:
                 owned = [want for path, want in overrides.get(profile, {}).items()
                          if f"/{path}".endswith(f"/{entry['name']}/{rel}")]
-                files[rel] = owned[0] if owned else sha(ROOT / entry["source"] / rel)
+                files[rel] = owned[0] if owned else TRACKED_SOURCE
             # A profile-only file that an override declares inside this skill's tree
             # (for example a reference file) is deployed in the same directory.
             marker = f"/{entry['name']}/"
@@ -104,8 +100,7 @@ clean["kanban"] = {key: copy.deepcopy(value) for key, value in desired["kanban"]
 clean["project_isolation"] = copy.deepcopy(desired["project_isolation"])
 clean["project_repair_policy"] = copy.deepcopy(desired["project_repair_policy"])
 clean["project_repair_cards"] = []
-clean["profile_soul_hashes"] = {
-    profile: sha(ROOT / entry["source"]) for profile, entry in desired["profile_souls"].items()}
+clean["profile_soul_hashes"] = {profile: TRACKED_SOURCE for profile in desired["profile_souls"]}
 clean["repository_policy_hashes"] = {
     name: entry["sha256"] for name, entry in desired["repository_policies"].items()}
 harness_adoption = (Path(__file__).resolve().parents[1] / "adoption" / "harness.md").read_text()
