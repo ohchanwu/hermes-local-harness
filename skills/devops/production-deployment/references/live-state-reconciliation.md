@@ -35,7 +35,7 @@ Do not run `terraform plan`, `refresh`, `apply`, `import`, or a state command th
 
 ## 4. Reconcile state against live inventory
 
-Parse selectors internally from the pulled state and query read-only describe/list/get APIs for each managed resource. Record value-blind facts:
+Parse selectors internally from the pulled state and query read-only describe/list/get APIs for each managed resource. Record facts that contain no secret or identifying values:
 
 - existence, lifecycle status, and state/live agreement;
 - compute architecture, instance type, encrypted root volume, instance profile, public-address and EIP-association booleans, and management-agent status;
@@ -92,18 +92,18 @@ If the plan creates a missing EIP, verify there is no association resource or ed
 
 Validate the complete observed action combination, not each action in isolation. When a legitimate recovery combines drift classes that the checked-in validator does not support (for example, one missing unattached EIP create plus one explicit host replacement), stop and add an explicit validator mode with an exact argument contract. Require the full allowlisted address set, exact actions and reasons, no imports or moves, known-null association controls, no extra diagnostics or outputs, and mutation tests derived from a valid fixture. Preserve ordinary create and replacement modes unchanged; never make a broad mode more permissive just to pass one live plan.
 
-Generate a fresh value-blind reconciliation checkpoint for recovery modes. Historical phase checkpoints remain evidence of that phase, not reusable claims about current state. The current checkpoint should bind the pending mutation to an exact schema, observation provenance, the clean release commit, selected-target confidence, the approved host disposition, retained rollback assets, EIP/exposure facts, database protection and restore metadata, recovery/backend safety, and runtime-secret metadata without reading or asserting secret content. Do not impose an arbitrary evidence-expiry window; reconcile relevant observed changes and satisfy the actual operation's current-state prerequisites. Record the observed secret-version count as a number when useful, but do not require an obsolete value such as zero after an unmanaged version legitimately exists. Mutation-test invalidated, missing, renamed, false, and unexpected fields. The plan must continue to exclude secret-version resources regardless of checkpoint count.
+Generate a fresh reconciliation checkpoint, free of secret or identifying values, for recovery modes. Historical phase checkpoints remain evidence of that phase, not reusable claims about current state. The current checkpoint should bind the pending mutation to an exact schema, observation provenance, the clean release commit, selected-target confidence, the approved host disposition, retained rollback assets, EIP/exposure facts, database protection and restore metadata, recovery/backend safety, and runtime-secret metadata without reading or asserting secret content. Do not impose an arbitrary evidence-expiry window; reconcile relevant observed changes and satisfy the actual operation's current-state prerequisites. Record the observed secret-version count as a number when useful, but do not require an obsolete value such as zero after an unmanaged version legitimately exists. Mutation-test invalidated, missing, renamed, false, and unexpected fields. The plan must continue to exclude secret-version resources regardless of checkpoint count.
 
 ## 9. Stop and report before mutation
 
-Produce a concise value-blind packet containing:
+Produce a concise packet free of secret or identifying values, containing:
 
 - exact release SHA and CI result;
 - selected host/database confidence or ambiguity;
 - drift list;
 - encryption, backups, ingress, EIP, DNS, state-backend, and recovery-bucket findings;
 - post-start readiness and sanitized diagnostic results when authorized;
-- exact plan digest and value-blind action summary when authorized;
+- exact plan digest and action summary free of secret or identifying values when authorized;
 - missing evidence and explicit stop conditions;
 - the next proposed mutation boundary.
 

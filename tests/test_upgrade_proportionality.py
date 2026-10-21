@@ -105,7 +105,7 @@ class UpgradeProportionalityTests(unittest.TestCase):
         section = text.split("## Release change selection", 1)[1].split("## Procedure", 1)[0]
         for clause in ("application-only", "migration-bearing", "infrastructure-changing", "first launch",
                        "Mixed", "smallest material uncertainty", "unchanged platform", "exact-source",
-                       "schema-compatible", "current execution prerequisites", "value-blind",
+                       "schema-compatible", "current execution prerequisites", "recording no secret or identifying values",
                        "before requesting an execution window", "guessed key names", "missing prose",
                        "publisher", "host replacement", "not a second deployment system"):
             self.assertIn(clause.lower(), section.lower())
