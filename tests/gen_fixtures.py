@@ -23,7 +23,8 @@ def override_hashes():
 IMPL = ["worker-flash-1", "worker-flash-2", "worker-flash-3", "worker-luna-1", "worker-luna-2",
         "worker-terra-1", "worker-terra-2", "worker-glm-full", "worker-sol", "worker-astra",
         "jobcron-worker", "chapt-worker", "harness-worker", "jss-worker",
-        "jobcron-worker-2", "chapt-worker-2", "harness-worker-2", "jss-worker-2"]
+        "jobcron-worker-2", "chapt-worker-2", "harness-worker-2", "jss-worker-2",
+        "anki-worker", "anki-worker-2"]
 NOTIF = "hermes-terminal-outcome-notification"
 ENABLED_NOTIF = f"enabled      git pinned@6ae2bf2d 0.2.0    {NOTIF}"
 DISABLED_NOTIF = f"disabled     git pinned@6ae2bf2d 0.2.0    {NOTIF}"
@@ -128,6 +129,18 @@ if jss_entries:
     jss_entries[0].update(jss_observation)
 else:
     clean["adapters"].append(jss_observation)
+# Marker text only: the first line of the tracked anki README.md.
+anki_adapter = next(adapter for adapter in desired["adoption"]["adapters"] if adapter["repo"] == "anki")
+anki_observation = {
+    "repo": "anki",
+    "content": anki_adapter["marker"],
+    "record": (Path(__file__).resolve().parents[1] / "adoption" / "anki.md").read_text(),
+}
+anki_entries = [adapter for adapter in clean["adapters"] if adapter.get("repo") == "anki"]
+if anki_entries:
+    anki_entries[0].update(anki_observation)
+else:
+    clean["adapters"].append(anki_observation)
 clean["plugins"] = base_plugins()
 set_skill_files(clean)
 clean["terminal_retry_policy"] = copy.deepcopy(

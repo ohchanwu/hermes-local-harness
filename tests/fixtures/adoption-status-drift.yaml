@@ -36,7 +36,11 @@
     "harness-worker-glm-1": "glm-5.3",
     "harness-worker-glm-2": "glm-5.3",
     "jss-worker-glm-1": "glm-5.3",
-    "jss-worker-glm-2": "glm-5.3"
+    "jss-worker-glm-2": "glm-5.3",
+    "anki-orchestrator": "claude-opus-5-5",
+    "anki-worker": "claude-opus-5-5",
+    "anki-worker-2": "claude-opus-5-5",
+    "anki-reviewer": "claude-fable-5-1"
   },
   "profile_providers": {
     "default": "claude-subscription",
@@ -75,7 +79,11 @@
     "harness-worker-glm-1": "zai",
     "harness-worker-glm-2": "zai",
     "jss-worker-glm-1": "zai",
-    "jss-worker-glm-2": "zai"
+    "jss-worker-glm-2": "zai",
+    "anki-orchestrator": "claude-subscription",
+    "anki-worker": "claude-subscription",
+    "anki-worker-2": "claude-subscription",
+    "anki-reviewer": "claude-subscription"
   },
   "plugins": {
     "default": {
@@ -187,7 +195,21 @@
     "harness-worker-glm-1": {},
     "harness-worker-glm-2": {},
     "jss-worker-glm-1": {},
-    "jss-worker-glm-2": {}
+    "jss-worker-glm-2": {},
+    "anki-orchestrator": {
+      "hermes-terminal-outcome-notification": "disabled     git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification"
+    },
+    "anki-worker": {
+      "hermes-terminal-outcome-notification": "disabled     git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification",
+      "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail"
+    },
+    "anki-worker-2": {
+      "hermes-terminal-outcome-notification": "disabled     git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification",
+      "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail"
+    },
+    "anki-reviewer": {
+      "hermes-terminal-outcome-notification": "disabled     git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification"
+    }
   },
   "dispatch_profiles": [
     "jobcron-worker",
@@ -201,7 +223,10 @@
     "harness-worker-2",
     "chapt-worker-2",
     "jobcron-worker-2",
-    "jss-worker-2"
+    "jss-worker-2",
+    "anki-worker",
+    "anki-worker-2",
+    "anki-reviewer"
   ],
   "kanban": {
     "max_in_progress": null,
@@ -227,6 +252,10 @@
         "scripts/set-active-lanes.py": "tracked-source"
       },
       "jss-orchestrator": {
+        "SKILL.md": "tracked-source",
+        "scripts/set-active-lanes.py": "tracked-source"
+      },
+      "anki-orchestrator": {
         "SKILL.md": "tracked-source",
         "scripts/set-active-lanes.py": "tracked-source"
       }
@@ -285,6 +314,12 @@
       },
       "jss-worker-2": {
         "SKILL.md": "tracked-source"
+      },
+      "anki-worker": {
+        "SKILL.md": "tracked-source"
+      },
+      "anki-worker-2": {
+        "SKILL.md": "tracked-source"
       }
     },
     "simplification-review": {
@@ -340,6 +375,12 @@
         "SKILL.md": "tracked-source"
       },
       "jss-worker-2": {
+        "SKILL.md": "tracked-source"
+      },
+      "anki-worker": {
+        "SKILL.md": "tracked-source"
+      },
+      "anki-worker-2": {
         "SKILL.md": "tracked-source"
       }
     },
@@ -585,6 +626,9 @@
     },
     "jss-orchestrator": {
       "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md": "tracked-source"
+    },
+    "anki-orchestrator": {
+      "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md": "tracked-source"
     }
   },
   "terminal_retry_policy": {
@@ -675,6 +719,22 @@
         "jss-worker",
         "jss-worker-2"
       ]
+    },
+    "anki": {
+      "board": "anki",
+      "repository": "/Users/chanbla11mit/projects/anki",
+      "repositories": [
+        "/Users/chanbla11mit/projects/anki",
+        "/Users/chanbla11mit/projects/anki-addons"
+      ],
+      "addons_project": "anki-addons",
+      "orchestrator": "anki-orchestrator",
+      "worker": "anki-worker",
+      "reviewer": "anki-reviewer",
+      "workers": [
+        "anki-worker",
+        "anki-worker-2"
+      ]
     }
   },
   "profile_approval_modes": {
@@ -714,7 +774,11 @@
     "harness-worker-glm-1": "off",
     "harness-worker-glm-2": "off",
     "jss-worker-glm-1": "off",
-    "jss-worker-glm-2": "off"
+    "jss-worker-glm-2": "off",
+    "anki-orchestrator": "off",
+    "anki-worker": "off",
+    "anki-worker-2": "off",
+    "anki-reviewer": "off"
   },
   "profile_soul_hashes": {
     "chapt-orchestrator": "tracked-source",
@@ -729,7 +793,11 @@
     "jss-orchestrator": "tracked-source",
     "jss-worker": "tracked-source",
     "jss-worker-2": "tracked-source",
-    "jss-reviewer": "tracked-source"
+    "jss-reviewer": "tracked-source",
+    "anki-orchestrator": "tracked-source",
+    "anki-worker": "tracked-source",
+    "anki-worker-2": "tracked-source",
+    "anki-reviewer": "tracked-source"
   },
   "repository_policy_hashes": {
     "cha-pt-frontend": "113b81fd55294cfc3057f66163e1745d590f520003997d36c85b46c938342817"
@@ -744,7 +812,8 @@
       "jobcron",
       "cha-pt",
       "harness",
-      "jss-genr"
+      "jss-genr",
+      "anki"
     ]
   },
   "project_repair_cards": [],

@@ -36,7 +36,11 @@
     "harness-worker-glm-1": "glm-5.3",
     "harness-worker-glm-2": "glm-5.3",
     "jss-worker-glm-1": "glm-5.3",
-    "jss-worker-glm-2": "glm-5.3"
+    "jss-worker-glm-2": "glm-5.3",
+    "anki-orchestrator": "claude-opus-5-5",
+    "anki-worker": "claude-opus-5-5",
+    "anki-worker-2": "claude-opus-5-5",
+    "anki-reviewer": "claude-fable-5-1"
   },
   "profile_providers": {
     "default": "claude-subscription",
@@ -75,7 +79,11 @@
     "harness-worker-glm-1": "zai",
     "harness-worker-glm-2": "zai",
     "jss-worker-glm-1": "zai",
-    "jss-worker-glm-2": "zai"
+    "jss-worker-glm-2": "zai",
+    "anki-orchestrator": "claude-subscription",
+    "anki-worker": "claude-subscription",
+    "anki-worker-2": "claude-subscription",
+    "anki-reviewer": "claude-subscription"
   },
   "plugins": {
     "default": {
@@ -187,7 +195,21 @@
     "harness-worker-glm-1": {},
     "harness-worker-glm-2": {},
     "jss-worker-glm-1": {},
-    "jss-worker-glm-2": {}
+    "jss-worker-glm-2": {},
+    "anki-orchestrator": {
+      "hermes-terminal-outcome-notification": "disabled     git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification"
+    },
+    "anki-worker": {
+      "hermes-terminal-outcome-notification": "disabled     git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification",
+      "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail"
+    },
+    "anki-worker-2": {
+      "hermes-terminal-outcome-notification": "disabled     git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification",
+      "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail"
+    },
+    "anki-reviewer": {
+      "hermes-terminal-outcome-notification": "disabled     git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification"
+    }
   },
   "dispatch_profiles": [
     "jobcron-worker",
@@ -202,6 +224,9 @@
     "chapt-worker-2",
     "jobcron-worker-2",
     "jss-worker-2",
+    "anki-worker",
+    "anki-worker-2",
+    "anki-reviewer",
     "harness-worker-glm-1"
   ],
   "kanban": {
@@ -228,6 +253,10 @@
         "scripts/set-active-lanes.py": "tracked-source"
       },
       "jss-orchestrator": {
+        "SKILL.md": "tracked-source",
+        "scripts/set-active-lanes.py": "tracked-source"
+      },
+      "anki-orchestrator": {
         "SKILL.md": "tracked-source",
         "scripts/set-active-lanes.py": "tracked-source"
       }
@@ -286,6 +315,12 @@
       },
       "jss-worker-2": {
         "SKILL.md": "tracked-source"
+      },
+      "anki-worker": {
+        "SKILL.md": "tracked-source"
+      },
+      "anki-worker-2": {
+        "SKILL.md": "tracked-source"
       }
     },
     "simplification-review": {
@@ -341,6 +376,12 @@
         "SKILL.md": "tracked-source"
       },
       "jss-worker-2": {
+        "SKILL.md": "tracked-source"
+      },
+      "anki-worker": {
+        "SKILL.md": "tracked-source"
+      },
+      "anki-worker-2": {
         "SKILL.md": "tracked-source"
       }
     },
@@ -563,6 +604,11 @@
       "repo": "jss-genr",
       "content": "**This repo is pushed publicly.**",
       "record": "# jss-genr adoption\n\nAdapter: `/Users/chanbla11mit/projects/jss-genr/CLAUDE.md` (the repository's own agent rules, adopted unchanged; this fleet never writes it outside an owner-scoped repository card). The verifier's adapter marker is the repository's public-push privacy boundary.\n\nStatus: defined in repository source; live setup pending. Board `jss-genr` is rooted solely at `/Users/chanbla11mit/projects/jss-genr` and routes only through `jss-orchestrator`, the workers `jss-worker` and `jss-worker-2`, and `jss-reviewer`. The orchestrator and both workers use `claude-subscription/claude-opus-5-5`; the reviewer uses `claude-subscription/claude-fable-5-1`. There is no preview-port contract. Launch the controller with `scripts/run-jss-orchestrator`.\n\nTwo card kinds, declared on every card: repository cards (`tools/`, `resume/` HTML/PDF build and QA, `guides/`, `CLAUDE.md`, `README.md`) work in an isolated worktree with executable tests, one local candidate commit, same-card `jss-reviewer` review, and controller local integration; writing-round cards (\uc790\uae30\uc18c\uac1c\uc11c Workflow A rounds, resume or portfolio copy rounds) use the worktree only as the dispatch workspace and create only their declared new files under `profile/` or one `companies/<slug>/` (normally numbered drafts under `companies/<slug>/drafts/`) in the main checkout, with no commit. Existing drafts are never overwritten or deleted.\n\nPrivacy is a hard gate: nothing from `profile/`, `companies/`, or `resume/resources/` is copied into tracked files, commits, card bodies, comments, handoffs, or Telegram summaries beyond the company slug and file names. The repository has a public GitHub remote; the fleet never pushes, opens PRs, deploys, submits applications, or logs in to job sites. Writes to the separate portfolio site repository (`make sync-site`, `tools/check-materials.py --sync`), installs, credentials, and live profile, skill, board, or gateway changes require separate explicit owner authorization.\n\nGT dependency: none.\n"
+    },
+    {
+      "repo": "anki",
+      "content": "# Anki tooling and standards",
+      "record": "# anki adoption\n\nAdapter: `/Users/chanbla11mit/projects/anki/README.md` (the repository's own description and safety rules, adopted unchanged; this fleet never edits its safety rules or adapter text outside an owner-scoped card). The verifier's adapter marker is the file's first line.\n\nStatus: defined in repository source; live setup pending. Board `anki` routes only through `anki-orchestrator`, the workers `anki-worker` and `anki-worker-2`, and `anki-reviewer`. The board is rooted at the primary repository `/Users/chanbla11mit/projects/anki` (deck tooling, writing standards, deck change sets); the second repository `/Users/chanbla11mit/projects/anki-addons` holds Anki add-on code and is reached only through the Hermes project `anki-addons`, whose cards carry the line `Add-on project EXACT anki-addons.`. The controller creates `/Users/chanbla11mit/projects/anki-addons` during live setup. The orchestrator and both workers use `claude-subscription/claude-opus-5-5`; the reviewer uses `claude-subscription/claude-fable-5-1`. There is no preview-port contract. Launch the controller with `scripts/run-anki-orchestrator`.\n\nEvery card is a repository card in exactly one of the two repositories: one repository-owned isolated worktree, one protected baseline, one explicit test contract, one reviewed local commit, and controller local integration. Deck change cards commit a change set file under `changesets/` in the primary repository; the commit does not change the collection.\n\nCollection access: workers and the reviewer read the collection only through the AnkiConnect read actions `version`, `requestPermission`, `deckNames`, `deckNamesAndIds`, `modelNames`, `modelFieldNames`, `findNotes`, `notesInfo`, `findCards`, `cardsInfo`, and `getTags` at http://127.0.0.1:8765. Only `anki-orchestrator` writes to the collection, only through AnkiConnect, only for the change set file and reviewed commit SHA that the owner names, and only after confirming every recorded current value and making a backup of every affected deck into the gitignored `private/backups/`; no change set is applied until an apply tool for those steps exists in the primary repository. No fleet profile opens the collection files (`*.anki2`, `*.anki21`, `*.anki21b`, `collection.media`) directly. Only `anki-orchestrator` installs an add-on build into the Anki `addons21` folder, only for the add-on and commit SHA that the owner approves, with a backup of any existing folder of that add-on.\n\nThere is no privacy rule for note content (owner decision, 2026-10-23): note text, deck names, change sets, exports and reports may appear in tracked files, commits, cards, comments, handoffs, memory and Telegram replies. Credentials stay excluded: an AnkiConnect `apiKey`, AnkiWeb login data and any token are never read, printed, committed or put on cards. Both repositories stay local with no remote; the fleet never adds a remote, pushes, opens a PR, syncs with AnkiWeb, publishes to AnkiWeb, or changes other installed add-ons or their configuration. Installs, downloads (including the add-on test environment with `anki` and `aqt` 26.9.2), credentials, and live profile, skill, board, or gateway changes require separate explicit owner authorization.\n\nGT dependency: none.\n"
     }
   ],
   "terminal_notification_runtime": {
@@ -597,6 +643,9 @@
       "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md": "tracked-source"
     },
     "jss-orchestrator": {
+      "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md": "tracked-source"
+    },
+    "anki-orchestrator": {
       "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md": "tracked-source"
     }
   },
@@ -688,6 +737,22 @@
         "jss-worker",
         "jss-worker-2"
       ]
+    },
+    "anki": {
+      "board": "anki",
+      "repository": "/Users/chanbla11mit/projects/anki",
+      "repositories": [
+        "/Users/chanbla11mit/projects/anki",
+        "/Users/chanbla11mit/projects/anki-addons"
+      ],
+      "addons_project": "anki-addons",
+      "orchestrator": "anki-orchestrator",
+      "worker": "anki-worker",
+      "reviewer": "anki-reviewer",
+      "workers": [
+        "anki-worker",
+        "anki-worker-2"
+      ]
     }
   },
   "profile_approval_modes": {
@@ -727,7 +792,11 @@
     "harness-worker-glm-1": "off",
     "harness-worker-glm-2": "off",
     "jss-worker-glm-1": "off",
-    "jss-worker-glm-2": "off"
+    "jss-worker-glm-2": "off",
+    "anki-orchestrator": "off",
+    "anki-worker": "off",
+    "anki-worker-2": "off",
+    "anki-reviewer": "off"
   },
   "profile_soul_hashes": {
     "chapt-orchestrator": "tracked-source",
@@ -742,7 +811,11 @@
     "jss-orchestrator": "tracked-source",
     "jss-worker": "tracked-source",
     "jss-worker-2": "tracked-source",
-    "jss-reviewer": "tracked-source"
+    "jss-reviewer": "tracked-source",
+    "anki-orchestrator": "tracked-source",
+    "anki-worker": "tracked-source",
+    "anki-worker-2": "tracked-source",
+    "anki-reviewer": "tracked-source"
   },
   "repository_policy_hashes": {
     "cha-pt-frontend": "113b81fd55294cfc3057f66163e1745d590f520003997d36c85b46c938342817"
@@ -757,7 +830,8 @@
       "jobcron",
       "cha-pt",
       "harness",
-      "jss-genr"
+      "jss-genr",
+      "anki"
     ]
   },
   "project_repair_cards": [],

@@ -104,7 +104,11 @@
       "harness-worker-glm-1",
       "harness-worker-glm-2",
       "jss-worker-glm-1",
-      "jss-worker-glm-2"
+      "jss-worker-glm-2",
+      "anki-orchestrator",
+      "anki-worker",
+      "anki-worker-2",
+      "anki-reviewer"
     ]
   },
   "dispatch_pool": {
@@ -939,6 +943,96 @@
       "credential_present": null,
       "required_plugins": [],
       "installed_disabled_plugins": []
+    },
+    {
+      "name": "anki-orchestrator",
+      "role": "project orchestrator",
+      "model": "claude-opus-5-5",
+      "provider": "claude-subscription",
+      "installed": true,
+      "dispatch_eligible": false,
+      "in_dispatch_pool": false,
+      "lifecycle": "project-active",
+      "concurrency_limit": 1,
+      "required_plugins": [],
+      "modes": [
+        "project-isolated",
+        "anki"
+      ],
+      "toolsets": "orchestrator",
+      "credential_required": true,
+      "credential_present": true,
+      "installed_disabled_plugins": [
+        "hermes-terminal-outcome-notification"
+      ]
+    },
+    {
+      "name": "anki-worker",
+      "role": "project implementation",
+      "model": "claude-opus-5-5",
+      "provider": "claude-subscription",
+      "installed": true,
+      "dispatch_eligible": true,
+      "in_dispatch_pool": true,
+      "lifecycle": "project-active",
+      "concurrency_limit": 1,
+      "required_plugins": [],
+      "modes": [
+        "project-isolated",
+        "anki"
+      ],
+      "toolsets": "implementation",
+      "credential_required": true,
+      "credential_present": true,
+      "installed_disabled_plugins": [
+        "ponytail",
+        "hermes-terminal-outcome-notification"
+      ]
+    },
+    {
+      "name": "anki-worker-2",
+      "role": "project implementation",
+      "model": "claude-opus-5-5",
+      "provider": "claude-subscription",
+      "installed": true,
+      "dispatch_eligible": true,
+      "in_dispatch_pool": true,
+      "lifecycle": "project-active",
+      "concurrency_limit": 1,
+      "required_plugins": [],
+      "modes": [
+        "project-isolated",
+        "anki"
+      ],
+      "toolsets": "implementation",
+      "credential_required": true,
+      "credential_present": true,
+      "installed_disabled_plugins": [
+        "ponytail",
+        "hermes-terminal-outcome-notification"
+      ]
+    },
+    {
+      "name": "anki-reviewer",
+      "role": "project independent reviewer",
+      "model": "claude-fable-5-1",
+      "provider": "claude-subscription",
+      "installed": true,
+      "dispatch_eligible": true,
+      "in_dispatch_pool": true,
+      "lifecycle": "project-active",
+      "concurrency_limit": 1,
+      "required_plugins": [],
+      "modes": [
+        "project-isolated",
+        "anki"
+      ],
+      "toolsets": "review",
+      "credential_required": true,
+      "credential_present": true,
+      "installed_disabled_plugins": [
+        "hermes-terminal-outcome-notification"
+      ]
     }
   ],
   "project_fleets": {
@@ -1003,6 +1097,22 @@
         "jss-worker",
         "jss-worker-2"
       ]
+    },
+    "anki": {
+      "board": "anki",
+      "repository": "/Users/chanbla11mit/projects/anki",
+      "repositories": [
+        "/Users/chanbla11mit/projects/anki",
+        "/Users/chanbla11mit/projects/anki-addons"
+      ],
+      "addons_project": "anki-addons",
+      "orchestrator": "anki-orchestrator",
+      "worker": "anki-worker",
+      "reviewer": "anki-reviewer",
+      "workers": [
+        "anki-worker",
+        "anki-worker-2"
+      ]
     }
   },
   "project_repair_policy": {
@@ -1015,7 +1125,8 @@
       "jobcron",
       "cha-pt",
       "harness",
-      "jss-genr"
+      "jss-genr",
+      "anki"
     ]
   },
   "profile_souls": {
@@ -1070,6 +1181,22 @@
     "jss-reviewer": {
       "source": "policies/profile-souls/jss-reviewer/SOUL.md",
       "live": "/Users/chanbla11mit/.hermes/profiles/jss-reviewer/SOUL.md"
+    },
+    "anki-orchestrator": {
+      "source": "policies/profile-souls/anki-orchestrator/SOUL.md",
+      "live": "/Users/chanbla11mit/.hermes/profiles/anki-orchestrator/SOUL.md"
+    },
+    "anki-worker": {
+      "source": "policies/profile-souls/anki-worker/SOUL.md",
+      "live": "/Users/chanbla11mit/.hermes/profiles/anki-worker/SOUL.md"
+    },
+    "anki-worker-2": {
+      "source": "policies/profile-souls/anki-worker-2/SOUL.md",
+      "live": "/Users/chanbla11mit/.hermes/profiles/anki-worker-2/SOUL.md"
+    },
+    "anki-reviewer": {
+      "source": "policies/profile-souls/anki-reviewer/SOUL.md",
+      "live": "/Users/chanbla11mit/.hermes/profiles/anki-reviewer/SOUL.md"
     }
   },
   "repository_policies": {
@@ -1090,6 +1217,9 @@
     "harness-worker-2",
     "chapt-worker-2",
     "jobcron-worker-2",
-    "jss-worker-2"
+    "jss-worker-2",
+    "anki-worker",
+    "anki-worker-2",
+    "anki-reviewer"
   ]
 }

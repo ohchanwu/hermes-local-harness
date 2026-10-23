@@ -22,11 +22,15 @@ from incident_recovery_verify_fixture import LocalReads, ROOT, load_verifier, re
 FLEETS = {"jobcron": "jobcron", "cha-pt": "chapt", "harness": "harness", "jss-genr": "jss"}
 POOLS = {project: [f"{prefix}-worker", f"{prefix}-worker-2"] for project, prefix in FLEETS.items()}
 SECOND = tuple(pool[1] for pool in POOLS.values())
+# The anki fleet (t_06fc410a) was defined with both workers; it is not part of the
+# 2026-10-18 second-worker change that SECOND and the procedure text record.
+ALL_POOLS = {**POOLS, "anki": ["anki-worker", "anki-worker-2"]}
 # Live default-home kanban.dispatch_profiles order after the controller's 2026-10-18 change.
 PROJECT_DISPATCH = [
     "jobcron-worker", "jobcron-reviewer", "chapt-worker", "chapt-reviewer",
     "harness-worker", "harness-reviewer", "jss-worker", "jss-reviewer",
     "harness-worker-2", "chapt-worker-2", "jobcron-worker-2", "jss-worker-2",
+    "anki-worker", "anki-worker-2", "anki-reviewer",
 ]
 GLM = tuple(f"{prefix}-worker-glm-{n}" for prefix in FLEETS.values() for n in (1, 2))
 GLM_NAME = re.compile(r"\b(?:jobcron|chapt|harness|jss)-worker-glm-\d\b")
@@ -128,7 +132,7 @@ class DesiredState(unittest.TestCase):
         dispatch = self.snapshot["kanban"]["dispatch_profiles"]
         self.assertEqual(dispatch[-len(PROJECT_DISPATCH):], PROJECT_DISPATCH)
         self.assertEqual(self.snapshot["kanban"]["max_in_progress_per_profile"], 1)
-        self.assertEqual(self.roster["project_repair_policy"]["project_boards"], list(FLEETS))
+        self.assertEqual(self.roster["project_repair_policy"]["project_boards"], [*FLEETS, "anki"])
         # The legacy default-board pool never held a project worker.
         for key in ("implementation_allowlist", "dispatch_allowlist"):
             for pool in POOLS.values():
@@ -164,7 +168,7 @@ class Verifier(unittest.TestCase):
         cls.fleets = load(ROOT / "snapshots/sanitized-current-state.yaml")["project_isolation"]
 
     def test_constants(self):
-        self.assertEqual(self.verifier.PROJECT_WORKER_POOLS, POOLS)
+        self.assertEqual(self.verifier.PROJECT_WORKER_POOLS, ALL_POOLS)
         for assignees, prefix in ((self.verifier.CHAPT_ASSIGNEES, "chapt"),
                                   (self.verifier.HARNESS_ASSIGNEES, "harness"),
                                   (self.verifier.JSS_ASSIGNEES, "jss")):
@@ -376,7 +380,7 @@ class Pins(unittest.TestCase):
                 continue
             data = resolved_fixture(fixture)  # "tracked-source" resolved as verify-state does
             with self.subTest(fixture=fixture.name):
-                for project, pool in POOLS.items():
+                for project, pool in ALL_POOLS.items():
                     self.assertEqual(data["project_isolation"][project]["workers"], pool)
                 for profile in PINNED_WORKERS:
                     self.assertEqual(data["profile_soul_hashes"][f"{profile}-2"],

@@ -38,7 +38,11 @@
     "harness-worker-glm-1",
     "harness-worker-glm-2",
     "jss-worker-glm-1",
-    "jss-worker-glm-2"
+    "jss-worker-glm-2",
+    "anki-orchestrator",
+    "anki-worker",
+    "anki-worker-2",
+    "anki-reviewer"
   ],
   "approvals": {
     "mode": "off",
@@ -79,7 +83,11 @@
       "harness-worker-glm-1",
       "harness-worker-glm-2",
       "jss-worker-glm-1",
-      "jss-worker-glm-2"
+      "jss-worker-glm-2",
+      "anki-orchestrator",
+      "anki-worker",
+      "anki-worker-2",
+      "anki-reviewer"
     ]
   },
   "managed_profile_settings": {
@@ -112,7 +120,10 @@
       "harness-worker-2",
       "chapt-worker-2",
       "jobcron-worker-2",
-      "jss-worker-2"
+      "jss-worker-2",
+      "anki-worker",
+      "anki-worker-2",
+      "anki-reviewer"
     ]
   },
   "plugins": {
@@ -194,6 +205,11 @@
         "baseline": "248e3be912900802e50676522de31759a3ab5bf6",
         "protected_reference": "refs/harness/baselines/t_76a2134d",
         "status": "repository-only: shared skill, profile-local override and profile SOUL expectations are derived at check time from tracked sources; hash pins removed wherever a tracked source exists; the default profile's skill home is ~/.hermes/skills and every other profile's is its own profiles/<profile>/skills; not observed deployment, live rollout unperformed"
+      },
+      "anki_fleet": {
+        "baseline": "00453fee8fdd4438c185eb97c1279255c7170132",
+        "protected_reference": "refs/harness/baselines/t_06fc410a",
+        "status": "repository-only anki fleet definition and desired-source declarations, not observed deployment; live setup unperformed and live verification pending"
       }
     },
     "policy_version": "scoped-ponytail-separation-v1",
@@ -210,7 +226,8 @@
           "jobcron-orchestrator",
           "chapt-orchestrator",
           "harness-orchestrator",
-          "jss-orchestrator"
+          "jss-orchestrator",
+          "anki-orchestrator"
         ],
         "version": "0.6.10",
         "files": [
@@ -240,7 +257,9 @@
           "harness-worker",
           "harness-worker-2",
           "jss-worker",
-          "jss-worker-2"
+          "jss-worker-2",
+          "anki-worker",
+          "anki-worker-2"
         ],
         "version": "1.0.0",
         "files": [
@@ -269,7 +288,9 @@
           "harness-worker",
           "harness-worker-2",
           "jss-worker",
-          "jss-worker-2"
+          "jss-worker-2",
+          "anki-worker",
+          "anki-worker-2"
         ],
         "version": "1.0.0",
         "files": [
@@ -361,6 +382,9 @@
       },
       "jss-orchestrator": {
         "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md": "tracked-source"
+      },
+      "anki-orchestrator": {
+        "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md": "tracked-source"
       }
     }
   },
@@ -388,6 +412,12 @@
         "repo": "jss-genr",
         "path": "/Users/chanbla11mit/projects/jss-genr/CLAUDE.md",
         "marker": "**This repo is pushed publicly.**",
+        "record_marker": "Status: defined in repository source; live setup pending."
+      },
+      {
+        "repo": "anki",
+        "path": "/Users/chanbla11mit/projects/anki/README.md",
+        "marker": "# Anki tooling and standards",
         "record_marker": "Status: defined in repository source; live setup pending."
       }
     ]
@@ -459,6 +489,22 @@
         "jss-worker",
         "jss-worker-2"
       ]
+    },
+    "anki": {
+      "board": "anki",
+      "repository": "/Users/chanbla11mit/projects/anki",
+      "repositories": [
+        "/Users/chanbla11mit/projects/anki",
+        "/Users/chanbla11mit/projects/anki-addons"
+      ],
+      "addons_project": "anki-addons",
+      "orchestrator": "anki-orchestrator",
+      "worker": "anki-worker",
+      "reviewer": "anki-reviewer",
+      "workers": [
+        "anki-worker",
+        "anki-worker-2"
+      ]
     }
   },
   "project_repair_policy": {
@@ -471,7 +517,8 @@
       "jobcron",
       "cha-pt",
       "harness",
-      "jss-genr"
+      "jss-genr",
+      "anki"
     ]
   },
   "profile_souls": {
@@ -526,6 +573,22 @@
     "jss-reviewer": {
       "source": "policies/profile-souls/jss-reviewer/SOUL.md",
       "live": "/Users/chanbla11mit/.hermes/profiles/jss-reviewer/SOUL.md"
+    },
+    "anki-orchestrator": {
+      "source": "policies/profile-souls/anki-orchestrator/SOUL.md",
+      "live": "/Users/chanbla11mit/.hermes/profiles/anki-orchestrator/SOUL.md"
+    },
+    "anki-worker": {
+      "source": "policies/profile-souls/anki-worker/SOUL.md",
+      "live": "/Users/chanbla11mit/.hermes/profiles/anki-worker/SOUL.md"
+    },
+    "anki-worker-2": {
+      "source": "policies/profile-souls/anki-worker-2/SOUL.md",
+      "live": "/Users/chanbla11mit/.hermes/profiles/anki-worker-2/SOUL.md"
+    },
+    "anki-reviewer": {
+      "source": "policies/profile-souls/anki-reviewer/SOUL.md",
+      "live": "/Users/chanbla11mit/.hermes/profiles/anki-reviewer/SOUL.md"
     }
   },
   "repository_policies": {

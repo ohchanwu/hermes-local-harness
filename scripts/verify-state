@@ -309,6 +309,7 @@ PROFILE_SOUL_PATHS = {
         "harness-orchestrator", "harness-worker", "harness-worker-2", "harness-reviewer",
         "jobcron-orchestrator",
         "jss-orchestrator", "jss-worker", "jss-worker-2", "jss-reviewer",
+        "anki-orchestrator", "anki-worker", "anki-worker-2", "anki-reviewer",
     )
 }
 # Fleet GLM workers retired 2026-10-18 (procedures/switching-hermes-models.md).
@@ -600,6 +601,7 @@ ADOPTION_REPOS = {
     "jobcron": "adoption/jobcron.md",
     "harness": "adoption/harness.md",
     "jss-genr": "adoption/jss-genr.md",
+    "anki": "adoption/anki.md",
 }
 PROJECT_REPOSITORY_ALLOWLISTS = {
     "jobcron": ["/Users/chanbla11mit/projects/jobcron"],
@@ -610,14 +612,19 @@ PROJECT_REPOSITORY_ALLOWLISTS = {
     ],
     "harness": ["/Users/chanbla11mit/hermes-local-harness"],
     "jss-genr": ["/Users/chanbla11mit/projects/jss-genr"],
+    "anki": [
+        "/Users/chanbla11mit/projects/anki",
+        "/Users/chanbla11mit/projects/anki-addons",
+    ],
 }
-# Control and writing repositories have no preview-server contract.
-PROJECTS_WITHOUT_PREVIEW_PORT = {"harness", "jss-genr"}
+# Control, writing and Anki repositories have no preview-server contract.
+PROJECTS_WITHOUT_PREVIEW_PORT = {"harness", "jss-genr", "anki"}
 PROJECT_LAUNCHERS = {
     "jobcron": "run-jobcron-orchestrator",
     "cha-pt": "run-chapt-orchestrator",
     "harness": "run-harness-orchestrator",
     "jss-genr": "run-jss-orchestrator",
+    "anki": "run-anki-orchestrator",
 }
 # Each fleet has two implementation workers (second Opus worker added 2026-10-18).
 PROJECT_WORKER_POOLS = {
@@ -625,10 +632,18 @@ PROJECT_WORKER_POOLS = {
     "cha-pt": ["chapt-worker", "chapt-worker-2"],
     "harness": ["harness-worker", "harness-worker-2"],
     "jss-genr": ["jss-worker", "jss-worker-2"],
+    "anki": ["anki-worker", "anki-worker-2"],
 }
 CHAPT_ASSIGNEES = {"chapt-worker", "chapt-worker-2", "chapt-reviewer"}
 HARNESS_ASSIGNEES = {"harness-worker", "harness-worker-2", "harness-reviewer"}
 JSS_ASSIGNEES = {"jss-worker", "jss-worker-2", "jss-reviewer"}
+ANKI_ASSIGNEES = {"anki-worker", "anki-worker-2", "anki-reviewer"}
+# Anki add-on repository (owner decision 2026-10-22): its cards declare the add-on
+# project line; cards for the primary Anki repository never carry it.
+ANKI_REPOSITORY = "/Users/chanbla11mit/projects/anki"
+ANKI_ADDONS_REPOSITORY = "/Users/chanbla11mit/projects/anki-addons"
+ANKI_ADDONS_PROJECT = "anki-addons"
+ANKI_ADDONS_PROJECT_LINE = re.compile(r"(?m)^Add-on project EXACT anki-addons\.$")
 JSS_CARD_KIND = re.compile(r"(?m)^Card kind EXACT (repository|writing-round)\.$")
 JSS_WRITE_TARGETS = re.compile(r"(?m)^Write targets EXACT ([^\n]+)\.$")
 # Writing-round targets: new files at any depth under `profile/` or one `companies/<slug>/`.
@@ -696,7 +711,7 @@ def frontend_path_allowed(path):
 def check_project_isolation(errors, fleets, observed=None):
     """Validate the hard board/repository/profile mapping for concurrent projects."""
     if not isinstance(fleets, dict) or set(fleets) != set(PROJECT_REPOSITORY_ALLOWLISTS):
-        fail(errors, "project isolation mapping must contain exactly jobcron, cha-pt, harness, and jss-genr")
+        fail(errors, "project isolation mapping must contain exactly jobcron, cha-pt, harness, jss-genr, and anki")
         return
     seen_profiles, seen_boards, seen_repos, seen_ports = set(), set(), set(), set()
     for project, fleet in fleets.items():
@@ -730,6 +745,11 @@ def check_project_isolation(errors, fleets, observed=None):
                 project != "cha-pt" or scraper_project != SCRAPER_PROJECT
                 or SCRAPER_REPOSITORY not in repos):
             fail(errors, f"project scraper mapping malformed: {project}")
+        addons_project = fleet.get("addons_project")
+        if (addons_project is not None or project == "anki") and (
+                project != "anki" or addons_project != ANKI_ADDONS_PROJECT
+                or ANKI_ADDONS_REPOSITORY not in repos):
+            fail(errors, f"project add-on mapping malformed: {project}")
         if (project in PROJECTS_WITHOUT_PREVIEW_PORT and port is not None) or (
                 project not in PROJECTS_WITHOUT_PREVIEW_PORT and
                 (not isinstance(port, int) or not 1024 <= port <= 65535)):
@@ -767,7 +787,7 @@ PROJECT_REPAIR_POLICY = {
     "max_approaches": 3,
     "max_attempts_per_approach": 3,
     "max_infrastructure_retries_per_attempt": 1,
-    "project_boards": ["jobcron", "cha-pt", "harness", "jss-genr"],
+    "project_boards": ["jobcron", "cha-pt", "harness", "jss-genr", "anki"],
 }
 
 
@@ -1284,6 +1304,37 @@ def check_jss_card_contract(errors, tasks):
             fail(errors, f"jss-genr card contract drift {task_id}: writing-round write targets invalid")
 
 
+def check_anki_card_contract(errors, tasks):
+    """Every open anki card fails closed on its single-repository contract. The card names
+    exactly one of the two Anki repositories; an add-on repository card declares the add-on
+    project line and project, and a primary repository card carries neither."""
+    if not isinstance(tasks, list):
+        fail(errors, "anki card contract observation malformed")
+        return
+    for task in tasks:
+        if not isinstance(task, dict):
+            fail(errors, "anki card contract observation malformed")
+            continue
+        if task.get("board") != "anki":
+            continue
+        body = task.get("body") if isinstance(task.get("body"), str) else ""
+        declared = [repo for repo in PROJECT_REPOSITORY_ALLOWLISTS["anki"] if re.search(
+            r"(?:^|[.!?;]\s+)Repository\s+" + re.escape(repo) + r"\s+ONLY\b", body)]
+        repository = declared[0] if len(declared) == 1 else ANKI_REPOSITORY
+        task_id, body = check_isolated_card(
+            errors, task, "anki", repository, ANKI_ASSIGNEES, "anki-reviewer", (TEST_COMMAND_LINE,))
+        if len(declared) > 1:
+            fail(errors, f"anki card contract drift {task_id}: expected exactly one repository")
+            continue
+        addons_line = ANKI_ADDONS_PROJECT_LINE.search(body)
+        if repository == ANKI_ADDONS_REPOSITORY and (
+                not addons_line or task.get("project_id") != ANKI_ADDONS_PROJECT):
+            fail(errors, f"anki card contract drift {task_id}: add-on project contract missing")
+        if repository != ANKI_ADDONS_REPOSITORY and (
+                addons_line or task.get("project_id") == ANKI_ADDONS_PROJECT):
+            fail(errors, f"anki card contract drift {task_id}: add-on project on primary repository")
+
+
 def observe_open_chapt_cards(errors, runner=run):
     listed = runner("hermes", "-p", "default", "kanban", "--board", "cha-pt", "list", "--json")
     if listed.returncode:
@@ -1791,6 +1842,7 @@ def main():
         project_cards = observed.get("project_repair_cards")
         check_harness_card_contract(errors, project_cards)
         check_jss_card_contract(errors, project_cards)
+        check_anki_card_contract(errors, project_cards)
         check_project_repair_cards(errors, project_cards, warnings)
         check_profile_souls(errors, profile_souls, observed.get("profile_soul_hashes"))
         check_repository_policies(errors, repository_policies,
@@ -1885,9 +1937,11 @@ def main():
                 tools = json_config(profile, "platform_toolsets.cli")
                 if tools != expected_tools:
                     fail(errors, f"project toolset drift {profile}: expected {expected_tools!r}")
-            # Alternate-root Hermes projects (frontend, scraper), each owned by the orchestrator only.
+            # Alternate-root Hermes projects (frontend, scraper, Anki add-ons), each owned by the
+            # orchestrator only.
             alternate_projects = {fleet[key]: repo for key, repo in (
-                ("frontend_project", FRONTEND_REPOSITORY), ("scraper_project", SCRAPER_REPOSITORY))
+                ("frontend_project", FRONTEND_REPOSITORY), ("scraper_project", SCRAPER_REPOSITORY),
+                ("addons_project", ANKI_ADDONS_REPOSITORY))
                 if fleet.get(key)}
             for alternate_project, alternate_repo in alternate_projects.items():
                 shown = run("hermes", "-p", fleet["orchestrator"], "project", "show", alternate_project)
@@ -1918,6 +1972,7 @@ def main():
         project_cards = observe_open_project_cards(errors)
         check_harness_card_contract(errors, project_cards)
         check_jss_card_contract(errors, project_cards)
+        check_anki_card_contract(errors, project_cards)
         check_project_repair_cards(errors, project_cards, warnings)
         deployed_hashes = {}
         for entry in snapshot["skill"]["shared_skills"]:

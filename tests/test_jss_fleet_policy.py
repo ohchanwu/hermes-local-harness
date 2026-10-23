@@ -29,7 +29,7 @@ WORKERS = (WORKER, WORKER2)
 GLM_WORKERS = ("jss-worker-glm-1", "jss-worker-glm-2")
 NON_ORCH_SOULS = (WORKER, WORKER2, REVIEWER, *GLM_WORKERS)
 SITE = "/Users/chanbla11mit/mystuff/projects/ohchanwu.dev"
-FLEETS = {"jobcron", "cha-pt", "harness", "jss-genr"}
+FLEETS = {"jobcron", "cha-pt", "harness", "jss-genr", "anki"}
 RELATIVE = "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md"
 SKILL = ROOT / "policies/profile-skills" / ORCH / RELATIVE
 RUN_SCRIPT = ROOT / "scripts/run-jss-orchestrator"
@@ -75,7 +75,7 @@ class FleetDesiredState(unittest.TestCase):
         cls.verifier = load_verifier()
         cls.profiles = {profile["name"]: profile for profile in cls.roster["profiles"]}
 
-    def test_roster_snapshot_and_verifier_agree_on_four_fleets(self):
+    def test_roster_snapshot_and_verifier_agree_on_five_fleets(self):
         fleets = self.roster["project_fleets"]
         self.assertEqual(set(fleets), FLEETS)
         self.assertEqual(self.snapshot["project_isolation"], fleets)
@@ -85,7 +85,7 @@ class FleetDesiredState(unittest.TestCase):
         self.assertEqual(self.verifier.PROJECT_REPAIR_POLICY, self.roster["project_repair_policy"])
         self.assertEqual(self.snapshot["project_repair_policy"], self.roster["project_repair_policy"])
         self.assertEqual(self.roster["project_repair_policy"]["project_boards"],
-                         ["jobcron", "cha-pt", "harness", "jss-genr"])
+                         ["jobcron", "cha-pt", "harness", "jss-genr", "anki"])
         self.assertEqual({adapter["repo"] for adapter in self.snapshot["adoption"]["adapters"]}, FLEETS)
         errors = []
         with redirect_stdout(io.StringIO()):
@@ -110,12 +110,12 @@ class FleetDesiredState(unittest.TestCase):
         with redirect_stdout(io.StringIO()):
             self.verifier.check_project_isolation(errors, with_port)
         self.assertIn("project isolation preview port invalid: jss-genr", errors)
-        three = {key: value for key, value in self.roster["project_fleets"].items() if key != "jss-genr"}
+        four = {key: value for key, value in self.roster["project_fleets"].items() if key != "jss-genr"}
         errors = []
         with redirect_stdout(io.StringIO()):
-            self.verifier.check_project_isolation(errors, three)
+            self.verifier.check_project_isolation(errors, four)
         self.assertEqual(errors, [
-            "project isolation mapping must contain exactly jobcron, cha-pt, harness, and jss-genr"])
+            "project isolation mapping must contain exactly jobcron, cha-pt, harness, jss-genr, and anki"])
 
     def test_profiles_models_and_dispatch(self):
         expected = {

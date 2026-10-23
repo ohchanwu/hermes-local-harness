@@ -25,6 +25,7 @@ BASELINE = "b7093717054754283c6f9ac671a227f695fec9b5"
 POLICY = "policies/writing-rules.md"
 POLICY_SHA256 = "36609ae76520b9eef3aa4d8cf795f7844aebc91fb8e0ee072b0843d232d2044c"
 REVIEWERS = ("chapt-reviewer", "harness-reviewer", "jobcron-reviewer", "jss-reviewer")
+LATER_SOULS = ("anki-orchestrator", "anki-worker", "anki-worker-2", "anki-reviewer")
 REVIEWER_SENTENCE = (b"Reject a card, document, or commit that introduces a coined compound term or a "
                      b"'(project term)' that is not defined in the repository glossary.\n")
 OK = "OK: desired state matches observed state"
@@ -59,7 +60,18 @@ class TrackedText(unittest.TestCase):
 
     def test_every_soul_is_its_baseline_bytes_plus_the_exact_append(self):
         block = (ROOT / POLICY).read_bytes()
-        souls = sorted((ROOT / "policies/profile-souls").glob("*/SOUL.md"))
+        all_souls = sorted((ROOT / "policies/profile-souls").glob("*/SOUL.md"))
+        # SOULs added after BASELINE (the anki fleet, t_06fc410a) have no baseline bytes;
+        # they were written with the block already at their end.
+        later = {path for path in all_souls if path.parent.name in LATER_SOULS}
+        self.assertEqual({path.parent.name for path in later}, set(LATER_SOULS))
+        for path in sorted(later):
+            with self.subTest(profile=path.parent.name):
+                text = path.read_bytes()
+                self.assertTrue(text.endswith(b"\n\n" + block))
+                self.assertEqual(text.count(block), 1)
+                self.assertEqual(text.count(REVIEWER_SENTENCE), 1 if path.parent.name == "anki-reviewer" else 0)
+        souls = [path for path in all_souls if path not in later]
         self.assertEqual(len(souls), 20)
         self.assertEqual({path.parent.name for path in souls} & set(REVIEWERS), set(REVIEWERS))
         for path in souls:

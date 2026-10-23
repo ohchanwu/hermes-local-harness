@@ -30,7 +30,8 @@ GPT_ERA = ("reviewer-sol", "worker-flash-1", "worker-flash-2", "worker-flash-3",
            "worker-terra-2")
 PROJECT_DISPATCH = ["jobcron-worker", "jobcron-reviewer", "chapt-worker", "chapt-reviewer",
                     "harness-worker", "harness-reviewer", "jss-worker", "jss-reviewer",
-                    "harness-worker-2", "chapt-worker-2", "jobcron-worker-2", "jss-worker-2"]
+                    "harness-worker-2", "chapt-worker-2", "jobcron-worker-2", "jss-worker-2",
+                    "anki-worker", "anki-worker-2", "anki-reviewer"]
 HARNESS = "/Users/chanbla11mit/hermes-local-harness"
 
 

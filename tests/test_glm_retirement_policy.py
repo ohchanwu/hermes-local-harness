@@ -150,8 +150,9 @@ class DesiredState(unittest.TestCase):
         self.assertEqual(self.roster["project_dispatch_allowlist"], [
             "jobcron-worker", "jobcron-reviewer", "chapt-worker", "chapt-reviewer",
             "harness-worker", "harness-reviewer", "jss-worker", "jss-reviewer",
-            "harness-worker-2", "chapt-worker-2", "jobcron-worker-2", "jss-worker-2"])
-        self.assertEqual(dispatch[-12:], self.roster["project_dispatch_allowlist"])
+            "harness-worker-2", "chapt-worker-2", "jobcron-worker-2", "jss-worker-2",
+            "anki-worker", "anki-worker-2", "anki-reviewer"])
+        self.assertEqual(dispatch[-15:], self.roster["project_dispatch_allowlist"])
 
     def test_verifier_constants(self):
         self.assertEqual(set(self.verifier.RETIRED_PROFILES), set(GLM))
