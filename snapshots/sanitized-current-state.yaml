@@ -229,7 +229,7 @@
           "jss-orchestrator",
           "anki-orchestrator"
         ],
-        "version": "0.6.10",
+        "version": "0.6.11",
         "files": [
           "SKILL.md",
           "scripts/set-active-lanes.py"

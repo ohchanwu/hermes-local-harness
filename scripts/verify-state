@@ -904,23 +904,31 @@ def valid_project_repair_history(history):
                 (candidate is None and review is None) or evidenced if outcome == "blocked" else evidenced)
             review_valid = review is None if incomplete else (
                 (candidate is None and review is None) or evidenced if outcome == "blocked" else evidenced)
+            final_attempt = attempt_index == len(attempts) - 1
+            final_approach = approach_index == len(history) - 1
+            # A run ID does not exist before dispatch: only the final pending
+            # attempt with no retry, candidate, or review may record null.
+            null_run_allowed = (implementation_run is None and final_attempt and final_approach
+                           and outcome == "pending" and not isinstance(retries, bool)
+                           and retries == 0 and candidate is None and review is None)
+            run_valid = null_run_allowed or (
+                isinstance(implementation_run, str) and bool(implementation_run.strip())
+                and implementation_run == implementation_run.strip()
+                and implementation_run not in implementation_runs)
             if (not candidate_valid or (candidate is not None and candidate in candidates)
-                    or not isinstance(implementation_run, str) or not implementation_run.strip()
-                    or implementation_run != implementation_run.strip()
-                    or implementation_run in implementation_runs or not review_valid
+                    or not run_valid or not review_valid
                     or (review is not None and review in review_runs)
                     or isinstance(retries, bool) or not isinstance(retries, int)
                     or not 0 <= retries <= PROJECT_REPAIR_POLICY["max_infrastructure_retries_per_attempt"]
                     or outcome not in REPAIR_OUTCOMES
                     or (outcome == "infrastructure_failed" and retries != 1)):
                 return False
-            implementation_runs.add(implementation_run)
+            if implementation_run is not None:
+                implementation_runs.add(implementation_run)
             if candidate is not None:
                 candidates.add(candidate)
             if review is not None:
                 review_runs.add(review)
-            final_attempt = attempt_index == len(attempts) - 1
-            final_approach = approach_index == len(history) - 1
             if not final_attempt and outcome not in {"revise", "infrastructure_failed"}:
                 return False
             exhausted = (len(attempts) == PROJECT_REPAIR_POLICY["max_attempts_per_approach"]
@@ -956,6 +964,13 @@ def project_repair_transition_valid(previous, current):
                 and len(prev_approach["attempts"]) == len(current_approach["attempts"])
                 and prev_approach["attempts"][:-1] == current_approach["attempts"][:-1]
                 and prev_attempt["outcome"] == "pending"):
+            # Record the dispatched run ID: the null run ID of the final
+            # pending attempt becomes a string and nothing else changes.
+            if prev_attempt["implementation_run_id"] is None:
+                return (isinstance(current_attempt["implementation_run_id"], str)
+                        and current_attempt == dict(
+                            prev_attempt,
+                            implementation_run_id=current_attempt["implementation_run_id"]))
             if current_attempt["outcome"] == "pending":
                 return (prev_attempt["infrastructure_retries"] == 0
                         and current_attempt["infrastructure_retries"] == 1

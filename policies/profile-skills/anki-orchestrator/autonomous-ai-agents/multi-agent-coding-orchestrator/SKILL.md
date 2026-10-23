@@ -1,7 +1,7 @@
 ---
 name: multi-agent-coding-orchestrator
 description: "Use when orchestrating anki add-on, tooling, and deck change work."
-version: 0.6.10-anki.1
+version: 0.6.10-anki.2
 author: chanbla11mit, Hermes Agent
 license: MIT
 platforms: [macos]
@@ -95,6 +95,8 @@ Every card must contain:
 12. The collection access rules and explicit prohibitions on remotes, push, PR, AnkiWeb sync or publication, installs, live policy changes, credentials, and other external writes without separate owner authorization.
 13. Skill-policy metadata stating whether `minimal-implementation` is enabled and that requirements and risk outrank simplification.
 
+Item 1 writes the repository line in exactly the form `Repository <exact repository path> ONLY.` `scripts/verify-state` accepts no other repository wording; a repository line that uses `EXACT` instead of `ONLY` fails the card contract check.
+
 `scripts/verify-state` fails closed on items 1–4 and 7–9 for every open card. Use `kanban_create(..., board: anki)` only after validating the complete contract, then read the card with `kanban_show(..., board: anki)` and verify the stored fields before dispatch.
 
 ## Card Setup
@@ -146,6 +148,18 @@ A nonzero result rejects card creation.
 Autonomous repair is opt-in only when the same card contains exactly one full line `authorization_mode: autonomous` and one full line `repair_policy: bounded-convergence-v1`.
 
 Before first dispatch, append one `repair_history: <JSON array>` comment with `kanban_comment(..., board: anki)`. Append a complete successor snapshot for every transition. Continue on the same card; never reset the budget by changing cards, workers, models, branches, prompts, or labels.
+
+Exact `repair_history` formats. `scripts/verify-state` rejects a snapshot that does not follow them:
+
+- `approach_id` uses only lowercase letters, digits and hyphens, starts with a letter or digit, and has at most 64 characters, for example `a1` or `a2`. An ID with uppercase letters, such as `A1`, is rejected.
+- `strategy_sha256` is the lowercase hexadecimal SHA-256 of the UTF-8 bytes of the `strategy` text after every run of whitespace is replaced with one space and leading and trailing whitespace is removed. Copy the strategy text byte-for-byte into the snapshot, and compute the hash from that same text with this exact command: `python3 -I -c 'import hashlib,sys; print(hashlib.sha256(" ".join(sys.argv[1].split()).encode()).hexdigest())' "<strategy text>"`.
+- The snapshot appended before the first dispatch has `implementation_run_id: null`, because no run exists before dispatch. After the dispatcher starts the run, append a successor snapshot that sets `implementation_run_id` to that run ID and changes nothing else. Follow the same two steps when an appended attempt or approach is recorded before its dispatch. Only the final attempt of the final approach may have a null run ID, and only while that attempt has `outcome: "pending"`, `infrastructure_retries: 0`, `candidate_commit: null` and `review_run_id: null`. A pending attempt with a null run ID never changes directly to another outcome.
+
+Complete example of a valid snapshot line before the first dispatch:
+
+```text
+repair_history: [{"approach_id":"a1","strategy":"Add a bounded retry limit to the export job and cover the limit with one unit test","strategy_sha256":"95a031c63f8d9676ebce8a6628f6c9681318ef99b653ca6619e1ff9a941aa934","material_difference_review_run_id":null,"attempts":[{"candidate_commit":null,"implementation_run_id":null,"review_run_id":null,"infrastructure_retries":0,"outcome":"pending"}]}]
+```
 
 Limits:
 

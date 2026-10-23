@@ -11,6 +11,7 @@ import unittest
 
 import test_orchestrator_skill_terminology as terminology
 from test_orchestrator_skill_terminology import CHAPT, reverse_terminology_edits
+from test_repair_history_format_policy import reverse_repair_format_edits
 
 ROOT = Path(__file__).resolve().parents[1]
 RELATIVE = "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md"
@@ -26,6 +27,9 @@ PRE_SCRAPER_SHA256 = "c963e090ef2f19929b01a8cd3581f1b6e87501d6371439e27e3e757346
 PRE_CARD_CREATION_SHA256 = "f95f1441f0c9c689d36b4756e465c9d088346f72d589b0ecfbf7281773020138"
 PRE_TERMINOLOGY_SHA256 = terminology.PRE_TERMINOLOGY_SHA256[CHAPT]
 MERGED_SHA256 = "432fe0e129378fc4620820a0aa17327e1ac88d9e57df84f10c8f303b42e46d44"
+# The repair_history format and repository line change (t_a4dccec1, 0.6.7-chapt.5)
+# is listed in tests/test_repair_history_format_policy.py; reversing it recovers
+# the merged bytes (MERGED_SHA256).
 # The model-name and wording change (t_c836d2a4, no version bump) is listed in
 # tests/test_orchestrator_skill_terminology.py; reversing it recovers the
 # card-creation bytes (PRE_TERMINOLOGY_SHA256).
@@ -146,6 +150,7 @@ def digest(content):
 class ChaptPolicyReconciliationTests(unittest.TestCase):
     def setUp(self):
         self.source = SOURCE.read_bytes()
+        self.merged = reverse_repair_format_edits(CHAPT, self.source)
         self.skill = json.loads((ROOT / "snapshots/sanitized-current-state.yaml").read_bytes())["skill"]
 
     def retained_rule(self):
@@ -166,11 +171,11 @@ class ChaptPolicyReconciliationTests(unittest.TestCase):
         self.retained_rule()
 
     def test_entire_reviewed_source_is_preserved(self):
-        self.assertEqual(self.source.count(b"version: 0.6.7-chapt.4\n"), 1)
+        self.assertEqual(self.merged.count(b"version: 0.6.7-chapt.4\n"), 1)
         # Invert the 0.6.7-chapt.4 second worker, the 0.6.7-chapt.3 legacy-lane
         # note, then the 0.6.7-chapt.2 GLM worker retirement.
         # Invert the model-name and wording change first.
-        original = reverse_terminology_edits(CHAPT, self.source)
+        original = reverse_terminology_edits(CHAPT, self.merged)
         self.assertEqual(digest(original), PRE_TERMINOLOGY_SHA256)
         # Then invert the card-creation change: restore Card Setup steps 1 and 4.
         for new, old in CARD_CREATION_EDITS:
@@ -217,7 +222,7 @@ class ChaptPolicyReconciliationTests(unittest.TestCase):
         original = original.replace(rule + b"\n", b"", 1).replace(
             b"version: 0.6.5-chapt.4\n", b"version: 0.6.5-chapt.3\n", 1)
         self.assertEqual(digest(original), BASELINE_SHA256)
-        self.assertEqual(digest(self.source), MERGED_SHA256)
+        self.assertEqual(digest(self.merged), MERGED_SHA256)
 
     def test_upgrade_selection_is_byte_unchanged(self):
         # Unchanged apart from the one t_c836d2a4 wording edit in this section.
@@ -254,7 +259,7 @@ class ChaptPolicyReconciliationTests(unittest.TestCase):
         overrides = self.skill["profile_local_skill_overrides"]["chapt-orchestrator"]
         # The declaration names the tracked source; its bytes are the merged result.
         self.assertEqual(overrides, {RELATIVE: "tracked-source"})
-        self.assertEqual(digest(self.source), MERGED_SHA256)
+        self.assertEqual(digest(self.merged), MERGED_SHA256)
         provenance = self.skill["source_pin_provenance"]
         self.assertEqual(provenance["baseline"], "84d91a7ba698d38bb31c5b80e04dea0dd002d15f")
         self.assertEqual(provenance["upgrade_proportionality"]["baseline"], "fdc59293262e15c0376cfaa9f25244e7c317fc58")

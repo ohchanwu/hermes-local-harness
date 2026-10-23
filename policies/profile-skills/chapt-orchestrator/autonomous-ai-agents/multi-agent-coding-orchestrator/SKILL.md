@@ -1,7 +1,7 @@
 ---
 name: multi-agent-coding-orchestrator
 description: "Use when orchestrating multi-agent coding with Hermes."
-version: 0.6.7-chapt.4
+version: 0.6.7-chapt.5
 author: chanbla11mit, Hermes Agent
 license: MIT
 platforms: [macos]
@@ -53,6 +53,18 @@ Each project has two implementation workers. Assign implementation only to them,
 Project-fleet repair is independent of the legacy escalation ladder. Enable it only when the exact `jobcron` or `cha-pt` card body records exactly one full line `authorization_mode: autonomous` and one full line `repair_policy: bounded-convergence-v1`. Before the first dispatch, append a card comment containing one single-line `repair_history: <JSON array>` snapshot; append a complete successor snapshot comment for every state transition. Kanban comments are the append-only card-wide counter and evidence ledger. Continue on the same card—bounded-convergence-v1 repair authority never transfers to a replacement card. Reassign the same card when authorized, or human-block.
 
 Each approach object has exactly `approach_id`, `strategy`, `strategy_sha256`, `material_difference_review_run_id`, and `attempts`. The strategy hash is calculated from the whitespace-normalized written strategy; approaches after the first require a distinct independent material-difference review run. Each attempt has exactly `candidate_commit`, `implementation_run_id`, `review_run_id`, `infrastructure_retries`, and `outcome`. Start an in-flight attempt with null candidate/review and `outcome: pending`. A successor snapshot may update only that final pending attempt, append one next attempt, or append one next approach; all prior snapshot content remains immutable.
+
+Exact `repair_history` formats. `scripts/verify-state` rejects a snapshot that does not follow them:
+
+- `approach_id` uses only lowercase letters, digits and hyphens, starts with a letter or digit, and has at most 64 characters, for example `a1` or `a2`. An ID with uppercase letters, such as `A1`, is rejected.
+- `strategy_sha256` is the lowercase hexadecimal SHA-256 of the UTF-8 bytes of the `strategy` text after every run of whitespace is replaced with one space and leading and trailing whitespace is removed. Copy the strategy text byte-for-byte into the snapshot, and compute the hash from that same text with this exact command: `python3 -I -c 'import hashlib,sys; print(hashlib.sha256(" ".join(sys.argv[1].split()).encode()).hexdigest())' "<strategy text>"`.
+- The snapshot appended before the first dispatch has `implementation_run_id: null`, because no run exists before dispatch. After the dispatcher starts the run, append a successor snapshot that sets `implementation_run_id` to that run ID and changes nothing else. Follow the same two steps when an appended attempt or approach is recorded before its dispatch. Only the final attempt of the final approach may have a null run ID, and only while that attempt has `outcome: "pending"`, `infrastructure_retries: 0`, `candidate_commit: null` and `review_run_id: null`. A pending attempt with a null run ID never changes directly to another outcome.
+
+Complete example of a valid snapshot line before the first dispatch:
+
+```text
+repair_history: [{"approach_id":"a1","strategy":"Add a bounded retry limit to the export job and cover the limit with one unit test","strategy_sha256":"95a031c63f8d9676ebce8a6628f6c9681318ef99b653ca6619e1ff9a941aa934","material_difference_review_run_id":null,"attempts":[{"candidate_commit":null,"implementation_run_id":null,"review_run_id":null,"infrastructure_retries":0,"outcome":"pending"}]}]
+```
 
 - `max_approaches: 3`: an approach is a materially distinct written implementation strategy. Hash the normalized strategy as `strategy_sha256`; changing a worker, model, card, branch, or worktree, prompt, commit, label, or approach ID is not a new approach. The verifier rejects reused IDs or exact strategy hashes; the independent reviewer must reject a superficial semantic rewrite.
 - `max_attempts_per_approach: 3`: the initial implementation and at most two reviewer-directed corrections. Every completed semantic attempt records a unique 40-hex candidate commit and non-empty independent review run ID.
@@ -336,7 +348,7 @@ Preserve all external-read/write, credential, mutation, deployment, and cutover 
 
 Each implementation card must include:
 
-- One exact repository from the fleet allowlist and the tenant.
+- One exact repository from the fleet allowlist, declared with the exact repository line below, and the tenant.
 - Specification path and exact assigned slice.
 - Base branch or commit and recovery procedure.
 - Required repository-owned worktree/branch isolation.
@@ -347,6 +359,10 @@ Each implementation card must include:
 - Required local commit and structured handoff.
 - The exact board-designated reviewer as same-card reviewer for code changes.
 - Explicit prohibitions on push, PR creation, deployment, and production mutation.
+
+Write the repository line on the card body in exactly the form `Repository <exact repository path> ONLY.` `scripts/verify-state` accepts no other repository wording; a repository line that uses `EXACT` instead of `ONLY` fails the card contract check. The exact repository lines are:
+
+- Cha PT, exactly one per card: `Repository /Users/chanbla11mit/projects/cha-pt ONLY.`, `Repository /Users/chanbla11mit/projects/cha-pt-frontend ONLY.`, or `Repository /Users/chanbla11mit/projects/cha-webpt-website-sync ONLY.`
 
 Use parent-child links for real dependencies. Keep independent slices parallel. Do not decompose merely to keep every lane busy.
 

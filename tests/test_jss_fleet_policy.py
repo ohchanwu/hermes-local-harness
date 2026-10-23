@@ -333,7 +333,7 @@ class RoleContracts(unittest.TestCase):
         self.assertLessEqual(len(paragraph), 1000)
 
     def test_skill_version_size_and_sections(self):
-        self.assertRegex(self.skill_raw, r"(?m)^version: 0\.6\.7-jss\.5$")
+        self.assertRegex(self.skill_raw, r"(?m)^version: 0\.6\.7-jss\.6$")
         self.assertLessEqual(len(self.skill_raw.splitlines()), 260)
         self.assertEqual(re.findall(r"^## (.+)$", self.skill_raw, re.M), [
             "Hard Scope", "Privacy Gate", "Card Kinds", "Role Separation", "Card Contract",

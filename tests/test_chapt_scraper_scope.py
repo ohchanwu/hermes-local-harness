@@ -19,6 +19,7 @@ from incident_recovery_verify_fixture import ROOT, load_verifier
 from rule_text import assert_rule
 from test_chapt_policy_reconciliation import CARD_CREATION_EDITS
 from test_orchestrator_skill_terminology import TERMINOLOGY_EDITS, reverse_terminology_edits
+from test_repair_history_format_policy import reverse_repair_format_edits
 
 BASELINE = "7a4ed4bbb75a9680e11e5fdb70b60268f9a6eaff"
 SCRAPER = "/Users/chanbla11mit/projects/cha-webpt-website-sync"
@@ -513,6 +514,8 @@ class PolicyText(unittest.TestCase):
             base = self.baseline_text(path).split("\n\n")
             current = self.text(path)
             relative = str(path.relative_to(ROOT))
+            # Reverse the later repair_history format and repository line change (t_a4dccec1).
+            current = reverse_repair_format_edits(relative, current)
             if relative in TERMINOLOGY_EDITS:
                 # Reverse the later model-name and wording change (t_c836d2a4).
                 current = reverse_terminology_edits(relative, current)
