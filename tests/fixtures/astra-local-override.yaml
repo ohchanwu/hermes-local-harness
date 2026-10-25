@@ -593,6 +593,9 @@
       },
       "anki-orchestrator": {
         "SKILL.md": "tracked-source"
+      },
+      "advisor": {
+        "SKILL.md": "tracked-source"
       }
     }
   },

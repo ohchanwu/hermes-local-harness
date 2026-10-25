@@ -1,7 +1,7 @@
 ---
 name: harness-bug-report
 description: "Use when a Hermes or harness defect is suspected. File a harness-board card with evidence; never write outside your own repository."
-version: 1.0.0
+version: 1.1.0
 author: chanbla11mit, Hermes Agent
 license: MIT
 platforms: [macos, linux, windows]
@@ -12,7 +12,7 @@ metadata:
 
 # Harness bug report
 
-This skill tells a project orchestrator how to report a suspected defect in Hermes or in the harness. The result is a card on the harness board. A harness worker then writes the `docs/bugs/` report and any fix in the harness repository, under the normal review procedure of the harness board.
+This skill tells a project orchestrator how to report a suspected defect in Hermes or in the harness. The result is a card on the harness board. A harness worker then writes the `docs/bugs/` report and any fix in the harness repository, under the normal review procedure of the harness board. Section 8 states when the `advisor` profile may take the same two actions that section 2 authorizes.
 
 ## 1. When this skill applies
 
@@ -88,3 +88,25 @@ If the defect blocks the project work, state that in the card body and tell the 
 ## 7. When harness-orchestrator loads this skill
 
 `harness-orchestrator` files its card on its own board `harness` under its normal card procedure. The exception in section 2 is not needed for it, because the harness board is its own board.
+
+## 8. When the advisor profile loads this skill
+
+The owner explicitly authorized (2026-10-25) the `advisor` profile to take exactly the two actions of section 2 on board `harness`:
+
+- One `kanban_create` call per suspected defect.
+- `kanban_comment` on a card that the advisor filed.
+
+These two actions are the one owner-authorized exception to the advisor's default of read-only consultation. Every other action remains prohibited: no other board access, no claim, no unblock, no reassignment, no comment on a card that the advisor did not file, no file write, and no message to any orchestrator or to any orchestrator session.
+
+This section applies when, during a consultation, the advisor's own investigation (for example of an orchestrator's stored transcript, of local files, or of system state) shows a failure that meets the test in section 1.
+
+The advisor files the card without first asking the user, and states the ID of the card that it filed in the same reply to the user.
+
+The advisor uses the arguments of section 4, with the title `<project>: <one-line defect>`, where `<project>` is the project whose work showed the defect, or `advisor` when no project is involved.
+
+The evidence follows section 3, with these differences:
+
+- The session ID is the advisor's own session ID.
+- When the evidence comes from the stored transcript of another profile, give that profile name and that session ID, and quote only the lines that are needed, with secret values replaced as section 3 requires.
+
+After filing, section 5 applies with "continue the consultation" in place of "continue the project work". Re-testing is limited to read-only observation.

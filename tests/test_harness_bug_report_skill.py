@@ -1,4 +1,5 @@
 """The harness-bug-report shared skill: frontmatter, snapshot declaration, body rules and index line."""
+import hashlib
 import json
 import re
 import subprocess
@@ -14,6 +15,17 @@ DESCRIPTION = ("Use when a Hermes or harness defect is suspected. File a harness
                "evidence; never write outside your own repository.")
 ORCHESTRATORS = ["jobcron-orchestrator", "chapt-orchestrator", "harness-orchestrator",
                  "jss-orchestrator", "anki-orchestrator"]
+DEPLOY_PROFILES = ORCHESTRATORS + ["advisor"]
+VERSION = "1.1.0"
+# SHA-256 of sections 1 to 7 (from "## 1." up to "## 8.", trailing newlines removed) as they were
+# in version 1.0.0. Version 1.1.0 adds section 8 and leaves sections 1 to 7 unchanged.
+SECTIONS_1_TO_7_SHA256 = "0894ba1525519ad6cac21fa6c2e34cd0f139914605fb7f5f46224399e420bc99"
+INTRO_1_0_0 = ("This skill tells a project orchestrator how to report a suspected defect in Hermes or in the "
+               "harness. The result is a card on the harness board. A harness worker then writes the "
+               "`docs/bugs/` report and any fix in the harness repository, under the normal review "
+               "procedure of the harness board.")
+INTRO_ADDED_SENTENCE = (" Section 8 states when the `advisor` profile may take the same two actions that "
+                        "section 2 authorizes.")
 README_LINE = ("- Harness defects found by project orchestrators arrive as cards on the harness board "
                "assigned to `harness-worker`, filed under the `harness-bug-report` skill "
                "([skill source](../skills/harness-bug-report/SKILL.md)); harness workers write the "
@@ -87,7 +99,7 @@ class HarnessBugReportSkill(unittest.TestCase):
         self.assertEqual(self.frontmatter, {
             "name": "harness-bug-report",
             "description": DESCRIPTION,
-            "version": "1.0.0",
+            "version": VERSION,
             "author": "chanbla11mit, Hermes Agent",
             "license": "MIT",
             "platforms": ["macos", "linux", "windows"],
@@ -111,10 +123,12 @@ class HarnessBugReportSkill(unittest.TestCase):
             "name": "harness-bug-report",
             "path": "/Users/chanbla11mit/.hermes/profiles/<profile>/skills/autonomous-ai-agents/harness-bug-report",
             "source": "skills/harness-bug-report",
-            "deploy_profiles": ORCHESTRATORS,
-            "version": "1.0.0",
+            "deploy_profiles": DEPLOY_PROFILES,
+            "version": VERSION,
             "files": ["SKILL.md"],
         }])
+        self.assertEqual(entries[0]["deploy_profiles"][-1], "advisor")
+        self.assertEqual(entries[0]["version"], self.frontmatter["version"])
         self.assertEqual(sorted(p.name for p in SKILL.parent.rglob("*") if p.is_file()), ["SKILL.md"])
 
     # (3)
@@ -173,7 +187,48 @@ class HarnessBugReportSkill(unittest.TestCase):
                                 cwd=ROOT, capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         clean = json.loads((ROOT / "tests/fixtures/clean.yaml").read_text(encoding="utf-8"))
-        self.assertEqual(sorted(clean["skill_files"]["harness-bug-report"]), sorted(ORCHESTRATORS))
+        self.assertEqual(sorted(clean["skill_files"]["harness-bug-report"]), sorted(DEPLOY_PROFILES))
+
+    # (8)
+    def test_advisor_section_is_limited_to_create_and_comment_on_board_harness(self):
+        self.assertEqual(re.findall(r"^## (\d+)\. ", self.body, re.M), [str(n) for n in range(1, 9)])
+        advisor = section(self.body, 8)
+        self.assertTrue(advisor.startswith("## 8. When the advisor profile loads this skill\n"))
+        self.assertIn("The owner explicitly authorized (2026-10-25) the `advisor` profile to take exactly "
+                      "the two actions of section 2 on board `harness`:", advisor)
+        self.assertEqual(set(re.findall(r"kanban_[a-z_]+", advisor)), {"kanban_create", "kanban_comment"})
+        self.assertEqual(re.findall(r"board `([a-z-]+)`", advisor), ["harness"])
+        self.assertIn("- One `kanban_create` call per suspected defect.", advisor)
+        self.assertIn("- `kanban_comment` on a card that the advisor filed.", advisor)
+        self.assertIn("the one owner-authorized exception to the advisor's default of read-only consultation",
+                      advisor)
+        for action in ("no other board access", "no claim", "no unblock", "no reassignment",
+                       "no comment on a card that the advisor did not file", "no file write",
+                       "no message to any orchestrator or to any orchestrator session"):
+            with self.subTest(action=action):
+                self.assertIn(action, advisor)
+        self.assertIn("during a consultation, the advisor's own investigation", advisor)
+        self.assertIn("meets the test in section 1", advisor)
+        self.assertIn("The advisor files the card without first asking the user", advisor)
+        self.assertIn("states the ID of the card that it filed in the same reply to the user", advisor)
+        self.assertIn("the title `<project>: <one-line defect>`", advisor)
+        self.assertIn("or `advisor` when no project is involved", advisor)
+        self.assertIn("The session ID is the advisor's own session ID.", advisor)
+        self.assertIn("give that profile name and that session ID", advisor)
+        self.assertIn("quote only the lines that are needed", advisor)
+        self.assertIn("with secret values replaced as section 3 requires", advisor)
+        self.assertIn('section 5 applies with "continue the consultation" in place of '
+                      '"continue the project work"', advisor)
+        self.assertIn("Re-testing is limited to read-only observation.", advisor)
+
+    # (9)
+    def test_sections_1_to_7_unchanged_and_intro_gains_one_sentence(self):
+        match = re.search(r"^## 1\. .*?(?=^## 8\. )", self.body, re.M | re.S)
+        assert match is not None
+        digest = hashlib.sha256(match.group(0).rstrip("\n").encode("utf-8")).hexdigest()
+        self.assertEqual(digest, SECTIONS_1_TO_7_SHA256)
+        intro = self.body.split("\n## 1. ", 1)[0]
+        self.assertEqual(intro, "\n# Harness bug report\n\n" + INTRO_1_0_0 + INTRO_ADDED_SENTENCE + "\n")
 
 
 if __name__ == "__main__":
