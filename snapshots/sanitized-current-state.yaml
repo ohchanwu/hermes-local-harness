@@ -360,6 +360,22 @@
           "references/temporary-cloud-bootstrap-iam.md",
           "references/frontend-origin-separation.md"
         ]
+      },
+      {
+        "name": "harness-bug-report",
+        "path": "/Users/chanbla11mit/.hermes/profiles/<profile>/skills/autonomous-ai-agents/harness-bug-report",
+        "source": "skills/harness-bug-report",
+        "deploy_profiles": [
+          "jobcron-orchestrator",
+          "chapt-orchestrator",
+          "harness-orchestrator",
+          "jss-orchestrator",
+          "anki-orchestrator"
+        ],
+        "version": "1.0.0",
+        "files": [
+          "SKILL.md"
+        ]
       }
     ],
     "profile_local_skill_overrides": {

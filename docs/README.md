@@ -35,6 +35,7 @@ This index is the entry point for durable harness documentation tracked in Git. 
 
 ## Bugs
 
+- Harness defects found by project orchestrators arrive as cards on the harness board assigned to `harness-worker`, filed under the `harness-bug-report` skill ([skill source](../skills/harness-bug-report/SKILL.md)); harness workers write the `docs/bugs/` entries from those cards.
 - [Claude subscription provider rejected CLI retries, title-helper requests and parallel tool calls](bugs/261017-claude-subscription-cli-retries-and-title-helper-rejected.md) — fixed and deployed: mid-reply CLI retries restart cleanly before any text reaches Hermes; `extra_body.reasoning` on helper calls is accepted and ignored; parallel tool calls are supported.
 - [Repair-history formatting blocked approved autonomous completion](bugs/261017-repair-history-formatting-blocked-approved-completion.md) — task-local bookkeeping gate removed; systemic prevention not implemented.
 - [Jobcron upgrade orchestration: repeated first-launch ceremony](bugs/261007-jobcron-upgrade-orchestration-repeated-first-launch-ceremony.md)

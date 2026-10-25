@@ -578,6 +578,23 @@
         "references/temporary-cloud-bootstrap-iam.md": "tracked-source",
         "references/frontend-origin-separation.md": "tracked-source"
       }
+    },
+    "harness-bug-report": {
+      "jobcron-orchestrator": {
+        "SKILL.md": "tracked-source"
+      },
+      "chapt-orchestrator": {
+        "SKILL.md": "tracked-source"
+      },
+      "harness-orchestrator": {
+        "SKILL.md": "tracked-source"
+      },
+      "jss-orchestrator": {
+        "SKILL.md": "tracked-source"
+      },
+      "anki-orchestrator": {
+        "SKILL.md": "tracked-source"
+      }
     }
   },
   "active_extras": [],
