@@ -1,7 +1,7 @@
 ---
 name: multi-agent-coding-orchestrator
 description: "Use when orchestrating multi-agent coding with Hermes."
-version: 0.6.9-jobcron.6
+version: 0.6.9-jobcron.7
 author: chanbla11mit, Hermes Agent
 license: MIT
 platforms: [macos]
@@ -47,11 +47,20 @@ Exact `repair_history` formats. `scripts/verify-state` rejects a snapshot that d
 - `approach_id` uses only lowercase letters, digits and hyphens, starts with a letter or digit, and has at most 64 characters, for example `a1` or `a2`. An ID with uppercase letters, such as `A1`, is rejected.
 - `strategy_sha256` is the lowercase hexadecimal SHA-256 of the UTF-8 bytes of the `strategy` text after every run of whitespace is replaced with one space and leading and trailing whitespace is removed. Copy the strategy text byte-for-byte into the snapshot, and compute the hash from that same text with this exact command: `python3 -I -c 'import hashlib,sys; print(hashlib.sha256(" ".join(sys.argv[1].split()).encode()).hexdigest())' "<strategy text>"`.
 - The snapshot appended before the first dispatch has `implementation_run_id: null`, because no run exists before dispatch. After the dispatcher starts the run, append a successor snapshot that sets `implementation_run_id` to that run ID and changes nothing else. Follow the same two steps when an appended attempt or approach is recorded before its dispatch. Only the final attempt of the final approach may have a null run ID, and only while that attempt has `outcome: "pending"`, `infrastructure_retries: 0`, `candidate_commit: null` and `review_run_id: null`. A pending attempt with a null run ID never changes directly to another outcome.
+- `candidate_commit` and `review_run_id` stay null until the snapshot that records the review outcome of the attempt. While an attempt has `outcome: "pending"` or `outcome: "infrastructure_failed"`, both are null, even after the worker has committed a candidate. Record the candidate commit and the review run ID in the same successor snapshot that changes the outcome from `pending` to the review outcome. With `outcome: "blocked"`, both are null or both are set. With `outcome: "revise"`, `outcome: "pivot"` or `outcome: "approve"`, both are set. A set `review_run_id` is a non-empty string without leading or trailing whitespace. A `candidate_commit` value is never used by more than one attempt, and a `review_run_id` value is never used by more than one attempt or by any `material_difference_review_run_id` in the same history.
+- A non-null `candidate_commit` is the full 40-character lowercase hexadecimal commit ID. Get it with `git rev-parse <commit>`. An abbreviated commit ID such as `abc1234`, or a commit ID with uppercase letters, is rejected.
+- `outcome` is exactly one of `pending`, `revise`, `pivot`, `approve`, `blocked` or `infrastructure_failed`. The value `approved` is accepted as an alias of `approve`. Any other value, such as `changes_requested`, is rejected. Record a reviewer change request as `revise` when the work continues with the same approach, and as `pivot` when the work continues with a materially different approach. A `revise` on the third attempt of an approach exhausts that approach, and `pivot` is rejected on the third approach.
 
 Complete example of a valid snapshot line before the first dispatch:
 
 ```text
 repair_history: [{"approach_id":"a1","strategy":"Add a bounded retry limit to the export job and cover the limit with one unit test","strategy_sha256":"95a031c63f8d9676ebce8a6628f6c9681318ef99b653ca6619e1ff9a941aa934","material_difference_review_run_id":null,"attempts":[{"candidate_commit":null,"implementation_run_id":null,"review_run_id":null,"infrastructure_retries":0,"outcome":"pending"}]}]
+```
+
+Complete example of the same history after the dispatched run `run-worker-1` committed a candidate and the first review, run `run-review-1`, requested changes on the same approach:
+
+```text
+repair_history: [{"approach_id":"a1","strategy":"Add a bounded retry limit to the export job and cover the limit with one unit test","strategy_sha256":"95a031c63f8d9676ebce8a6628f6c9681318ef99b653ca6619e1ff9a941aa934","material_difference_review_run_id":null,"attempts":[{"candidate_commit":"0123456789abcdef0123456789abcdef01234567","implementation_run_id":"run-worker-1","review_run_id":"run-review-1","infrastructure_retries":0,"outcome":"revise"}]}]
 ```
 
 - `max_approaches: 3`: an approach is a materially distinct written implementation strategy. Hash the normalized strategy as `strategy_sha256`; changing a worker, model, card, branch, or worktree, prompt, commit, label, or approach ID is not a new approach. The verifier rejects reused IDs or exact strategy hashes; the independent reviewer must reject a superficial semantic rewrite.

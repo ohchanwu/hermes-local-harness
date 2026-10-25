@@ -25,6 +25,7 @@ from importlib.machinery import SourceFileLoader
 from pathlib import Path
 
 from test_card_contract_line_start_policy import reverse_owner_path_edits
+from test_repair_history_candidate_rules_policy import reverse_candidate_rule_edits
 
 ROOT = Path(__file__).resolve().parents[1]
 RELATIVE = "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md"
@@ -418,7 +419,12 @@ def tracked_files(*prefixes):
 class InstructionTextTests(unittest.TestCase):
     def setUp(self):
         self.verifier = load_validator()
-        self.text = {path: (ROOT / path).read_text() for path in SKILL_FILES + POLICY_FILES}
+        # The later repair_history candidate rule change (t_6436ac1c) inserts three bullet
+        # points into FORMAT_RULES and adds a second example line in the six skill files;
+        # tests/test_repair_history_candidate_rules_policy.py checks that change, and it is
+        # reversed here so these checks keep reading the text this card wrote.
+        self.text = {path: reverse_candidate_rule_edits(path, (ROOT / path).read_text())
+                     for path in SKILL_FILES + POLICY_FILES}
 
     def example_lines(self, path):
         return [line for line in self.text[path].splitlines() if line.startswith("repair_history: ")]
@@ -469,8 +475,10 @@ class InstructionTextTests(unittest.TestCase):
     def test_reversing_the_edits_recovers_the_baseline_bytes(self):
         for path, want in PRE_REPAIR_FORMAT_SHA256.items():
             with self.subTest(path=path):
-                # Reverse the later owner shell command path change (t_bd860536) first.
-                current = reverse_owner_path_edits(path, (ROOT / path).read_bytes())
+                # Reverse the later repair_history candidate rule change (t_6436ac1c) and the
+                # owner shell command path change (t_bd860536) first.
+                current = reverse_candidate_rule_edits(path, (ROOT / path).read_bytes())
+                current = reverse_owner_path_edits(path, current)
                 original = reverse_repair_format_edits(path, current)
                 self.assertEqual(hashlib.sha256(original).hexdigest(), want)
 

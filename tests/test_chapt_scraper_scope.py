@@ -20,6 +20,7 @@ from rule_text import assert_rule
 from test_chapt_policy_reconciliation import CARD_CREATION_EDITS
 from test_orchestrator_skill_terminology import TERMINOLOGY_EDITS, reverse_terminology_edits
 from test_card_contract_line_start_policy import reverse_owner_path_edits
+from test_repair_history_candidate_rules_policy import reverse_candidate_rule_edits
 from test_repair_history_format_policy import reverse_repair_format_edits
 
 BASELINE = "7a4ed4bbb75a9680e11e5fdb70b60268f9a6eaff"
@@ -515,8 +516,10 @@ class PolicyText(unittest.TestCase):
             base = self.baseline_text(path).split("\n\n")
             current = self.text(path)
             relative = str(path.relative_to(ROOT))
-            # Reverse the later owner shell command path change (t_bd860536) and the
+            # Reverse the later repair_history candidate rule change (t_6436ac1c), the
+            # owner shell command path change (t_bd860536) and the
             # repair_history format and repository line change (t_a4dccec1).
+            current = reverse_candidate_rule_edits(relative, current)
             current = reverse_owner_path_edits(relative, current)
             current = reverse_repair_format_edits(relative, current)
             if relative in TERMINOLOGY_EDITS:

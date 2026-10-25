@@ -12,6 +12,7 @@ import unittest
 import test_orchestrator_skill_terminology as terminology
 from test_orchestrator_skill_terminology import CHAPT, reverse_terminology_edits
 from test_card_contract_line_start_policy import reverse_owner_path_edits
+from test_repair_history_candidate_rules_policy import reverse_candidate_rule_edits
 from test_repair_history_format_policy import reverse_repair_format_edits
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -151,8 +152,10 @@ def digest(content):
 class ChaptPolicyReconciliationTests(unittest.TestCase):
     def setUp(self):
         self.source = SOURCE.read_bytes()
-        # Reverse the later owner shell command path change (t_bd860536) first.
-        self.merged = reverse_repair_format_edits(CHAPT, reverse_owner_path_edits(CHAPT, self.source))
+        # Reverse the later repair_history candidate rule change (t_6436ac1c) and the
+        # owner shell command path change (t_bd860536) first.
+        current = reverse_candidate_rule_edits(CHAPT, self.source)
+        self.merged = reverse_repair_format_edits(CHAPT, reverse_owner_path_edits(CHAPT, current))
         self.skill = json.loads((ROOT / "snapshots/sanitized-current-state.yaml").read_bytes())["skill"]
 
     def retained_rule(self):

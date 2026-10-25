@@ -16,6 +16,7 @@ from pathlib import Path
 import unittest
 
 from test_card_contract_line_start_policy import reverse_owner_path_edits
+from test_repair_history_candidate_rules_policy import reverse_candidate_rule_edits
 from test_repair_history_format_policy import reverse_repair_format_edits
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -211,20 +212,24 @@ class OrchestratorSkillTerminologyTests(unittest.TestCase):
     def test_reversing_the_edits_recovers_the_baseline_bytes(self):
         for path, want in PRE_TERMINOLOGY_SHA256.items():
             with self.subTest(path=path):
-                # Reverse the later owner shell command path change (t_bd860536) and the
+                # Reverse the later repair_history candidate rule change (t_6436ac1c), the
+                # owner shell command path change (t_bd860536) and the
                 # repair_history format change (t_a4dccec1) first.
-                current = reverse_owner_path_edits(path, (ROOT / path).read_bytes())
+                current = reverse_candidate_rule_edits(path, (ROOT / path).read_bytes())
+                current = reverse_owner_path_edits(path, current)
                 current = reverse_repair_format_edits(path, current)
                 original = reverse_terminology_edits(path, current)
                 self.assertEqual(hashlib.sha256(original).hexdigest(), want)
 
     def test_harness_and_jss_copies_are_unchanged(self):
-        # Unchanged by this card; the later owner shell command path change (t_bd860536) and
+        # Unchanged by this card; the later repair_history candidate rule change (t_6436ac1c),
+        # owner shell command path change (t_bd860536) and
         # repair_history format change (t_a4dccec1) are reversed first.
         for path, want in ((HARNESS, "c1e78607948f4d0c890ef86afb2fe63f3898efe35d8c413ec225147c99d8f17c"),
                            (JSS, "589ca4a53186e13726d4f77a6a647a36559fa8795dbc7682000007114211b5e6")):
             with self.subTest(path=path):
-                current = reverse_owner_path_edits(path, (ROOT / path).read_bytes())
+                current = reverse_candidate_rule_edits(path, (ROOT / path).read_bytes())
+                current = reverse_owner_path_edits(path, current)
                 original = reverse_repair_format_edits(path, current)
                 self.assertEqual(hashlib.sha256(original).hexdigest(), want)
 

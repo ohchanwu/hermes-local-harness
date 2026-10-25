@@ -21,7 +21,7 @@ SKILLS = {
     board: ROOT / f"policies/profile-skills/{profile}-orchestrator" / RELATIVE
     for board, profile in (("jobcron", "jobcron"), ("cha-pt", "chapt"))
 }
-VERSIONS = {"jobcron": "0.6.9-jobcron.6", "cha-pt": "0.6.7-chapt.6"}
+VERSIONS = {"jobcron": "0.6.9-jobcron.7", "cha-pt": "0.6.7-chapt.7"}
 BASELINE_SKILL_LINES = {"jobcron": 429, "cha-pt": 434}
 # Live-only Jobcron rules reconciled verbatim from the installed
 # jobcron-orchestrator skill (0.6.5-jobcron.1) into the repository copy.
@@ -85,8 +85,9 @@ class FleetAutonomyPolicy(unittest.TestCase):
                     assert match is not None, heading
                     port_lines += match.group(1).count("\n")
                 self.assertLessEqual(port_lines, 65)
+                # Plus the 9 lines of repair_history candidate rules and example (t_6436ac1c).
                 self.assertLessEqual(len(self.raw[board].splitlines()),
-                                     BASELINE_SKILL_LINES[board] + 90)
+                                     BASELINE_SKILL_LINES[board] + 90 + 9)
 
     def test_rule1_card_setup_without_setup_hold(self):
         for board in SKILLS:

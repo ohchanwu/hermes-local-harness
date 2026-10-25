@@ -42,8 +42,9 @@ class HarnessAutonomyPolicy(unittest.TestCase):
         cls.text = flat(cls.raw)
 
     def test_version_and_bounded_growth(self):
-        self.assertRegex(self.raw, r"(?m)^version: 0\.6\.7-harness\.5$")
-        self.assertLessEqual(len(self.raw.splitlines()), BASELINE_SKILL_LINES + 70)
+        self.assertRegex(self.raw, r"(?m)^version: 0\.6\.7-harness\.6$")
+        # Plus the 9 lines of repair_history candidate rules and example (t_6436ac1c).
+        self.assertLessEqual(len(self.raw.splitlines()), BASELINE_SKILL_LINES + 70 + 9)
 
     def test_rule1_card_setup_without_setup_hold(self):
         setup = section(self.raw, "Card Setup")

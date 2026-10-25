@@ -23,6 +23,8 @@ import unittest
 from contextlib import redirect_stdout
 from pathlib import Path
 
+from test_repair_history_candidate_rules_policy import reverse_candidate_rule_edits
+
 ROOT = Path(__file__).resolve().parents[1]
 RELATIVE = "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md"
 SHARED = "skills/multi-agent-coding-orchestrator/SKILL.md"
@@ -277,7 +279,9 @@ class OwnerShellCommandPaths(unittest.TestCase):
         return (ROOT / path).read_bytes()
 
     def test_jobcron_file_with_live_version_has_the_live_hash(self):
-        data = self.read(JOBCRON).decode()
+        # The live skill predates the later repair_history candidate rule change
+        # (t_6436ac1c), so reverse that change first.
+        data = reverse_candidate_rule_edits(JOBCRON, self.read(JOBCRON).decode())
         self.assertEqual(data.count("version: 0.6.9-jobcron.6\n"), 1)
         live = data.replace("version: 0.6.9-jobcron.6\n", JOBCRON_LIVE_VERSION, 1).encode()
         self.assertEqual(hashlib.sha256(live).hexdigest(), JOBCRON_LIVE_SHA256)
@@ -305,7 +309,9 @@ class OwnerShellCommandPaths(unittest.TestCase):
     def test_reversing_the_edits_recovers_the_baseline_bytes(self):
         for path, want in PRE_OWNER_PATH_SHA256.items():
             with self.subTest(path=path):
-                original = reverse_owner_path_edits(path, self.read(path))
+                # Reverse the later repair_history candidate rule change (t_6436ac1c) first.
+                current = reverse_candidate_rule_edits(path, self.read(path))
+                original = reverse_owner_path_edits(path, current)
                 self.assertEqual(hashlib.sha256(original).hexdigest(), want)
 
 
