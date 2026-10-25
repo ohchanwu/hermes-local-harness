@@ -166,6 +166,20 @@ types (bounded), blocks, restarts, whether text reached Hermes, text length and
 sha256, and its relation to the previous message's text. It never holds text,
 thinking, tool arguments/results, prompts, environment, paths or credentials. A
 write failure is one log warning; an existing file is never replaced.
+One bounded exception: when a runtime stdout line is not JSON, the request fails
+as before (`runtime startup, I/O or malformed protocol: JSONDecodeError`), and
+the audit's `rejected_line` holds the line's length (`bytes`), `sha256`, and at
+most its first 200 bytes (`prefix_bytes`, `prefix`) after Hermes's secret
+redaction (`agent.redact.redact_sensitive_text` with `force=True`). A token that
+the 200-byte boundary cuts is left out whole, so redaction never sees a
+shortened secret. If redaction cannot be imported or fails, `prefix` is null
+and `prefix_omitted` is `redaction unavailable`; no part of the line is stored.
+A `tool_progress` event (the CLI reports a running tool call, every 30 s while
+Hermes runs a parked call) is recorded in the audit's event types, counts as
+activity for the idle timeout, and is never forwarded. A non-null
+`parent_tool_use_id` (a subagent's message) is rejected on `assistant`, `user`
+and `stream_event` events only, as `malformed runtime event or unexpected
+subagent`; `tool_progress` is accepted with any value of it.
 Snapshot/stream mismatch, malformed protocol, quota/refusal, rejected rate limit,
 process death and unsupported model/executor selection terminate the client.
 An unmatched tool cannot become a text-success result. Unknown usage is absent,

@@ -39,6 +39,15 @@ __all__ = ["ClaudeSubscriptionClient", "Bridge", "ProviderError", "History", "Me
 log = logging.getLogger(__name__)
 OUTPUT_FLOOR = 4096
 MAX_SECOND_MESSAGES = 4  # decided follow-on messages per request before the stream counts as runaway
+# The event types whose non-null parent_tool_use_id marks a subagent's message. The provider advertises
+# only its own MCP tools, so the CLI cannot start a subagent. tool_progress also declares the field;
+# it carries no model output and is accepted with any value of it.
+MESSAGE_EVENTS = ("assistant", "user", "stream_event")
+
+
+def protocol_error(exc):
+    """The error Hermes receives for a runtime startup, I/O or protocol exception."""
+    return ProviderError("runtime startup, I/O or malformed protocol: " + type(exc).__name__)
 
 
 def owner_only(info):
@@ -472,17 +481,27 @@ class ClaudeSubscriptionClient:
                         raise
                     raise ProviderError(f"{exc} (before initialization; an upgraded Claude CLI "
                                         f"{version_text(self._cli_version)} may reject a flag: run smoke.py)") from None
+                except ValueError as exc:
+                    line = getattr(exc, "rejected_line", None)
+                    if line is not None:
+                        # A stdout line that is not JSON: audit it (bounded, redacted), then fail as before.
+                        self._persist_stream_audit(stream_log, protocol_error(exc), runtime, line, rejected_line=line)
+                    raise
                 if obj is None:
                     continue
                 self._request_deadline = time.monotonic() + seconds  # idle timeout: any runtime event is activity
-                if not isinstance(obj, dict) or obj.get("parent_tool_use_id"):
+                kind = obj.get("type") if isinstance(obj, dict) else None
+                if not isinstance(obj, dict) or (kind in MESSAGE_EVENTS and obj.get("parent_tool_use_id")):
                     error = ProviderError("malformed runtime event or unexpected subagent")
                     self._persist_stream_audit(stream_log, error, runtime, obj)
                     raise error
-                kind = obj.get("type")
                 if kind not in ("assistant", "stream_event"):
                     stream_log.observe(obj)
-                if kind == "system" and obj.get("subtype") == "init":
+                if kind == "tool_progress":
+                    # Progress of a running tool call (every 30 s while Hermes runs a parked call): recorded
+                    # by the stream log and counted as activity above; never forwarded, no state changes.
+                    pass
+                elif kind == "system" and obj.get("subtype") == "init":
                     expected = {PREFIX + t["name"] for t in self._tools}
                     if obj.get("model") not in served or set(obj.get("tools", [])) != expected or obj.get("apiKeySource") != "none":
                         raise ProviderError("unexpected runtime model/auth source/executor")
@@ -557,7 +576,7 @@ class ClaudeSubscriptionClient:
                     raise error
         except (ValueError, TypeError, KeyError, OSError, subprocess.SubprocessError) as exc:
             self.cancel()
-            raise ProviderError("runtime startup, I/O or malformed protocol: " + type(exc).__name__) from None
+            raise protocol_error(exc) from None
         except BaseException:
             self.cancel()
             raise
@@ -611,12 +630,14 @@ class ClaudeSubscriptionClient:
         first.usage = merged
         return first
 
-    def _persist_stream_audit(self, stream_log, error, runtime, failed, *, observed=False):
+    def _persist_stream_audit(self, stream_log, error, runtime, failed, *, observed=False, rejected_line=None):
         """Write this request's stream audit; the caller then raises the original error unchanged.
 
         The event that failed is recorded (as not forwarded) unless it already was, then the rest of
         the current message is read briefly into the record only, never to Hermes, so a second
-        message's relation to the first is known. Any failure here is one warning, never a new error.
+        message's relation to the first is known. A stdout line that was not JSON (`rejected_line`,
+        bytes) is recorded as its length, hash and a bounded, redacted prefix (stream_audit.rejected).
+        Any failure here is one warning, never a new error.
         """
         try:
             if not observed:
@@ -627,7 +648,8 @@ class ClaudeSubscriptionClient:
             session = self._scope[-1] if self._scope else None
             record = stream_audit.payload(error, session, self._model,
                                           version_text(self._cli_version) if self._cli_version else None,
-                                          self.audit, stream_log, declared={PREFIX + t["name"] for t in self._tools or ()})
+                                          self.audit, stream_log, declared={PREFIX + t["name"] for t in self._tools or ()},
+                                          rejected_line=rejected_line)
             path = stream_audit.write(self._home, session, record)
         except Exception as exc:
             log.warning("claude-subscription stream failed (%s); stream audit not written (%s)", error, type(exc).__name__)

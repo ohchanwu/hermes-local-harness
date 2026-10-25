@@ -6,6 +6,12 @@ counts, hashes and relations. It never holds text, thinking, tool arguments or
 results, prompts, environment, paths or credentials. A stream/snapshot mismatch adds a
 classification of the two compared sides (key names, types, lengths, hashes, character
 classes at the first difference), never their values.
+
+One bounded exception: when a runtime stdout line is not JSON, `rejected_line` holds its
+length, its sha256 and at most its first PREFIX_BYTES bytes as text, after Hermes's secret
+redaction (agent.redact, forced on). A token that the PREFIX_BYTES boundary cuts is left out
+whole, so redaction never sees a shortened secret. Without working redaction the prefix is
+left out (null), never stored unredacted.
 """
 import datetime
 import hashlib
@@ -25,6 +31,9 @@ MAX_BLOCKS = 64      # per message
 MAX_AUDIT = 200      # newest client audit entries kept
 DRAIN_SECONDS, DRAIN_IDLE_SECONDS = 5.0, 1.0
 IDENTIFIER = re.compile(r"[A-Za-z0-9_.:-]+")
+PREFIX_BYTES = 200   # of a rejected (non-JSON) runtime stdout line
+TOKEN_BYTE = re.compile(rb"[A-Za-z0-9+/=_.~:%-]")    # bytes that can belong to a credential-like token
+TOKEN_TAIL = re.compile(rb"[A-Za-z0-9+/=_.~:%-]+\Z")
 
 # Client audit stages and the only fields copied from each; tool_parked's arguments are left out.
 AUDIT_FIELDS = {
@@ -149,6 +158,9 @@ class StreamLog:
             pass
 
     def _observe(self, obj, forwarded):
+        if isinstance(obj, bytes):  # a stdout line that was not JSON; payload's rejected_line describes it
+            self.events.add("<non-json-line>")
+            return
         if not isinstance(obj, dict):
             self.events.add("<non-object>")
             return
@@ -374,7 +386,33 @@ def snapshot_mismatch(kind, streamed, snapshot, declared=()):
             "calls_truncated": max(0, count - MAX_MISMATCH_CALLS)}
 
 
-def payload(error, session_id, model, cli_version, audit, stream_log, declared=()):
+def redactor():
+    """Hermes's secret redaction, forced on; imported only when a rejected line is recorded."""
+    from agent.redact import redact_sensitive_text
+    return lambda text: redact_sensitive_text(text, force=True)
+
+
+def rejected(line):
+    """Length, sha256 and a bounded, redacted prefix of a runtime stdout line that was not JSON."""
+    kept = line[:PREFIX_BYTES]
+    if len(line) > PREFIX_BYTES and TOKEN_BYTE.fullmatch(line[PREFIX_BYTES:PREFIX_BYTES + 1]):
+        # The boundary cuts a token: keep none of it, since redaction may not recognize a shortened secret.
+        tail = TOKEN_TAIL.search(kept)
+        kept = kept[:tail.start()] if tail else kept
+    out = {"bytes": len(line), "sha256": hashlib.sha256(line).hexdigest(), "prefix_bytes": len(kept)}
+    try:
+        text = redactor()(kept.decode("utf-8", errors="backslashreplace"))
+        if not isinstance(text, str):
+            raise TypeError("redaction returned no text")
+    except Exception:
+        out.update(prefix_bytes=0, prefix=None, prefix_omitted="redaction unavailable")
+        return out
+    # Escapes and redaction markers can lengthen the text; the stored prefix stays within PREFIX_BYTES.
+    out["prefix"] = text.encode("utf-8", errors="backslashreplace")[:PREFIX_BYTES].decode("utf-8", errors="ignore")
+    return out
+
+
+def payload(error, session_id, model, cli_version, audit, stream_log, declared=(), rejected_line=None):
     entries = list(audit)[-MAX_AUDIT:]
     record = {"schema_version": SCHEMA_VERSION, "created_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
               "session_id": session_label(session_id), "model": label(model, 80), "cli_version": label(cli_version, 40),
@@ -387,6 +425,8 @@ def payload(error, session_id, model, cli_version, audit, stream_log, declared=(
             record["snapshot_mismatch"] = snapshot_mismatch(*sides, declared=declared)
         except Exception as exc:  # the classification must never cost the rest of the record
             record["snapshot_mismatch"] = {"classification_failed": type(exc).__name__}
+    if rejected_line is not None:
+        record["rejected_line"] = rejected(rejected_line)
     return record
 
 

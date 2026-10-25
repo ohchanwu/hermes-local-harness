@@ -70,7 +70,11 @@ class Runtime:
     def read(self):
         if b"\n" in self.buffer:
             line, self.buffer = self.buffer.split(b"\n", 1)
-            return json.loads(line)
+            try:
+                return json.loads(line)
+            except ValueError as exc:
+                exc.rejected_line = line  # for the stream audit; the exception itself is unchanged
+                raise
         for key, _ in self.selector.select(0.01):
             data = os.read(key.fd, 65536)
             if not data:
