@@ -24,6 +24,8 @@ import unittest
 from importlib.machinery import SourceFileLoader
 from pathlib import Path
 
+from test_card_contract_line_start_policy import reverse_owner_path_edits
+
 ROOT = Path(__file__).resolve().parents[1]
 RELATIVE = "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md"
 SHARED = "skills/multi-agent-coding-orchestrator/SKILL.md"
@@ -467,7 +469,9 @@ class InstructionTextTests(unittest.TestCase):
     def test_reversing_the_edits_recovers_the_baseline_bytes(self):
         for path, want in PRE_REPAIR_FORMAT_SHA256.items():
             with self.subTest(path=path):
-                original = reverse_repair_format_edits(path, (ROOT / path).read_bytes())
+                # Reverse the later owner shell command path change (t_bd860536) first.
+                current = reverse_owner_path_edits(path, (ROOT / path).read_bytes())
+                original = reverse_repair_format_edits(path, current)
                 self.assertEqual(hashlib.sha256(original).hexdigest(), want)
 
 

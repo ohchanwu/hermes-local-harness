@@ -1,7 +1,7 @@
 ---
 name: multi-agent-coding-orchestrator
 description: "Use when orchestrating multi-agent coding with Hermes."
-version: 0.6.7-chapt.5
+version: 0.6.7-chapt.6
 author: chanbla11mit, Hermes Agent
 license: MIT
 platforms: [macos]
@@ -451,6 +451,7 @@ Send only milestone completions, genuine blockers, and approval requests. Do not
 
 ## Pitfalls
 
+- Shell commands given to the owner to run themselves must use absolute paths (for example `/Users/<user>/...`), never `~` or `$HOME`. The owner's shell can inherit `HOME` set to a Hermes profile directory, so `~` resolves to the wrong place. Check the exact paths with `stat` before sending the command.
 - For a byte-exact forward-port from an approved Git revision, avoid repeated text-patch attempts when escape normalization changes reviewed test literals. Preserve partial work and raw failures, verify the exact card tuple and yielded owner, then route the implementer to `git restore --source=<approved-full-SHA> --worktree -- <one-authorized-path>` in that card's worktree. This supported Git operation restores a known blob; it is not permission for broad resets, staging, new source generation, or shell file-write workarounds. Require actual byte equality and identity-only fixture rebinding before acceptance; reuse unaffected behavioral RED evidence and resume only unfinished gates on the same card.
 - When the user says stop, terminate every owned background worker, reviewer, preview server, and watcher before replying, then verify they stopped. Do not resume because a delayed completion notification arrives.
 - Run every Git command with an explicit repository `workdir` or `git -C`; printing a repository path inside a loop does not change the command's working repository.

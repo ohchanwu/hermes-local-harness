@@ -333,13 +333,14 @@ class RoleContracts(unittest.TestCase):
         self.assertLessEqual(len(paragraph), 1000)
 
     def test_skill_version_size_and_sections(self):
-        self.assertRegex(self.skill_raw, r"(?m)^version: 0\.6\.7-jss\.6$")
-        self.assertLessEqual(len(self.skill_raw.splitlines()), 260)
+        self.assertRegex(self.skill_raw, r"(?m)^version: 0\.6\.7-jss\.7$")
+        # 260 lines plus the 4-line Pitfalls section (t_bd860536).
+        self.assertLessEqual(len(self.skill_raw.splitlines()), 264)
         self.assertEqual(re.findall(r"^## (.+)$", self.skill_raw, re.M), [
             "Hard Scope", "Privacy Gate", "Card Kinds", "Role Separation", "Card Contract",
             "Card Setup", "Worker Selection", "Worktree and Baseline Gate", "Skills",
             "Bounded Autonomous Repair", "Autonomy", "Incident recovery", "Review and Integration",
-            "Operational Discipline", "Completion Gate",
+            "Operational Discipline", "Completion Gate", "Pitfalls",
         ])
 
     def test_skill_board_pinning_and_no_foreign_fleets(self):

@@ -1,7 +1,7 @@
 ---
 name: multi-agent-coding-orchestrator
 description: "Use when orchestrating multi-agent coding with Hermes."
-version: 0.6.9-jobcron.5
+version: 0.6.9-jobcron.6
 author: chanbla11mit, Hermes Agent
 license: MIT
 platforms: [macos]
@@ -457,6 +457,8 @@ The orchestrator may edit implementation code only after repeated delegation fai
 Send only milestone completions, genuine blockers, and approval requests. Do not stream routine heartbeats or verbose logs. A remote instruction may pause, resume, reprioritize, or clarify work, but repository and Kanban state remain authoritative.
 
 ## Pitfalls
+
+- Shell commands given to the owner to run themselves must use absolute paths (for example `/Users/<user>/...` and an explicit keychain path), never `~` or `$HOME`. The owner's shell can inherit `HOME` set to a Hermes profile directory, so `~` resolves to the wrong place and `security` cannot find the login keychain. Check the exact paths with `stat` before sending the command.
 
 - When the user says stop, terminate every owned background worker, reviewer, preview server, and watcher before replying, then verify they stopped. Do not resume because a delayed completion notification arrives.
 - Run every Git command with an explicit repository `workdir` or `git -C`; printing a repository path inside a loop does not change the command's working repository. Set explicit pinned `workdir` on every dispatcher-worker terminal call, including absolute-path helper/test invocations: shell cwd persistence can differ by backend. A receipt's cwd derived from its artifact root is declarative, not observed process-cwd evidence; use same-call native `pwd` or an actual `Path.cwd()` assertion when proving execution context.

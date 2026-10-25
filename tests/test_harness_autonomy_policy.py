@@ -42,7 +42,7 @@ class HarnessAutonomyPolicy(unittest.TestCase):
         cls.text = flat(cls.raw)
 
     def test_version_and_bounded_growth(self):
-        self.assertRegex(self.raw, r"(?m)^version: 0\.6\.7-harness\.4$")
+        self.assertRegex(self.raw, r"(?m)^version: 0\.6\.7-harness\.5$")
         self.assertLessEqual(len(self.raw.splitlines()), BASELINE_SKILL_LINES + 70)
 
     def test_rule1_card_setup_without_setup_hold(self):
@@ -170,6 +170,7 @@ class HarnessAutonomyPolicy(unittest.TestCase):
             "Hard Scope", "Role Separation", "Card Contract", "Card Setup", "Worker Selection",
             "Worktree and Baseline Gate", "Skills", "Bounded Autonomous Repair", "Autonomy",
             "Incident recovery", "Review and Integration", "Operational Discipline", "Completion Gate",
+            "Pitfalls",
         ])
 
     def test_snapshot_and_fixture_pins_match_tracked_bytes(self):

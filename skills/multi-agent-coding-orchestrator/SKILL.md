@@ -1,7 +1,7 @@
 ---
 name: multi-agent-coding-orchestrator
 description: "Use when orchestrating multi-agent coding with Hermes."
-version: 0.6.11
+version: 0.6.12
 author: chanbla11mit, Hermes Agent
 license: MIT
 platforms: [macos]
@@ -411,6 +411,7 @@ Send only milestone completions, genuine blockers, and approval requests. Do not
 
 ## Pitfalls
 
+- Shell commands given to the owner to run themselves must use absolute paths (for example `/Users/<user>/...`), never `~` or `$HOME`. The owner's shell can inherit `HOME` set to a Hermes profile directory, so `~` resolves to the wrong place. Check the exact paths with `stat` before sending the command.
 - When the user says stop, terminate every owned background worker, reviewer, preview server, and watcher before replying, then verify they stopped. Do not resume because a delayed completion notification arrives.
 - Run every Git command with an explicit repository `workdir` or `git -C`; printing a repository path inside a loop does not change the command's working repository.
 - For Hermes plugin or service specifications, validate every required hook and payload against the installed source or current official documentation on each emitting surface. CLI, TUI, gateway, and automatic lifecycle paths can expose different identifiers and ordering.

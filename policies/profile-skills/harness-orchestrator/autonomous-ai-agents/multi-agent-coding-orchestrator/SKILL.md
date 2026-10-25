@@ -1,7 +1,7 @@
 ---
 name: multi-agent-coding-orchestrator
 description: "Use when orchestrating Harness repository work."
-version: 0.6.7-harness.4
+version: 0.6.7-harness.5
 author: chanbla11mit, Hermes Agent
 license: MIT
 platforms: [macos]
@@ -222,3 +222,7 @@ Before reporting a Harness card complete, check semantic validity, not bookkeepi
 - The approved change is locally integrated or an exact integration blocker is recorded.
 - Git and `kanban_show(..., board: harness)` agree on the result.
 - No unauthorized push, PR, deployment, policy rollout, credential operation, production/cloud mutation, or external write occurred.
+
+## Pitfalls
+
+- Shell commands given to the owner to run themselves must use absolute paths (for example `/Users/<user>/...`), never `~` or `$HOME`. The owner's shell can inherit `HOME` set to a Hermes profile directory, so `~` resolves to the wrong place. Check the exact paths with `stat` before sending the command.

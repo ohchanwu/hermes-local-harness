@@ -663,7 +663,10 @@ TEST_COMMAND_LINE = re.compile(
     r"go\s+test\b.*|pytest\b.*|npm\s+(?:test\b.*|run\s+\S+.*)|"
     r"pnpm\s+(?:test\b.*|run\s+\S+.*)|yarn\s+(?:test\b.*|run\s+\S+.*)|"
     r"node\s+--test\b.*|cargo\s+test\b.*|make\s+test\b.*|"
-    r"python3?\s+\S*(?:check|test)\S*.*)\s*`{0,3}\s*$"
+    # Python: options that take no argument, then a check or test script,
+    # or the unittest or pytest module.
+    r"python3?(?:[ \t]+-[IBEsSuOqPb]+)*\s+"
+    r"(?:-m[ \t]+(?:unittest|pytest)(?:[ \t].*)?|\S*(?:check|test)\S*.*))\s*`{0,3}\s*$"
 )
 FRONTEND_POLICY_DECLARATION = (
     "Follow AGENTS.md; operator-protected paths require explicit human authorization."
@@ -1133,14 +1136,14 @@ def check_chapt_card_contract(errors, tasks):
         task_id = task.get("id") or "<unknown>"
         body = task.get("body") if isinstance(task.get("body"), str) else ""
         repositories = [repo for repo in PROJECT_REPOSITORY_ALLOWLISTS["cha-pt"] if re.search(
-            r"(?:^|[.!?;]\s+)Repository\s+" + re.escape(repo) + r"\s+ONLY\b", body)]
+            r"(?m)(?:^|[.!?;]\s+)Repository\s+" + re.escape(repo) + r"\s+ONLY\b", body)]
         if len(repositories) != 1:
             fail(errors, f"Cha PT card contract drift {task_id}: expected exactly one repository")
             continue
         repo = repositories[0]
         if not isolated_workspace_valid(task, repo, task_id):
             fail(errors, f"Cha PT card contract drift {task_id}: isolated worktree mismatch")
-        if not re.search(r"(?:^|[.!?]\s+)Baseline EXACT\s+[0-9a-f]{40}\b", body):
+        if not re.search(r"(?m)(?:^|[.!?]\s+)Baseline EXACT\s+[0-9a-f]{40}\b", body):
             fail(errors, f"Cha PT card contract drift {task_id}: exact baseline missing")
         headings = list(re.finditer(r"(?m)^(#{1,4})\s+([^\n]+)\n", body))
         test_section = ""
@@ -1162,7 +1165,7 @@ def check_chapt_card_contract(errors, tasks):
         if not canonical_test and not legacy_match:
             fail(errors, f"Cha PT card contract drift {task_id}: explicit test contract missing")
         reviewer_declared = re.search(
-            r"(?i)(?:^|[.!?;]\s+)(?:Independent reviewer(?: EXACT)?|Reviewer EXACT)\s+"
+            r"(?im)(?:^|[.!?;]\s+)(?:Independent reviewer(?: EXACT)?|Reviewer EXACT)\s+"
             r"chapt-reviewer\b", body)
         if (not isinstance(task.get("assignee"), str)
                 or task["assignee"] not in CHAPT_ASSIGNEES or not reviewer_declared):
@@ -1229,12 +1232,12 @@ def check_isolated_card(errors, task, label, repository, assignees, reviewer, te
     task_id = task.get("id") if isinstance(task.get("id"), str) else "<unknown>"
     body = task.get("body") if isinstance(task.get("body"), str) else ""
     repository_declared = re.search(
-        r"(?:^|[.!?;]\s+)Repository\s+" + re.escape(repository) + r"\s+ONLY\b", body)
+        r"(?m)(?:^|[.!?;]\s+)Repository\s+" + re.escape(repository) + r"\s+ONLY\b", body)
     if not repository_declared:
         fail(errors, f"{label} card contract drift {task_id}: expected exact repository")
     if not isolated_workspace_valid(task, repository, task_id):
         fail(errors, f"{label} card contract drift {task_id}: isolated worktree mismatch")
-    if not re.search(r"(?:^|[.!?]\s+)Baseline EXACT\s+[0-9a-f]{40}\b", body):
+    if not re.search(r"(?m)(?:^|[.!?]\s+)Baseline EXACT\s+[0-9a-f]{40}\b", body):
         fail(errors, f"{label} card contract drift {task_id}: exact baseline missing")
     test_section = project_card_test_section(body)
     if not test_section or not any(pattern.search(test_section) for pattern in test_patterns):
@@ -1334,7 +1337,7 @@ def check_anki_card_contract(errors, tasks):
             continue
         body = task.get("body") if isinstance(task.get("body"), str) else ""
         declared = [repo for repo in PROJECT_REPOSITORY_ALLOWLISTS["anki"] if re.search(
-            r"(?:^|[.!?;]\s+)Repository\s+" + re.escape(repo) + r"\s+ONLY\b", body)]
+            r"(?m)(?:^|[.!?;]\s+)Repository\s+" + re.escape(repo) + r"\s+ONLY\b", body)]
         repository = declared[0] if len(declared) == 1 else ANKI_REPOSITORY
         task_id, body = check_isolated_card(
             errors, task, "anki", repository, ANKI_ASSIGNEES, "anki-reviewer", (TEST_COMMAND_LINE,))

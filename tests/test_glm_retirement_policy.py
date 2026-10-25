@@ -43,11 +43,11 @@ JOBCRON_PRODUCTION_DEPLOYMENT = ("devops/production-deployment/SKILL.md",
                                  "devops/production-deployment/references/release-ci-portability.md")
 SHARED_SKILL = ROOT / "skills/multi-agent-coding-orchestrator/SKILL.md"
 VERSIONS = {
-    PROFILE_SKILLS["jobcron-orchestrator"]: "0.6.9-jobcron.5",
-    PROFILE_SKILLS["chapt-orchestrator"]: "0.6.7-chapt.5",
-    PROFILE_SKILLS["harness-orchestrator"]: "0.6.7-harness.4",
-    PROFILE_SKILLS["jss-orchestrator"]: "0.6.7-jss.6",
-    SHARED_SKILL: "0.6.11",
+    PROFILE_SKILLS["jobcron-orchestrator"]: "0.6.9-jobcron.6",
+    PROFILE_SKILLS["chapt-orchestrator"]: "0.6.7-chapt.6",
+    PROFILE_SKILLS["harness-orchestrator"]: "0.6.7-harness.5",
+    PROFILE_SKILLS["jss-orchestrator"]: "0.6.7-jss.7",
+    SHARED_SKILL: "0.6.12",
 }
 PROCEDURE = ROOT / "procedures/switching-hermes-models.md"
 JOBCRON_SOUL = ROOT / "policies/profile-souls/jobcron-orchestrator/SOUL.md"
@@ -312,7 +312,7 @@ class Pins(unittest.TestCase):
             "jobcron-orchestrator", JOBCRON_REFERENCE, overrides["jobcron-orchestrator"][JOBCRON_REFERENCE]),
             sha(reference))
         shared = next(e for e in self.snapshot["skill"]["shared_skills"] if e["name"] == "multi-agent-coding-orchestrator")
-        self.assertEqual(shared["version"], "0.6.11")
+        self.assertEqual(shared["version"], "0.6.12")
         self.assertEqual(shared["source"], "skills/multi-agent-coding-orchestrator")
         for rel, want in verifier.shared_skill_expected(shared).items():
             self.assertEqual(want, sha(SHARED_SKILL.parent / rel))

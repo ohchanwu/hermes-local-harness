@@ -1,7 +1,7 @@
 ---
 name: multi-agent-coding-orchestrator
 description: "Use when orchestrating anki add-on, tooling, and deck change work."
-version: 0.6.10-anki.2
+version: 0.6.10-anki.3
 author: chanbla11mit, Hermes Agent
 license: MIT
 platforms: [macos]
@@ -257,3 +257,7 @@ Before reporting an anki card complete, check semantic validity, not bookkeeping
 - The approved change is locally integrated or an exact integration blocker is recorded.
 - Git and `kanban_show(..., board: anki)` agree on the result.
 - No forbidden AnkiConnect action, direct collection file access, unapproved collection write or add-on install, remote, push, PR, AnkiWeb sync or publication, install, policy rollout, credential operation, or other external write occurred.
+
+## Pitfalls
+
+- Shell commands given to the owner to run themselves must use absolute paths (for example `/Users/<user>/...`), never `~` or `$HOME`. The owner's shell can inherit `HOME` set to a Hermes profile directory, so `~` resolves to the wrong place. Check the exact paths with `stat` before sending the command.

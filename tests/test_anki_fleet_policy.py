@@ -355,7 +355,7 @@ class RoleContracts(unittest.TestCase):
         self.assertLessEqual(len(paragraph), 1000)
 
     def test_skill_version_scope_and_board_pinning(self):
-        self.assertRegex(self.skill_raw, r"(?m)^version: 0\.6\.10-anki\.2$")
+        self.assertRegex(self.skill_raw, r"(?m)^version: 0\.6\.10-anki\.3$")
         history = "This caused the 2026-10-20 stalls of the JSS and Jobcron orchestrators."
         self.assertEqual(self.skill_raw.count(history), 1)
         rest = self.skill_raw.replace(history, "")

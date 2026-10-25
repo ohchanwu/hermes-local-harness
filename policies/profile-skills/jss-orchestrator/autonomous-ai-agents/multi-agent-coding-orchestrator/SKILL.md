@@ -1,7 +1,7 @@
 ---
 name: multi-agent-coding-orchestrator
 description: "Use when orchestrating jss-genr repository and writing-round work."
-version: 0.6.7-jss.6
+version: 0.6.7-jss.7
 author: chanbla11mit, Hermes Agent
 license: MIT
 platforms: [macos]
@@ -257,3 +257,7 @@ Before reporting a jss-genr card complete, check semantic validity, not bookkeep
 - Repository card: the approved change is locally integrated or an exact integration blocker is recorded. Writing round: no pre-existing file was overwritten, renamed, or deleted, and owner questions are relayed by file name.
 - Git (for repository cards) and `kanban_show(..., board: jss-genr)` agree on the result.
 - No privacy leak and no unauthorized push, PR, deployment, application submission, job-site login, install, policy rollout, credential operation, or external write occurred.
+
+## Pitfalls
+
+- Shell commands given to the owner to run themselves must use absolute paths (for example `/Users/<user>/...`), never `~` or `$HOME`. The owner's shell can inherit `HOME` set to a Hermes profile directory, so `~` resolves to the wrong place. Check the exact paths with `stat` before sending the command.

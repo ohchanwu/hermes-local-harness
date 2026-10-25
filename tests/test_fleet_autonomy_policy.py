@@ -21,7 +21,7 @@ SKILLS = {
     board: ROOT / f"policies/profile-skills/{profile}-orchestrator" / RELATIVE
     for board, profile in (("jobcron", "jobcron"), ("cha-pt", "chapt"))
 }
-VERSIONS = {"jobcron": "0.6.9-jobcron.5", "cha-pt": "0.6.7-chapt.5"}
+VERSIONS = {"jobcron": "0.6.9-jobcron.6", "cha-pt": "0.6.7-chapt.6"}
 BASELINE_SKILL_LINES = {"jobcron": 429, "cha-pt": 434}
 # Live-only Jobcron rules reconciled verbatim from the installed
 # jobcron-orchestrator skill (0.6.5-jobcron.1) into the repository copy.
