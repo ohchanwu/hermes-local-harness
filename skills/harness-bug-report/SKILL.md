@@ -1,7 +1,7 @@
 ---
 name: harness-bug-report
 description: "Use when a Hermes or harness defect is suspected. File a harness-board card with evidence; never write outside your own repository."
-version: 1.1.0
+version: 1.2.0
 author: chanbla11mit, Hermes Agent
 license: MIT
 platforms: [macos, linux, windows]
@@ -60,11 +60,59 @@ Call the `kanban_create` tool with these arguments:
 - board: `harness`
 - assignee: `harness-worker`
 - title: `<project>: <one-line defect>`, for example `jobcron: notifier sent no message when a card was blocked`
-- body: the evidence from section 3
+- workspace_kind: `worktree`, with no `workspace_path` argument, so that the card uses the default working directory of the harness board, which is the repository root. This argument is required because the workspace kind of a card cannot be changed after the card is created.
+- initial_status: `blocked`. This argument is required because the card must not be dispatched before harness-orchestrator has checked it.
+- body: the card body template below, filled in
+
+Pass no other argument.
 
 Do not use the command-line create (`hermes kanban ... create`) for this, because the command-line create does not subscribe the caller to the card.
 
 Do not write any file under `/Users/chanbla11mit/hermes-local-harness`, and do not write any file under any repository that is not the orchestrator's own repository. Do not create a cron job. Do not send a message to the Harness Orchestrator directly.
+
+### Card body template
+
+Copy the template below into the body and replace every part in angle brackets:
+
+- `<40-hex>`: the output of `git -C /Users/chanbla11mit/hermes-local-harness rev-parse main`. This command only reads the repository, and it is the only command that you run in that repository.
+- Evidence: the items of section 3, as list items or fenced blocks. Do not add a heading inside any section of the template.
+- Suspected location: the repository file and line numbers at the baseline, if you know them; otherwise `not known`.
+- Proposed change: your proposal, which harness-orchestrator accepts or rewrites; otherwise `none`.
+- Tests: replace the line `python3 tests/<focused test file>.py` with one line for each focused test that you can name, each a command that starts with `python3 tests/`. When you cannot name a focused test, write `Focused test: not known.` in its place; harness-orchestrator then adds a focused test at setup. Keep the line with the loop over every `tests/test_*.py` file unchanged. pytest is not installed in the harness repository, so never write `pytest` or `python3 -m pytest`.
+
+Keep every other line of the template unchanged. The card contract check in `scripts/verify-state` reads the `Repository`, `Baseline EXACT` and `Reviewer EXACT` lines only at the start of a line, and it reads the first heading that contains the word "test" as the Tests section. That section must contain at least one focused test command; the loop line alone does not satisfy the check, so a card with `Focused test: not known.` does not pass the check until harness-orchestrator adds a focused test.
+
+```text
+Repository /Users/chanbla11mit/hermes-local-harness ONLY. Board harness ONLY.
+Workspace kind worktree; harness-orchestrator adds the exact path at setup.
+Baseline EXACT <40-hex>.
+Assigned worker EXACT harness-worker.
+Reviewer EXACT harness-reviewer.
+Runtime cap 3600s per run.
+Skill policy: minimal-implementation disabled; requirements and risk outrank simplification.
+
+## Evidence
+<the items of section 3>
+
+## Suspected location
+<repository file and line numbers at the baseline, or not known>
+
+## Proposed change
+Proposal for harness-orchestrator to accept or rewrite: <the proposed change, or none>
+
+## Tests
+python3 tests/<focused test file>.py
+for f in tests/test_*.py; do [ "$f" = tests/test_verify_state.py ] && continue; LANG=en_US.UTF-8 python3 "$f" >/dev/null 2>&1 || echo "FAIL $f"; env -u LANG python3 "$f" >/dev/null 2>&1 || echo "FAIL-noLANG $f"; done
+Every command exits 0, and the loop prints no FAIL line.
+
+## Deployment
+Deployment to the live profile copies is out of scope for this card and needs a separate card.
+
+## Prohibited without separate human authorization
+Push, PR, deployment; any change to live profiles, plugins, skills, SOULs or config; credentials; network; production or cloud mutations; other repositories and boards; any other external write. Do not run `scripts/verify-state` without `--fixture`. Never put secrets, tokens or real transcript content in tests or fixtures.
+
+Deliverable: one local commit on the card's branch whose parent is the baseline, then `kanban_request_review` with reviewer `harness-reviewer`.
+```
 
 ## 5. After filing
 
@@ -89,6 +137,8 @@ If the defect blocks the project work, state that in the card body and tell the 
 
 `harness-orchestrator` files its card on its own board `harness` under its normal card procedure. The exception in section 2 is not needed for it, because the harness board is its own board.
 
+A card filed under this skill arrives on the harness board blocked. harness-orchestrator checks the card against the card contract, writes the worktree path and the branch, which depend on the card ID, into the body, pins `refs/harness/baselines/<ID>`, may replace the baseline with the current `main`, and then unblocks the card. Files under `docs/bugs/` and filed cards remain evidence, not implementation authorization, until harness-orchestrator unblocks the card.
+
 ## 8. When the advisor profile loads this skill
 
 The owner explicitly authorized (2026-10-25) the `advisor` profile to take exactly the two actions of section 2 on board `harness`:
@@ -102,7 +152,7 @@ This section applies when, during a consultation, the advisor's own investigatio
 
 The advisor files the card without first asking the user, and states the ID of the card that it filed in the same reply to the user.
 
-The advisor uses the arguments of section 4, with the title `<project>: <one-line defect>`, where `<project>` is the project whose work showed the defect, or `advisor` when no project is involved.
+The advisor uses the arguments and the card body template of section 4, with the title `<project>: <one-line defect>`, where `<project>` is the project whose work showed the defect, or `advisor` when no project is involved.
 
 The evidence follows section 3, with these differences:
 
