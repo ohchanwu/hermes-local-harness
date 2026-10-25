@@ -217,9 +217,19 @@ class Message:
             block["closed"] = True
             call = self.calls[block["call"]] if block["kind"] == "tool_use" else None
             if call is not None and call["fragments"]:
-                call["arguments"] = json.loads("".join(call["fragments"]))
-                if not isinstance(call["arguments"], dict):
-                    raise ProviderError("tool arguments must be an object")
+                joined = "".join(call["fragments"])
+                if not joined.strip(" \t\n\r"):  # empty, or JSON whitespace only (RFC 8259)
+                    # A call without arguments streams one empty partial_json. With no fragments
+                    # left, the client forwards json.dumps({}) to Hermes instead of the empty text.
+                    call["arguments"], call["fragments"] = {}, []
+                else:
+                    try:
+                        call["arguments"] = json.loads(joined)
+                    except ValueError:
+                        # A ProviderError, so the client writes the stream audit; the text holds no argument content.
+                        raise ProviderError("invalid tool argument JSON") from None
+                    if not isinstance(call["arguments"], dict):
+                        raise ProviderError("tool arguments must be an object")
         elif event == "message_delta":
             self.stop = ev.get("delta", {}).get("stop_reason")
             self.usage.update(ev.get("usage") or {})
