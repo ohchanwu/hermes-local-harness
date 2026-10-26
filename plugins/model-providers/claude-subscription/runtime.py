@@ -92,6 +92,12 @@ class Runtime:
             raise ProviderError("malformed/truncated runtime JSON")
         return None
 
+    def output_pending(self):
+        """Whether a complete stdout line is buffered or stdout can be read now; reads and changes nothing."""
+        if b"\n" in self.buffer:
+            return True
+        return any(key.fileobj is self.process.stdout for key, _ in self.selector.select(0))
+
     def group_exists(self):
         try:
             os.killpg(self.process.pid, 0)

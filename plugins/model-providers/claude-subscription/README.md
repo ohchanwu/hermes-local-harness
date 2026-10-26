@@ -131,6 +131,14 @@ every acknowledgement. The server never opens the requested tool path and
 contains no filesystem/shell/tool implementation. Duplicate/replayed IDs,
 missing/mismatched results and changed prefixes are errors. Multi-step tool use
 is supported without a step cap.
+The CLI writes a message's events before it requests that message's calls over
+MCP, but one read of runtime output can buffer several events, and the client
+takes bridge requests before it parses buffered events. When the request for a
+completed message's calls equals none of them while runtime output is still
+unread, the client leaves the request queued, reads that output first (for
+example a following message that a keep_last decision then keeps), and matches
+again. Once no output is unread, a request that still equals no call is
+rejected as before.
 
 Streaming text is the runtime's own deltas, but each message is held whole: its
 text reaches Hermes only once the message is final (parked for its tool calls, or
@@ -156,7 +164,9 @@ such messages in one request, fails as `duplicate streamed message` with a
 stream audit.
 When the stream itself fails (an undecidable second message, event outside a
 message, invalid block, snapshot mismatch, malformed or
-unknown runtime event), the client first reads the rest of the current message
+unknown runtime event, or an MCP request that `_match` rejects as
+`unmatched/replayed/unadvertised model and MCP invocation (<condition>)`),
+the client first reads the rest of the current message
 briefly into memory only (never to Hermes), then writes one owner-only (0600)
 file `$HERMES_HOME/sessions/stream_audit_<session>_<YYYYMMDD_HHMMSS_ffffff>.json`
 (`stream_audit.py`), and raises the original error unchanged. The file holds an
@@ -166,6 +176,22 @@ types (bounded), blocks, restarts, whether text reached Hermes, text length and
 sha256, and its relation to the previous message's text. It never holds text,
 thinking, tool arguments/results, prompts, environment, paths or credentials. A
 write failure is one log warning; an existing file is never replaced.
+For a rejected MCP request the audit's `mcp_match_failure` names the call site
+(`message_calls` when the request would park a completed message's calls,
+`remaining_calls` when it asks for the rest of a batch) and the first condition
+that failed: `call_sequence_differs` (the server's call number is not the
+client's sequence), `result_not_acknowledged` (a delivered result has no
+acknowledgement yet), `invalid_rpc_id_type`, `tool_not_advertised`, or
+`no_equal_call` (no candidate call has an equal name and equal arguments). It
+also holds the server's call number, the client's sequence, the number of
+unacknowledged deliveries, whether the name is advertised, the number of
+candidate calls and of those with the requested name, whether this request
+resolved a second message as keep_last, whether the request equals a call that
+keep_last dropped, and whether a same-name call's streamed arguments equal the
+request's only after the snapshot's extra backslash-u decoding, and whether
+runtime output was still unread at the rejection (a following message may not
+have been parsed yet; the audit's drain reads it afterwards). It holds no
+tool name, argument value or text. The rejection itself is unchanged.
 One bounded exception: when a runtime stdout line is not JSON, the request fails
 as before (`runtime startup, I/O or malformed protocol: JSONDecodeError`), and
 the audit's `rejected_line` holds the line's length (`bytes`), `sha256`, and at

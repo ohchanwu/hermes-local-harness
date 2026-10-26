@@ -5,7 +5,9 @@ previous message. The file holds allowlisted fields: event types, identifiers,
 counts, hashes and relations. It never holds text, thinking, tool arguments or
 results, prompts, environment, paths or credentials. A stream/snapshot mismatch adds a
 classification of the two compared sides (key names, types, lengths, hashes, character
-classes at the first difference), never their values.
+classes at the first difference), never their values. A rejected MCP invocation
+(client._match) adds `mcp_match_failure`: the call site, which condition failed, and
+counts and booleans about the request and the candidate calls, never names or values.
 
 One bounded exception: when a runtime stdout line is not JSON, `rejected_line` holds its
 length, its sha256 and at most its first PREFIX_BYTES bytes as text, after Hermes's secret
@@ -412,6 +414,28 @@ def rejected(line):
     return out
 
 
+MATCH_SITES = ("message_calls", "remaining_calls")
+MATCH_CONDITIONS = ("call_sequence_differs", "result_not_acknowledged", "invalid_rpc_id_type", "tool_not_advertised",
+                    "no_equal_call")
+MATCH_COUNTS = ("mcp_call", "sequence", "delivered_unacknowledged", "candidates", "same_name_candidates")
+MATCH_FLAGS = ("name_advertised", "keep_last_in_request", "matches_dropped_call", "same_name_equal_after_escape_decoding",
+               "runtime_output_pending")
+
+
+def match_failure(detail):
+    """The client's record of a rejected MCP invocation (client._match), reduced to allowlisted counts and booleans.
+
+    A value of an unexpected type is kept as its JSON type in angle brackets, never as the value.
+    """
+    detail = mapping(detail)
+    out = {key: detail.get(key) if detail.get(key) in allowed else "<other>"
+           for key, allowed in (("call_site", MATCH_SITES), ("condition", MATCH_CONDITIONS))}
+    out.update({key: detail.get(key) if type(detail.get(key)) is int else f"<{kind_of(detail.get(key))}>"
+                for key in MATCH_COUNTS})
+    out.update({key: detail.get(key) is True for key in MATCH_FLAGS})
+    return out
+
+
 def payload(error, session_id, model, cli_version, audit, stream_log, declared=(), rejected_line=None):
     entries = list(audit)[-MAX_AUDIT:]
     record = {"schema_version": SCHEMA_VERSION, "created_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
@@ -425,6 +449,9 @@ def payload(error, session_id, model, cli_version, audit, stream_log, declared=(
             record["snapshot_mismatch"] = snapshot_mismatch(*sides, declared=declared)
         except Exception as exc:  # the classification must never cost the rest of the record
             record["snapshot_mismatch"] = {"classification_failed": type(exc).__name__}
+    failure = getattr(error, "match_failure", None)
+    if failure is not None:
+        record["mcp_match_failure"] = match_failure(failure)
     if rejected_line is not None:
         record["rejected_line"] = rejected(rejected_line)
     return record

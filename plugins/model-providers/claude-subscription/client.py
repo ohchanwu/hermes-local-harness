@@ -29,7 +29,7 @@ from .errors import ProviderError
 from .history import History
 from .runtime import Runtime
 from . import second_message, stream_audit
-from .stream_events import Message
+from .stream_events import Message, _escape_match as escape_match
 from .transcript import render_restored
 from .translate import convert_tools, record, usage
 
@@ -430,6 +430,30 @@ class ClaudeSubscriptionClient:
             decisions = 0
             stream_log = stream_audit.StreamLog()  # this request's events, persisted if the stream fails
             restarts = 0
+            keep_last, dropped = False, []  # whether this request resolved keep_last, and the bare calls it dropped
+
+            def match(pending, calls, site, defer=False):
+                """_match; a rejection writes the stream audit first, then raises unchanged.
+
+                With `defer`, a request equal to none of `calls` returns None instead while runtime output is
+                still unread. The CLI writes a message's events before it requests that message's calls, but
+                one read can buffer several events and the loop takes bridge requests before it parses them,
+                so the message the request is for may still be unread; the caller reads it first and asks
+                again. The record notes whether output was still unread at a rejection (the audit's drain
+                reads it afterwards).
+                """
+                try:
+                    return self._match(pending, calls, site=site, keep_last=keep_last, dropped=dropped)
+                except ProviderError as exc:
+                    try:
+                        unread = runtime.output_pending()
+                        if defer and unread and exc.match_failure["condition"] == "no_equal_call":
+                            return None
+                        exc.match_failure["runtime_output_pending"] = unread
+                    except Exception:
+                        pass  # the record must never change the error
+                    self._persist_stream_audit(stream_log, exc, runtime, None, observed=True)
+                    raise
             while True:
                 self._check_active()
                 self._pump_bridge()
@@ -439,21 +463,25 @@ class ClaudeSubscriptionClient:
                         self._bridge.require_open()
                     else:
                         pending = self._bridge.calls.pop(0)
-                        call = self._match(pending, self._awaiting)
+                        call = match(pending, self._awaiting, "remaining_calls")
                         self._awaiting.remove(call)
                         self._deliver(pending["rpc_id"], call["id"], self._queued.pop(call["id"]))
                         continue
                 if message.done and message.calls and follower is None:
                     if self._bridge is not None and not self._bridge.calls:
                         self._bridge.require_open()
+                    first = None
                     if self._bridge is not None and self._bridge.calls:
-                        pending = self._bridge.calls.pop(0)
+                        pending = self._bridge.calls[0]
                         calls = message.calls
                         if any(c["id"] in self._seen_ids or not c["name"].startswith(PREFIX)
                                or c["name"][len(PREFIX):] not in {t["name"] for t in self._tools} for c in calls):
                             raise ProviderError("replayed or unadvertised model tool call")
                         bare = [{"id": c["id"], "name": c["name"][len(PREFIX):], "arguments": c["arguments"]} for c in calls]
-                        first = self._match(pending, bare)
+                        # None: the request stays queued and the runtime output already written is read first.
+                        first = match(pending, bare, "message_calls", defer=True)
+                    if first is not None:
+                        self._bridge.calls.pop(0)
                         self._seen_ids.update(c["id"] for c in calls)
                         self._pending = {"rpc_id": pending["rpc_id"], "tool_use_id": first["id"]}
                         self._awaiting = [c for c in bare if c is not first]
@@ -541,8 +569,12 @@ class ClaudeSubscriptionClient:
                         log.warning("claude-subscription: the Claude CLI retried a failed API call; the partial message was dropped")
                     if follower is not None and follower.done:
                         decisions += 1
-                        message = self._second_message(message, follower, requested, decisions, stream_log, runtime, obj)
-                        follower, requested = None, False
+                        kept = self._second_message(message, follower, requested, decisions, stream_log, runtime, obj)
+                        if kept is follower:  # keep_last: the first message's calls are dropped
+                            keep_last = True
+                            dropped.extend({"name": c["name"][len(PREFIX):] if c["name"].startswith(PREFIX) else c["name"],
+                                            "arguments": c["arguments"]} for c in message.calls)
+                        message, follower, requested = kept, None, False
                 elif kind == "user":
                     # Tool results the runtime fed back. After a delivery they precede the next message;
                     # while a message is current they are the CLI answering its calls without Hermes.
@@ -656,15 +688,41 @@ class ClaudeSubscriptionClient:
         else:
             log.warning("claude-subscription stream failed (%s); stream audit written to %s", error, path.name)
 
-    def _match(self, pending, calls):
-        """The first of the message's calls that this MCP request is for; the CLI may request them in any order."""
-        if (pending.get("call") != self._sequence or self._delivered or type(pending.get("rpc_id")) not in (str, int)
-                or pending.get("name") not in {t["name"] for t in self._tools}):
-            raise ProviderError("unmatched/replayed/unadvertised model and MCP invocation")
-        for call in calls:
-            if call["name"] == pending["name"] and call["arguments"] == pending.get("arguments"):
-                return call
-        raise ProviderError("unmatched/replayed/unadvertised model and MCP invocation")
+    def _match(self, pending, calls, *, site, keep_last=False, dropped=()):
+        """The first of the message's calls that this MCP request is for; the CLI may request them in any order.
+
+        A rejection names the condition that failed, checked in this order, and carries a detail record
+        without content (match_failure) for the stream audit. `site` names the call site, `keep_last`
+        whether this request resolved a second message as keep_last, and `dropped` the bare calls that
+        those resolutions dropped.
+        """
+        if pending.get("call") != self._sequence:
+            condition = "call_sequence_differs"
+        elif self._delivered:
+            condition = "result_not_acknowledged"
+        elif type(pending.get("rpc_id")) not in (str, int):
+            condition = "invalid_rpc_id_type"
+        elif pending.get("name") not in {t["name"] for t in self._tools}:
+            condition = "tool_not_advertised"
+        else:
+            for call in calls:
+                if call["name"] == pending["name"] and call["arguments"] == pending.get("arguments"):
+                    return call
+            condition = "no_equal_call"
+        name, arguments = pending.get("name"), pending.get("arguments")
+        same_name = [c for c in calls if c["name"] == name]
+        error = ProviderError(f"unmatched/replayed/unadvertised model and MCP invocation ({condition})")
+        # Counts and booleans only: no tool name, argument value or text.
+        error.match_failure = {
+            "call_site": site, "condition": condition, "mcp_call": pending.get("call"), "sequence": self._sequence,
+            "delivered_unacknowledged": len(self._delivered),
+            "name_advertised": isinstance(name, str) and name in {t["name"] for t in self._tools},
+            "candidates": len(calls), "same_name_candidates": len(same_name), "keep_last_in_request": keep_last,
+            "matches_dropped_call": any(c["name"] == name and c["arguments"] == arguments for c in dropped),
+            # The CLI snapshot decodes literal backslash-u sequences once more (stream_events.escape_accepted):
+            # whether a same-name call's streamed arguments equal the request's only after that decoding.
+            "same_name_equal_after_escape_decoding": any(bool(escape_match(c["arguments"], arguments)) for c in same_name)}
+        raise error
 
     def _deliver(self, rpc_id, tool_use_id, text):
         """Answer one parked MCP call; outside the lock, so a full socket cannot block cancel()."""
