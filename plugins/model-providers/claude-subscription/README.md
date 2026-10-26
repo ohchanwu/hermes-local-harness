@@ -176,6 +176,19 @@ types (bounded), blocks, restarts, whether text reached Hermes, text length and
 sha256, and its relation to the previous message's text. It never holds text,
 thinking, tool arguments/results, prompts, environment, paths or credentials. A
 write failure is one log warning; an existing file is never replaced.
+The CLI's snapshot of a tool call decodes a literal backslash-u sequence in an
+argument string one extra time. The client accepts that difference (audit stage
+`snapshot_unicode_escape_accepted`; Hermes runs the streamed arguments) only
+when decoding the streamed strings as Claude CLI 2.1.302 does gives the snapshot
+exactly: a sequence after an odd number of backslashes, for a lone surrogate, or
+for a control character (U+0000 to U+001F, U+007F to U+009F) stays as written,
+and every other sequence is decoded. Any other difference fails as
+`stream/snapshot tool identity or arguments mismatch`; its audit's
+`snapshot_mismatch` holds, per unequal string key, `escape_decoding`: the number
+of sequences, how many were decoded or kept for each of those reasons, the
+decoded length, whether the decoded value equals the snapshot, and if not the
+first differing index, its streamed index, the character class on each side, and
+whether a sequence starts there with a second backslash directly before it.
 For a rejected MCP request the audit's `mcp_match_failure` names the call site
 (`message_calls` when the request would park a completed message's calls,
 `remaining_calls` when it asks for the rest of a batch) and the first condition

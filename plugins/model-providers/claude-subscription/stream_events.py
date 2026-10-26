@@ -7,33 +7,55 @@ from .errors import ProviderError
 # A literal backslash-u-four-hex sequence inside a string value, or a high+low surrogate pair written as two.
 # \x5c is the backslash, spelled so that this source never holds such a sequence itself.
 _ESCAPE = re.compile(r"\x5cu([dD][89abAB][0-9a-fA-F]{2})\x5cu([dD][c-fC-F][0-9a-fA-F]{2})|\x5cu([0-9a-fA-F]{4})")
+BACKSLASH = chr(92)
+# What _decode() does with each _ESCAPE match; every outcome but DECODED keeps the sequence as written.
+DECODED, KEPT_ODD_BACKSLASHES, KEPT_SURROGATE, KEPT_CONTROL = "decoded", "odd_backslashes", "surrogate", "control"
+
+
+def _decode(text):
+    """`text` with the CLI snapshot's extra decoding applied, and per _ESCAPE match (outcome, start, end) in order.
+
+    This follows the Claude CLI's own snapshot repair, read in the binary of the newest version in
+    compat.CLI_TESTED (it uses the same _ESCAPE pattern). A sequence stays as written after an odd number
+    of backslashes (the backslash before `u` is itself escaped), for a lone surrogate, and for a control
+    character (U+0000 to U+001F, U+007F to U+009F). A pair of sequences for a high and a low surrogate
+    becomes one character. Every other sequence is decoded.
+    The CLI also decodes nothing in a string that holds a Windows drive or UNC path; its snapshot then
+    equals the stream, so that rule never reaches this comparison and is not reproduced here.
+    """
+    outcomes = []
+    def replace(match):
+        high, low, single = match.groups()
+        start = run = match.start()
+        while run > 0 and text[run - 1] == BACKSLASH:
+            run -= 1
+        if (start - run) % 2:
+            outcome, decoded = KEPT_ODD_BACKSLASHES, None
+        elif single is None:
+            outcome, decoded = DECODED, chr(0x10000 + ((int(high, 16) - 0xD800) << 10) + (int(low, 16) - 0xDC00))
+        elif 0xD800 <= int(single, 16) <= 0xDFFF:
+            outcome, decoded = KEPT_SURROGATE, None
+        elif int(single, 16) <= 0x1F or 0x7F <= int(single, 16) <= 0x9F:
+            outcome, decoded = KEPT_CONTROL, None
+        else:
+            outcome, decoded = DECODED, chr(int(single, 16))
+        outcomes.append((outcome, start, match.end()))
+        return match.group(0) if decoded is None else decoded
+    return _ESCAPE.sub(replace, text), outcomes
 
 
 def _decode_escapes(text):
-    """`text` with each literal backslash-u sequence replaced by the character it denotes, and how many were.
-
-    A pair of sequences for a high and a low surrogate becomes one character; a lone surrogate sequence stays.
-    """
-    count = 0
-    def replace(match):
-        nonlocal count
-        high, low, single = match.groups()
-        if single is None:
-            count += 1
-            return chr(0x10000 + ((int(high, 16) - 0xD800) << 10) + (int(low, 16) - 0xDC00))
-        if 0xD800 <= int(single, 16) <= 0xDFFF:
-            return match.group(0)
-        count += 1
-        return chr(int(single, 16))
-    return _ESCAPE.sub(replace, text), count
+    """`text` with the CLI snapshot's extra decoding applied (_decode), and how many sequences it decoded."""
+    decoded, outcomes = _decode(text)
+    return decoded, sum(outcome == DECODED for outcome, _, _ in outcomes)
 
 
 def _escape_match(streamed, shown):
-    """Decoded sequences if `shown` is `streamed` with only its literal backslash-u sequences decoded, else None.
+    """Decoded sequences if `shown` is `streamed` with the CLI snapshot's extra decoding (_decode), else None.
 
-    The CLI snapshot decodes such a sequence inside a string value one extra time; the streamed fragments
-    are the faithful version. Equal values match as today; unequal ones must be strings, or lists/objects
-    of identical structure and keys whose unequal strings each decode exactly to the snapshot's.
+    The CLI snapshot decodes a literal backslash-u sequence inside a string value one extra time; the streamed
+    fragments are the faithful version. Equal values match as today; unequal ones must be strings, or
+    lists/objects of identical structure and keys whose unequal strings each decode exactly to the snapshot's.
     """
     if streamed == shown:
         return 0

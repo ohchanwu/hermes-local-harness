@@ -5,7 +5,9 @@ previous message. The file holds allowlisted fields: event types, identifiers,
 counts, hashes and relations. It never holds text, thinking, tool arguments or
 results, prompts, environment, paths or credentials. A stream/snapshot mismatch adds a
 classification of the two compared sides (key names, types, lengths, hashes, character
-classes at the first difference), never their values. A rejected MCP invocation
+classes at the first difference) and, per unequal string key, `escape_decoding`: how the
+snapshot's extra backslash-u decoding of the streamed value compares (counts, lengths,
+indexes, character classes), never their values. A rejected MCP invocation
 (client._match) adds `mcp_match_failure`: the call site, which condition failed, and
 counts and booleans about the request and the candidate calls, never names or values.
 
@@ -25,6 +27,8 @@ import re
 import tempfile
 import time
 import unicodedata
+
+from . import stream_events
 
 SCHEMA_VERSION = 1
 MAX_MESSAGES = 32    # per request
@@ -325,6 +329,38 @@ def string_difference(stream, snapshot):
             "stream_char": character(stream, index), "snapshot_char": character(snapshot, index)}
 
 
+def escape_decoding(stream, snapshot):
+    """How the snapshot's extra backslash-u decoding (stream_events._decode) of a streamed string compares; no content.
+
+    Counts of _ESCAPE matches and of what became of them, the decoded length, and whether the decoded value
+    equals the snapshot. If not: the first index where they differ, the streamed index of that character, the
+    class of the decoded and the snapshot character there, whether an _ESCAPE match starts at that streamed
+    index, and if one does, whether a second backslash directly precedes it.
+    """
+    decoded, outcomes = stream_events._decode(stream)
+    reasons = [outcome for outcome, _, _ in outcomes]
+    out = {"sequences": len(outcomes), "decoded_sequences": reasons.count(stream_events.DECODED),
+           "kept_odd_backslashes": reasons.count(stream_events.KEPT_ODD_BACKSLASHES),
+           "kept_surrogate": reasons.count(stream_events.KEPT_SURROGATE),
+           "kept_control": reasons.count(stream_events.KEPT_CONTROL),
+           "decoded_length": len(decoded), "decoded_equal": decoded == snapshot}
+    if decoded == snapshot:
+        return out
+    index = common_prefix(decoded, snapshot)
+    position = index  # streamed index of decoded[index]: each decoded sequence before it is one character
+    for outcome, start, end in outcomes:
+        if start >= position:
+            break
+        if outcome == stream_events.DECODED:
+            position += end - start - 1
+    at_sequence = any(start == position for _, start, _ in outcomes)
+    out.update(first_difference=index, stream_index=position, decoded_char=character(decoded, index),
+               snapshot_char=character(snapshot, index), sequence_at_difference=at_sequence,
+               backslash_before_sequence=(position > 0 and stream[position - 1] == stream_events.BACKSLASH)
+               if at_sequence else None)
+    return out
+
+
 def key_name(key):
     return label(key[:40], 40) if isinstance(key, str) else "<other>"
 
@@ -339,6 +375,7 @@ def compare_value(key, stream, snapshot):
                snapshot_sha256=hashlib.sha256(forms[1].encode()).hexdigest())
     if isinstance(stream, str) and isinstance(snapshot, str) and stream != snapshot:
         out.update(string_difference(stream, snapshot))
+        out["escape_decoding"] = escape_decoding(stream, snapshot)
     return out
 
 
