@@ -50,6 +50,28 @@ def protocol_error(exc):
     return ProviderError("runtime startup, I/O or malformed protocol: " + type(exc).__name__)
 
 
+def snapshot_escaped(message):
+    """Key names by tool_use id of each call of `message` that the snapshot check accepted only after
+    the snapshot's extra backslash-u decoding (Message.escapes)."""
+    return {message.calls[accepted["index"]]["id"]: accepted["keys"] for accepted in message.escapes}
+
+
+def escape_equal(call, name, arguments, keys):
+    """Decoded sequences if an MCP request for `name` with `arguments` asks for `call` under the snapshot's rule.
+
+    That is: `keys` (the snapshot check's record for this call) is present, the names are equal, and the
+    request arguments are the call's streamed arguments with stream_events._escape_match's decoding applied,
+    differing in exactly the key names `keys`. Otherwise None; no other difference is accepted.
+    """
+    streamed = call["arguments"]
+    if keys is None or call["name"] != name or not isinstance(streamed, dict) or not isinstance(arguments, dict):
+        return None
+    decoded = escape_match(streamed, arguments)
+    if not decoded or sorted(k for k in streamed if streamed[k] != arguments[k]) != keys:
+        return None
+    return decoded
+
+
 def owner_only(info):
     return stat.S_ISREG(info.st_mode) and info.st_uid == os.getuid() and not info.st_mode & 0o077
 
@@ -135,6 +157,7 @@ class ClaudeSubscriptionClient:
         self._inputs = 0
         self._pending = None  # the parked MCP call: its RPC id and tool_use id
         self._awaiting = []   # other calls of that message the CLI has not requested yet
+        self._escaped = {}    # of those, the ones the snapshot check accepted after decoding: key names by tool_use id
         self._queued = {}     # Hermes' results for those calls, by tool_use id
         self._sequence = 0
         self._delivered = []
@@ -432,7 +455,7 @@ class ClaudeSubscriptionClient:
             restarts = 0
             keep_last, dropped = False, []  # whether this request resolved keep_last, and the bare calls it dropped
 
-            def match(pending, calls, site, defer=False):
+            def match(pending, calls, site, escaped, defer=False):
                 """_match; a rejection writes the stream audit first, then raises unchanged.
 
                 With `defer`, a request equal to none of `calls` returns None instead while runtime output is
@@ -443,7 +466,7 @@ class ClaudeSubscriptionClient:
                 reads it afterwards).
                 """
                 try:
-                    return self._match(pending, calls, site=site, keep_last=keep_last, dropped=dropped)
+                    return self._match(pending, calls, site=site, keep_last=keep_last, dropped=dropped, escaped=escaped)
                 except ProviderError as exc:
                     try:
                         unread = runtime.output_pending()
@@ -463,14 +486,15 @@ class ClaudeSubscriptionClient:
                         self._bridge.require_open()
                     else:
                         pending = self._bridge.calls.pop(0)
-                        call = match(pending, self._awaiting, "remaining_calls")
+                        call = match(pending, self._awaiting, "remaining_calls", self._escaped)
                         self._awaiting.remove(call)
+                        self._escaped.pop(call["id"], None)
                         self._deliver(pending["rpc_id"], call["id"], self._queued.pop(call["id"]))
                         continue
                 if message.done and message.calls and follower is None:
                     if self._bridge is not None and not self._bridge.calls:
                         self._bridge.require_open()
-                    first = None
+                    first, escaped = None, {}
                     if self._bridge is not None and self._bridge.calls:
                         pending = self._bridge.calls[0]
                         calls = message.calls
@@ -478,13 +502,16 @@ class ClaudeSubscriptionClient:
                                or c["name"][len(PREFIX):] not in {t["name"] for t in self._tools} for c in calls):
                             raise ProviderError("replayed or unadvertised model tool call")
                         bare = [{"id": c["id"], "name": c["name"][len(PREFIX):], "arguments": c["arguments"]} for c in calls]
+                        escaped = snapshot_escaped(message)
                         # None: the request stays queued and the runtime output already written is read first.
-                        first = match(pending, bare, "message_calls", defer=True)
+                        first = match(pending, bare, "message_calls", escaped, defer=True)
                     if first is not None:
                         self._bridge.calls.pop(0)
                         self._seen_ids.update(c["id"] for c in calls)
                         self._pending = {"rpc_id": pending["rpc_id"], "tool_use_id": first["id"]}
                         self._awaiting = [c for c in bare if c is not first]
+                        # Kept for the remaining requests of this batch, which arrive in later Hermes requests.
+                        self._escaped = {c["id"]: escaped[c["id"]] for c in self._awaiting if c["id"] in escaped}
                         native_calls = [{"id": c["id"], "type": "function", "function": {
                             "name": c["name"], "arguments": json.dumps(c["arguments"], sort_keys=True, separators=(",", ":"))}} for c in bare]
                         assistant = {"role": "assistant", "content": message.text, "tool_calls": native_calls}
@@ -549,8 +576,11 @@ class ClaudeSubscriptionClient:
                     event = obj.get("event") if kind == "stream_event" else None
                     if message.done and follower is None and isinstance(event, dict) and event.get("type") == "message_start":
                         # Any MCP request queued now is for `message`: the new one has no complete call yet.
+                        # Equal as in _match: exactly, or under its backslash-u rule for a call the snapshot check accepted so.
                         requested = self._bridge is not None and any(
                             (PREFIX + pending.get("name", ""), pending.get("arguments")) == (c["name"], c["arguments"])
+                            or escape_equal(c, PREFIX + pending.get("name", ""), pending.get("arguments"),
+                                            snapshot_escaped(message).get(c["id"])) is not None
                             for pending in self._bridge.calls for c in message.calls)
                         follower = Message(served)
                     target = follower or message
@@ -655,6 +685,7 @@ class ClaudeSubscriptionClient:
         first.text += added
         first.deltas.extend([{"content": added}] if added else [])
         first.calls, first.stop = second.calls, second.stop
+        first.escapes = second.escapes  # its indexes refer to second.calls
         first.answered, first.errored = second.answered, second.errored
         merged = {**first.usage, **second.usage}
         if type(first.usage.get("output_tokens")) is int and type(second.usage.get("output_tokens")) is int:
@@ -688,8 +719,14 @@ class ClaudeSubscriptionClient:
         else:
             log.warning("claude-subscription stream failed (%s); stream audit written to %s", error, path.name)
 
-    def _match(self, pending, calls, *, site, keep_last=False, dropped=()):
+    def _match(self, pending, calls, *, site, keep_last=False, dropped=(), escaped=None):
         """The first of the message's calls that this MCP request is for; the CLI may request them in any order.
+
+        A call with an equal name and equal arguments is taken first. Otherwise the first same-name call that
+        `escaped` (key names by tool_use id: calls the snapshot check accepted only after the snapshot's extra
+        backslash-u decoding) records, and whose streamed arguments decode to the request's exactly
+        (escape_equal), is taken and audited as mcp_unicode_escape_accepted. The returned call keeps its
+        streamed arguments, which Hermes runs.
 
         A rejection names the condition that failed, checked in this order, and carries a detail record
         without content (match_failure) for the stream audit. `site` names the call site, `keep_last`
@@ -707,6 +744,14 @@ class ClaudeSubscriptionClient:
         else:
             for call in calls:
                 if call["name"] == pending["name"] and call["arguments"] == pending.get("arguments"):
+                    return call
+            for call in calls:
+                keys = (escaped or {}).get(call["id"])
+                decoded = escape_equal(call, pending["name"], pending.get("arguments"), keys)
+                if decoded is not None:
+                    # Counts and key names only, never values.
+                    self.audit.append({"stage": "mcp_unicode_escape_accepted", "call_site": site, "mcp_call": pending.get("call"),
+                                       "sequence": self._sequence, "decoded": decoded, "keys": keys})
                     return call
             condition = "no_equal_call"
         name, arguments = pending.get("name"), pending.get("arguments")
@@ -764,6 +809,7 @@ class ClaudeSubscriptionClient:
             runtime, bridge, temporary = self._runtime, self._bridge, self._temporary
             self._runtime = self._bridge = self._temporary = self._startup = None
         self._pending, self._sequence, self._delivered, self._awaiting, self._queued = None, 0, [], [], {}
+        self._escaped = {}
         self._initialized, self._request_deadline = False, None
         try:
             if bridge is not None:

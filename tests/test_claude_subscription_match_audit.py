@@ -157,10 +157,18 @@ class MatchAuditTests(unittest.TestCase):
 
     def test_the_audit_names_snapshot_escape_decoding_when_the_request_holds_the_decoded_arguments(self):
         # Hypothesis tested for the cause search: the CLI may run its snapshot's (decoded) input. The
-        # flag records that case; the invocation stays rejected.
-        record = self.rejected(lambda: self.request("__escape_decoded__", stream=True),
-                               detail(same_name_equal_after_escape_decoding=True))
+        # flag records that case. Card t_15903481 accepts that request under the snapshot's rule
+        # (test_claude_subscription_mcp_unicode_escape.py); with that rule off, it is rejected as before.
+        with patch.object(client, "escape_equal", lambda *args: None):
+            record = self.rejected(lambda: self.request("__escape_decoded__", stream=True),
+                                   detail(same_name_equal_after_escape_decoding=True))
         self.assertIn("snapshot_unicode_escape_accepted", [a["stage"] for a in record["audit"]])
+        self.fresh()
+        response = self.request("__escape_decoded__")  # with the rule: the decoded request is accepted
+        self.assertEqual(response.choices[0].finish_reason, "tool_calls")
+        self.assertEqual([a["stage"] for a in self.c.audit if a["stage"] == "mcp_unicode_escape_accepted"],
+                         ["mcp_unicode_escape_accepted"])
+        self.assertEqual(self.audits(), [])
         self.fresh()
         response = self.request("__escape_streamed__")  # the streamed (faithful) arguments still match
         self.assertEqual(response.choices[0].finish_reason, "tool_calls")

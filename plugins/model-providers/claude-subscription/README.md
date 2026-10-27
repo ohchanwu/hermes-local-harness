@@ -182,7 +182,11 @@ argument string one extra time. The client accepts that difference (audit stage
 when decoding the streamed strings as Claude CLI 2.1.302 does gives the snapshot
 exactly: a sequence after an odd number of backslashes, for a lone surrogate, or
 for a control character (U+0000 to U+001F, U+007F to U+009F) stays as written,
-and every other sequence is decoded. Any other difference fails as
+and every other sequence is decoded. An MCP request for a call accepted this
+way whose arguments equal the streamed arguments only after the same decoding,
+in exactly the key names recorded for it, is matched to that call (audit stage
+`mcp_unicode_escape_accepted`: call site, call number, sequence, decoded count
+and key names; Hermes still runs the streamed arguments). Any other difference fails as
 `stream/snapshot tool identity or arguments mismatch`; its audit's
 `snapshot_mismatch` holds, per unequal string key, `escape_decoding`: the number
 of sequences, how many were decoded or kept for each of those reasons, the
