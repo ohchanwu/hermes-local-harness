@@ -59,4 +59,10 @@ Changes requested from Hermes Agent:
 4. Log a warning when the time since the previous dispatcher pass for a board is much larger than `dispatch_interval_seconds`, so that a delay such as the 78 minutes reported here can be attributed (host sleep, pause, a blocked pass, or a held dispatch lock).
 
 ## Upstream status
-Not checked: network access was not authorized on this card.
+Checked on 2026-10-28 against NousResearch/hermes-agent upstream `main` at commit `26ba38a098d8`: `_run_reclaim_phase` and `detect_crashed_workers` are identical to the installed commit `9cf7960f274e`, and `release_stale_claims` still calls `_record_task_failure` for every released claim without reading the run's exit status.
+- No existing issue reports this case. Filed as issue #145820 on 2026-10-28 (open), containing Requested items 1 to 4.
+- Related, not duplicates:
+  - Issue #111306 (closed): its fix added the failure count on the expired-claim path, for a claim that never spawns a worker.
+  - Pull request #113840 (open): a run counted as a failure after a dispatcher restart.
+  - Issue #133361 (open): rate-limited workers that exit with code 1 instead of 75.
+  - Issues #140028 and #140662 (open): visibility of a stalled dispatcher, related to Requested item 4.
