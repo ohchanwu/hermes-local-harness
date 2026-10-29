@@ -1,0 +1,85 @@
+#!/usr/bin/env python3
+"""List open Kanban cards on one board that have no notify+wake subscription.
+
+Reads one board's kanban.db, given as --db PATH, through SQLite's read-only
+mode (mode=ro). The script makes no writes, opens no other file, starts no
+other program and uses no network.
+
+An open card is a row of `tasks` whose status is neither `done` nor `archived`.
+An open card is reported unless at least one `kanban_notify_subs` row for its
+id has delivery_mode `notify+wake`, a non-empty notifier_profile and a
+non-empty user_id.
+
+Exit 0: every open card has such a row (one `OK:` line).
+Exit 1: one `NO-WAKE-SUBSCRIPTION <id> <status> <assignee or -> <title>` line
+        per open card without one, ordered by created_at, then id.
+Exit 2: missing file, missing table or unreadable database (one `ERROR:` line
+        on standard error).
+"""
+import argparse
+import sqlite3
+import sys
+from pathlib import Path
+from urllib.parse import quote
+
+CLOSED_STATUSES = ("done", "archived")
+
+OPEN_CARDS_SQL = (
+    "SELECT id, status, assignee, title FROM tasks"
+    " WHERE COALESCE(status, '') NOT IN (?, ?)"
+    " ORDER BY created_at, id"
+)
+
+WAKING_CARDS_SQL = (
+    "SELECT DISTINCT task_id FROM kanban_notify_subs"
+    " WHERE delivery_mode = 'notify+wake'"
+    " AND COALESCE(notifier_profile, '') <> ''"
+    " AND COALESCE(user_id, '') <> ''"
+)
+
+
+def one_line(value):
+    """Return value as text on a single line (line breaks become spaces)."""
+    return " ".join(str(value if value is not None else "").split())
+
+
+def read_board(db_path):
+    """Return (open_cards, waking_ids); raises sqlite3.Error on any database failure."""
+    conn = sqlite3.connect("file:" + quote(str(db_path)) + "?mode=ro", uri=True)
+    try:
+        open_cards = conn.execute(OPEN_CARDS_SQL, CLOSED_STATUSES).fetchall()
+        waking_ids = {row[0] for row in conn.execute(WAKING_CARDS_SQL)}
+    finally:
+        conn.close()
+    return open_cards, waking_ids
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--db", required=True,
+                        help="absolute path of one board's kanban.db (opened read-only)")
+    args = parser.parse_args(argv)
+
+    db_path = Path(args.db)
+    # Checked before connecting: the file must already exist, so it is never made here.
+    if not db_path.is_file():
+        print(f"ERROR: database file not found: {db_path}", file=sys.stderr)
+        return 2
+    try:
+        open_cards, waking_ids = read_board(db_path)
+    except sqlite3.Error as exc:
+        print(f"ERROR: cannot read {db_path}: {one_line(exc)}", file=sys.stderr)
+        return 2
+
+    missing = [card for card in open_cards if card[0] not in waking_ids]
+    if not missing:
+        print(f"OK: {len(open_cards)} open cards, each with a notify+wake subscription")
+        return 0
+    for task_id, status, assignee, title in missing:
+        print(f"NO-WAKE-SUBSCRIPTION {one_line(task_id)} {one_line(status) or '-'}"
+              f" {one_line(assignee) or '-'} {one_line(title)}")
+    return 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
