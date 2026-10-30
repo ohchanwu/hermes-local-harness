@@ -16,7 +16,8 @@ shows the history after the first review requested changes.
 CANDIDATE_RULE_EDITS lists the exact (new, old) text this card changed in each
 skill file, so tests that pin older bytes of these files can reverse the change
 byte for byte with reverse_candidate_rule_edits(). This module imports no other
-test module, so any test module can import it.
+test module except test_orchestrator_skill_changes_policy, which imports none, so
+any test module can import it.
 """
 import hashlib
 import importlib.util
@@ -27,6 +28,8 @@ import unittest
 from contextlib import redirect_stdout
 from importlib.machinery import SourceFileLoader
 from pathlib import Path
+
+from test_orchestrator_skill_changes_policy import reverse_skill_changes_edits
 
 ROOT = Path(__file__).resolve().parents[1]
 RELATIVE = "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md"
@@ -225,7 +228,9 @@ class InstructionText(unittest.TestCase):
     def test_reversing_the_edits_recovers_the_baseline_bytes(self):
         for path, want in PRE_CANDIDATE_RULE_SHA256.items():
             with self.subTest(path=path):
-                original = reverse_candidate_rule_edits(path, (ROOT / path).read_bytes())
+                # Reverse the later Skill Changes section (t_0a8674fe) first.
+                current = reverse_skill_changes_edits(path, (ROOT / path).read_bytes())
+                original = reverse_candidate_rule_edits(path, current)
                 self.assertEqual(hashlib.sha256(original).hexdigest(), want)
 
 

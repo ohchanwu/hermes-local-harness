@@ -65,6 +65,25 @@
       "compression.idle_compact_after_seconds": 3600
     }
   },
+  "orchestrator_profile_settings": {
+    "profiles": [
+      "harness-orchestrator",
+      "jobcron-orchestrator",
+      "chapt-orchestrator",
+      "jss-orchestrator",
+      "anki-orchestrator"
+    ],
+    "settings": {
+      "skills.auto_load": [
+        "multi-agent-coding-orchestrator"
+      ],
+      "skills.write_approval": true,
+      "security.protected_instruction_files": true,
+      "security.protected_instruction_extra_patterns": [
+        "SKILL.md"
+      ]
+    }
+  },
   "approval_policy": {
     "mode": "off",
     "profiles": [

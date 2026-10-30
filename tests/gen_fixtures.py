@@ -92,9 +92,13 @@ clean["profile_models"] = {profile["name"]: profile["model"] for profile in rost
 clean["profile_providers"] = {profile["name"]: profile["provider"] for profile in roster["profiles"]}
 clean["profile_approval_modes"] = {
     profile: desired["approvals"]["mode"] for profile in desired["approvals"]["profiles"]}
-clean["profile_managed_settings"] = {
-    profile: copy.deepcopy(desired["managed_profile_settings"]["settings"])
-    for profile in desired["managed_profile_settings"]["profiles"]}
+# Observed config values of every managed settings group, merged per profile:
+# managed_profile_settings (mirrored in the snapshot) and orchestrator_profile_settings
+# (roster.yaml only).
+clean["profile_managed_settings"] = {}
+for group in (desired["managed_profile_settings"], roster["orchestrator_profile_settings"]):
+    for profile in group["profiles"]:
+        clean["profile_managed_settings"].setdefault(profile, {}).update(copy.deepcopy(group["settings"]))
 clean["dispatch_profiles"] = copy.deepcopy(desired["kanban"]["dispatch_profiles"])
 clean["kanban"] = {key: copy.deepcopy(value) for key, value in desired["kanban"].items()
                    if key != "dispatch_profiles"}
@@ -171,6 +175,15 @@ def compression_drift(d):
 
 
 write("compression-drift.yaml", delta(compression_drift))
+
+
+def orchestrator_skill_settings_drift(d):
+    # One orchestrator still has no pinned skill; another cannot report write_approval (unreadable).
+    d["profile_managed_settings"]["jobcron-orchestrator"]["skills.auto_load"] = []
+    del d["profile_managed_settings"]["anki-orchestrator"]["skills.write_approval"]
+
+
+write("orchestrator-skill-settings-drift.yaml", delta(orchestrator_skill_settings_drift))
 
 
 def rogue(d):

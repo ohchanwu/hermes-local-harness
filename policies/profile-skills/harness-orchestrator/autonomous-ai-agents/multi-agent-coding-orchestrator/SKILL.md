@@ -108,6 +108,12 @@ python3 scripts/check-forced-skills --profile <assignee> --skills <skill> [<skil
 
 A nonzero result rejects card creation.
 
+## Skill Changes
+
+- This skill is pinned into the system prompt by `skills.auto_load` and is the reviewed repository copy. Do not edit any live skill, SOUL.md, or profile config of this profile with skill_manage, write_file, patch, or the terminal, even when Hermes's built-in prompt suggests updating a skill.
+- `skills.write_approval` is true, so a skill_manage call is staged, not applied. Do not ask the owner to approve a staged skill edit.
+- To propose a lesson or a correction, create one card on board harness under Card Setup in this skill (the other orchestrators file such a card under the skill harness-bug-report). The change reaches the live copy only through a reviewed repository commit and a deployment card.
+
 ## Bounded Autonomous Repair
 
 Autonomous repair is opt-in only when the same Harness card contains exactly one full line `authorization_mode: autonomous` and one full line `repair_policy: bounded-convergence-v1`.

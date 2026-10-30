@@ -1703,25 +1703,60 @@ def check_live_terminal_notification_runtime(errors, producer_profiles):
         check_terminal_notification_runtime(errors, runtime, producer_profiles)
 
 
-def check_managed_profile_settings(errors, managed, roster_profiles, read):
+def same_setting_value(actual, want):
+    """Equality that also requires equal types at every level, because Python treats
+    1 == True and 1 == 1.0 as equal while Hermes reads a boolean setting stored as 1 as off."""
+    if type(actual) is not type(want):
+        return False
+    if isinstance(want, list):
+        return len(actual) == len(want) and all(map(same_setting_value, actual, want))
+    if isinstance(want, dict):
+        return actual.keys() == want.keys() and all(same_setting_value(actual[k], want[k]) for k in want)
+    return actual == want
+
+
+def check_managed_profile_settings(errors, managed, roster_profiles, read, name="managed profile settings"):
     """Per-profile config keys the harness manages. read(profile, key) returns the
     observed value or UNREADABLE; live mode passes json_config, fixture mode a
-    reader over fixture data only."""
+    reader over fixture data only. Returns False when the declaration is malformed."""
     profiles = managed.get("profiles") if isinstance(managed, dict) else None
     settings = managed.get("settings") if isinstance(managed, dict) else None
-    if (not isinstance(profiles, list) or not profiles or len(set(profiles)) != len(profiles)
-            or not isinstance(settings, dict) or not settings):
-        fail(errors, "managed profile settings malformed: expected unique profiles and non-empty settings")
-        return
+    if (not isinstance(profiles, list) or not profiles or not all(isinstance(p, str) for p in profiles)
+            or len(set(profiles)) != len(profiles) or not isinstance(settings, dict) or not settings):
+        fail(errors, f"{name} malformed: expected unique profiles and non-empty settings")
+        return False
     for profile in profiles:
         if profile not in roster_profiles:
-            fail(errors, f"managed profile settings name unknown roster profile: {profile}")
+            fail(errors, f"{name} name unknown roster profile: {profile}")
             continue
         for key, want in settings.items():
             actual = read(profile, key)
-            if actual is UNREADABLE or actual != want:
+            if actual is UNREADABLE or not same_setting_value(actual, want):
                 fail(errors, f"managed setting drift {profile} {key}: expected {want!r}, "
                              f"actual {'<unreadable>' if actual is UNREADABLE else repr(actual)}")
+    return True
+
+
+def check_managed_setting_groups(errors, roster, fleets, roster_profiles, read):
+    """Check every managed settings group in roster.yaml with the same reader.
+    managed_profile_settings covers the compression settings of the advisor, the
+    default profile and three orchestrators; orchestrator_profile_settings covers the
+    skill settings of every project orchestrator named in the snapshot's project_isolation."""
+    groups = (("managed profile settings", roster.get("managed_profile_settings")),
+              ("orchestrator profile settings", roster.get("orchestrator_profile_settings")))
+    orchestrators = {fleet.get("orchestrator") for fleet in (fleets or {}).values() if isinstance(fleet, dict)}
+    declared = {}
+    for name, group in groups:
+        if not check_managed_profile_settings(errors, group, roster_profiles, read, name):
+            continue
+        for profile in group["profiles"]:
+            for key in group["settings"]:
+                if (profile, key) in declared:
+                    fail(errors, f"{name} and {declared[profile, key]} both declare {profile} {key}")
+                declared.setdefault((profile, key), name)
+        if name == "orchestrator profile settings" and set(group["profiles"]) != orchestrators:
+            fail(errors, f"{name} must name exactly the project orchestrators {sorted(orchestrators)}, "
+                         f"actual {group['profiles']}")
 
 
 def fixture_setting_reader(observed_settings):
@@ -1848,8 +1883,8 @@ def main():
         for name in list(models) + list(providers) + list(approval_modes):
             if name not in expected:
                 fail(errors, f"behavior-changing unexpected profile: {name}")
-        check_managed_profile_settings(errors, managed_settings, expected,
-                                       fixture_setting_reader(observed.get("profile_managed_settings")))
+        check_managed_setting_groups(errors, roster, fleets, expected,
+                                     fixture_setting_reader(observed.get("profile_managed_settings")))
         plugins = observed.get("plugins", {})
         check_terminal_notification_observed(errors, plugins, snapshot["terminal_notification"]["producer_profiles"])
         check_terminal_notification_runtime(errors, observed.get("terminal_notification_runtime", {}),
@@ -1917,7 +1952,7 @@ def main():
                             fail(errors, message)
                     check_plugins(errors, warnings, name, profile["required_plugins"], state, snapshot["plugins"],
                                   profile.get("installed_disabled_plugins"))
-        check_managed_profile_settings(errors, managed_settings, expected, json_config)
+        check_managed_setting_groups(errors, roster, fleets, expected, json_config)
         check_live_terminal_notification_runtime(errors, snapshot["terminal_notification"]["producer_profiles"])
         for key, want in snapshot["kanban"].items():
             actual = json_config("default", f"kanban.{key}")

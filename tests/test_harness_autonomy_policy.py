@@ -43,8 +43,9 @@ class HarnessAutonomyPolicy(unittest.TestCase):
 
     def test_version_and_bounded_growth(self):
         self.assertRegex(self.raw, r"(?m)^version: 0\.6\.7-harness\.6$")
-        # Plus the 9 lines of repair_history candidate rules and example (t_6436ac1c).
-        self.assertLessEqual(len(self.raw.splitlines()), BASELINE_SKILL_LINES + 70 + 9)
+        # Plus the 9 lines of repair_history candidate rules and example (t_6436ac1c)
+        # and the 6 lines of the Skill Changes section (t_0a8674fe).
+        self.assertLessEqual(len(self.raw.splitlines()), BASELINE_SKILL_LINES + 70 + 9 + 6)
 
     def test_rule1_card_setup_without_setup_hold(self):
         setup = section(self.raw, "Card Setup")
@@ -169,7 +170,7 @@ class HarnessAutonomyPolicy(unittest.TestCase):
         headings = re.findall(r"^## (.+)$", self.raw, re.M)
         self.assertEqual(headings, [
             "Hard Scope", "Role Separation", "Card Contract", "Card Setup", "Worker Selection",
-            "Worktree and Baseline Gate", "Skills", "Bounded Autonomous Repair", "Autonomy",
+            "Worktree and Baseline Gate", "Skills", "Skill Changes", "Bounded Autonomous Repair", "Autonomy",
             "Incident recovery", "Review and Integration", "Operational Discipline", "Completion Gate",
             "Pitfalls",
         ])

@@ -25,6 +25,7 @@ from importlib.machinery import SourceFileLoader
 from pathlib import Path
 
 from test_card_contract_line_start_policy import reverse_owner_path_edits
+from test_orchestrator_skill_changes_policy import reverse_skill_changes_edits
 from test_repair_history_candidate_rules_policy import reverse_candidate_rule_edits
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -475,9 +476,11 @@ class InstructionTextTests(unittest.TestCase):
     def test_reversing_the_edits_recovers_the_baseline_bytes(self):
         for path, want in PRE_REPAIR_FORMAT_SHA256.items():
             with self.subTest(path=path):
-                # Reverse the later repair_history candidate rule change (t_6436ac1c) and the
-                # owner shell command path change (t_bd860536) first.
-                current = reverse_candidate_rule_edits(path, (ROOT / path).read_bytes())
+                # Reverse the later Skill Changes section (t_0a8674fe), the repair_history
+                # candidate rule change (t_6436ac1c) and the owner shell command path change
+                # (t_bd860536) first.
+                current = reverse_skill_changes_edits(path, (ROOT / path).read_bytes())
+                current = reverse_candidate_rule_edits(path, current)
                 current = reverse_owner_path_edits(path, current)
                 original = reverse_repair_format_edits(path, current)
                 self.assertEqual(hashlib.sha256(original).hexdigest(), want)

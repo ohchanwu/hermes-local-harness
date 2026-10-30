@@ -23,6 +23,7 @@ import unittest
 from contextlib import redirect_stdout
 from pathlib import Path
 
+from test_orchestrator_skill_changes_policy import reverse_skill_changes_edits
 from test_repair_history_candidate_rules_policy import reverse_candidate_rule_edits
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -279,9 +280,10 @@ class OwnerShellCommandPaths(unittest.TestCase):
         return (ROOT / path).read_bytes()
 
     def test_jobcron_file_with_live_version_has_the_live_hash(self):
-        # The live skill predates the later repair_history candidate rule change
-        # (t_6436ac1c), so reverse that change first.
-        data = reverse_candidate_rule_edits(JOBCRON, self.read(JOBCRON).decode())
+        # The live skill predates the later Skill Changes section (t_0a8674fe) and the
+        # repair_history candidate rule change (t_6436ac1c), so reverse those changes first.
+        data = reverse_skill_changes_edits(JOBCRON, self.read(JOBCRON).decode())
+        data = reverse_candidate_rule_edits(JOBCRON, data)
         self.assertEqual(data.count("version: 0.6.9-jobcron.6\n"), 1)
         live = data.replace("version: 0.6.9-jobcron.6\n", JOBCRON_LIVE_VERSION, 1).encode()
         self.assertEqual(hashlib.sha256(live).hexdigest(), JOBCRON_LIVE_SHA256)
@@ -309,8 +311,10 @@ class OwnerShellCommandPaths(unittest.TestCase):
     def test_reversing_the_edits_recovers_the_baseline_bytes(self):
         for path, want in PRE_OWNER_PATH_SHA256.items():
             with self.subTest(path=path):
-                # Reverse the later repair_history candidate rule change (t_6436ac1c) first.
-                current = reverse_candidate_rule_edits(path, self.read(path))
+                # Reverse the later Skill Changes section (t_0a8674fe) and repair_history
+                # candidate rule change (t_6436ac1c) first.
+                current = reverse_skill_changes_edits(path, self.read(path))
+                current = reverse_candidate_rule_edits(path, current)
                 original = reverse_owner_path_edits(path, current)
                 self.assertEqual(hashlib.sha256(original).hexdigest(), want)
 

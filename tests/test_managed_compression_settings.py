@@ -24,6 +24,10 @@ SETTINGS = {
     "compression.idle_compact_after_seconds": 3600,
 }
 FIXTURES = ROOT / "tests/fixtures"
+# The second managed settings group (t_0a8674fe); tests/test_orchestrator_profile_settings.py
+# checks it. Fixtures carry both groups merged per profile.
+ORCHESTRATOR_GROUP = json.loads((ROOT / "roster.yaml").read_text())["orchestrator_profile_settings"]
+DRIFT_FIXTURES = ("compression-drift.yaml", "orchestrator-skill-settings-drift.yaml")
 DRIFT_MESSAGES = [
     "FAIL: managed setting drift advisor compression.threshold_tokens: "
     f"expected {SETTINGS['compression.threshold_tokens']!r}, actual 200000",
@@ -63,11 +67,13 @@ class DesiredStateTests(unittest.TestCase):
 
 class FixtureConsistencyTests(unittest.TestCase):
     def test_every_fixture_carries_matching_values_except_the_drift_fixture(self):
-        expected = {profile: SETTINGS for profile in PROFILES}
+        expected = {profile: dict(SETTINGS) for profile in PROFILES}
+        for profile in ORCHESTRATOR_GROUP["profiles"]:
+            expected.setdefault(profile, {}).update(ORCHESTRATOR_GROUP["settings"])
         names = sorted(path.name for path in FIXTURES.glob("*.yaml"))
         self.assertIn("compression-drift.yaml", names)
         for name in names:
-            if name in ("incomplete-empty.yaml", "compression-drift.yaml"):
+            if name == "incomplete-empty.yaml" or name in DRIFT_FIXTURES:
                 continue
             with self.subTest(fixture=name):
                 fixture = json.loads((FIXTURES / name).read_text())
@@ -113,7 +119,8 @@ class FixtureVerifierTests(unittest.TestCase):
             self.assertEqual(code, 1, output)
             self.assertIn("incomplete fixture: missing required section 'profile_managed_settings'", output)
             self.assert_isolated(guard)
-            every_key = len(PROFILES) * len(SETTINGS)
+            every_key = (len(PROFILES) * len(SETTINGS)
+                         + len(ORCHESTRATOR_GROUP["profiles"]) * len(ORCHESTRATOR_GROUP["settings"]))
             for observation in (None, [], {}, "not a mapping"):
                 with self.subTest(observation=observation):
                     path.write_text(json.dumps({**clean, "profile_managed_settings": observation}))

@@ -91,6 +91,12 @@ Ponytail never runs as a plugin on Hermes profiles. Implementation profiles keep
 
 Record the decision in card metadata: `skill_policy_version`, `minimal_implementation: enabled|disabled`, the reason, and that verification precedence applies (`verification_precedence: requirements-and-risk-outrank-simplification`). Reviewer and advisor lanes never load the implementation skill.
 
+## Skill Changes
+
+- This skill is pinned into the system prompt by `skills.auto_load` and is the reviewed repository copy. Do not edit any live skill, SOUL.md, or profile config of this profile with skill_manage, write_file, patch, or the terminal, even when Hermes's built-in prompt suggests updating a skill.
+- `skills.write_approval` is true, so a skill_manage call is staged, not applied. Do not ask the owner to approve a staged skill edit.
+- To propose a lesson or a correction, file one card on board harness under the skill harness-bug-report. The change reaches the live copy only through a reviewed repository commit and a deployment card.
+
 ## Routing Rubric
 
 Flash is the default entry rung. The Sol orchestrator may start directly at:

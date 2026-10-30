@@ -85,9 +85,10 @@ class FleetAutonomyPolicy(unittest.TestCase):
                     assert match is not None, heading
                     port_lines += match.group(1).count("\n")
                 self.assertLessEqual(port_lines, 65)
-                # Plus the 9 lines of repair_history candidate rules and example (t_6436ac1c).
+                # Plus the 9 lines of repair_history candidate rules and example (t_6436ac1c)
+                # and the 6 lines of the Skill Changes section (t_0a8674fe).
                 self.assertLessEqual(len(self.raw[board].splitlines()),
-                                     BASELINE_SKILL_LINES[board] + 90 + 9)
+                                     BASELINE_SKILL_LINES[board] + 90 + 9 + 6)
 
     def test_rule1_card_setup_without_setup_hold(self):
         for board in SKILLS:

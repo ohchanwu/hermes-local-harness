@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Card creation and notification subscription wording in the four orchestrator skills (t_b6d0e590).
+"""Card creation and notification subscription wording in the five orchestrator skills (t_b6d0e590;
+anki-orchestrator added by t_0a8674fe).
 
 Offline checks of tracked bytes only: no live ~/.hermes reads, board access,
 network or model calls. Each project orchestrator must create cards with the
@@ -22,7 +23,11 @@ SKILLS = {
     "jobcron-orchestrator": "jobcron",
     "chapt-orchestrator": "cha-pt",
     "jss-orchestrator": "jss-genr",
+    "anki-orchestrator": "anki",
 }
+# The text that ends the kanban_create call sentence of step 1. The anki fleet has a second
+# repository, reached through the Hermes project anki-addons, so its sentence names that project.
+STEP_ONE_CALL_END = {"anki-orchestrator": ", adding `project: anki-addons` for an add-on repository card."}
 
 
 def skill_text(profile):
@@ -89,7 +94,7 @@ class OrchestratorCardCreationPolicy(unittest.TestCase):
             with self.subTest(profile=profile):
                 self.assertTrue(first.startswith(
                     f"1. Create it with the kanban_create tool: `kanban_create(..., board: {board}, "
-                    "initial_status: blocked)`."), first)
+                    "initial_status: blocked)`" + STEP_ONE_CALL_END.get(profile, ".")), first)
                 self.assertNotIn("before any notification subscription exists", first)
                 assert_rule(self, first, "created blocked", "cannot be dispatched before setup is complete",
                             "notification subscription exists from creation")
