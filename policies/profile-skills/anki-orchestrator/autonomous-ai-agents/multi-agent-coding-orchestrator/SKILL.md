@@ -99,6 +99,8 @@ Item 1 writes the repository line in exactly the form `Repository <exact reposit
 
 `scripts/verify-state` fails closed on items 1–4 and 7–9 for every open card. Use `kanban_create(..., board: anki)` only after validating the complete contract, then read the card with `kanban_show(..., board: anki)` and verify the stored fields before dispatch.
 
+For a card that extends `scripts/apply_changeset.py` (a new AnkiConnect action or a new change set entry type), read `references/apply-tool-card-contracts.md` and write the exceptions it lists into the card body before dispatch.
+
 ## Card Setup
 
 Set up a card without a setup-only hold:

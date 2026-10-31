@@ -16,7 +16,8 @@ shows the history after the first review requested changes.
 CANDIDATE_RULE_EDITS lists the exact (new, old) text this card changed in each
 skill file, so tests that pin older bytes of these files can reverse the change
 byte for byte with reverse_candidate_rule_edits(). This module imports no other
-test module except test_orchestrator_skill_changes_policy, which imports none, so
+test module except test_anki_apply_tool_card_contracts_reference and
+test_orchestrator_skill_changes_policy; neither of them imports this module, so
 any test module can import it.
 """
 import hashlib
@@ -29,6 +30,7 @@ from contextlib import redirect_stdout
 from importlib.machinery import SourceFileLoader
 from pathlib import Path
 
+from test_anki_apply_tool_card_contracts_reference import reverse_apply_tool_reference_edits
 from test_orchestrator_skill_changes_policy import reverse_skill_changes_edits
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -228,8 +230,10 @@ class InstructionText(unittest.TestCase):
     def test_reversing_the_edits_recovers_the_baseline_bytes(self):
         for path, want in PRE_CANDIDATE_RULE_SHA256.items():
             with self.subTest(path=path):
-                # Reverse the later Skill Changes section (t_0a8674fe) first.
-                current = reverse_skill_changes_edits(path, (ROOT / path).read_bytes())
+                # Reverse the later apply-tool-card-contracts pointer (t_c9d4d5c8) and
+                # Skill Changes section (t_0a8674fe) first.
+                current = reverse_apply_tool_reference_edits(path, (ROOT / path).read_bytes())
+                current = reverse_skill_changes_edits(path, current)
                 original = reverse_candidate_rule_edits(path, current)
                 self.assertEqual(hashlib.sha256(original).hexdigest(), want)
 

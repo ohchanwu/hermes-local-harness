@@ -12,13 +12,16 @@ repository commit and a deployment card.
 SKILL_CHANGES_EDITS lists the exact (new, old) text this card changed in each
 skill file, so tests that pin older bytes of these files can reverse the change
 byte for byte with reverse_skill_changes_edits(). This module imports no other
-test module, so any test module can import it.
+test module except test_anki_apply_tool_card_contracts_reference, which imports
+none, so any test module can import it.
 """
 import hashlib
 import json
 import re
 from pathlib import Path
 import unittest
+
+from test_anki_apply_tool_card_contracts_reference import reverse_apply_tool_reference_edits
 
 ROOT = Path(__file__).resolve().parents[1]
 RELATIVE = "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md"
@@ -149,7 +152,9 @@ class SkillChangesSection(unittest.TestCase):
     def test_reversing_the_edits_recovers_the_baseline_bytes(self):
         for path in SKILL_FILES:
             with self.subTest(path=path):
-                original = reverse_skill_changes_edits(path, (ROOT / path).read_bytes())
+                # Reverse the later apply-tool-card-contracts pointer (t_c9d4d5c8) first.
+                current = reverse_apply_tool_reference_edits(path, (ROOT / path).read_bytes())
+                original = reverse_skill_changes_edits(path, current)
                 self.assertEqual(hashlib.sha256(original).hexdigest(), PRE_SKILL_CHANGES_SHA256[path])
 
     def test_new_text_is_ascii_and_uses_no_coined_compound(self):

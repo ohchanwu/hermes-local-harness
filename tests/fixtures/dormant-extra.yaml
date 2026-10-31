@@ -257,7 +257,8 @@
       },
       "anki-orchestrator": {
         "SKILL.md": "tracked-source",
-        "scripts/set-active-lanes.py": "tracked-source"
+        "scripts/set-active-lanes.py": "tracked-source",
+        "references/apply-tool-card-contracts.md": "tracked-source"
       }
     },
     "minimal-implementation": {
@@ -665,7 +666,8 @@
       "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md": "tracked-source"
     },
     "anki-orchestrator": {
-      "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md": "tracked-source"
+      "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md": "tracked-source",
+      "autonomous-ai-agents/multi-agent-coding-orchestrator/references/apply-tool-card-contracts.md": "tracked-source"
     }
   },
   "terminal_retry_policy": {

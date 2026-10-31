@@ -401,7 +401,8 @@
         "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md": "tracked-source"
       },
       "anki-orchestrator": {
-        "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md": "tracked-source"
+        "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md": "tracked-source",
+        "autonomous-ai-agents/multi-agent-coding-orchestrator/references/apply-tool-card-contracts.md": "tracked-source"
       }
     }
   },

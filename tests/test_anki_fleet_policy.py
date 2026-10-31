@@ -31,6 +31,7 @@ FLEETS = {"jobcron", "cha-pt", "harness", "jss-genr", "anki"}
 BASELINE = "00453fee8fdd4438c185eb97c1279255c7170132"
 RELATIVE = "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md"
 SKILL = ROOT / "policies/profile-skills" / ORCH / RELATIVE
+APPLY_TOOL_REFERENCE = "autonomous-ai-agents/multi-agent-coding-orchestrator/references/apply-tool-card-contracts.md"
 RUN_SCRIPT = ROOT / "scripts/run-anki-orchestrator"
 ADOPTION = ROOT / "adoption/anki.md"
 CHECKLIST_ABS = "/Users/chanbla11mit/hermes-local-harness/policies/overgating-review.md"
@@ -198,7 +199,9 @@ class FleetDesiredState(unittest.TestCase):
                 self.assertEqual(self.verifier.PROFILE_SOUL_PATHS[profile], entry)
                 self.assertEqual(self.verifier.profile_soul_expected(entry), sha(ROOT / entry["source"]))
         override = self.snapshot["skill"]["profile_local_skill_overrides"][ORCH]
-        self.assertEqual(override, {RELATIVE: self.verifier.TRACKED_SOURCE})
+        # The reference file adopted on t_c9d4d5c8 is the second tracked override.
+        self.assertEqual(override, {RELATIVE: self.verifier.TRACKED_SOURCE,
+                                    APPLY_TOOL_REFERENCE: self.verifier.TRACKED_SOURCE})
         self.assertEqual(self.verifier.local_override_expected(ORCH, RELATIVE, override[RELATIVE]), sha(SKILL))
 
     def test_fixtures_resolve_to_tracked_bytes(self):
