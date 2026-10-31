@@ -11,6 +11,7 @@ This index is the entry point for durable harness documentation tracked in Git. 
 
 ## Current entries
 
+- [Human deployment guide review](../skills/devops/human-deployment-guide-review/SKILL.md) — shared skill `human-deployment-guide-review` (version 1.0.0): six review steps for a guide that a person runs against production, with the rules of `human-deployment-guide-writing` as the rule list; declared for jobcron-reviewer; live deployment is a separate card.
 - [Human deployment guide writing](../skills/devops/human-deployment-guide-writing/SKILL.md) — shared skill `human-deployment-guide-writing` (version 1.0.0): twelve rules for a guide that a person runs against production; declared for jobcron-orchestrator, jobcron-worker, jobcron-worker-2 and jobcron-reviewer; live deployment is a separate card.
 - [Cha PT scraper repository scope and owner-approved pushes to its `main`](specs/261020-chapt-scraper-repository-scope-and-push.md) — owner specification (2026-10-20), repository desired state only: three-repository Cha PT allowlist, `cha-webpt-website-sync` project, controller-only per-SHA push helper `scripts/chapt-push-scraper-main` and the clone's `pre-push` hook. Clone, project creation, hook installation and live deployment are a separate attended rollout.
 - [Live verify-state drift triage (2026-10-19)](state/261019-live-drift-triage.md) — skill/SOUL expectations derived from tracked sources; every remaining live FAIL classified with its recommended action.

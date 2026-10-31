@@ -609,6 +609,11 @@
       "jobcron-reviewer": {
         "SKILL.md": "tracked-source"
       }
+    },
+    "human-deployment-guide-review": {
+      "jobcron-reviewer": {
+        "SKILL.md": "tracked-source"
+      }
     }
   },
   "active_extras": [],

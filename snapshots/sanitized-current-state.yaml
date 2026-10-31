@@ -392,6 +392,18 @@
         "files": [
           "SKILL.md"
         ]
+      },
+      {
+        "name": "human-deployment-guide-review",
+        "path": "/Users/chanbla11mit/.hermes/profiles/<profile>/skills/devops/human-deployment-guide-review",
+        "source": "skills/devops/human-deployment-guide-review",
+        "deploy_profiles": [
+          "jobcron-reviewer"
+        ],
+        "version": "1.0.0",
+        "files": [
+          "SKILL.md"
+        ]
       }
     ],
     "profile_local_skill_overrides": {
