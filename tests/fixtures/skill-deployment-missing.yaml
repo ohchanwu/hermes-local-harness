@@ -595,6 +595,20 @@
       "advisor": {
         "SKILL.md": "tracked-source"
       }
+    },
+    "human-deployment-guide-writing": {
+      "jobcron-orchestrator": {
+        "SKILL.md": "tracked-source"
+      },
+      "jobcron-worker": {
+        "SKILL.md": "tracked-source"
+      },
+      "jobcron-worker-2": {
+        "SKILL.md": "tracked-source"
+      },
+      "jobcron-reviewer": {
+        "SKILL.md": "tracked-source"
+      }
     }
   },
   "active_extras": [],
