@@ -1,0 +1,14 @@
+{
+  "board": "jss-genr",
+  "db": "/Users/chanbla11mit/.hermes/kanban/boards/jss-genr/kanban.db",
+  "orchestrator_profile": "jss-orchestrator",
+  "reviewer_profile": "jss-reviewer",
+  "repositories": [
+    "/Users/chanbla11mit/projects/jss-genr"
+  ],
+  "main_branch": "main",
+  "state_file": "/Users/chanbla11mit/.hermes/profiles/jss-orchestrator/cron/orchestrator_board_check_state.json",
+  "stale_after_seconds": 7200,
+  "report_again_seconds": 43200,
+  "approved_lookback_seconds": 604800
+}

@@ -1,0 +1,338 @@
+#!/usr/bin/env python3
+"""Scheduled board check for one project orchestrator.
+
+Deployed as <profile home>/scripts/orchestrator_board_check.py and run by the
+Hermes cron scheduler, which passes no arguments. The settings are read from
+orchestrator_board_check.json in the same directory as this script, unless
+--config PATH is given. --now EPOCH_SECONDS replaces the current time (tests).
+
+The board database is opened through SQLite's read-only mode (mode=ro). Git is
+run only as `git -C <repository>` with `cat-file -e`, `merge-base
+--is-ancestor` and `log --fixed-strings --grep`; nothing is fetched. The only
+file written is the settings key `state_file`, through a temporary file in the
+same directory and os.replace.
+
+Findings, one line each, `<KIND> <card id> <status> <assignee or -> <title>`:
+  NO-WAKE-SUBSCRIPTION     open card without a notify+wake subscription row
+                           (same rule as scripts/check-notify-subscriptions)
+  APPROVED-NOT-INTEGRATED  done card whose latest reviewer run completed within
+                           approved_lookback_seconds and names a 40-hex
+                           candidate commit that is not on main_branch in any
+                           listed repository; the line ends with
+                           ` commit <candidate>` and, when no listed repository
+                           has the commit, ` (commit not found)`
+  STALE-BLOCKED            blocked card with no activity for stale_after_seconds
+  STALE-REVIEW             review card with no activity for stale_after_seconds
+
+Repeat control: a finding with key `<KIND>:<card id>` is due when the state
+file has no report time for the key, or the last report is at least
+report_again_seconds old. When at least one finding is due, the header line
+and every current finding are printed and the due keys get the current time.
+When none is due, the only line printed is {"wakeAgent": false}, which tells
+the scheduler not to start the agent. Keys of findings that no longer exist
+are removed from the state file on every run.
+
+A settings, database, state file or Git error prints one line starting with
+`Board check error:` and exits 0 without the wakeAgent line, so the scheduler
+starts the agent. Exit is nonzero only on an unexpected exception.
+
+The output never contains card bodies, comment text, run summaries or run
+metadata other than the candidate commit.
+"""
+import argparse
+import json
+import os
+import re
+import sqlite3
+import subprocess
+import sys
+import tempfile
+import time
+from pathlib import Path
+from urllib.parse import quote
+
+SETTINGS_NAME = "orchestrator_board_check.json"
+WAKE_FALSE_LINE = '{"wakeAgent": false}'
+GIT_TIMEOUT_SECONDS = 60
+
+CLOSED_STATUSES = ("done", "archived")
+CANDIDATE_KEYS = ("candidate_commit", "candidate", "commit")
+FULL_COMMIT_RE = re.compile(r"\A[0-9a-f]{40}\Z")
+
+STRING_KEYS = ("board", "db", "orchestrator_profile", "reviewer_profile", "main_branch", "state_file")
+SECONDS_KEYS = ("stale_after_seconds", "report_again_seconds", "approved_lookback_seconds")
+
+OPEN_CARDS_SQL = (
+    "SELECT id, status, assignee, title FROM tasks"
+    " WHERE COALESCE(status, '') NOT IN (?, ?)"
+    " ORDER BY created_at, id"
+)
+
+# Same condition as WAKING_CARDS_SQL in scripts/check-notify-subscriptions.
+WAKING_CARDS_SQL = (
+    "SELECT DISTINCT task_id FROM kanban_notify_subs"
+    " WHERE delivery_mode = 'notify+wake'"
+    " AND COALESCE(notifier_profile, '') <> ''"
+    " AND COALESCE(user_id, '') <> ''"
+)
+
+LATEST_REVIEWER_RUNS_SQL = (
+    "SELECT t.id, t.status, t.assignee, t.title, r.outcome, r.ended_at, r.metadata"
+    " FROM tasks t JOIN task_runs r ON r.task_id = t.id"
+    " WHERE t.status = 'done'"
+    " AND r.id = (SELECT MAX(r2.id) FROM task_runs r2"
+    "             WHERE r2.task_id = t.id AND r2.profile = ?)"
+    " ORDER BY t.created_at, t.id"
+)
+
+WAITING_CARDS_SQL = (
+    "SELECT t.id, t.status, t.assignee, t.title, MAX("
+    " COALESCE(t.created_at, 0),"
+    " COALESCE((SELECT MAX(e.created_at) FROM task_events e WHERE e.task_id = t.id), 0),"
+    " COALESCE((SELECT MAX(c.created_at) FROM task_comments c WHERE c.task_id = t.id), 0))"
+    " FROM tasks t WHERE t.status IN ('blocked', 'review')"
+    " ORDER BY t.created_at, t.id"
+)
+
+STALE_KINDS = {"blocked": "STALE-BLOCKED", "review": "STALE-REVIEW"}
+
+
+class CheckError(Exception):
+    """A settings, database, state file or Git error; reported as one line, exit 0."""
+
+
+def one_line(value):
+    """Return value as text on a single line (line breaks become spaces)."""
+    return " ".join(str(value if value is not None else "").split())
+
+
+def finding_line(kind, card, suffix=""):
+    task_id, status, assignee, title = card
+    return (f"{kind} {one_line(task_id)} {one_line(status) or '-'}"
+            f" {one_line(assignee) or '-'} {one_line(title)}{suffix}")
+
+
+def load_settings(path):
+    try:
+        with open(path, encoding="utf-8") as handle:
+            settings = json.load(handle)
+    except OSError as exc:
+        raise CheckError(f"cannot read settings file {path}: {one_line(exc.strerror or exc)}")
+    except ValueError as exc:
+        raise CheckError(f"settings file {path} is not valid JSON: {one_line(exc)}")
+    if not isinstance(settings, dict):
+        raise CheckError(f"settings file {path} does not contain a JSON object")
+    for key in STRING_KEYS + ("repositories",) + SECONDS_KEYS:
+        if key not in settings:
+            raise CheckError(f"settings file {path} has no key {key}")
+    for key in STRING_KEYS:
+        if not isinstance(settings[key], str) or not settings[key]:
+            raise CheckError(f"settings key {key} must be a non-empty string")
+    for key in ("db", "state_file"):
+        if not os.path.isabs(settings[key]):
+            raise CheckError(f"settings key {key} must be an absolute path")
+    if settings["main_branch"].startswith("-"):
+        raise CheckError("settings key main_branch must not start with '-'")
+    repositories = settings["repositories"]
+    if (not isinstance(repositories, list) or not repositories
+            or not all(isinstance(r, str) and os.path.isabs(r) for r in repositories)):
+        raise CheckError("settings key repositories must be a non-empty list of absolute paths")
+    for key in SECONDS_KEYS:
+        value = settings[key]
+        if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+            raise CheckError(f"settings key {key} must be a positive integer")
+    return settings
+
+
+def read_board(db_path, reviewer_profile):
+    """Return the rows the three checks need; raises CheckError on any database failure."""
+    if not Path(db_path).is_file():
+        raise CheckError(f"database file not found: {db_path}")
+    try:
+        conn = sqlite3.connect("file:" + quote(str(db_path)) + "?mode=ro", uri=True)
+        try:
+            open_cards = conn.execute(OPEN_CARDS_SQL, CLOSED_STATUSES).fetchall()
+            waking_ids = {row[0] for row in conn.execute(WAKING_CARDS_SQL)}
+            reviewed = conn.execute(LATEST_REVIEWER_RUNS_SQL, (reviewer_profile,)).fetchall()
+            waiting = conn.execute(WAITING_CARDS_SQL).fetchall()
+        finally:
+            conn.close()
+    except sqlite3.Error as exc:
+        raise CheckError(f"cannot read database {db_path}: {one_line(exc)}")
+    return open_cards, waking_ids, reviewed, waiting
+
+
+def run_git(repository, *args):
+    """Run one read-only Git command; return (exit code, standard output)."""
+    env = dict(os.environ, GIT_TERMINAL_PROMPT="0", GIT_OPTIONAL_LOCKS="0")
+    try:
+        result = subprocess.run(["git", "-C", repository, *args], capture_output=True, text=True,
+                                env=env, timeout=GIT_TIMEOUT_SECONDS, check=False)
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise CheckError(f"git {args[0]} failed in {repository}: {one_line(exc)}")
+    return result.returncode, result.stdout
+
+
+class Repositories:
+    """Answers whether a candidate commit is on main_branch in any listed repository."""
+
+    def __init__(self, paths, main_branch):
+        self.paths = paths
+        self.main_branch = main_branch
+        self.checked = False
+
+    def check_main_branches(self):
+        if self.checked:
+            return
+        for path in self.paths:
+            code, _ = run_git(path, "cat-file", "-e", self.main_branch + "^{commit}")
+            if code != 0:
+                raise CheckError(f"git cat-file found no branch {self.main_branch} in {path}"
+                                 f" (exit {code})")
+        self.checked = True
+
+    def status(self, candidate):
+        """Return 'integrated', 'missing' (in no repository) or 'not integrated'."""
+        self.check_main_branches()
+        found = False
+        for path in self.paths:
+            code, _ = run_git(path, "cat-file", "-e", candidate + "^{commit}")
+            if code == 0:
+                found = True
+                code, _ = run_git(path, "merge-base", "--is-ancestor", candidate, self.main_branch)
+                if code == 0:
+                    return "integrated"
+                if code != 1:
+                    raise CheckError(f"git merge-base failed in {path} (exit {code})")
+            code, out = run_git(path, "log", "--format=%H", "--max-count=1", "--fixed-strings",
+                                "--grep=cherry picked from commit " + candidate, self.main_branch)
+            if code != 0:
+                raise CheckError(f"git log failed in {path} (exit {code})")
+            if out.strip():
+                return "integrated"
+        return "not integrated" if found else "missing"
+
+
+def candidate_commit(metadata_text):
+    """Return the 40-hex candidate from run metadata, or None (first present key wins)."""
+    try:
+        metadata = json.loads(metadata_text) if metadata_text else None
+    except (TypeError, ValueError):
+        return None
+    if not isinstance(metadata, dict):
+        return None
+    for key in CANDIDATE_KEYS:
+        if key in metadata:
+            value = metadata[key]
+            if isinstance(value, str) and FULL_COMMIT_RE.match(value):
+                return value
+            return None
+    return None
+
+
+def collect_findings(settings, now):
+    """Return a list of (key, line) in output order."""
+    open_cards, waking_ids, reviewed, waiting = read_board(settings["db"], settings["reviewer_profile"])
+    findings = []
+    for card in open_cards:
+        if card[0] not in waking_ids:
+            findings.append((f"NO-WAKE-SUBSCRIPTION:{card[0]}", finding_line("NO-WAKE-SUBSCRIPTION", card)))
+
+    repositories = Repositories(settings["repositories"], settings["main_branch"])
+    for task_id, status, assignee, title, outcome, ended_at, metadata in reviewed:
+        if outcome != "completed" or not isinstance(ended_at, (int, float)):
+            continue
+        if now - ended_at > settings["approved_lookback_seconds"]:
+            continue
+        candidate = candidate_commit(metadata)
+        if candidate is None:
+            continue
+        state = repositories.status(candidate)
+        if state == "integrated":
+            continue
+        suffix = f" commit {candidate}" + (" (commit not found)" if state == "missing" else "")
+        findings.append((f"APPROVED-NOT-INTEGRATED:{task_id}",
+                         finding_line("APPROVED-NOT-INTEGRATED", (task_id, status, assignee, title), suffix)))
+
+    for task_id, status, assignee, title, newest in waiting:
+        if now - (newest or 0) > settings["stale_after_seconds"]:
+            kind = STALE_KINDS[status]
+            findings.append((f"{kind}:{task_id}", finding_line(kind, (task_id, status, assignee, title))))
+    return findings
+
+
+def read_state(path):
+    try:
+        with open(path, encoding="utf-8") as handle:
+            state = json.load(handle)
+    except FileNotFoundError:
+        return {}
+    except OSError as exc:
+        raise CheckError(f"cannot read state file {path}: {one_line(exc.strerror or exc)}")
+    except ValueError as exc:
+        raise CheckError(f"state file {path} is not valid JSON: {one_line(exc)}")
+    reported = state.get("reported") if isinstance(state, dict) else None
+    if not isinstance(reported, dict) or not all(
+            isinstance(v, (int, float)) and not isinstance(v, bool) for v in reported.values()):
+        raise CheckError(f"state file {path} does not have the expected form")
+    return reported
+
+
+def write_state(path, reported):
+    directory = os.path.dirname(path)
+    try:
+        fd, temporary = tempfile.mkstemp(prefix=".orchestrator_board_check_state.", suffix=".tmp",
+                                         dir=directory)
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as handle:
+                json.dump({"reported": reported}, handle, indent=2, sort_keys=True)
+                handle.write("\n")
+            os.replace(temporary, path)
+        except BaseException:
+            try:
+                os.unlink(temporary)
+            except OSError:
+                pass
+            raise
+    except OSError as exc:
+        raise CheckError(f"cannot write state file {path}: {one_line(exc.strerror or exc)}")
+
+
+def run_check(settings, now):
+    """Return the output lines; raises CheckError."""
+    findings = collect_findings(settings, now)
+    previous = read_state(settings["state_file"])
+    current_keys = {key for key, _ in findings}
+    reported = {key: when for key, when in previous.items() if key in current_keys}
+    due = [key for key, _ in findings
+           if key not in reported or now - reported[key] >= settings["report_again_seconds"]]
+    for key in due:
+        reported[key] = now
+    if reported != previous:
+        write_state(settings["state_file"], reported)
+    if not due:
+        return [WAKE_FALSE_LINE]
+    header = f"Board {settings['board']} check for {settings['orchestrator_profile']}:"
+    return [header] + [line for _, line in findings]
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--config", help=f"settings file (default: {SETTINGS_NAME} next to this script)")
+    parser.add_argument("--now", type=int, help="current time as epoch seconds (tests only)")
+    args = parser.parse_args(argv)
+
+    config = args.config or os.path.join(os.path.dirname(os.path.abspath(__file__)), SETTINGS_NAME)
+    now = args.now if args.now is not None else int(time.time())
+    try:
+        lines = run_check(load_settings(config), now)
+    except CheckError as exc:
+        print(f"Board check error: {exc}")
+        return 0
+    for line in lines:
+        print(line)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

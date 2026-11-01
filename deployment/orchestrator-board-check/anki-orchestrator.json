@@ -1,0 +1,15 @@
+{
+  "board": "anki",
+  "db": "/Users/chanbla11mit/.hermes/kanban/boards/anki/kanban.db",
+  "orchestrator_profile": "anki-orchestrator",
+  "reviewer_profile": "anki-reviewer",
+  "repositories": [
+    "/Users/chanbla11mit/projects/anki",
+    "/Users/chanbla11mit/projects/anki-addons"
+  ],
+  "main_branch": "main",
+  "state_file": "/Users/chanbla11mit/.hermes/profiles/anki-orchestrator/cron/orchestrator_board_check_state.json",
+  "stale_after_seconds": 7200,
+  "report_again_seconds": 43200,
+  "approved_lookback_seconds": 604800
+}

@@ -1,0 +1,14 @@
+{
+  "board": "harness",
+  "db": "/Users/chanbla11mit/.hermes/kanban/boards/harness/kanban.db",
+  "orchestrator_profile": "harness-orchestrator",
+  "reviewer_profile": "harness-reviewer",
+  "repositories": [
+    "/Users/chanbla11mit/hermes-local-harness"
+  ],
+  "main_branch": "main",
+  "state_file": "/Users/chanbla11mit/.hermes/profiles/harness-orchestrator/cron/orchestrator_board_check_state.json",
+  "stale_after_seconds": 7200,
+  "report_again_seconds": 43200,
+  "approved_lookback_seconds": 604800
+}
