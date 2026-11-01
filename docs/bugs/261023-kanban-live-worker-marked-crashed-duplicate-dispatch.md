@@ -67,6 +67,17 @@ before it marks a run crashed and reclaims the card.
 - The `harness-orchestrator` profile sent SIGTERM to pid 46429 and its child processes; all of them had exited by 14:21 KST. Run 208 continued. The uncommitted change that run 205 left in this file (13 added lines) was its partial work, and run 208 kept it.
 - Not checked upstream for this recurrence: network access was not authorized on this card.
 
+## Fifth recurrence (2026-11-01, board `anki`, cards `t_8b704011` and `t_5f91d067`)
+- Reported by the `anki-orchestrator` profile. The dispatcher ran in the gateway process, pid 3312, which started on 2026-10-30 at 10:46:42 KST.
+- At 2026-11-01 09:13:53 KST, in the same second, the dispatcher recorded two runs as `crashed`: card `t_8b704011`, worker run 140 (`anki-worker`, pid 99687), with "pid 99687 not alive", and card `t_5f91d067`, review run 141 (`anki-reviewer`, pid 99694), with "pid 99694 not alive". At 09:13:55 KST run 142 started on `t_8b704011` and run 144 started on `t_5f91d067`.
+- Both processes were alive. Pid 99687 (`hermes_cli.main -p anki-worker ... work kanban task t_8b704011`, parent pid 3312, started 09:09:50 KST) was still running at 09:24 KST, with the child processes `claude` (pid 21464, started 09:15:18 KST, after the crash record), its MCP server (pid 21473) and a kernel runner (pid 48784). Pid 99694 kept working until 09:18:11 KST, when its agent.log records the CLI cleanup message for the memory shutdown of its session.
+- Runs 140 and 142 wrote to the same worktree and scratch directory at the same time. At 09:22:34 KST run 140 wrote an untracked change set file and replaced scratch files that run 142 was using. Run 142 detected this and blocked the card.
+- The run-141 reviewer process, whose run was already recorded as `crashed`, called `kanban_complete` twice, and both calls were refused with "pid 99694 not alive ...", so it posted its verdict as a comment. The duplicate review run 144 completed normally.
+- At about 09:25 KST the `anki-orchestrator` profile stopped pids 99687, 21464, 21473 and 48784 with SIGTERM. After 5 seconds pid 99687 was a zombie (`<defunct>`) that its parent pid 3312 had not reaped, and the other three processes had exited. No gateway log line in the `anki-orchestrator` profile records the reason for the crash records.
+- Observation only: the process list also showed worker processes of other profiles that were spawned at 09:13:53 KST with parent pid 3312.
+- Reasoning of the filer, not verified: two runs on different profiles were recorded as `crashed` in the same second while their processes were alive, which points to the liveness check (for example a pid check from a different process context, or a timeout) and not to the workers.
+- Not checked upstream for this recurrence: network access was not authorized on this card.
+
 ## Upstream status
 Checked on 2026-10-26 against NousResearch/hermes-agent. No new upstream issue was filed, because the defect is already reported:
 - Issue #141758: the dispatcher records a live worker as `crashed: pid not alive` on macOS and dispatches a duplicate run (open).
