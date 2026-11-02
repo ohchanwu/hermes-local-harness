@@ -442,6 +442,86 @@ class OrchestratorBoardCheckTests(unittest.TestCase):
         self.write_settings()
         self.assertIn("trunk", self.assert_error())
 
+    # repository_branches
+
+    def remote_tracking_repo(self, name):
+        """Make a repository that has refs/remotes/origin/main and no local branch main."""
+        repo = make_repo(self.dir / name)
+        commit(repo, "base-" + name)
+        git(repo, "update-ref", "refs/remotes/origin/main", "HEAD")
+        git(repo, "checkout", "-q", "-b", "work")
+        git(repo, "branch", "-q", "-D", "main")
+        self.assertNotEqual(subprocess.run(
+            ["git", "-C", str(repo), "rev-parse", "--verify", "--quiet", "refs/heads/main"],
+            capture_output=True).returncode, 0)
+        return repo
+
+    def test_override_with_remote_tracking_reference_counts_ancestry_and_cherry_pick_line(self):
+        repo_c = self.remote_tracking_repo("repo-c")
+        self.settings["repositories"] = [str(self.repo_a), str(repo_c)]
+        self.settings["repository_branches"] = {str(repo_c): "origin/main"}
+        self.write_settings()
+
+        git(repo_c, "checkout", "-q", "-b", "side-ancestor", "origin/main")
+        by_ancestry = commit(repo_c, "ancestor")
+        git(repo_c, "update-ref", "refs/remotes/origin/main", by_ancestry)
+
+        git(repo_c, "checkout", "-q", "-b", "side-picked", "origin/main")
+        by_cherry_pick = commit(repo_c, "picked")
+        git(repo_c, "checkout", "-q", "-b", "integration", "origin/main")
+        git(repo_c, "cherry-pick", "-x", by_cherry_pick)
+        git(repo_c, "update-ref", "refs/remotes/origin/main", "HEAD")
+        self.assertNotEqual(subprocess.run(
+            ["git", "-C", str(repo_c), "merge-base", "--is-ancestor", by_cherry_pick, "origin/main"]
+        ).returncode, 0)
+
+        git(repo_c, "checkout", "-q", "-b", "side-open", "origin/main")
+        not_integrated = commit(repo_c, "open")
+        git(repo_c, "checkout", "-q", "work")
+
+        self.approved("t_0150", by_ancestry)
+        self.approved("t_0151", by_cherry_pick)
+        self.approved("t_0152", not_integrated)
+        self.assertEqual(self.findings(), [
+            f"APPROVED-NOT-INTEGRATED t_0152 done example-worker Approved t_0152 commit {not_integrated}"])
+
+    def test_repository_without_override_still_uses_main_branch(self):
+        repo_c = self.remote_tracking_repo("repo-c")
+        self.settings["repositories"] = [str(self.repo_a), str(repo_c)]
+        self.settings["repository_branches"] = {str(repo_c): "origin/main"}
+        self.write_settings()
+        # In repo_a, origin/main contains the candidate and main does not, so the
+        # candidate is integrated only if repo_a were checked against origin/main.
+        candidate = self.side_commit(self.repo_a, "only-on-origin-main")
+        git(self.repo_a, "update-ref", "refs/remotes/origin/main", candidate)
+        on_main = commit(self.repo_a, "on-main-a")
+        self.approved("t_0160", candidate)
+        self.approved("t_0161", on_main)
+        self.assertEqual(self.findings(), [
+            f"APPROVED-NOT-INTEGRATED t_0160 done example-worker Approved t_0160 commit {candidate}"])
+
+    def test_missing_override_reference_prints_error_naming_repository_and_reference(self):
+        self.settings["repository_branches"] = {str(self.repo_b): "origin/main"}
+        self.write_settings()
+        self.approved("t_0170", self.base_a)
+        line = self.assert_error()
+        self.assertIn(str(self.repo_b), line)
+        self.assertIn("origin/main", line)
+        self.assertNotIn(str(self.repo_a) + " ", line)
+
+    def test_invalid_repository_branches_prints_error(self):
+        repo_a = str(self.repo_a)
+        for value in [["origin/main"], "origin/main", 5, None,
+                      {str(self.dir / "not-listed"): "origin/main"},
+                      {repo_a + "/": "origin/main"},
+                      {repo_a: ""},
+                      {repo_a: 5},
+                      {repo_a: "-x"},
+                      {repo_a: "--output=x"}]:
+            with self.subTest(value=value):
+                self.write_settings(dict(self.settings, repository_branches=value))
+                self.assertIn("repository_branches", self.assert_error())
+
     def test_invalid_state_file_prints_error(self):
         self.board.card("t_0110", "running", "No wake", wake=False)
         self.state.write_text("{not json")
@@ -541,7 +621,12 @@ class SettingsFilesTests(unittest.TestCase):
             orchestrator = fleet["orchestrator"]
             with self.subTest(orchestrator=orchestrator):
                 settings = json.loads((SETTINGS_DIR / f"{orchestrator}.json").read_text())
+                expected_branches = {}
+                if orchestrator == "chapt-orchestrator":
+                    expected_branches = {"repository_branches": {
+                        "/Users/chanbla11mit/projects/cha-pt-frontend": "origin/main"}}
                 self.assertEqual(settings, {
+                    **expected_branches,
                     "board": fleet["board"],
                     "db": f"/Users/chanbla11mit/.hermes/kanban/boards/{fleet['board']}/kanban.db",
                     "orchestrator_profile": orchestrator,

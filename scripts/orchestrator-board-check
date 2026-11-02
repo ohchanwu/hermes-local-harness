@@ -17,12 +17,16 @@ Findings, one line each, `<KIND> <card id> <status> <assignee or -> <title>`:
                            (same rule as scripts/check-notify-subscriptions)
   APPROVED-NOT-INTEGRATED  done card whose latest reviewer run completed within
                            approved_lookback_seconds and names a 40-hex
-                           candidate commit that is not on main_branch in any
-                           listed repository; the line ends with
+                           candidate commit that is not on the branch
+                           reference of any listed repository; the line ends with
                            ` commit <candidate>` and, when no listed repository
                            has the commit, ` (commit not found)`
   STALE-BLOCKED            blocked card with no activity for stale_after_seconds
   STALE-REVIEW             review card with no activity for stale_after_seconds
+
+Branch reference of a repository: the value for that repository in the
+optional settings key repository_branches (a JSON object that maps a path in
+repositories to a reference such as origin/main), otherwise main_branch.
 
 Repeat control: a finding with key `<KIND>:<card id>` is due when the state
 file has no report time for the key, or the last report is at least
@@ -137,6 +141,19 @@ def load_settings(path):
     if (not isinstance(repositories, list) or not repositories
             or not all(isinstance(r, str) and os.path.isabs(r) for r in repositories)):
         raise CheckError("settings key repositories must be a non-empty list of absolute paths")
+    branches = settings.get("repository_branches", {})
+    if not isinstance(branches, dict):
+        raise CheckError("settings key repository_branches must be a JSON object")
+    for repository, branch in branches.items():
+        if not isinstance(repository, str) or repository not in repositories:
+            raise CheckError(f"settings key repository_branches names {one_line(repository)},"
+                             " which is not in repositories")
+        if not isinstance(branch, str) or not branch:
+            raise CheckError(f"settings key repository_branches value for {repository}"
+                             " must be a non-empty string")
+        if branch.startswith("-"):
+            raise CheckError(f"settings key repository_branches value for {repository}"
+                             " must not start with '-'")
     for key in SECONDS_KEYS:
         value = settings[key]
         if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
@@ -174,20 +191,20 @@ def run_git(repository, *args):
 
 
 class Repositories:
-    """Answers whether a candidate commit is on main_branch in any listed repository."""
+    """Answers whether a candidate commit is on the branch reference of any listed repository."""
 
-    def __init__(self, paths, main_branch):
+    def __init__(self, paths, main_branch, repository_branches):
         self.paths = paths
-        self.main_branch = main_branch
+        self.branches = {path: repository_branches.get(path, main_branch) for path in paths}
         self.checked = False
 
     def check_main_branches(self):
         if self.checked:
             return
         for path in self.paths:
-            code, _ = run_git(path, "cat-file", "-e", self.main_branch + "^{commit}")
+            code, _ = run_git(path, "cat-file", "-e", self.branches[path] + "^{commit}")
             if code != 0:
-                raise CheckError(f"git cat-file found no branch {self.main_branch} in {path}"
+                raise CheckError(f"git cat-file found no branch {self.branches[path]} in {path}"
                                  f" (exit {code})")
         self.checked = True
 
@@ -199,13 +216,13 @@ class Repositories:
             code, _ = run_git(path, "cat-file", "-e", candidate + "^{commit}")
             if code == 0:
                 found = True
-                code, _ = run_git(path, "merge-base", "--is-ancestor", candidate, self.main_branch)
+                code, _ = run_git(path, "merge-base", "--is-ancestor", candidate, self.branches[path])
                 if code == 0:
                     return "integrated"
                 if code != 1:
                     raise CheckError(f"git merge-base failed in {path} (exit {code})")
             code, out = run_git(path, "log", "--format=%H", "--max-count=1", "--fixed-strings",
-                                "--grep=cherry picked from commit " + candidate, self.main_branch)
+                                "--grep=cherry picked from commit " + candidate, self.branches[path])
             if code != 0:
                 raise CheckError(f"git log failed in {path} (exit {code})")
             if out.strip():
@@ -238,7 +255,8 @@ def collect_findings(settings, now):
         if card[0] not in waking_ids:
             findings.append((f"NO-WAKE-SUBSCRIPTION:{card[0]}", finding_line("NO-WAKE-SUBSCRIPTION", card)))
 
-    repositories = Repositories(settings["repositories"], settings["main_branch"])
+    repositories = Repositories(settings["repositories"], settings["main_branch"],
+                                settings.get("repository_branches", {}))
     for task_id, status, assignee, title, outcome, ended_at, metadata in reviewed:
         if outcome != "completed" or not isinstance(ended_at, (int, float)):
             continue

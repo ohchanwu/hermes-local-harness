@@ -9,6 +9,9 @@
     "/Users/chanbla11mit/projects/cha-webpt-website-sync"
   ],
   "main_branch": "main",
+  "repository_branches": {
+    "/Users/chanbla11mit/projects/cha-pt-frontend": "origin/main"
+  },
   "state_file": "/Users/chanbla11mit/.hermes/profiles/chapt-orchestrator/cron/orchestrator_board_check_state.json",
   "stale_after_seconds": 7200,
   "report_again_seconds": 43200,
