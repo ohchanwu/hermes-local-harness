@@ -19,6 +19,7 @@ import tempfile
 import unittest
 from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts/orchestrator-board-check"
@@ -312,6 +313,154 @@ class OrchestratorBoardCheckTests(unittest.TestCase):
         self.assertEqual(self.findings(), [
             f"APPROVED-NOT-INTEGRATED t_0043 done example-worker Later worker run commit {candidate}"])
 
+    # APPROVED-NOT-INTEGRATED: tree comparison for squash merges and rebase merges
+
+    def tree(self, repo, rev):
+        return git(repo, "rev-parse", rev + "^{tree}")
+
+    def assert_not_ancestor_and_no_cherry_pick_line(self, repo, candidate, branch="main"):
+        self.assertEqual(subprocess.run(
+            ["git", "-C", str(repo), "merge-base", "--is-ancestor", candidate, branch]).returncode, 1)
+        self.assertEqual(git(repo, "log", "--format=%H", "--fixed-strings",
+                             "--grep=cherry picked from commit " + candidate, branch), "")
+
+    def squash_merge(self, repo, branch, message, extra_file=None):
+        """Squash-merge branch into the checked-out branch as one new commit; return it."""
+        git(repo, "merge", "-q", "--squash", branch)
+        if extra_file:
+            (repo / extra_file).write_text(extra_file + "\n")
+            git(repo, "add", extra_file)
+        git(repo, "commit", "-q", "-m", message)
+        return git(repo, "rev-parse", "HEAD")
+
+    def copy_commit(self, repo, source, message):
+        """Apply source's change as a new commit with another message (no cherry-pick line)."""
+        git(repo, "cherry-pick", "--no-commit", source)
+        git(repo, "commit", "-q", "-m", message)
+        return git(repo, "rev-parse", "HEAD")
+
+    def test_squash_merge_with_the_candidate_tree_is_not_reported(self):
+        git(self.repo_a, "checkout", "-q", "-b", "side-squash", "main")
+        commit(self.repo_a, "squash-part-1")
+        candidate = commit(self.repo_a, "squash-part-2")
+        git(self.repo_a, "checkout", "-q", "main")
+        squashed = self.squash_merge(self.repo_a, "side-squash", "Squash merge of side-squash")
+        self.assertEqual(git(self.repo_a, "rev-parse", squashed + "^"), self.base_a)
+        self.assertEqual(self.tree(self.repo_a, squashed), self.tree(self.repo_a, candidate))
+        self.assert_not_ancestor_and_no_cherry_pick_line(self.repo_a, candidate)
+        self.approved("t_0200", candidate)
+        refs_before = ref_snapshot(self.repo_a)
+        self.assertEqual(self.findings(), [])
+        self.assertEqual(ref_snapshot(self.repo_a), refs_before)
+
+    def test_squash_merge_with_a_different_tree_is_reported(self):
+        # The branch reference received another change before the squash merge.
+        after_change = self.side_commit(self.repo_a, "approved-before-main-moved")
+        commit(self.repo_a, "other-change-on-main")
+        self.squash_merge(self.repo_a, "side-approved-before-main-moved", "Squash after main moved")
+        # The squash merge commit itself contains one more file.
+        with_extra = self.side_commit(self.repo_a, "approved-then-extended")
+        self.squash_merge(self.repo_a, "side-approved-then-extended", "Squash with extra file",
+                          extra_file="extra-in-squash")
+        log_trees = git(self.repo_a, "log", "--format=%T", "main").split()
+        for candidate in (after_change, with_extra):
+            self.assert_not_ancestor_and_no_cherry_pick_line(self.repo_a, candidate)
+            self.assertNotIn(self.tree(self.repo_a, candidate), log_trees)
+        self.approved("t_0201", after_change)
+        self.approved("t_0202", with_extra)
+        self.assertEqual(self.findings(), [
+            f"APPROVED-NOT-INTEGRATED t_0201 done example-worker Approved t_0201 commit {after_change}",
+            f"APPROVED-NOT-INTEGRATED t_0202 done example-worker Approved t_0202 commit {with_extra}",
+        ])
+
+    def test_rebase_merge_with_the_candidate_tree_is_not_reported(self):
+        git(self.repo_a, "checkout", "-q", "-b", "side-rebase", "main")
+        first = commit(self.repo_a, "rebase-part-1")
+        candidate = commit(self.repo_a, "rebase-part-2")
+        git(self.repo_a, "checkout", "-q", "main")
+        rewritten_first = self.copy_commit(self.repo_a, first, "rebase-part-1 (rewritten)")
+        rewritten = self.copy_commit(self.repo_a, candidate, "rebase-part-2 (rewritten)")
+        commit(self.repo_a, "later-change-on-main")
+        self.assertNotEqual(rewritten_first, first)
+        self.assertNotEqual(rewritten, candidate)
+        self.assertEqual(self.tree(self.repo_a, rewritten), self.tree(self.repo_a, candidate))
+        self.assert_not_ancestor_and_no_cherry_pick_line(self.repo_a, candidate)
+        self.assert_not_ancestor_and_no_cherry_pick_line(self.repo_a, first)
+        self.approved("t_0203", candidate)
+        self.approved("t_0204", first)
+        self.assertEqual(self.findings(), [])
+
+    def test_same_tree_reachable_only_through_a_second_parent_is_reported(self):
+        candidate = self.side_commit(self.repo_a, "second-parent")
+        git(self.repo_a, "checkout", "-q", "-b", "side-merged", self.base_a)
+        self.copy_commit(self.repo_a, candidate, "copy of second-parent")
+        commit(self.repo_a, "more-on-side-merged")
+        git(self.repo_a, "checkout", "-q", "main")
+        git(self.repo_a, "merge", "-q", "--no-ff", "-m", "Merge side-merged", "side-merged")
+        candidate_tree = self.tree(self.repo_a, candidate)
+        self.assertIn(candidate_tree, git(self.repo_a, "log", "--format=%T", self.base_a + "..main").split())
+        self.assertNotIn(candidate_tree, git(self.repo_a, "log", "--first-parent", "--format=%T",
+                                             self.base_a + "..main").split())
+        self.assert_not_ancestor_and_no_cherry_pick_line(self.repo_a, candidate)
+        self.approved("t_0205", candidate)
+        self.assertEqual(self.findings(), [
+            f"APPROVED-NOT-INTEGRATED t_0205 done example-worker Approved t_0205 commit {candidate}"])
+
+    def test_candidate_without_common_ancestor_is_reported_even_with_an_equal_tree(self):
+        git(self.repo_a, "checkout", "-q", "--orphan", "unrelated")
+        git(self.repo_a, "commit", "-q", "-m", "Unrelated history with the same files")
+        candidate = git(self.repo_a, "rev-parse", "HEAD")
+        git(self.repo_a, "checkout", "-q", "main")
+        self.assertEqual(self.tree(self.repo_a, candidate), self.tree(self.repo_a, "main"))
+        self.assertEqual(subprocess.run(["git", "-C", str(self.repo_a), "merge-base", candidate, "main"],
+                                        capture_output=True).returncode, 1)
+        self.approved("t_0206", candidate)
+        self.assertEqual(self.findings(), [
+            f"APPROVED-NOT-INTEGRATED t_0206 done example-worker Approved t_0206 commit {candidate}"])
+
+    def test_squash_merge_onto_remote_tracking_override_is_not_reported(self):
+        repo_c = self.remote_tracking_repo("repo-c")
+        self.settings["repositories"] = [str(self.repo_a), str(repo_c)]
+        self.settings["repository_branches"] = {str(repo_c): "origin/main"}
+        self.write_settings()
+        git(repo_c, "checkout", "-q", "-b", "side-squashed", "origin/main")
+        squashed_candidate = commit(repo_c, "squashed-feature")
+        git(repo_c, "checkout", "-q", "-b", "side-open", "origin/main")
+        open_candidate = commit(repo_c, "open-feature")
+        git(repo_c, "checkout", "-q", "-b", "integration", "origin/main")
+        self.squash_merge(repo_c, "side-squashed", "Squash merge of side-squashed")
+        git(repo_c, "update-ref", "refs/remotes/origin/main", "HEAD")
+        git(repo_c, "checkout", "-q", "work")
+        self.assert_not_ancestor_and_no_cherry_pick_line(repo_c, squashed_candidate, "origin/main")
+        self.approved("t_0207", squashed_candidate)
+        self.approved("t_0208", open_candidate)
+        self.assertEqual(self.findings(), [
+            f"APPROVED-NOT-INTEGRATED t_0208 done example-worker Approved t_0208 commit {open_candidate}"])
+
+    def test_failing_tree_comparison_git_command_prints_one_error_line(self):
+        candidate = self.side_commit(self.repo_a, "synthetic-failure")
+        self.approved("t_0210", candidate)
+        real_run_git = check.run_git
+        cases = [
+            ("rev-parse", lambda args: args[0] == "rev-parse"),
+            ("merge-base", lambda args: args[0] == "merge-base" and "--is-ancestor" not in args),
+            ("log", lambda args: args[0] == "log" and "--first-parent" in args),
+        ]
+        for command, matches in cases:
+            with self.subTest(command=command):
+                calls = []
+
+                def fake_run_git(repository, *args, matches=matches, calls=calls):
+                    if matches(args):
+                        calls.append(args)
+                        return 128, ""
+                    return real_run_git(repository, *args)
+
+                with mock.patch.object(check, "run_git", side_effect=fake_run_git):
+                    line = self.assert_error()
+                self.assertEqual(len(calls), 1, calls)
+                self.assertEqual(line, f"Board check error: git {command} failed in {self.repo_a} (exit 128)")
+
     # STALE-BLOCKED and STALE-REVIEW
 
     def test_old_blocked_and_review_cards_are_reported(self):
@@ -572,7 +721,7 @@ class OrchestratorBoardCheckTests(unittest.TestCase):
         self.assertNotIn(MARKER, "\n".join(out))
         self.assertNotIn(MARKER, self.state.read_text())
 
-    def test_script_source_uses_read_only_database_and_only_the_three_git_commands(self):
+    def test_script_source_uses_read_only_database_and_only_the_listed_git_commands(self):
         source = SCRIPT.read_text()
         self.assertIn('"?mode=ro", uri=True', source)
         self.assertEqual(source.count("sqlite3.connect("), 1)
@@ -581,10 +730,11 @@ class OrchestratorBoardCheckTests(unittest.TestCase):
             self.assertIsNone(re.search(r"\b" + re.escape(word) + r"\b", source, re.IGNORECASE), word)
         self.assertEqual(source.count("subprocess.run("), 1)
         self.assertEqual(set(re.findall(r'run_git\(path, "([a-z-]+)"', source)),
-                         {"cat-file", "merge-base", "log"})
-        self.assertEqual(len(re.findall(r"run_git\(", source)), 5)  # definition and four calls
+                         {"cat-file", "merge-base", "log", "rev-parse"})
+        self.assertEqual(len(re.findall(r"run_git\(", source)), 8)  # definition and seven calls
         self.assertIn('"--fixed-strings"', source)
         self.assertIn('"--is-ancestor"', source)
+        self.assertIn('"--first-parent"', source)
         self.assertIn("os.replace(", source)
 
     # Deployment layout and settings files

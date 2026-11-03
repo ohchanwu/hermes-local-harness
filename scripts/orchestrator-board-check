@@ -8,9 +8,19 @@ orchestrator_board_check.json in the same directory as this script, unless
 
 The board database is opened through SQLite's read-only mode (mode=ro). Git is
 run only as `git -C <repository>` with `cat-file -e`, `merge-base
---is-ancestor` and `log --fixed-strings --grep`; nothing is fetched. The only
-file written is the settings key `state_file`, through a temporary file in the
-same directory and os.replace.
+--is-ancestor`, `log --fixed-strings --grep`, `rev-parse <candidate>^{tree}`,
+`merge-base <candidate> <branch reference>` and `log --first-parent
+--format=%T <merge base>..<branch reference>`; nothing is fetched and no
+reference is written. The only file written is the settings key `state_file`,
+through a temporary file in the same directory and os.replace.
+
+A candidate counts as integrated in a repository when it is an ancestor of the
+branch reference, when a commit on the branch reference contains `cherry picked
+from commit <candidate>`, or, for a squash merge or rebase merge, when one
+first-parent commit on the branch reference after the merge base of the
+candidate and the branch reference has exactly the candidate's tree. A squash
+merge commit that also contains other changes has a different tree, so the
+finding stays.
 
 Findings, one line each, `<KIND> <card id> <status> <assignee or -> <title>`:
   NO-WAKE-SUBSCRIPTION     open card without a notify+wake subscription row
@@ -209,12 +219,20 @@ class Repositories:
         self.checked = True
 
     def status(self, candidate):
-        """Return 'integrated', 'missing' (in no repository) or 'not integrated'."""
+        """Return 'integrated', 'missing' (in no repository) or 'not integrated'.
+
+        In each repository, in this order: the candidate is an ancestor of the
+        branch reference; a commit on the branch reference contains
+        `cherry picked from commit <candidate>`; or, when the candidate commit
+        exists there, one first-parent commit on the branch reference after the
+        merge base has exactly the candidate's tree (squash merge or rebase merge).
+        """
         self.check_main_branches()
         found = False
         for path in self.paths:
             code, _ = run_git(path, "cat-file", "-e", candidate + "^{commit}")
-            if code == 0:
+            exists = code == 0
+            if exists:
                 found = True
                 code, _ = run_git(path, "merge-base", "--is-ancestor", candidate, self.branches[path])
                 if code == 0:
@@ -227,7 +245,31 @@ class Repositories:
                 raise CheckError(f"git log failed in {path} (exit {code})")
             if out.strip():
                 return "integrated"
+            if exists and self.tree_on_branch(path, candidate):
+                return "integrated"
         return "not integrated" if found else "missing"
+
+    def tree_on_branch(self, path, candidate):
+        """Return True when a first-parent commit after the merge base has the candidate's tree.
+
+        Called only when the candidate commit exists in path and is not an
+        ancestor of the branch reference. No common ancestor returns False.
+        """
+        branch = self.branches[path]
+        code, out = run_git(path, "rev-parse", candidate + "^{tree}")
+        tree = out.strip()
+        if code != 0 or not tree:
+            raise CheckError(f"git rev-parse failed in {path} (exit {code})")
+        code, out = run_git(path, "merge-base", candidate, branch)
+        if code == 1:
+            return False
+        base = out.strip()
+        if code != 0 or not base:
+            raise CheckError(f"git merge-base failed in {path} (exit {code})")
+        code, out = run_git(path, "log", "--first-parent", "--format=%T", base + ".." + branch)
+        if code != 0:
+            raise CheckError(f"git log failed in {path} (exit {code})")
+        return tree in out.split()
 
 
 def candidate_commit(metadata_text):
