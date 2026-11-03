@@ -12,8 +12,9 @@ repository commit and a deployment card.
 SKILL_CHANGES_EDITS lists the exact (new, old) text this card changed in each
 skill file, so tests that pin older bytes of these files can reverse the change
 byte for byte with reverse_skill_changes_edits(). This module imports no other
-test module except test_anki_apply_tool_card_contracts_reference, which imports
-none, so any test module can import it.
+test module except test_anki_apply_tool_card_contracts_reference and
+test_jobcron_app_only_deploy_authorization, which import none, so any test module
+can import it.
 """
 import hashlib
 import json
@@ -22,6 +23,7 @@ from pathlib import Path
 import unittest
 
 from test_anki_apply_tool_card_contracts_reference import reverse_apply_tool_reference_edits
+from test_jobcron_app_only_deploy_authorization import reverse_app_only_deploy_edits
 
 ROOT = Path(__file__).resolve().parents[1]
 RELATIVE = "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md"
@@ -35,10 +37,11 @@ PROFILES = {HARNESS: "harness-orchestrator", JOBCRON: "jobcron-orchestrator", CH
             JSS: "jss-orchestrator", ANKI: "anki-orchestrator"}
 
 # Version lines stay unchanged: tests outside this card pin them, and an increment
-# is optional on this card.
+# is optional on this card. The later owner-requested application-only production
+# deploy exception (t_b7455361) raised the Jobcron version.
 VERSIONS = {
     HARNESS: "0.6.7-harness.6",
-    JOBCRON: "0.6.9-jobcron.7",
+    JOBCRON: "0.6.9-jobcron.8",
     CHAPT: "0.6.7-chapt.7",
     JSS: "0.6.7-jss.8",
     ANKI: "0.6.10-anki.4",
@@ -152,8 +155,10 @@ class SkillChangesSection(unittest.TestCase):
     def test_reversing_the_edits_recovers_the_baseline_bytes(self):
         for path in SKILL_FILES:
             with self.subTest(path=path):
-                # Reverse the later apply-tool-card-contracts pointer (t_c9d4d5c8) first.
-                current = reverse_apply_tool_reference_edits(path, (ROOT / path).read_bytes())
+                # Reverse the later owner-requested application-only production deploy
+                # exception (t_b7455361) and apply-tool-card-contracts pointer (t_c9d4d5c8) first.
+                current = reverse_app_only_deploy_edits(path, (ROOT / path).read_bytes())
+                current = reverse_apply_tool_reference_edits(path, current)
                 original = reverse_skill_changes_edits(path, current)
                 self.assertEqual(hashlib.sha256(original).hexdigest(), PRE_SKILL_CHANGES_SHA256[path])
 

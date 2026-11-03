@@ -21,6 +21,7 @@ from unittest.mock import patch
 
 from incident_recovery_verify_fixture import LocalReads, ROOT, load_verifier, resolved_fixture
 from rule_text import assert_rule
+from test_jobcron_app_only_deploy_authorization import reverse_app_only_deploy_edits
 
 FLEETS = {"jobcron": "jobcron", "cha-pt": "chapt", "harness": "harness", "jss-genr": "jss"}
 GLM = tuple(f"{prefix}-worker-glm-{n}" for prefix in FLEETS.values() for n in (1, 2))
@@ -43,7 +44,7 @@ JOBCRON_PRODUCTION_DEPLOYMENT = ("devops/production-deployment/SKILL.md",
                                  "devops/production-deployment/references/release-ci-portability.md")
 SHARED_SKILL = ROOT / "skills/multi-agent-coding-orchestrator/SKILL.md"
 VERSIONS = {
-    PROFILE_SKILLS["jobcron-orchestrator"]: "0.6.9-jobcron.7",
+    PROFILE_SKILLS["jobcron-orchestrator"]: "0.6.9-jobcron.8",  # raised by t_b7455361
     PROFILE_SKILLS["chapt-orchestrator"]: "0.6.7-chapt.7",
     PROFILE_SKILLS["harness-orchestrator"]: "0.6.7-harness.6",
     PROFILE_SKILLS["jss-orchestrator"]: "0.6.7-jss.8",
@@ -216,7 +217,9 @@ class PolicyText(unittest.TestCase):
                 self.assertIsNone(LEGACY_GLM_NAME.search(text))
 
     def test_jobcron_orchestrator_soul_routes_only_to_its_worker(self):
-        text = JOBCRON_SOUL.read_bytes()
+        # The later owner-requested application-only production deploy exception
+        # (t_b7455361) appended a sentence to line 7; reverse it first.
+        text = reverse_app_only_deploy_edits(JOBCRON_SOUL.relative_to(ROOT).as_posix(), JOBCRON_SOUL.read_bytes())
         self.assertEqual(text.count(JOBCRON_SOUL_EDIT[0]), 1)
         self.assertNotIn(b"glm", text.lower())
         self.assertIn(b"assign same-card review only to `jobcron-reviewer`", text)

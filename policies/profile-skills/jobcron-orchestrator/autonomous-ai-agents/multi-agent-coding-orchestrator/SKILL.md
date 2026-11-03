@@ -1,7 +1,7 @@
 ---
 name: multi-agent-coding-orchestrator
 description: "Use when orchestrating multi-agent coding with Hermes."
-version: 0.6.9-jobcron.7
+version: 0.6.9-jobcron.8
 author: chanbla11mit, Hermes Agent
 license: MIT
 platforms: [macos]
@@ -259,7 +259,7 @@ Begin only when both conditions are true:
 
 For work expected to last hours or days, send the approved specification through the board-designated independent reviewer (`jobcron-reviewer`, `chapt-reviewer`, or legacy `reviewer-sol`) before dispatching implementation.
 
-Authorization covers local branches, worktrees, commits, tests, and recoverable local destructive operations. It never covers pushes, PR creation, deployments, production mutations, messages beyond the configured progress protocol, purchases, credential changes, or other external writes.
+Authorization covers local branches, worktrees, commits, tests, and recoverable local destructive operations. It never covers pushes, PR creation, deployments, production mutations, messages beyond the configured progress protocol, purchases, credential changes, or other external writes. The one exception is the owner-requested application-only production deploy defined in the section "Owner-requested application-only production deploy" of the `production-deployment` skill. That section, not this mode, authorizes it, and only for the actions that section names; this mode still never covers any other push, PR creation, deployment, production mutation, credential change, or external write.
 
 ## Proportional operational constraints
 

@@ -16,9 +16,9 @@ shows the history after the first review requested changes.
 CANDIDATE_RULE_EDITS lists the exact (new, old) text this card changed in each
 skill file, so tests that pin older bytes of these files can reverse the change
 byte for byte with reverse_candidate_rule_edits(). This module imports no other
-test module except test_anki_apply_tool_card_contracts_reference and
-test_orchestrator_skill_changes_policy; neither of them imports this module, so
-any test module can import it.
+test module except test_anki_apply_tool_card_contracts_reference,
+test_orchestrator_skill_changes_policy and test_jobcron_app_only_deploy_authorization;
+none of them imports this module, so any test module can import it.
 """
 import hashlib
 import importlib.util
@@ -32,6 +32,7 @@ from pathlib import Path
 
 from test_anki_apply_tool_card_contracts_reference import reverse_apply_tool_reference_edits
 from test_orchestrator_skill_changes_policy import reverse_skill_changes_edits
+from test_jobcron_app_only_deploy_authorization import reverse_app_only_deploy_edits
 
 ROOT = Path(__file__).resolve().parents[1]
 RELATIVE = "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md"
@@ -220,7 +221,10 @@ class InstructionText(unittest.TestCase):
     def test_versions_are_bumped_and_the_snapshot_agrees(self):
         for path, (new, _old) in VERSIONS.items():
             with self.subTest(path=path):
-                self.assertEqual(re.findall(r"(?m)^version: (.+)$", self.text[path]), [new])
+                # The later owner-requested application-only production deploy exception
+                # (t_b7455361) raised the Jobcron version again; reverse it first.
+                text = reverse_app_only_deploy_edits(path, self.text[path])
+                self.assertEqual(re.findall(r"(?m)^version: (.+)$", text), [new])
         snapshot = json.loads((ROOT / SNAPSHOT).read_text())
         shared = next(entry for entry in snapshot["skill"]["shared_skills"]
                       if entry["name"] == "multi-agent-coding-orchestrator")
@@ -230,9 +234,11 @@ class InstructionText(unittest.TestCase):
     def test_reversing_the_edits_recovers_the_baseline_bytes(self):
         for path, want in PRE_CANDIDATE_RULE_SHA256.items():
             with self.subTest(path=path):
-                # Reverse the later apply-tool-card-contracts pointer (t_c9d4d5c8) and
+                # Reverse the later owner-requested application-only production deploy
+                # exception (t_b7455361), the apply-tool-card-contracts pointer (t_c9d4d5c8) and
                 # Skill Changes section (t_0a8674fe) first.
-                current = reverse_apply_tool_reference_edits(path, (ROOT / path).read_bytes())
+                current = reverse_app_only_deploy_edits(path, (ROOT / path).read_bytes())
+                current = reverse_apply_tool_reference_edits(path, current)
                 current = reverse_skill_changes_edits(path, current)
                 original = reverse_candidate_rule_edits(path, current)
                 self.assertEqual(hashlib.sha256(original).hexdigest(), want)

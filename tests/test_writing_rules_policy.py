@@ -20,6 +20,7 @@ from unittest.mock import patch
 
 from incident_recovery_verify_fixture import ROOT
 from test_verify_state_derived_expectations import TempTree, TreeReads, load, redeployed, tree_verifier
+from test_jobcron_app_only_deploy_authorization import reverse_app_only_deploy_edits
 
 BASELINE = "b7093717054754283c6f9ac671a227f695fec9b5"
 POLICY = "policies/writing-rules.md"
@@ -83,7 +84,9 @@ class TrackedText(unittest.TestCase):
                 if profile in REVIEWERS:
                     want += b"\n" + REVIEWER_SENTENCE
                 want += b"\n" + block
-                text = path.read_bytes()
+                # The later owner-requested application-only production deploy exception
+                # (t_b7455361) changed line 7 of the jobcron-orchestrator SOUL; reverse it first.
+                text = reverse_app_only_deploy_edits(path.relative_to(ROOT).as_posix(), path.read_bytes())
                 self.assertEqual(text, want)
                 self.assertTrue(text.endswith(block))
                 self.assertEqual(text.count(REVIEWER_SENTENCE), 1 if profile in REVIEWERS else 0)

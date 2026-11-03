@@ -15,6 +15,7 @@ import re
 from pathlib import Path
 import unittest
 
+from test_jobcron_app_only_deploy_authorization import reverse_app_only_deploy_edits
 from test_card_contract_line_start_policy import reverse_owner_path_edits
 from test_orchestrator_skill_changes_policy import reverse_skill_changes_edits
 from test_repair_history_candidate_rules_policy import reverse_candidate_rule_edits
@@ -213,10 +214,12 @@ class OrchestratorSkillTerminologyTests(unittest.TestCase):
     def test_reversing_the_edits_recovers_the_baseline_bytes(self):
         for path, want in PRE_TERMINOLOGY_SHA256.items():
             with self.subTest(path=path):
-                # Reverse the later Skill Changes section (t_0a8674fe), the repair_history
+                # Reverse the later owner-requested application-only production deploy
+                # exception (t_b7455361), the Skill Changes section (t_0a8674fe), the repair_history
                 # candidate rule change (t_6436ac1c), the owner shell command path change
                 # (t_bd860536) and the repair_history format change (t_a4dccec1) first.
-                current = reverse_skill_changes_edits(path, (ROOT / path).read_bytes())
+                current = reverse_app_only_deploy_edits(path, (ROOT / path).read_bytes())
+                current = reverse_skill_changes_edits(path, current)
                 current = reverse_candidate_rule_edits(path, current)
                 current = reverse_owner_path_edits(path, current)
                 current = reverse_repair_format_edits(path, current)

@@ -49,7 +49,7 @@ JOBCRON_PRODUCTION_DEPLOYMENT = ("devops/production-deployment/SKILL.md",
                                  "devops/production-deployment/references/release-ci-portability.md")
 SHARED_SKILL = ROOT / "skills/multi-agent-coding-orchestrator/SKILL.md"
 VERSIONS = {
-    PROFILE_SKILLS["jobcron"]: "0.6.9-jobcron.7",
+    PROFILE_SKILLS["jobcron"]: "0.6.9-jobcron.8",  # raised by t_b7455361
     PROFILE_SKILLS["chapt"]: "0.6.7-chapt.7",
     PROFILE_SKILLS["harness"]: "0.6.7-harness.6",
     PROFILE_SKILLS["jss"]: "0.6.7-jss.8",

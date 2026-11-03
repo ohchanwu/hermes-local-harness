@@ -15,6 +15,8 @@ import subprocess
 from pathlib import Path
 import unittest
 
+from test_jobcron_app_only_deploy_authorization import reverse_app_only_deploy_edits
+
 ROOT = Path(__file__).resolve().parents[1]
 BASELINE = "bcf811b63da0393484b4a4403eb9ae4e1e7286c0"
 P = "skills/devops/production-deployment/SKILL.md"
@@ -98,7 +100,10 @@ class ProductionDeploymentTerminologyTests(unittest.TestCase):
         # Proves that no text other than the listed phrases changed.
         for path in REWRITES:
             with self.subTest(path=path):
-                self.assertEqual(reverse_rewrites(path, (ROOT / path).read_text()), baseline_text(path))
+                # The later owner-requested application-only production deploy exception
+                # (t_b7455361) changed O; reverse it first.
+                current = reverse_app_only_deploy_edits(path, (ROOT / path).read_text())
+                self.assertEqual(reverse_rewrites(path, current), baseline_text(path))
 
     def test_override_keeps_every_shared_line_it_had_at_the_baseline(self):
         override_lines = set((ROOT / O).read_text().splitlines())

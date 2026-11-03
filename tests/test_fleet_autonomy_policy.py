@@ -21,7 +21,9 @@ SKILLS = {
     board: ROOT / f"policies/profile-skills/{profile}-orchestrator" / RELATIVE
     for board, profile in (("jobcron", "jobcron"), ("cha-pt", "chapt"))
 }
-VERSIONS = {"jobcron": "0.6.9-jobcron.7", "cha-pt": "0.6.7-chapt.7"}
+# The jobcron version was raised by the owner-requested application-only production
+# deploy exception (t_b7455361).
+VERSIONS = {"jobcron": "0.6.9-jobcron.8", "cha-pt": "0.6.7-chapt.7"}
 BASELINE_SKILL_LINES = {"jobcron": 429, "cha-pt": 434}
 # Live-only Jobcron rules reconciled verbatim from the installed
 # jobcron-orchestrator skill (0.6.5-jobcron.1) into the repository copy.
