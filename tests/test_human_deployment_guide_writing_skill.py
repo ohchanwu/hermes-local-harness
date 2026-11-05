@@ -18,12 +18,14 @@ README = ROOT / "docs/README.md"
 NAME = "human-deployment-guide-writing"
 VERSION = "1.0.0"
 TRIGGER = "Use when writing steps a person runs against production."
-DEPLOY_PROFILES = ["jobcron-orchestrator", "jobcron-worker", "jobcron-worker-2", "jobcron-reviewer"]
+DEPLOY_PROFILES = ["jobcron-orchestrator", "jobcron-worker", "jobcron-worker-2", "jobcron-reviewer",
+                   "chapt-orchestrator", "chapt-worker", "chapt-worker-2", "chapt-reviewer"]
 README_LINE = (
     "- [Human deployment guide writing](../skills/devops/human-deployment-guide-writing/SKILL.md) — "
     "shared skill `human-deployment-guide-writing` (version 1.0.0): twelve rules for a guide that a "
     "person runs against production; declared for jobcron-orchestrator, jobcron-worker, "
-    "jobcron-worker-2 and jobcron-reviewer; live deployment is a separate card.")
+    "jobcron-worker-2, jobcron-reviewer, chapt-orchestrator, chapt-worker, chapt-worker-2 and "
+    "chapt-reviewer; live deployment is a separate card.")
 
 # For each of the twelve owner-approved rules (2026-10-31), phrases that the rule text must contain.
 RULE_PHRASES = {

@@ -608,10 +608,25 @@
       },
       "jobcron-reviewer": {
         "SKILL.md": "tracked-source"
+      },
+      "chapt-orchestrator": {
+        "SKILL.md": "tracked-source"
+      },
+      "chapt-worker": {
+        "SKILL.md": "tracked-source"
+      },
+      "chapt-worker-2": {
+        "SKILL.md": "tracked-source"
+      },
+      "chapt-reviewer": {
+        "SKILL.md": "tracked-source"
       }
     },
     "human-deployment-guide-review": {
       "jobcron-reviewer": {
+        "SKILL.md": "tracked-source"
+      },
+      "chapt-reviewer": {
         "SKILL.md": "tracked-source"
       }
     }

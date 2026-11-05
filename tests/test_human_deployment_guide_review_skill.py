@@ -23,12 +23,12 @@ NAME = "human-deployment-guide-review"
 WRITING_NAME = "human-deployment-guide-writing"
 VERSION = "1.0.0"
 TRIGGER = "Use when reviewing a guide that a person runs against production."
-DEPLOY_PROFILES = ["jobcron-reviewer"]
+DEPLOY_PROFILES = ["jobcron-reviewer", "chapt-reviewer"]
 README_LINE = (
     "- [Human deployment guide review](../skills/devops/human-deployment-guide-review/SKILL.md) — "
     "shared skill `human-deployment-guide-review` (version 1.0.0): six review steps for a guide that "
     "a person runs against production, with the rules of `human-deployment-guide-writing` as the "
-    "rule list; declared for jobcron-reviewer; live deployment is a separate card.")
+    "rule list; declared for jobcron-reviewer and chapt-reviewer; live deployment is a separate card.")
 
 # For each review step of the accepted proposal (card t_db6b8e4b), phrases that the step must contain.
 STEP_PHRASES = {

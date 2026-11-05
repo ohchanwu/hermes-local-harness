@@ -386,7 +386,11 @@
           "jobcron-orchestrator",
           "jobcron-worker",
           "jobcron-worker-2",
-          "jobcron-reviewer"
+          "jobcron-reviewer",
+          "chapt-orchestrator",
+          "chapt-worker",
+          "chapt-worker-2",
+          "chapt-reviewer"
         ],
         "version": "1.0.0",
         "files": [
@@ -398,7 +402,8 @@
         "path": "/Users/chanbla11mit/.hermes/profiles/<profile>/skills/devops/human-deployment-guide-review",
         "source": "skills/devops/human-deployment-guide-review",
         "deploy_profiles": [
-          "jobcron-reviewer"
+          "jobcron-reviewer",
+          "chapt-reviewer"
         ],
         "version": "1.0.0",
         "files": [
