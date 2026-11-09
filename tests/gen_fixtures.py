@@ -99,6 +99,16 @@ clean["profile_managed_settings"] = {}
 for group in (desired["managed_profile_settings"], roster["orchestrator_profile_settings"]):
     for profile in group["profiles"]:
         clean["profile_managed_settings"].setdefault(profile, {}).update(copy.deepcopy(group["settings"]))
+# Observed fallback settings of every non-retired roster profile, as the roster declares
+# them: `hermes config get --json fallback_providers` and the fallback_chain values inside
+# `hermes config get --json auxiliary` (an absent declaration is an empty list / no value).
+clean["profile_fallback_settings"] = {
+    profile["name"]: {
+        "fallback_providers": copy.deepcopy(profile.get("fallback_providers", [])),
+        "auxiliary": {task: {"fallback_chain": copy.deepcopy(chain)}
+                      for task, chain in profile.get("auxiliary_fallback_chain", {}).items()},
+    }
+    for profile in roster["profiles"] if profile.get("lifecycle") != "retired"}
 clean["dispatch_profiles"] = copy.deepcopy(desired["kanban"]["dispatch_profiles"])
 clean["kanban"] = {key: copy.deepcopy(value) for key, value in desired["kanban"].items()
                    if key != "dispatch_profiles"}
@@ -184,6 +194,21 @@ def orchestrator_skill_settings_drift(d):
 
 
 write("orchestrator-skill-settings-drift.yaml", delta(orchestrator_skill_settings_drift))
+
+
+def fallback_drift(d):
+    # Synthetic values only. One profile gained a main fallback the roster does not declare;
+    # another gained an auxiliary fallback_chain entry carrying an extra credential-named field
+    # (its value must never reach a message); a third cannot report its auxiliary mapping.
+    settings = d["profile_fallback_settings"]
+    settings["jobcron-worker"]["fallback_providers"] = [
+        {"provider": "anthropic", "model": "synthetic-fallback-model"}]
+    settings["harness-worker"]["auxiliary"]["title_generation"] = {"fallback_chain": [
+        {"provider": "anthropic", "model": "synthetic-helper-model", "api_key": "synthetic-value-not-shown"}]}
+    del settings["anki-worker"]["auxiliary"]
+
+
+write("fallback-drift.yaml", delta(fallback_drift))
 
 
 def rogue(d):

@@ -38,6 +38,7 @@ FIXTURE_RESULTS = {
     "approval-mode-drift.yaml": (1, "approval mode drift jobcron-worker"),
     "compression-drift.yaml": (1, "managed setting drift advisor compression.threshold_tokens"),
     "orchestrator-skill-settings-drift.yaml": (1, "managed setting drift jobcron-orchestrator skills.auto_load"),
+    "fallback-drift.yaml": (1, "fallback drift jobcron-worker fallback_providers"),
     "terminal-deployment-pending.yaml": (1, "terminal notification deployment pending"),
     "terminal-notification-rollback.yaml": (1, "terminal notification deployment pending"),
     "plugin-pin-drift.yaml": (1, "expected pinned 4.8.4@16f29800"),
