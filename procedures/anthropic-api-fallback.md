@@ -34,24 +34,29 @@ Hermes facts below were read from the installed Hermes source at commit `9cf7960
 ## 4. Credential (the owner does this; the harness never reads or prints the key)
 
 1. In the Anthropic Console, create one API key for this purpose.
-2. For each of the four profiles, run the command below in a terminal and paste the key at the masked prompt:
+2. **Add the key to the `.env` file of each of the four profiles.** Run the three commands below in zsh, once, in one terminal. `read -rs` asks for the key with a prompt that does not show the typed text, and keeps the key only in the shell variable `K`. The typed command lines and the shell history contain `$K`, not the key. While each `hermes` process runs, the key is one of its process arguments.
 
-   ```sh
-   hermes -p <profile> auth add anthropic --type api-key --label anthropic-console-2611
+   ```zsh
+   read -rs "K?Anthropic API key: "; echo
+   for p in jobcron-orchestrator jobcron-worker jobcron-worker-2 jobcron-reviewer; do hermes -p "$p" config set ANTHROPIC_API_KEY "$K"; done
+   unset K
    ```
 
-   - **`--type api-key` is required.** `anthropic` is an OAuth-default provider (`hermes_cli/auth_commands.py:30-33` and `:392-396`), so without `--type api-key` the command starts an OAuth login instead of asking for a key.
-   - **Do not pass `--api-key <value>`.** The key would then be stored in the shell history. Without it, Hermes asks with a masked prompt (`hermes_cli/auth_commands.py:360-362`).
-3. **Where Hermes stores the key.** The profile's own credential pool: the `credential_pool.anthropic` list in `~/.hermes/profiles/<profile>/auth.json` (`_add_api_key_credential`, `hermes_cli/auth_commands.py:360-375`; `write_credential_pool`, `hermes_cli/auth.py:1099-1117`; the file path is `get_hermes_home() / "auth.json"`, `hermes_cli/auth.py:496-497`). Hermes does not write the key to the profile `.env`.
-4. **Places the key must never be written:** `~/.hermes/.env`, `roster.yaml`, any Kanban card or comment, any log, or any commit. Only the masked prompt in step 2 receives the key.
-5. **Check without printing the key.** `hermes -p <profile> auth list anthropic` prints the label, credential type, id, priority and source of each entry, but not the key (`hermes_cli/auth_commands.py:532-541`).
-6. **Billing boundary: borrowed Claude Code login.** `auth.adopt_external_logins` defaults to true (`hermes_cli/config_defaults.py:1763`). With that setting, and when `ANTHROPIC_API_KEY` is not set in the environment, Hermes also seeds the Claude Code OAuth login (`~/.claude/.credentials.json`) into the `anthropic` credential pool as a `claude_code` entry (`agent/credential_pool.py:2595-2640`). A manually added key is placed ahead of seeded entries (`hermes_cli/auth_commands.py:475`). However, credential rotation after an authentication or rate-limit error can move the fallback onto the subscription login. Before the live configuration card applies values, check `hermes -p <profile> auth list anthropic` for a `claude_code` entry. The owner then decides whether those four profiles get `auth.adopt_external_logins: false`. That decision is not made on this card.
+   - Each `config set` prints only `✓ Set ANTHROPIC_API_KEY in <path of the profile .env>`. A key name that ends in `_API_KEY` is written to the active profile's `.env`, not to `config.yaml` (`_is_env_config_key`, `hermes_cli/config.py:869-879`; `set_config_value`, `hermes_cli/config.py:3629-3638`; `save_provider_env_credential`, `hermes_cli/credential_lifecycle.py:163-199`).
+3. **Do not use `hermes auth add anthropic --type api-key` in these four profiles until the Hermes defect is fixed** ([bug report](../docs/bugs/261109-anthropic-api-key-auth-add-dropped-in-named-profile.md)): in a named profile it prints `Added anthropic credential` but stores nothing.
+4. **How Hermes uses the key.** At every credential pool load, Hermes adds an in-memory `anthropic` entry with label `ANTHROPIC_API_KEY` and source `env:ANTHROPIC_API_KEY` (`_seed_from_env`, `agent/credential_pool.py:2951-2991`; `_env_payload`, `agent/credential_pool.py:2899-2905`). `resolve_anthropic_token` reads `ANTHROPIC_API_KEY` (`agent/anthropic_credentials.py:702`), but `ANTHROPIC_TOKEN` or `CLAUDE_CODE_OAUTH_TOKEN` in the same environment takes precedence (line 697). On 2026-11-09 none of the four profile `.env` files defined either name (checked by name only); do not add them.
+5. **Places the key must never be written:** `~/.hermes/.env`, `roster.yaml`, any Kanban card or comment, any log, or any commit. Only the four profile `.env` files receive the key, through step 2.
+6. **Check without printing the key.** For each of the four profiles, run `hermes -p <profile> auth list anthropic`. The expected output is one entry, with label `ANTHROPIC_API_KEY` and source `env:ANTHROPIC_API_KEY`. The command prints the label, credential type, id, priority and source of each entry, but not the key (`hermes_cli/auth_commands.py:537-541`). If an entry with another source is listed, for example `claude_code` or `hermes_pkce`, do not continue with section 6 and report it to the owner.
+7. **Billing boundary: `auth.adopt_external_logins` is `false` on the four profiles.** Owner decision, 2026-11-09. The reason: the Claude Code login uses the same Max plan allowance as the primary provider `claude-subscription`, and Hermes must not use that login directly.
+   - With the default value `true` (`hermes_cli/config_defaults.py:1763`), Hermes can seed the Claude Code login (`~/.claude/.credentials.json`) into the `anthropic` credential pool as a `claude_code` entry (`agent/credential_pool.py:2621-2625`), and credential rotation after an authentication or rate-limit error could move the fallback onto it.
+   - While `ANTHROPIC_API_KEY` is set and neither `ANTHROPIC_TOKEN` nor `CLAUDE_CODE_OAUTH_TOKEN` is set, Hermes already removes and does not seed the `claude_code` and `hermes_pkce` entries (`agent/credential_pool.py:2598-2615`). The setting `false` additionally stops Hermes from reading or refreshing the Claude Code login files at all (`adopt_external_logins_enabled`, `agent/credential_sources.py:32-38`), and removes a `claude_code` entry that an earlier process stored (`agent/credential_pool.py:2626-2629`).
+   - The command for each of the four profiles is `hermes -p <profile> config set auth.adopt_external_logins false`. The earlier value was `true`; section 7 restores it.
 
 ## 5. Model identifiers
 
 - **Source.** The identifiers must come from the live Anthropic model list that `hermes -p jobcron-worker model --refresh` shows after the key exists. Do not copy them from documentation or from memory.
 - **Run the picker without selecting.** `hermes model` is an interactive picker (`hermes_cli/subcommands/model.py:8-15`): `--refresh` deletes the model picker disk cache and fetches every provider's live `/v1/models` list. Close the picker without choosing anything. Then confirm that `hermes -p jobcron-worker config get model.provider` still prints `claude-subscription` and `model.default` is unchanged.
-- **Which credential lists the models.** `_fetch_anthropic_models` (`hermes_cli/models.py:2138-2150`) uses `ANTHROPIC_API_KEY` from the environment, an OAuth token or the Claude Code login before it uses a pooled API key. The list can therefore come from the subscription login. The live test in section 6 is what proves that each identifier works with the API key.
+- **Which credential lists the models.** `_fetch_anthropic_models` (`hermes_cli/models.py:2136-2150`) uses `resolve_anthropic_token`: `ANTHROPIC_TOKEN` or `CLAUDE_CODE_OAUTH_TOKEN`, then `ANTHROPIC_API_KEY`, then a pool entry or the Claude Code login (`agent/anthropic_credentials.py:691-709`). After section 4, the list therefore comes from the API key in the profile `.env`. The live test in section 6 is what proves that each identifier works with the API key.
 - **Where the list is cached.** `hermes_cli/models_profile_cache.py` keeps only in-memory values per profile; it writes no file. The disk cache is `~/.hermes/profiles/jobcron-worker/provider_models_cache.json` (`hermes_cli/models.py:1783` and `:1869-1871`, `_provider_models_cache_path`). Each entry is keyed by provider and a credential fingerprint, which is a short hash, not the key (`_credential_fingerprint`, `hermes_cli/models.py:1874`). A later card can read the `anthropic` model identifiers from that file without the key. It must not print any other part of the file.
 
 ## 6. Intended values, apply steps and live test plan
@@ -121,12 +126,16 @@ Hermes facts below were read from the installed Hermes source at commit `9cf7960
    scripts/switch-profile-model --profile <profile> --clear-fallbacks
    ```
 
-2. In the repository, remove `fallback_providers` and `auxiliary_fallback_chain` from the four roster entries. Restore the assertion in `test_repository_roster_declarations`, run `python3 tests/gen_fixtures.py` and the test contract, and get the change reviewed and committed. If the owner set `auth.adopt_external_logins: false` under section 4, revert that setting the same way.
-3. The owner removes the key from each profile. Use `hermes -p <profile> auth list anthropic` to find the entry, then remove it by its label or index:
+2. In the repository, remove `fallback_providers` and `auxiliary_fallback_chain` from the four roster entries. Restore the assertion in `test_repository_roster_declarations`, run `python3 tests/gen_fixtures.py` and the test contract, and get the change reviewed and committed.
+3. The owner removes the key from the four profile `.env` files and restores `auth.adopt_external_logins` to its earlier value `true`:
 
-   ```sh
-   hermes -p <profile> auth remove anthropic anthropic-console-2611
+   ```zsh
+   for p in jobcron-orchestrator jobcron-worker jobcron-worker-2 jobcron-reviewer; do hermes -p "$p" config unset ANTHROPIC_API_KEY; done
+   for p in jobcron-orchestrator jobcron-worker jobcron-worker-2 jobcron-reviewer; do hermes -p "$p" config set auth.adopt_external_logins true; done
    ```
 
+   - `config unset ANTHROPIC_API_KEY` removes the `ANTHROPIC_API_KEY` line from the profile `.env`, removes the variable from the process environment and removes the credential pool entries seeded from it (`unset_config_value`, `hermes_cli/config.py:3800-3819`; `remove_provider_env_credential`, `hermes_cli/credential_lifecycle.py:202-221`; `remove_env_value`, `hermes_cli/config.py:2808-2826`). It prints `✓ Unset ANTHROPIC_API_KEY from <path of the profile .env>`, or exits with a non-zero status and `Config key not set: ANTHROPIC_API_KEY` when the profile has no such line.
+   - This replaces the earlier `auth remove` step: no `auth.json` entry exists to remove.
+   - Then `hermes -p <profile> auth list anthropic` must list no entry with source `env:ANTHROPIC_API_KEY`.
 4. The owner deletes (revokes) the key in the Anthropic Console, under API keys.
 5. Run `scripts/verify-state`. The expected result is no `fallback drift` line, and `hermes -p <profile> config get --json fallback_providers` prints `[]` for each profile.

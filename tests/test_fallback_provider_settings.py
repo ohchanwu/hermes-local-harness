@@ -297,6 +297,27 @@ class FixtureTests(unittest.TestCase):
                             for line in fail_lines(output)))
 
 
+class ProcedureTests(unittest.TestCase):
+    def test_credential_steps_use_the_profile_env_file(self):
+        """t_11314ed2: `auth add anthropic --type api-key` stores nothing in a named profile
+        (docs/bugs/261109-anthropic-api-key-auth-add-dropped-in-named-profile.md)."""
+        text = (ROOT / "procedures/anthropic-api-fallback.md").read_text(encoding="utf-8")
+        self.assertIn('read -rs "K?Anthropic API key: "; echo', text)
+        self.assertIn('hermes -p "$p" config set ANTHROPIC_API_KEY "$K"; done', text)
+        self.assertIn("unset K", text)
+        self.assertIn('hermes -p "$p" config unset ANTHROPIC_API_KEY; done', text)
+        self.assertIn("auth.adopt_external_logins false", text)
+        self.assertIn("auth.adopt_external_logins true", text)
+        self.assertIn("env:ANTHROPIC_API_KEY", text)
+        # `auth add anthropic` appears only in the sentence that says not to use it.
+        lines = [line for line in text.splitlines() if "auth add anthropic" in line]
+        self.assertEqual(len(lines), 1, lines)
+        self.assertIn("Do not use `hermes auth add anthropic --type api-key`", lines[0])
+        self.assertIn("261109-anthropic-api-key-auth-add-dropped-in-named-profile.md", lines[0])
+        self.assertNotIn("auth remove anthropic", text)
+        self.assertNotIn("sk-" + "ant-", text)  # Anthropic key prefix, split so this file does not contain it
+
+
 class SwitchTests(unittest.TestCase):
     def setUp(self):
         self.switch = load_switch()
