@@ -35,9 +35,46 @@ Before the first candidate commit is checked, the script runs `git -C <repositor
 
 A remote-tracking reference such as `origin/main` is only as current as the last fetch from that checkout, or the last push from that checkout that updated it. The check does not fetch, so work that reached the remote through another checkout appears on `origin/main` only after the next fetch in this checkout; until then the check can report that work as `APPROVED-NOT-INTEGRATED`.
 
+## Provider of watched profiles (`provider_watch`)
+
+Source card: `t_f6ea4228` (owner request of 2026-11-09, item 5: report for each Jobcron profile whether the current run is on the primary provider or on a fallback, from evidence that Hermes already records).
+
+The optional settings key `provider_watch` is a list of objects with exactly the keys `profile` (profile name), `home` (absolute path of the profile's Hermes home) and `primary_provider` (the provider name that Hermes records for the primary model, for example `claude-subscription`). Profile names must be unique. A settings file without the key behaves as before. jobcron-orchestrator.json lists jobcron-orchestrator, jobcron-worker, jobcron-worker-2 and jobcron-reviewer, each with the primary provider `claude-subscription` and the home `/Users/chanbla11mit/.hermes/profiles/<profile>`. No other settings file has the key.
+
+### Evidence that Hermes records
+
+The statements below were read from the installed Hermes source at commit `9cf7960f274ea2bdfe672d64d26389e9954dfeb6` (`/Users/chanbla11mit/.hermes/hermes-agent`).
+
+- When a fallback activates, Hermes sets the agent's model and provider to the fallback (`agent/chat_completion_helpers.py:2145`) and logs `Fallback activated: <old model> → <fallback model> (<fallback provider>)` at level INFO (`agent/chat_completion_helpers.py:1923`) for every reason except billing. For the billing reason it logs a WARNING with other text (`agent/chat_completion_helpers.py:1928-1932`). The log file is `<home>/logs/agent.log` with the rotated files `agent.log.1`, `agent.log.2` and so on; the line format is `<date> <time>,<milliseconds> <level>[ [<session id>]] <logger>: <message>` in local time (`hermes_logging.py:107`, `hermes_logging.py:372`).
+- At the start of every turn Hermes restores the primary runtime (`agent/turn_context.py:1059`) and logs `Primary runtime restored for new turn` (`agent/agent_runtime_helpers.py:1514`). The fallback therefore lasts at most until the next turn (Hermes documentation `website/docs/user-guide/features/fallback-providers.md:149`, "Per-Turn, Not Per-Session").
+- Every main-loop API call reports its usage with the provider and model active at that call (`agent/turn_usage.py:268`). The table `sessions` does not show a fallback: its columns `billing_provider` and `model` are filled only while they are empty (`hermes_state_usage.py:40`), and are replaced only on the first accounted call of a session (`hermes_state_usage.py:322-331`). The table `session_model_usage` does show it: every main-loop call adds to the row for its session, model, provider, base URL, billing mode and task, and sets that row's `last_seen` (`hermes_state_usage.py:52-71`, `hermes_state_usage.py:312`, `hermes_state_usage.py:337`). The main agent loop has task `''`; auxiliary work such as compression or title generation has its own task name.
+
+### What the check reads and reports
+
+For each listed profile the script reads two things, and the newer item decides:
+
+1. `<home>/state.db`, opened in SQLite read-only mode: `SELECT billing_provider, model, last_seen FROM session_model_usage WHERE task = '' AND COALESCE(billing_provider, '') <> '' AND last_seen IS NOT NULL ORDER BY last_seen DESC LIMIT 1`. No other table and no other column is read; in particular no session id, message, title or content column.
+2. `<home>/logs/agent.log`, then `agent.log.1`, `agent.log.2` and so on up to `agent.log.20`. From each file only lines whose record is `agent.chat_completion_helpers: Fallback activated: ... → <model> (<provider>)` at level INFO are used, and only the time, the provider and the model are kept. The model and the provider must consist of letters, digits and the characters `. _ : / @ + -`; other lines are ignored. Reading stops at the first file that holds such a record, because every rotated file is older than the file before it. A log file whose modification time is older than the newest database row is not read, because it cannot hold a newer record; the older rotated files are then not read either.
+
+When the newest item names a provider other than `primary_provider` (compared without regard to letter case), the scheduled run prints the finding `ON-FALLBACK <profile>: <provider>/<model> at <time>` with the key `ON-FALLBACK:<profile>`, under the same repeat control as the other findings (again after `report_again_seconds`, 12 hours). `<time>` is the time of that newest item, as `YYYY-MM-DD HH:MM:SS +ZZZZ` in local time: for a database row its `last_seen`, for a log record the time of the record. It is not the start time of the fallback: the database row covers all calls of one session with that provider and model, so its first call can be older than the current fallback. When the newest item names the primary provider again, the finding disappears and its key is removed from the state file.
+
+A missing `state.db`, a missing `session_model_usage` row for the main loop and missing log files count as no evidence, and no finding is printed. A `state.db` that cannot be read (for example a file that is not an SQLite database, or one without the table `session_model_usage`) and a log file that cannot be read produce one `Board check error:` line, as for the board database.
+
+`--status` prints one line per listed profile and wakes nobody: `<profile>: primary <provider>`, `<profile>: fallback <provider>/<model> at <time>`, `<profile>: no evidence`, or `<profile>: error <reason>` for an unreadable `state.db` or log file. It does not read the board database, does not read or write the state file and writes no file. The scheduled run does not use `--status`. Example, run by hand on the machine where the settings file is deployed: `python3 <profile home>/scripts/orchestrator_board_check.py --status`.
+
+### Limits
+
+- Because the primary provider is restored at the start of the next turn, a fallback can begin and end between two scheduled runs (every 15 minutes). The check then reports nothing for it, since only the newest item is compared.
+- A profile whose newest main-loop call used a fallback and that has made no call since is reported as on the fallback until its next call, every 12 hours.
+- When one profile runs several sessions at the same time, only the newest call of all its sessions is compared.
+- A fallback for the billing reason is logged only as a WARNING with other text, which the check does not read. The check sees such a fallback once the first call on the fallback provider is recorded in `session_model_usage`.
+- A change of the profile's model or provider by the owner (for example with `/model`) also appears as a provider other than `primary_provider`, and is reported as `ON-FALLBACK`.
+- The log time has no time zone; the script reads it in the local time zone of the machine that runs the check, which is the machine that wrote the log. Hermes uses another line format only for the `--verbose` console output (`hermes_logging.py:417`), not for `agent.log`.
+- The cron prompt `deployment/orchestrator-board-check/cron-prompt.md` describes only the card findings. It has no instruction for `ON-FALLBACK` lines, which have no card id. Before jobcron-orchestrator's live settings file gets `provider_watch`, the rollout card must add such an instruction (for example: report the line in the final report and do not run kanban_show for it).
+
 ## Output content
 
-The output contains card ids, statuses, assignees, titles and candidate commits only. It never contains card bodies, comment text, run summaries or other run metadata.
+The output contains card ids, statuses, assignees, titles and candidate commits, and, for `provider_watch`, profile names, provider names, model names and times. It never contains card bodies, comment text, run summaries or other run metadata, and nothing from `state.db` or the log files other than the provider, the model and the time.
 
 ## Rollout for one profile
 

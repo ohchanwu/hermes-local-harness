@@ -10,5 +10,27 @@
   "state_file": "/Users/chanbla11mit/.hermes/profiles/jobcron-orchestrator/cron/orchestrator_board_check_state.json",
   "stale_after_seconds": 7200,
   "report_again_seconds": 43200,
-  "approved_lookback_seconds": 604800
+  "approved_lookback_seconds": 604800,
+  "provider_watch": [
+    {
+      "profile": "jobcron-orchestrator",
+      "home": "/Users/chanbla11mit/.hermes/profiles/jobcron-orchestrator",
+      "primary_provider": "claude-subscription"
+    },
+    {
+      "profile": "jobcron-worker",
+      "home": "/Users/chanbla11mit/.hermes/profiles/jobcron-worker",
+      "primary_provider": "claude-subscription"
+    },
+    {
+      "profile": "jobcron-worker-2",
+      "home": "/Users/chanbla11mit/.hermes/profiles/jobcron-worker-2",
+      "primary_provider": "claude-subscription"
+    },
+    {
+      "profile": "jobcron-reviewer",
+      "home": "/Users/chanbla11mit/.hermes/profiles/jobcron-reviewer",
+      "primary_provider": "claude-subscription"
+    }
+  ]
 }

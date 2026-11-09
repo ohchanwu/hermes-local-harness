@@ -4,6 +4,9 @@ Every board database, Git repository, settings file and state file is made under
 a temporary directory. All card ids, profiles, user ids and titles are synthetic.
 The settings files in deployment/orchestrator-board-check/ are only read as text
 and compared with roster.yaml; no live board database or live repository is read.
+The provider_watch tests make synthetic profile homes whose state.db holds only a
+session_model_usage table and whose agent.log files hold only synthetic log
+records; neither contains message text, and no live profile home is read.
 """
 import importlib.machinery
 import importlib.util
@@ -16,6 +19,7 @@ import sqlite3
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
@@ -758,6 +762,323 @@ class OrchestratorBoardCheckTests(unittest.TestCase):
         self.assertIn("orchestrator_board_check.json", result.stdout)
 
 
+PRIMARY = "example-primary"
+FALLBACK = "example-fallback"
+SESSION_TAG = "20270115_000000_abcd12"
+
+
+def local_text(epoch):
+    return time.strftime("%Y-%m-%d %H:%M:%S %z", time.localtime(epoch))
+
+
+def log_record(epoch, model, provider, *, old_model="example-old-model", milliseconds=0,
+               session=SESSION_TAG, logger="agent.chat_completion_helpers", level="INFO"):
+    """One synthetic agent.log line in the Hermes default format; holds no message text."""
+    tag = f" [{session}]" if session else ""
+    stamp = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(epoch))
+    return (f"{stamp},{milliseconds:03d} {level}{tag} {logger}: "
+            f"Fallback activated: {old_model} \u2192 {model} ({provider})")
+
+
+def other_record(epoch, text):
+    stamp = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(epoch))
+    return f"{stamp},000 INFO [{SESSION_TAG}] agent.example: {text}"
+
+
+class ProfileHome:
+    """A temporary profile home with a state.db usage table and agent.log files only."""
+
+    def __init__(self, path):
+        self.path = path
+        (path / "logs").mkdir(parents=True)
+        self.db = path / "state.db"
+
+    def usage_table(self):
+        conn = sqlite3.connect(self.db)
+        conn.execute("CREATE TABLE IF NOT EXISTS session_model_usage (session_id TEXT NOT NULL,"
+                     " model TEXT NOT NULL, billing_provider TEXT NOT NULL DEFAULT '',"
+                     " billing_base_url TEXT NOT NULL DEFAULT '', billing_mode TEXT NOT NULL DEFAULT '',"
+                     " task TEXT NOT NULL DEFAULT '', api_call_count INTEGER NOT NULL DEFAULT 0,"
+                     " first_seen REAL, last_seen REAL)")
+        conn.commit()
+        return conn
+
+    def route(self, provider, model, last_seen, *, task="", session="example-session"):
+        conn = self.usage_table()
+        conn.execute("INSERT INTO session_model_usage (session_id, model, billing_provider, task,"
+                     " api_call_count, first_seen, last_seen) VALUES (?, ?, ?, ?, 1, ?, ?)",
+                     (session, model, provider, task, last_seen - 60, last_seen))
+        conn.commit()
+        conn.close()
+
+    def log(self, name, lines, mtime=NOW):
+        path = self.path / "logs" / name
+        path.write_text("".join(line + "\n" for line in lines), encoding="utf-8")
+        os.utime(path, (mtime, mtime))
+        return path
+
+
+class ProviderWatchTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.dir = Path(self.tmp.name)
+        self.board = Board(self.dir / "kanban.db")
+        self.addCleanup(self.board.close)
+        self.state = self.dir / "cron" / "orchestrator_board_check_state.json"
+        self.state.parent.mkdir()
+        self.homes = {name: ProfileHome(self.dir / "profiles" / name)
+                      for name in ("example-a", "example-b")}
+        self.settings = {
+            "board": "example-board",
+            "db": str(self.board.path),
+            "orchestrator_profile": "example-orchestrator",
+            "reviewer_profile": REVIEWER,
+            "repositories": [str(self.dir / "no-repository-is-read")],
+            "main_branch": "main",
+            "state_file": str(self.state),
+            "stale_after_seconds": 2 * HOUR,
+            "report_again_seconds": 12 * HOUR,
+            "approved_lookback_seconds": 7 * 24 * HOUR,
+            "provider_watch": [{"profile": name, "home": str(home.path), "primary_provider": PRIMARY}
+                               for name, home in self.homes.items()],
+        }
+        self.config = self.dir / "settings.json"
+        self.write_settings()
+
+    def write_settings(self, settings=None):
+        self.config.write_text(json.dumps(self.settings if settings is None else settings))
+
+    def main(self, *args):
+        out, err = io.StringIO(), io.StringIO()
+        with redirect_stdout(out), redirect_stderr(err):
+            code = check.main(["--config", str(self.config), *args])
+        self.assertEqual((code, err.getvalue()), (0, ""))
+        return out.getvalue().splitlines()
+
+    def run_check(self, now=NOW):
+        return self.main("--now", str(now))
+
+    def status(self):
+        return self.main("--status")
+
+    # Primary, fallback and no evidence
+
+    def test_primary_route_in_database_is_primary_and_wakes_nobody(self):
+        self.homes["example-a"].route(PRIMARY, "example-model", NOW - 600)
+        self.homes["example-a"].route(FALLBACK, "example-fallback-model", NOW - 900)
+        self.homes["example-b"].route(PRIMARY.upper(), "example-model", NOW - 300)
+        self.assertEqual(self.run_check(), [WAKE_FALSE])
+        self.assertEqual(self.status(), [f"example-a: primary {PRIMARY}",
+                                         f"example-b: primary {PRIMARY.upper()}"])
+
+    def test_fallback_route_in_database_is_a_finding_and_a_status_line(self):
+        self.homes["example-a"].route(PRIMARY, "example-model", NOW - 900)
+        self.homes["example-a"].route(FALLBACK, "example-fallback-model", NOW - 600.5)
+        self.homes["example-b"].route(PRIMARY, "example-model", NOW - 300)
+        self.assertEqual(self.run_check(), [
+            HEADER, f"ON-FALLBACK example-a: {FALLBACK}/example-fallback-model at {local_text(NOW - 601)}"])
+        self.assertEqual(json.loads(self.state.read_text()), {"reported": {"ON-FALLBACK:example-a": NOW}})
+        self.assertEqual(self.status(), [
+            f"example-a: fallback {FALLBACK}/example-fallback-model at {local_text(NOW - 601)}",
+            f"example-b: primary {PRIMARY}"])
+
+    def test_auxiliary_task_rows_and_rows_without_provider_are_not_evidence(self):
+        home = self.homes["example-a"]
+        home.route(PRIMARY, "example-model", NOW - 900)
+        home.route(FALLBACK, "example-compression-model", NOW - 60, task="compression")
+        home.route("", "unknown", NOW - 30)
+        self.assertEqual(self.status()[0], f"example-a: primary {PRIMARY}")
+        self.assertEqual(self.run_check(), [WAKE_FALSE])
+
+    def test_fallback_log_record_newer_than_the_database_route_is_fallback(self):
+        home = self.homes["example-a"]
+        home.route(PRIMARY, "example-model", NOW - 900)
+        home.log("agent.log", [log_record(NOW - 120, "example-fallback-model", FALLBACK, milliseconds=250)])
+        self.assertEqual(self.status()[0],
+                         f"example-a: fallback {FALLBACK}/example-fallback-model at {local_text(NOW - 120)}")
+        self.assertEqual(self.run_check()[1:], [
+            f"ON-FALLBACK example-a: {FALLBACK}/example-fallback-model at {local_text(NOW - 120)}"])
+
+    def test_primary_call_after_the_fallback_log_record_is_primary_again(self):
+        # The next turn restores the primary provider; its call is newer than the record.
+        home = self.homes["example-a"]
+        home.log("agent.log", [log_record(NOW - 900, "example-fallback-model", FALLBACK)])
+        home.route(FALLBACK, "example-fallback-model", NOW - 850)
+        home.route(PRIMARY, "example-model", NOW - 60)
+        self.assertEqual(self.status()[0], f"example-a: primary {PRIMARY}")
+        self.assertEqual(self.run_check(), [WAKE_FALSE])
+
+    def test_log_record_without_a_database_is_fallback(self):
+        self.homes["example-a"].log("agent.log", [log_record(NOW - 30, "example-fallback-model", FALLBACK,
+                                                             session="")])
+        self.assertEqual(self.status()[0],
+                         f"example-a: fallback {FALLBACK}/example-fallback-model at {local_text(NOW - 30)}")
+
+    def test_no_evidence(self):
+        home = self.homes["example-a"]
+        home.usage_table().close()
+        home.log("agent.log", [
+            other_record(NOW - 50, "Primary runtime restored for new turn: example-model (example-primary)"),
+            other_record(NOW - 40, f"Fallback activated after empty responses: now using x on {FALLBACK}"),
+            log_record(NOW - 30, "example-fallback-model", FALLBACK, level="WARNING"),
+            log_record(NOW - 20, "example-fallback-model", FALLBACK, logger="agent.other_module"),
+            log_record(NOW - 10, "model with spaces", FALLBACK),
+            "  " + log_record(NOW - 5, "example-fallback-model", FALLBACK),
+        ])
+        shutil.rmtree(self.homes["example-b"].path)
+        self.assertEqual(self.status(), ["example-a: no evidence", "example-b: no evidence"])
+        self.assertEqual(self.run_check(), [WAKE_FALSE])
+        self.assertFalse(self.homes["example-b"].path.exists())
+
+    def test_settings_without_provider_watch_behave_as_before(self):
+        del self.settings["provider_watch"]
+        self.write_settings()
+        self.assertEqual(self.run_check(), [WAKE_FALSE])
+        self.assertEqual(self.status(), ["No profile is listed in settings key provider_watch."])
+
+    # Unreadable database or log
+
+    def test_unreadable_database_is_a_board_check_error_and_a_status_error_line(self):
+        home = self.homes["example-a"]
+        home.db.write_bytes(b"not a database file " * 50)
+        self.homes["example-b"].route(FALLBACK, "example-fallback-model", NOW - 60)
+        out = self.run_check()
+        self.assertEqual(len(out), 1, out)
+        self.assertTrue(out[0].startswith(f"Board check error: cannot read database {home.db}:"), out)
+        self.assertFalse(self.state.exists())
+        status = self.status()
+        self.assertEqual(len(status), 2, status)
+        self.assertTrue(status[0].startswith(f"example-a: error cannot read database {home.db}:"), status)
+        self.assertEqual(status[1], f"example-b: fallback {FALLBACK}/example-fallback-model"
+                                    f" at {local_text(NOW - 60)}")
+
+    def test_database_without_the_usage_table_is_an_error(self):
+        conn = sqlite3.connect(self.homes["example-a"].db)
+        conn.execute("CREATE TABLE sessions (id TEXT, model TEXT, billing_provider TEXT)")
+        conn.commit()
+        conn.close()
+        out = self.run_check()
+        self.assertEqual(len(out), 1, out)
+        self.assertIn("session_model_usage", out[0])
+        self.assertTrue(out[0].startswith("Board check error: cannot read database"), out)
+
+    def test_unreadable_log_file_is_an_error(self):
+        (self.homes["example-a"].path / "logs" / "agent.log").mkdir()
+        out = self.run_check()
+        self.assertEqual(len(out), 1, out)
+        self.assertTrue(out[0].startswith("Board check error: cannot read log file"), out)
+
+    # Rotated logs
+
+    def test_record_in_a_rotated_log_is_found_when_newer_files_have_none(self):
+        home = self.homes["example-a"]
+        home.log("agent.log", [other_record(NOW - 10, "Example unrelated record")])
+        home.log("agent.log.2", [log_record(NOW - 7200, "example-old-fallback", FALLBACK),
+                                 log_record(NOW - 3600, "example-fallback-model", FALLBACK)])
+        self.assertEqual(self.status()[0],
+                         f"example-a: fallback {FALLBACK}/example-fallback-model at {local_text(NOW - 3600)}")
+
+    def test_newest_log_file_with_a_record_is_used_and_older_files_are_not_read(self):
+        home = self.homes["example-a"]
+        home.log("agent.log", [log_record(NOW - 300, "example-fallback-model", FALLBACK)])
+        home.log("agent.log.1", [log_record(NOW - 30, "example-rotated-model", "example-rotated")])
+        (home.path / "logs" / "agent.log.2").mkdir()  # would be an error if it were read
+        self.assertEqual(self.status()[0],
+                         f"example-a: fallback {FALLBACK}/example-fallback-model at {local_text(NOW - 300)}")
+
+    def test_log_files_older_than_the_database_route_are_not_read(self):
+        home = self.homes["example-a"]
+        home.route(PRIMARY, "example-model", NOW - 600)
+        # The record text claims a later time, but the file was last written before the route.
+        home.log("agent.log", [log_record(NOW - 60, "example-fallback-model", FALLBACK)], mtime=NOW - 601)
+        (home.path / "logs" / "agent.log.1").mkdir()
+        self.assertEqual(self.status()[0], f"example-a: primary {PRIMARY}")
+        home.log("agent.log", [log_record(NOW - 60, "example-fallback-model", FALLBACK)], mtime=NOW - 59)
+        self.assertEqual(self.status()[0],
+                         f"example-a: fallback {FALLBACK}/example-fallback-model at {local_text(NOW - 60)}")
+
+    # Repeat control
+
+    def test_on_fallback_repeats_after_12_hours_and_clears_when_primary_returns(self):
+        home = self.homes["example-a"]
+        home.route(FALLBACK, "example-fallback-model", NOW - 60)
+        line = f"ON-FALLBACK example-a: {FALLBACK}/example-fallback-model at {local_text(NOW - 60)}"
+        self.assertEqual(self.run_check(NOW), [HEADER, line])
+        self.assertEqual(self.run_check(NOW + 12 * HOUR - 1), [WAKE_FALSE])
+        self.assertEqual(self.run_check(NOW + 12 * HOUR), [HEADER, line])
+        self.assertEqual(json.loads(self.state.read_text()),
+                         {"reported": {"ON-FALLBACK:example-a": NOW + 12 * HOUR}})
+        home.route(PRIMARY, "example-model", NOW + 12 * HOUR + 10, session="example-later-session")
+        self.assertEqual(self.run_check(NOW + 12 * HOUR + 20), [WAKE_FALSE])
+        self.assertEqual(json.loads(self.state.read_text()), {"reported": {}})
+        # A new fallback is reported at once, together with the board findings.
+        home.route(FALLBACK, "example-fallback-model", NOW + 12 * HOUR + 30, session="example-third")
+        self.board.card("t_0300", "running", "No wake", wake=False)
+        self.assertEqual(self.run_check(NOW + 12 * HOUR + 40), [
+            HEADER, "NO-WAKE-SUBSCRIPTION t_0300 running example-worker No wake",
+            f"ON-FALLBACK example-a: {FALLBACK}/example-fallback-model at {local_text(NOW + 12 * HOUR + 30)}"])
+
+    # --status, read-only behaviour and output content
+
+    def test_status_reads_neither_board_nor_state_file_and_writes_nothing(self):
+        self.homes["example-a"].route(FALLBACK, "example-fallback-model", NOW - 60)
+        self.homes["example-a"].log("agent.log", [log_record(NOW - 120, "example-fallback-model", FALLBACK)])
+        self.settings["db"] = str(self.dir / "absent" / "kanban.db")
+        self.write_settings()
+        self.state.write_text("{not json")
+        before = {p: p.read_bytes() for p in self.dir.rglob("*") if p.is_file()}
+        self.assertEqual(self.status(), [
+            f"example-a: fallback {FALLBACK}/example-fallback-model at {local_text(NOW - 60)}",
+            "example-b: no evidence"])
+        self.assertEqual({p: p.read_bytes() for p in self.dir.rglob("*") if p.is_file()}, before)
+
+    def test_scheduled_run_leaves_profile_files_unchanged(self):
+        home = self.homes["example-a"]
+        home.route(FALLBACK, "example-fallback-model", NOW - 60)
+        home.log("agent.log", [log_record(NOW - 120, "example-fallback-model", FALLBACK)])
+        before = {p: p.read_bytes() for p in home.path.rglob("*") if p.is_file()}
+        self.assertEqual(len(self.run_check()), 2)
+        self.assertEqual({p: p.read_bytes() for p in home.path.rglob("*") if p.is_file()}, before)
+
+    def test_only_time_provider_and_model_of_a_record_reach_the_output(self):
+        home = self.homes["example-a"]
+        home.log("agent.log", [
+            other_record(NOW - 200, MARKER),
+            log_record(NOW - 100, "example-fallback-model", FALLBACK, old_model="example-old-" + MARKER),
+            other_record(NOW - 50, "Example record " + MARKER),
+        ])
+        out = self.run_check()
+        self.assertEqual(out, [
+            HEADER, f"ON-FALLBACK example-a: {FALLBACK}/example-fallback-model at {local_text(NOW - 100)}"])
+        status = self.status()
+        for text in ("\n".join(out), "\n".join(status), self.state.read_text()):
+            self.assertNotIn(MARKER, text)
+            self.assertNotIn(SESSION_TAG, text)
+            self.assertNotIn("example-old", text)
+
+    def test_database_query_reads_only_provider_model_and_last_seen(self):
+        self.assertTrue(check.LATEST_ROUTE_SQL.startswith(
+            "SELECT billing_provider, model, last_seen FROM session_model_usage WHERE task = ''"))
+        for word in ("session_id", "message", "title", "content", "sessions "):
+            self.assertNotIn(word, check.LATEST_ROUTE_SQL)
+
+    # Settings
+
+    def test_invalid_provider_watch_prints_error(self):
+        entry = {"profile": "example-a", "home": str(self.homes["example-a"].path), "primary_provider": PRIMARY}
+        for value in [{"example-a": entry}, "example-a", [["example-a"]], [dict(entry, extra="x")],
+                      [{"profile": "example-a", "home": entry["home"]}], [dict(entry, profile="")],
+                      [dict(entry, primary_provider=5)], [dict(entry, home="relative/home")],
+                      [entry, dict(entry)]]:
+            with self.subTest(value=value):
+                self.write_settings(dict(self.settings, provider_watch=value))
+                for args in ((), ("--status",)):
+                    out = self.main(*args)
+                    self.assertEqual(len(out), 1, out)
+                    self.assertTrue(out[0].startswith("Board check error: settings key provider_watch"), out)
+
+
 class SettingsFilesTests(unittest.TestCase):
     def test_each_settings_file_matches_roster_project_fleets(self):
         fleets = json.loads((ROOT / "roster.yaml").read_text())["project_fleets"]
@@ -775,8 +1096,17 @@ class SettingsFilesTests(unittest.TestCase):
                 if orchestrator == "chapt-orchestrator":
                     expected_branches = {"repository_branches": {
                         "/Users/chanbla11mit/projects/cha-pt-frontend": "origin/main"}}
+                expected_watch = {}
+                if orchestrator == "jobcron-orchestrator":
+                    profiles = [orchestrator, *fleet["workers"], fleet["reviewer"]]
+                    self.assertEqual(profiles, ["jobcron-orchestrator", "jobcron-worker", "jobcron-worker-2",
+                                                "jobcron-reviewer"])
+                    expected_watch = {"provider_watch": [
+                        {"profile": profile, "home": f"/Users/chanbla11mit/.hermes/profiles/{profile}",
+                         "primary_provider": "claude-subscription"} for profile in profiles]}
                 self.assertEqual(settings, {
                     **expected_branches,
+                    **expected_watch,
                     "board": fleet["board"],
                     "db": f"/Users/chanbla11mit/.hermes/kanban/boards/{fleet['board']}/kanban.db",
                     "orchestrator_profile": orchestrator,

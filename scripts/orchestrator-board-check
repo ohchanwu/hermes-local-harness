@@ -52,6 +52,31 @@ starts the agent. Exit is nonzero only on an unexpected exception.
 
 The output never contains card bodies, comment text, run summaries or run
 metadata other than the candidate commit.
+
+Provider of each watched profile (optional settings key provider_watch, a list
+of objects with the keys profile, home and primary_provider; home is the
+absolute path of the profile's Hermes home):
+  ON-FALLBACK <profile>: <provider>/<model> at <time>
+                           the most recent evidence for the profile names a
+                           provider other than primary_provider; the key is
+                           `ON-FALLBACK:<profile>` with the same repeat control
+The evidence is read from two places, and the newer item decides:
+  1. <home>/state.db, opened in SQLite read-only mode: the newest row of table
+     session_model_usage with task '' (the main agent loop), reading only the
+     columns billing_provider, model and last_seen. Hermes keeps one row per
+     session, provider and model, and sets its last_seen on every main-loop
+     API call made with that provider and model.
+  2. <home>/logs/agent.log, then agent.log.1, agent.log.2 and so on: only lines
+     whose record is `agent.chat_completion_helpers: Fallback activated: <old
+     model> → <model> (<provider>)` at level INFO; only the time, the provider
+     and the model are kept. A log file whose modification time is older than
+     the newest database row cannot hold newer evidence and is not read.
+A missing state.db or log file counts as no evidence. A state.db that cannot be
+read, or a log file that cannot be read, is a Board check error.
+--status prints one line per watched profile (`<profile>: primary <provider>`,
+`<profile>: fallback <provider>/<model> at <time>`, `<profile>: no evidence`
+or `<profile>: error <reason>`) and reads neither the board database nor the
+state file and writes nothing; the scheduled run does not use it.
 """
 import argparse
 import json
@@ -109,6 +134,26 @@ WAITING_CARDS_SQL = (
 )
 
 STALE_KINDS = {"blocked": "STALE-BLOCKED", "review": "STALE-REVIEW"}
+
+PROVIDER_WATCH_KEYS = ("profile", "home", "primary_provider")
+ROTATED_LOG_LIMIT = 20
+
+# Newest main-loop API call route of one profile. Only these three columns of
+# session_model_usage are read; no session id, message, title or content column.
+LATEST_ROUTE_SQL = (
+    "SELECT billing_provider, model, last_seen FROM session_model_usage"
+    " WHERE task = '' AND COALESCE(billing_provider, '') <> '' AND last_seen IS NOT NULL"
+    " ORDER BY last_seen DESC LIMIT 1"
+)
+
+# The record logged by Hermes agent/chat_completion_helpers.py when a fallback
+# activates, in the default agent.log format
+# `<date> <time>,<milliseconds> <level>[ [<session id>]] <logger>: <message>`.
+FALLBACK_RECORD_TEXT = "agent.chat_completion_helpers: Fallback activated: "
+FALLBACK_RECORD_RE = re.compile(
+    r"(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}),(\d{3}) INFO(?: \[[^\]\s]*\])? "
+    + re.escape(FALLBACK_RECORD_TEXT)
+    + r".* \u2192 ([A-Za-z0-9._:/@+-]{1,200}) \(([A-Za-z0-9._:/@+-]{1,100})\)")
 
 
 class CheckError(Exception):
@@ -168,7 +213,32 @@ def load_settings(path):
         value = settings[key]
         if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
             raise CheckError(f"settings key {key} must be a positive integer")
+    check_provider_watch(settings.get("provider_watch", []))
     return settings
+
+
+def check_provider_watch(watch):
+    """Raise CheckError unless watch is a list of objects with exactly PROVIDER_WATCH_KEYS."""
+    shape = "settings key provider_watch must be a list of objects with the keys profile, home and primary_provider"
+    if not isinstance(watch, list):
+        raise CheckError(shape)
+    profiles = set()
+    for entry in watch:
+        if not isinstance(entry, dict) or set(entry) != set(PROVIDER_WATCH_KEYS):
+            raise CheckError(shape)
+        for key in PROVIDER_WATCH_KEYS:
+            if not isinstance(entry[key], str) or not entry[key]:
+                raise CheckError(f"settings key provider_watch: {key} must be a non-empty string")
+        if not os.path.isabs(entry["home"]):
+            raise CheckError(f"settings key provider_watch: home of {one_line(entry['profile'])}"
+                             " must be an absolute path")
+        if entry["profile"] in profiles:
+            raise CheckError(f"settings key provider_watch names {one_line(entry['profile'])} twice")
+        profiles.add(entry["profile"])
+
+
+def connect_read_only(db_path):
+    return sqlite3.connect("file:" + quote(str(db_path)) + "?mode=ro", uri=True)
 
 
 def read_board(db_path, reviewer_profile):
@@ -176,7 +246,7 @@ def read_board(db_path, reviewer_profile):
     if not Path(db_path).is_file():
         raise CheckError(f"database file not found: {db_path}")
     try:
-        conn = sqlite3.connect("file:" + quote(str(db_path)) + "?mode=ro", uri=True)
+        conn = connect_read_only(db_path)
         try:
             open_cards = conn.execute(OPEN_CARDS_SQL, CLOSED_STATUSES).fetchall()
             waking_ids = {row[0] for row in conn.execute(WAKING_CARDS_SQL)}
@@ -289,6 +359,128 @@ def candidate_commit(metadata_text):
     return None
 
 
+def time_text(epoch):
+    return time.strftime("%Y-%m-%d %H:%M:%S %z", time.localtime(epoch))
+
+
+def latest_route(db_path):
+    """Return (epoch, provider, model) of the newest main-loop API call in state.db, or None.
+
+    A missing file is no evidence; any SQLite failure raises CheckError.
+    """
+    if not Path(db_path).is_file():
+        return None
+    try:
+        conn = connect_read_only(db_path)
+        try:
+            row = conn.execute(LATEST_ROUTE_SQL).fetchone()
+        finally:
+            conn.close()
+    except sqlite3.Error as exc:
+        raise CheckError(f"cannot read database {db_path}: {one_line(exc)}")
+    if row is None or isinstance(row[2], bool) or not isinstance(row[2], (int, float)):
+        return None
+    return float(row[2]), one_line(row[0]), one_line(row[1]) or "unknown"
+
+
+def fallback_record(line):
+    """Return (epoch, provider, model) when line is a Fallback activated record, otherwise None.
+
+    The time in the log is local time without a zone, as Hermes writes it.
+    """
+    match = FALLBACK_RECORD_RE.fullmatch(line.rstrip("\r\n"))
+    if match is None:
+        return None
+    try:
+        when = time.mktime(time.strptime(match.group(1), "%Y-%m-%d %H:%M:%S"))
+    except (ValueError, OverflowError):
+        return None
+    return when + int(match.group(2)) / 1000, match.group(4), match.group(3)
+
+
+def latest_fallback_record(home, newer_than):
+    """Return (epoch, provider, model) of the newest Fallback activated record, or None.
+
+    Reads <home>/logs/agent.log and then the rotated files agent.log.1,
+    agent.log.2, ... in that order, and stops at the first file that holds a
+    record, because every rotated file is older than the one before it. A file
+    whose modification time is older than newer_than (epoch seconds or None)
+    holds only records older than the database evidence, so it and the older
+    files are not read. Only the time, the model after the arrow and the
+    provider in parentheses are kept from a matching line.
+    """
+    logs = os.path.join(home, "logs")
+    for number in range(ROTATED_LOG_LIMIT + 1):
+        path = os.path.join(logs, "agent.log" + (f".{number}" if number else ""))
+        try:
+            if newer_than is not None and os.stat(path).st_mtime < newer_than:
+                return None
+            newest = None
+            with open(path, encoding="utf-8", errors="replace") as handle:
+                for line in handle:
+                    if FALLBACK_RECORD_TEXT not in line:
+                        continue
+                    record = fallback_record(line)
+                    if record is not None and (newest is None or record[0] >= newest[0]):
+                        newest = record
+        except FileNotFoundError:
+            continue
+        except OSError as exc:
+            raise CheckError(f"cannot read log file {path}: {one_line(exc.strerror or exc)}")
+        if newest is not None:
+            return newest
+    return None
+
+
+def provider_state(entry):
+    """Return (state, provider, model, epoch); state is 'primary', 'fallback' or 'none'.
+
+    The newer of the database route and the log record decides. Raises CheckError.
+    """
+    route = latest_route(os.path.join(entry["home"], "state.db"))
+    record = latest_fallback_record(entry["home"], route[0] if route else None)
+    evidence = [item for item in (route, record) if item is not None]
+    if not evidence:
+        return "none", None, None, None
+    when, provider, model = max(evidence, key=lambda item: item[0])
+    same = provider.lower() == entry["primary_provider"].lower()
+    return ("primary" if same else "fallback"), provider, model, when
+
+
+def provider_findings(settings):
+    """Return (key, line) for each watched profile whose newest evidence is not the primary provider."""
+    findings = []
+    for entry in settings.get("provider_watch", []):
+        state, provider, model, when = provider_state(entry)
+        if state == "fallback":
+            profile = one_line(entry["profile"])
+            findings.append((f"ON-FALLBACK:{profile}",
+                             f"ON-FALLBACK {profile}: {provider}/{model} at {time_text(when)}"))
+    return findings
+
+
+def status_lines(settings):
+    """Return one --status line per watched profile."""
+    watch = settings.get("provider_watch", [])
+    if not watch:
+        return ["No profile is listed in settings key provider_watch."]
+    lines = []
+    for entry in watch:
+        profile = one_line(entry["profile"])
+        try:
+            state, provider, model, when = provider_state(entry)
+        except CheckError as exc:
+            lines.append(f"{profile}: error {exc}")
+            continue
+        if state == "primary":
+            lines.append(f"{profile}: primary {provider}")
+        elif state == "fallback":
+            lines.append(f"{profile}: fallback {provider}/{model} at {time_text(when)}")
+        else:
+            lines.append(f"{profile}: no evidence")
+    return lines
+
+
 def collect_findings(settings, now):
     """Return a list of (key, line) in output order."""
     open_cards, waking_ids, reviewed, waiting = read_board(settings["db"], settings["reviewer_profile"])
@@ -318,7 +510,7 @@ def collect_findings(settings, now):
         if now - (newest or 0) > settings["stale_after_seconds"]:
             kind = STALE_KINDS[status]
             findings.append((f"{kind}:{task_id}", finding_line(kind, (task_id, status, assignee, title))))
-    return findings
+    return findings + provider_findings(settings)
 
 
 def read_state(path):
@@ -380,12 +572,16 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--config", help=f"settings file (default: {SETTINGS_NAME} next to this script)")
     parser.add_argument("--now", type=int, help="current time as epoch seconds (tests only)")
+    parser.add_argument("--status", action="store_true",
+                        help="print the provider evidence of each profile in provider_watch, one line each;"
+                             " reads neither the board database nor the state file and writes nothing")
     args = parser.parse_args(argv)
 
     config = args.config or os.path.join(os.path.dirname(os.path.abspath(__file__)), SETTINGS_NAME)
     now = args.now if args.now is not None else int(time.time())
     try:
-        lines = run_check(load_settings(config), now)
+        settings = load_settings(config)
+        lines = status_lines(settings) if args.status else run_check(settings, now)
     except CheckError as exc:
         print(f"Board check error: {exc}")
         return 0
