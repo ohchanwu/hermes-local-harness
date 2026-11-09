@@ -920,5 +920,95 @@
         "SKILL.md"
       ]
     }
+  },
+  "profile_fallback_settings": {
+    "default": {
+      "fallback_providers": [],
+      "auxiliary": {}
+    },
+    "advisor": {
+      "fallback_providers": [],
+      "auxiliary": {}
+    },
+    "jobcron-orchestrator": {
+      "fallback_providers": [],
+      "auxiliary": {}
+    },
+    "jobcron-worker": {
+      "fallback_providers": [],
+      "auxiliary": {}
+    },
+    "jobcron-worker-2": {
+      "fallback_providers": [],
+      "auxiliary": {}
+    },
+    "jobcron-reviewer": {
+      "fallback_providers": [],
+      "auxiliary": {}
+    },
+    "chapt-orchestrator": {
+      "fallback_providers": [],
+      "auxiliary": {}
+    },
+    "chapt-worker": {
+      "fallback_providers": [],
+      "auxiliary": {}
+    },
+    "chapt-worker-2": {
+      "fallback_providers": [],
+      "auxiliary": {}
+    },
+    "chapt-reviewer": {
+      "fallback_providers": [],
+      "auxiliary": {}
+    },
+    "harness-orchestrator": {
+      "fallback_providers": [],
+      "auxiliary": {}
+    },
+    "harness-worker": {
+      "fallback_providers": [],
+      "auxiliary": {}
+    },
+    "harness-worker-2": {
+      "fallback_providers": [],
+      "auxiliary": {}
+    },
+    "harness-reviewer": {
+      "fallback_providers": [],
+      "auxiliary": {}
+    },
+    "jss-orchestrator": {
+      "fallback_providers": [],
+      "auxiliary": {}
+    },
+    "jss-worker": {
+      "fallback_providers": [],
+      "auxiliary": {}
+    },
+    "jss-worker-2": {
+      "fallback_providers": [],
+      "auxiliary": {}
+    },
+    "jss-reviewer": {
+      "fallback_providers": [],
+      "auxiliary": {}
+    },
+    "anki-orchestrator": {
+      "fallback_providers": [],
+      "auxiliary": {}
+    },
+    "anki-worker": {
+      "fallback_providers": [],
+      "auxiliary": {}
+    },
+    "anki-worker-2": {
+      "fallback_providers": [],
+      "auxiliary": {}
+    },
+    "anki-reviewer": {
+      "fallback_providers": [],
+      "auxiliary": {}
+    }
   }
 }

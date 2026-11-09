@@ -38,3 +38,7 @@ scripts/switch-profile-model --profile worker-sol --to gpt --dispatch add       
 - **Before switching to Claude:** the profile needs the plugin in `plugins/model-providers/claude-subscription/`, and `HERMES_CLAUDE_SUBSCRIPTION_CLI` and `HERMES_CLAUDE_SUBSCRIPTION_TOKEN_FILE` in its `.env`.
 - **When changes take effect:** new Kanban tasks and new gateway turns pick up the change. Running tasks finish on their current model.
 - **Restoring a whole profile instead:** copy its `config.yaml.pre-claude-261017` back over `config.yaml`.
+
+## Fallback providers
+
+The script also manages fallback providers. `--apply-fallbacks` writes the `fallback_providers` and `auxiliary_fallback_chain` values that the profile's `roster.yaml` entry declares, and `--clear-fallbacks` sets them to empty lists. Both work with or without `--to` and honor `--dry-run`. `scripts/verify-state` reports any difference as `fallback drift`. The owner-approved Anthropic API fallback for the four Jobcron profiles, including the credential steps and the revert after 2026-11-19, is in [`anthropic-api-fallback.md`](anthropic-api-fallback.md).

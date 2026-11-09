@@ -4,6 +4,8 @@
     scripts/switch-profile-model --profile harness-worker --to claude-opus
     scripts/switch-profile-model --profile worker-sol --to gpt --model gpt-5.6-sol --dispatch add
     scripts/switch-profile-model --profile harness-reviewer --to glm --dry-run
+    scripts/switch-profile-model --profile jobcron-worker --apply-fallbacks --dry-run
+    scripts/switch-profile-model --profile jobcron-worker --clear-fallbacks
 
 Backs up the profile's config.yaml first, then uses `hermes config set` for
 model.provider, model.default, model.base_url and every auxiliary helper task.
@@ -11,8 +13,16 @@ It also updates the profile's model/provider expectation in the roster.yaml of
 the repository checkout it runs from (or --roster), so scripts/verify-state does
 not go stale; that roster change must then be committed. --dry-run prints both
 the live and the roster changes and writes nothing.
+
+--apply-fallbacks writes the roster-declared fallback_providers and
+auxiliary.<task>.fallback_chain of every helper task (an undeclared one as an
+empty list); --clear-fallbacks sets all of them to an empty list. Either works
+alone or with --to, with the same backup and --dry-run. Neither changes the
+roster and neither writes a credential (see procedures/anthropic-api-fallback.md).
 """
 import argparse
+import importlib.machinery
+import importlib.util
 import json
 import re
 import shutil
@@ -21,6 +31,18 @@ import sys
 import time
 from pathlib import Path
 
+
+def load_verifier():
+    """scripts/verify-state as a module: the roster fallback schema and HELPER_TASKS live there."""
+    path = Path(__file__).resolve().with_name("verify-state")
+    loader = importlib.machinery.SourceFileLoader("harness_verify_state", str(path))
+    module = importlib.util.module_from_spec(importlib.util.spec_from_loader(loader.name, loader))
+    loader.exec_module(module)
+    return module
+
+
+VERIFIER = load_verifier()
+
 # Each target: provider, base URL, default main model, and the helper model.
 TARGETS = {
     "claude-opus": ("claude-subscription", "acp://claude-subscription", "claude-opus-5-5", "claude-opus-5-5"),
@@ -28,9 +50,7 @@ TARGETS = {
     "gpt": ("openai-codex", "https://chatgpt.com/backend-api/codex", "gpt-5.6-sol", None),
     "glm": ("zai", "https://api.z.ai/api/coding/paas/v4", "glm-5.3", None),
 }
-HELPER_TASKS = ("vision", "compression", "skills_hub", "approval", "review", "mcp", "title_generation",
-                "memory_query_rewrite", "tts_audio_tags", "triage_specifier", "kanban_decomposer",
-                "profile_describer", "goal_judge", "curator", "monitor", "background_review")
+HELPER_TASKS = VERIFIER.HELPER_TASKS
 DISPATCH = re.compile(r"^  dispatch_profiles:(?: \[\])?\n((?:    - .*\n)*)", re.M)
 
 
@@ -44,6 +64,22 @@ def settings(target, model):
     pairs = [("model.provider", provider), ("model.default", model), ("model.base_url", base_url)]
     for task in HELPER_TASKS:
         pairs += [(f"auxiliary.{task}.provider", provider), (f"auxiliary.{task}.model", helper_model or model)]
+    return pairs
+
+
+def fallback_settings(entry, clear):
+    """`hermes config set` pairs for fallback_providers and the fallback_chain of every helper task.
+
+    Each value is a JSON list literal. `hermes config set` parses a value that starts with "["
+    as YAML/JSON and stores the resulting list (hermes_cli/config.py, _looks_structured_value
+    and _coerce_config_set_value), so this is the supported write path. An empty list is the
+    cleared state: Hermes treats an empty fallback_providers and an empty fallback_chain as no
+    fallback, and `hermes config unset` would exit non-zero for a key that was never set.
+    """
+    providers = [] if clear else entry.get("fallback_providers", [])
+    chains = {} if clear else entry.get("auxiliary_fallback_chain", {})
+    pairs = [("fallback_providers", json.dumps(providers))]
+    pairs += [(f"auxiliary.{task}.fallback_chain", json.dumps(chains.get(task, []))) for task in HELPER_TASKS]
     return pairs
 
 
@@ -71,9 +107,15 @@ def roster_change(roster_path, profile):
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     parser.add_argument("--profile", required=True, help="profile name, or 'default' for ~/.hermes itself")
-    parser.add_argument("--to", required=True, choices=sorted(TARGETS))
+    parser.add_argument("--to", choices=sorted(TARGETS),
+                        help="main model target (optional with --apply-fallbacks or --clear-fallbacks)")
     parser.add_argument("--model", help="main model id (defaults to the target's usual model)")
     parser.add_argument("--dispatch", choices=("add", "remove"), help="change the profile's Kanban dispatch membership")
+    fallbacks = parser.add_mutually_exclusive_group()
+    fallbacks.add_argument("--apply-fallbacks", action="store_true",
+                           help="write the roster-declared fallback_providers and auxiliary.<task>.fallback_chain")
+    fallbacks.add_argument("--clear-fallbacks", action="store_true",
+                           help="set fallback_providers and every auxiliary.<task>.fallback_chain to an empty list")
     parser.add_argument("--home-root", type=Path, default=Path.home() / ".hermes")
     parser.add_argument("--hermes", default=str(Path.home() / ".hermes/hermes-agent/.hermes/bin/hermes"))
     parser.add_argument("--roster", type=Path, default=Path(__file__).resolve().parents[1] / "roster.yaml",
@@ -82,27 +124,54 @@ def main(argv=None):
     args = parser.parse_args(argv)
     if "/" in args.profile or args.profile in {"", ".", ".."}:
         parser.error("--profile must be a profile identifier")
+    if not (args.to or args.apply_fallbacks or args.clear_fallbacks):
+        parser.error("give --to, --apply-fallbacks or --clear-fallbacks")
+    for option, value in (("--model", args.model), ("--dispatch", args.dispatch)):
+        if value and not args.to:
+            parser.error(f"{option} needs --to")
     home = home_of(args.home_root, args.profile)
     config = home / "config.yaml"
     if not config.is_file():
         parser.error(f"no config at {config}")
     if not args.roster.is_file():
         parser.error(f"no roster at {args.roster}")
-    pairs = settings(args.to, args.model)
-    provider, model = pairs[0][1], pairs[1][1]
     change = roster_change(args.roster, args.profile)
-    if change is None:
-        roster_note = f"roster: {args.profile} is not declared in {args.roster}; no roster change"
-    else:
-        old_model, old_provider = change[2]
-        roster_note = (f"roster: {args.roster} {args.profile} model {old_model} -> {model}, "
-                       f"provider {old_provider} -> {provider}")
+    pairs, roster_note, fallback_note = [], None, None
+    if args.to:
+        pairs = settings(args.to, args.model)
+        provider, model = pairs[0][1], pairs[1][1]
+        if change is None:
+            roster_note = f"roster: {args.profile} is not declared in {args.roster}; no roster change"
+        else:
+            old_model, old_provider = change[2]
+            roster_note = (f"roster: {args.roster} {args.profile} model {old_model} -> {model}, "
+                           f"provider {old_provider} -> {provider}")
+    if args.apply_fallbacks:
+        if change is None:
+            parser.error(f"--apply-fallbacks: {args.profile} is not declared in {args.roster}")
+        problems = VERIFIER.fallback_declaration_errors(change[1])
+        if problems:
+            parser.error("--apply-fallbacks: invalid roster fallback declaration; nothing written:\n  "
+                         + "\n  ".join(problems))
+        pairs += fallback_settings(change[1], clear=False)
+        fallback_note = f"fallbacks: applied the {args.roster} declaration of {args.profile}"
+    elif args.clear_fallbacks:
+        pairs += fallback_settings({}, clear=True)
+        fallback_note = "fallbacks: fallback_providers and every auxiliary.<task>.fallback_chain set to []"
+        declared = change is not None and any(change[1].get(key) for key in
+                                              ("fallback_providers", "auxiliary_fallback_chain"))
+        if declared:
+            fallback_note += (f"; {args.roster} still declares fallbacks for {args.profile}: remove its "
+                              "fallback_providers and auxiliary_fallback_chain, or scripts/verify-state "
+                              "reports fallback drift")
     prefix = [args.hermes] + ([] if args.profile == "default" else ["-p", args.profile])
     if args.dry_run:
         print("live:")
         for key, value in pairs:
             print(" ".join(prefix + ["config", "set", key, value]))
-        print(roster_note + " (dry run: nothing written)")
+        for note in (roster_note, fallback_note):
+            if note:
+                print(note + " (dry run: nothing written)")
         return 0
     backup = config.with_name(f"config.yaml.pre-switch-{time.strftime('%Y%m%d-%H%M%S')}")
     shutil.copy2(config, backup)
@@ -110,19 +179,24 @@ def main(argv=None):
         subprocess.run(prefix + ["config", "set", key, value], check=True, capture_output=True)
     if args.dispatch:
         set_dispatch(args.home_root / "config.yaml", args.profile, args.dispatch)
-    print(f"{args.profile}: {args.to} ({pairs[1][1]}); helpers on {pairs[4][1]}; backup {backup.name}")
-    if change is not None:
-        roster, entry, _ = change
-        entry["model"], entry["provider"] = model, provider
-        args.roster.write_text(json.dumps(roster, indent=2) + "\n")
-        print(roster_note)
-        print("commit the roster.yaml change (and keep it inside the owner model policy), "
-              "or scripts/verify-state reports model drift")
+    if args.to:
+        print(f"{args.profile}: {args.to} ({pairs[1][1]}); helpers on {pairs[4][1]}; backup {backup.name}")
+        if change is not None:
+            roster, entry, _ = change
+            entry["model"], entry["provider"] = pairs[1][1], pairs[0][1]
+            args.roster.write_text(json.dumps(roster, indent=2) + "\n")
+            print(roster_note)
+            print("commit the roster.yaml change (and keep it inside the owner model policy), "
+                  "or scripts/verify-state reports model drift")
+        else:
+            print(roster_note)
+        if TARGETS[args.to][0] == "claude-subscription":
+            print("needs the claude-subscription plugin and HERMES_CLAUDE_SUBSCRIPTION_CLI / _TOKEN_FILE in the "
+                  "profile's .env (see plugins/model-providers/claude-subscription/README.md)")
     else:
-        print(roster_note)
-    if TARGETS[args.to][0] == "claude-subscription":
-        print("needs the claude-subscription plugin and HERMES_CLAUDE_SUBSCRIPTION_CLI / _TOKEN_FILE in the "
-              "profile's .env (see plugins/model-providers/claude-subscription/README.md)")
+        print(f"{args.profile}: backup {backup.name}")
+    if fallback_note:
+        print(fallback_note)
     return 0
 
 
