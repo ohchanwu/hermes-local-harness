@@ -2,7 +2,8 @@
 
 Repository source only. No live installation, profile/model change or rollout
 has been performed. Provider name: `claude-subscription`; models: the exact ids
-allowlisted in `compat.MODELS` (currently `claude-opus-5-5`). It does not
+allowlisted in `compat.MODELS` (currently `claude-opus-5-5`, `claude-fable-5-1`
+and `claude-fable-5-2`). It does not
 replace `anthropic` or the native `claude-code` alias. Independent review of the
 local candidate is still required. Design: [hardening specification](../../../docs/specs/261017-claude-subscription-provider-hardening.md).
 
@@ -303,6 +304,29 @@ Verification:
 
 Rollback copies: `config.yaml.pre-claude-261017` (before any Claude change) and
 `config.yaml.pre-helpers-261017` (before helpers moved off GPT) in each home.
+
+### Claude Fable 5.2 allowlist entry (2026-11-11 KST)
+
+`claude-fable-5-2` is in `compat.MODELS` (card t_7b6f6fed). The id was taken
+from the live Anthropic model id list returned on 2026-11-11 10:40 KST by the
+single read-only request of card t_731d4476 (run 289); that list has three
+Fable ids, `claude-fable-5`, `claude-fable-5-1` and `claude-fable-5-2`. Its
+`context_length` 1000000 is the Hermes built-in family value
+(`"claude-fable-5": 1000000`, `agent/model_metadata.py:293` at Hermes
+`9cf7960f`, reached by `get_model_context_length` step 8), not a live
+measurement. The list request returned ids only. The Anthropic model page
+<https://platform.claude.com/docs/en/models/fable-5-2/overview>, read by the
+controller on 2026-11-11 (comment on card t_7b6f6fed), lists the model id
+`claude-fable-5-2` with a context window of 1M tokens (1,000,000), which agrees
+with the Hermes built-in value.
+
+The live smoke test for `claude-fable-5-2` has not been run. It runs only on a
+separate card under owner approval (the controller comment on card t_7b6f6fed
+records the owner's approval of 2026-11-11 for that later card, after this
+entry and the roster change are merged). That smoke test also confirms the context length
+from the CLI's reported context window where the CLI reports one. The rollout
+table above is unchanged until the live change of the profiles that use
+`claude-fable-5-1`; those profiles keep `claude-fable-5-1` until then.
 
 ## Manual setup and rollback reference
 

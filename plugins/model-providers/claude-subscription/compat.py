@@ -9,8 +9,16 @@ CLI_TESTED = {(2, 1, 283), (2, 1, 302)}
 
 # Allowlisted models and their Hermes capabilities. The served model must equal
 # the requested one; a provider-side variant name goes in "served_aliases".
+# claude-fable-5-2: id from the live Anthropic model id list of 2026-11-11 (card
+# t_731d4476, run 289). Its context_length is the Hermes built-in family value
+# ("claude-fable-5": 1000000, agent/model_metadata.py:293 at Hermes 9cf7960f),
+# not a live measurement; the live smoke test confirms it from the CLI's
+# reported context window where the CLI reports one. The Anthropic model page
+# https://platform.claude.com/docs/en/models/fable-5-2/overview (read by the
+# controller on 2026-11-11) states the same context window, 1M tokens.
 MODELS = {"claude-opus-5-5": {"context_length": 1000000},
-          "claude-fable-5-1": {"context_length": 1000000}}
+          "claude-fable-5-1": {"context_length": 1000000},
+          "claude-fable-5-2": {"context_length": 1000000}}
 
 # Fixed runtime flags. Per-session values (model, paths, tools, system prompt)
 # are appended by the client.
