@@ -284,13 +284,14 @@ Owner-approved and live; GPT is retired from 2026-10-18.
 | default (`~/.hermes`, main orchestrator) | `claude-opus-5-5` | high |
 | `harness-`, `chapt-`, `jobcron-` `worker` and `orchestrator` | `claude-opus-5-5` | high |
 | `harness-`, `chapt-`, `jobcron-` `reviewer` | `claude-fable-5-2` (live since 2026-11-11) | high |
-| `advisor` | `claude-fable-5-2` declared; live `claude-fable-5-1` until the gateway restart, then switch | high |
+| `advisor` | `claude-fable-5-2` (live since 2026-11-11 15:38 KST) | high |
 
 The reviewer and advisor row was `claude-fable-5-1` until 2026-11-11. On
 2026-11-11 (card t_cb1b2a0d) the live smoke test for `claude-fable-5-2` passed
 and five Fable profiles were switched to `claude-fable-5-2`: `anki-reviewer`,
 `chapt-reviewer`, `harness-reviewer`, `jobcron-reviewer` and `jss-reviewer`.
-`advisor` was not switched (see "Claude Fable 5.2 allowlist entry" below).
+`advisor` was switched later the same day, after the gateway restart (see
+"Claude Fable 5.2 allowlist entry" below).
 
 In all eleven homes, the sixteen `auxiliary.<task>` helpers run on this
 provider with `claude-opus-5-5`. Pinning Opus keeps Fable homes off Fable's
@@ -353,28 +354,33 @@ changes on 2026-11-11 KST:
   (`config.yaml.pre-switch-20261111-121943`). The `jobcron-reviewer` switch left
   `fallback_providers` and every `auxiliary.<task>.fallback_chain` unchanged, and
   `auth.adopt_external_logins` is still false.
-- Not switched, needs gateway restart, then switch: `advisor`. The launchd
-  gateway (PID 3312, started 2026-10-30) records all six Fable profiles in
-  `served_profiles`. The gateway reads `model.default` from the routed profile's
-  `config.yaml` on every turn (`gateway/run.py` `_resolve_gateway_model` at
-  Hermes `9cf7960f`), but it imports a profile's provider plugin once and never
-  reloads it (`providers/__init__.py` `_import_plugin_dir`, which returns when
-  the module name is already in `sys.modules`). The gateway therefore keeps any
-  `compat` module it imported before the copy, and that module's `MODELS`
-  rejects `claude-fable-5-2`. `advisor` has a
-  connected Telegram adapter in the gateway, so its gateway turns would fail
-  after a switch. The five reviewers have no platform adapter, no cron job and no
-  bot relay in the gateway; Kanban starts them as separate processes, which
-  import the new `compat.py` from disk. After the owner restarts the gateway, run
-  `scripts/switch-profile-model --profile advisor --to claude-fable`.
+- `advisor` needed a gateway restart before its switch, so card t_cb1b2a0d left
+  it for later. The launchd gateway (PID 3312, started 2026-10-30) recorded all six
+  Fable profiles in `served_profiles`. The gateway reads `model.default` from
+  the routed profile's `config.yaml` on every turn (`gateway/run.py`
+  `_resolve_gateway_model` at Hermes `9cf7960f`), but it imports a profile's
+  provider plugin once and never reloads it (`providers/__init__.py`
+  `_import_plugin_dir`, which returns when the module name is already in
+  `sys.modules`). That gateway therefore kept the `compat` module it imported
+  before the copy, and that module's `MODELS` rejects `claude-fable-5-2`.
+  `advisor` has a connected Telegram adapter in the gateway, so its gateway
+  turns would have failed after a switch. The five reviewers have no platform
+  adapter, no cron job and no bot relay in the gateway; Kanban starts them as
+  separate processes, which import the new `compat.py` from disk.
+- Switched after the gateway restart: `advisor`. The owner restarted the
+  gateway at 15:19:59 KST (launchd PID 4880). At 15:38 KST the controller
+  switched `advisor` to `claude-fable-5-2` (backup
+  `config.yaml.pre-switch-20261111-153833`); a one-shot call on `advisor`
+  replied `OK` on `claude-fable-5-2`.
 - The three live `multi-agent-coding-orchestrator` skill files (default,
   `chapt-orchestrator`, `jobcron-orchestrator`) matched the repository copies at
   `bed49a9` and now equal the repository copies; the previous files are in
   `~/.hermes/backups/fable52-20261111-121515/skills/<home>/SKILL.md`.
 - Read-back: the five switched profiles report `model.provider`
-  `claude-subscription` and `model.default` `claude-fable-5-2`. Live
-  `scripts/verify-state` reports model drift for `advisor` only, until its
-  switch.
+  `claude-subscription` and `model.default` `claude-fable-5-2`. `advisor`
+  reports the same two values (read by card t_b5c06c8c on 2026-11-11). Live
+  `scripts/verify-state` on card t_b5c06c8c (2026-11-11, finished 16:30:28 KST)
+  printed no model drift line.
 - One-shot call `hermes -p harness-reviewer -z "Reply with exactly OK."
   --usage-file ...`: reply `OK`, provider `claude-subscription`, model
   `claude-fable-5-2`, 1 main API call (input 2, output 4, cache write 19216
