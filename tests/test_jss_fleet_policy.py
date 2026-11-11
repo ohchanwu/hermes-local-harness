@@ -46,6 +46,67 @@ PRIVACY_FORBID = {
     REVIEWER: "reject any commit or tracked file that copies anything from `profile/`, `companies/`, or `resume/resources/`.",
 }
 
+# Owner decision, 2026-11-11 (t_3af6293c): jss-orchestrator and jss-reviewer may read the
+# committed content of four other repositories. Each changed source states the exception
+# on exactly one line that starts with (or, in the skill, follows "- ") this lead.
+EXCEPTION_LEAD = "Read-only repository exception (owner decision, 2026-11-11)"
+FOREIGN_REPOS = (
+    "/Users/chanbla11mit/projects/jobcron",
+    "/Users/chanbla11mit/projects/cha-pt",
+    "/Users/chanbla11mit/projects/cha-pt-frontend",
+    "/Users/chanbla11mit/projects/cha-webpt-website-sync",
+)
+PERMITTED_COMMANDS = ("git log", "git show", "git grep", "git ls-tree", "git diff", "git rev-parse",
+                      "git merge-base")
+PROHIBITED_COMMANDS = ("git fetch", "git pull", "git checkout", "git switch", "git worktree", "git stash",
+                       "git commit", "git push")
+EXCEPTION_REPOSITORIES = (
+    "read the committed content of these four repositories: `/Users/chanbla11mit/projects/jobcron`, "
+    "`/Users/chanbla11mit/projects/cha-pt`, `/Users/chanbla11mit/projects/cha-pt-frontend`, and "
+    "`/Users/chanbla11mit/projects/cha-webpt-website-sync`.")
+EXCEPTION_PERMITTED = (
+    "Read from the refs `main` and `origin/main` only, never from the working tree, and only with these "
+    "Git commands, which do not write: `git log`, `git show`, `git grep`, `git ls-tree`, `git diff` "
+    "between two commits, `git rev-parse`, and `git merge-base`.")
+EXCEPTION_PROHIBITED = (
+    "Never write in those repositories; never run `git fetch`, `git pull`, `git checkout`, `git switch`, "
+    "`git worktree`, `git stash`, `git commit`, or `git push` in them; never read `.worktrees/`, local task "
+    "branches, untracked files, `.env` files, files ignored by Git (this includes the per-release deployment "
+    "guides and the saved WebPT sign-in state in the `cha-webpt-website-sync` working directory), or anything "
+    "under `/Users/chanbla11mit/cha-pt-pipeline/`; never access boards `jobcron` or `cha-pt`, the Jobcron or "
+    "Cha PT profiles or their sessions, credentials, or production or cloud state; and never create a card "
+    "on board `jss-genr` pinned to any of those repositories.")
+EXCEPTION_MERGED_NOT_DEPLOYED = (
+    "These repositories show what is merged, not what is deployed: a deploy date or a statement that a "
+    "feature is live still needs an owner statement or a deployment record.")
+EXCEPTION_SHA_AND_DATE = (
+    "Because `git fetch` is prohibited, `origin/main` can be older than GitHub; record the commit SHA and its "
+    "commit date with every fact taken from these repositories.")
+EXCEPTION_PRIVACY = (
+    "The privacy gate applies unchanged to everything read from them: the Jobcron repository is private and "
+    "carries an all-rights-reserved notice, and the Cha PT repositories, including the WebPT exporter, "
+    "contain clinic operations documents. Nothing read from them is copied into tracked files or commits of "
+    "the jss-genr repository")
+EXCEPTION_RULES = (EXCEPTION_REPOSITORIES, EXCEPTION_PERMITTED, EXCEPTION_PROHIBITED,
+                   EXCEPTION_MERGED_NOT_DEPLOYED, EXCEPTION_SHA_AND_DATE, EXCEPTION_PRIVACY)
+REVIEWER_FIRST_LINE = (
+    "You are the independent jss-genr reviewer. Accept review only for a card on board `jss-genr`, "
+    "implemented by `jss-worker` or `jss-worker-2`, and pinned to repository `/Users/chanbla11mit/projects/jss-genr`.")
+# Sentences that limit access to other repositories name the exception instead of contradicting it.
+ACCESS_LIMIT = re.compile(r"(?i)never access|or access jobcron|may not probe|operate only on|use only `")
+EXCEPTION_REFERENCE = "the reads that the read-only repository exception"
+# SHA-256 at baseline f501e8a1dd9908b2efa3c1a9cead187b4fa445de. The four worker SOULs are unchanged
+# by t_3af6293c; the three changed sources return to these bytes once its edits are reversed.
+BASELINE_SHA256 = {
+    "policies/profile-souls/jss-worker/SOUL.md": "cc0c68296eba80371bfca434030db69476f7a57394e84a86f21e1cf5a22c9ca5",
+    "policies/profile-souls/jss-worker-2/SOUL.md": "cc0c68296eba80371bfca434030db69476f7a57394e84a86f21e1cf5a22c9ca5",
+    "policies/profile-souls/jss-worker-glm-1/SOUL.md": "28d6f9b3459494330b76d18480123d54e0a082c857b29bb207473a4c2bbb9eb2",
+    "policies/profile-souls/jss-worker-glm-2/SOUL.md": "4c51476e5a709c1aa3bc6cf1fac9e1e2e8801930311c91d4aab799c783440be6",
+    "policies/profile-souls/jss-orchestrator/SOUL.md": "4d6e0736e5ecbfaa94f2c2cee235b85dc8bab3839f7b62f10ebca48d8df2e592",
+    "policies/profile-souls/jss-reviewer/SOUL.md": "6d59dda4f71bd06e1a20e5f32b8114c323738c443b74abea61dbae68e0d15dec",
+    f"policies/profile-skills/{ORCH}/{RELATIVE}": "963b584080646beeee54a60562bc550025bdf78f5cb99254fab20951cdadc9e7",
+}
+
 
 def sha(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
@@ -65,6 +126,65 @@ def load(path):
 
 def jss_files():
     return [SKILL, RUN_SCRIPT, ADOPTION, *(soul_path(profile) for profile in JSS)]
+
+
+def exception_line(raw):
+    """The one line of a changed source that states the read-only repository exception."""
+    lines = [line for line in raw.splitlines() if EXCEPTION_LEAD in line]
+    assert len(lines) == 1, f"expected one exception line, found {len(lines)}"
+    return lines[0]
+
+
+def without_exception(raw):
+    """The source text with its exception line removed (unchanged when it has none)."""
+    return "\n".join(line for line in raw.splitlines() if EXCEPTION_LEAD not in line)
+
+
+ORCH_SOUL_RELATIVE = f"policies/profile-souls/{ORCH}/SOUL.md"
+REVIEWER_SOUL_RELATIVE = f"policies/profile-souls/{REVIEWER}/SOUL.md"
+SKILL_RELATIVE = f"policies/profile-skills/{ORCH}/{RELATIVE}"
+PERMITS = "the reads that the read-only repository exception below permits"
+
+
+def _read_only_exception_edits():
+    """File -> ((new text, old text), ...) for the t_3af6293c edits. Each new text occurs once."""
+    orch = exception_line(soul_path(ORCH).read_text())
+    reviewer = exception_line(soul_path(REVIEWER).read_text())
+    skill = exception_line(SKILL.read_text())
+    return {
+        ORCH_SOUL_RELATIVE: (
+            (f", apart from {PERMITS}. Load", ". Load"),
+            (f"your skill names and {PERMITS}.\n\n{orch}\n", "your skill names.\n"),
+        ),
+        REVIEWER_SOUL_RELATIVE: (
+            (f"without explicit owner authorization, apart from {PERMITS}.\n\n{reviewer}\n",
+             "without explicit owner authorization.\n"),
+        ),
+        SKILL_RELATIVE: (
+            (f"`/Users/chanbla11mit/projects/jss-genr/.worktrees/<task-id>`, apart from {PERMITS}.\n",
+             "`/Users/chanbla11mit/projects/jss-genr/.worktrees/<task-id>`.\n"),
+            (f"profile fleet, or worktree, apart from {PERMITS}. The portfolio",
+             "profile fleet, or worktree. The portfolio"),
+            (f"\n{skill}\n", "\n"),
+            (" and the reads that the read-only repository exception in Hard Scope permits, jss-genr",
+             ", jss-genr"),
+        ),
+    }
+
+
+READ_ONLY_EXCEPTION_EDITS = _read_only_exception_edits()
+
+
+def reverse_read_only_exception_edits(relative_path, text):
+    """Return text with the t_3af6293c edits reversed; text may be str or bytes."""
+    as_bytes = isinstance(text, bytes)
+    if as_bytes:
+        text = text.decode()
+    for new, old in READ_ONLY_EXCEPTION_EDITS.get(relative_path, ()):
+        if text.count(new) != 1:
+            raise AssertionError(f"{relative_path}: expected one occurrence of {new[:60]!r}")
+        text = text.replace(new, old, 1)
+    return text.encode() if as_bytes else text
 
 
 class FleetDesiredState(unittest.TestCase):
@@ -335,8 +455,9 @@ class RoleContracts(unittest.TestCase):
     def test_skill_version_size_and_sections(self):
         self.assertRegex(self.skill_raw, r"(?m)^version: 0\.6\.7-jss\.8$")
         # 260 lines plus the 4-line Pitfalls section (t_bd860536), the 9 lines of
-        # repair_history candidate rules and example (t_6436ac1c) and the 6-line
-        # Skill Changes section (t_0a8674fe).
+        # repair_history candidate rules and example (t_6436ac1c), the 6-line
+        # Skill Changes section (t_0a8674fe) and the one-line Hard Scope read-only
+        # repository exception (t_3af6293c), which fits inside the same cap.
         self.assertLessEqual(len(self.skill_raw.splitlines()), 279)
         self.assertEqual(re.findall(r"^## (.+)$", self.skill_raw, re.M), [
             "Hard Scope", "Privacy Gate", "Card Kinds", "Role Separation", "Card Contract",
@@ -350,7 +471,11 @@ class RoleContracts(unittest.TestCase):
         # Jobcron orchestrator as history only; it routes no work to that fleet.
         history = "This caused the 2026-10-20 stalls of the JSS and Jobcron orchestrators."
         self.assertEqual(self.skill_raw.count(history), 1)
-        lower = self.skill_raw.replace(history, "").lower()
+        # The one Hard Scope line of the read-only repository exception (owner decision,
+        # 2026-11-11) names the four repositories it may read and the boards it may not
+        # access; ReadOnlyRepositoryException pins that line. It routes no work to them.
+        self.assertTrue(exception_line(self.skill_raw).startswith(f"- {EXCEPTION_LEAD}: "))
+        lower = without_exception(self.skill_raw).replace(history, "").lower()
         for foreign in ("jobcron", "cha-pt", "chapt-", "harness-orchestrator", "harness-worker",
                         "harness-reviewer", "board: harness", "--board harness"):
             self.assertNotIn(foreign, lower)
@@ -503,7 +628,15 @@ class StandingExceptions(unittest.TestCase):
         self.assertEqual(self.skill_raw.count("Protected-instruction-file exception"), 1)
 
     def test_no_other_jss_soul_carries_an_exception(self):
-        for profile, body in self.others.items():
+        # The reviewer alone also carries the read-only repository exception (owner decision,
+        # 2026-11-11); its `git push` appears only in that line's prohibited-command list.
+        # ReadOnlyRepositoryException pins that line, so it is removed before this check.
+        for profile in NON_ORCH_SOULS:
+            with self.subTest(profile=profile):
+                self.assertEqual(soul_path(profile).read_text().count(EXCEPTION_LEAD),
+                                 1 if profile == REVIEWER else 0)
+        for profile in NON_ORCH_SOULS:
+            body = flat(without_exception(soul_path(profile).read_text()))
             with self.subTest(profile=profile):
                 for marker in ("update my portfolio", "ohchanwu.dev", "git push", "Sole standing exception",
                                "Sole edit exception", "\"grant\"", "Protected-instruction-file", "2026-10-20"):
@@ -646,6 +779,145 @@ class CardContract(unittest.TestCase):
             self.verifier.check_harness_card_contract(errors, [card(REPOSITORY_BODY)])
         self.assertEqual(errors, [])
         self.assertEqual(self.errors(None), ["jss-genr card contract observation malformed"])
+
+
+class ReadOnlyRepositoryException(unittest.TestCase):
+    """Owner decision, 2026-11-11 (t_3af6293c): jss-orchestrator and jss-reviewer may read the
+    committed `main` and `origin/main` content of four other repositories with Git commands
+    that do not write. The workers get no such access, and the jss-genr card repository
+    allowlist is unchanged."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.raw = {ORCH_SOUL_RELATIVE: soul_path(ORCH).read_text(),
+                   REVIEWER_SOUL_RELATIVE: soul_path(REVIEWER).read_text(),
+                   SKILL_RELATIVE: SKILL.read_text()}
+        cls.verifier = load_verifier()
+
+    def test_each_changed_source_states_the_whole_exception_on_one_line(self):
+        for path, raw in self.raw.items():
+            with self.subTest(path=path):
+                self.assertEqual(raw.count(EXCEPTION_LEAD), 1)
+                line = exception_line(raw)
+                lead = f"- {EXCEPTION_LEAD}: " if path == SKILL_RELATIVE else f"{EXCEPTION_LEAD}: "
+                self.assertTrue(line.startswith(lead), line[:80])
+                for repo in FOREIGN_REPOS:
+                    self.assertIn(f"`{repo}`", line)
+                for rule in EXCEPTION_RULES:
+                    self.assertIn(rule, line)
+                # Outside its own line, no source names the four repository paths.
+                rest = without_exception(raw)
+                for repo in FOREIGN_REPOS:
+                    self.assertNotIn(f"`{repo}`", rest)
+
+    def test_permitted_and_prohibited_command_lists_are_exact_and_disjoint(self):
+        for path, raw in self.raw.items():
+            line = exception_line(raw)
+            permitted = line.split("Read from the refs `main` and `origin/main` only", 1)[1]
+            permitted = permitted.split("Never write in those repositories;", 1)[0]
+            prohibited = line.split("Never write in those repositories;", 1)[1].split(" in them;", 1)[0]
+            with self.subTest(path=path):
+                self.assertEqual(tuple(re.findall(r"`(git [a-z-]+)`", permitted)), PERMITTED_COMMANDS)
+                self.assertEqual(tuple(re.findall(r"`(git [a-z-]+)`", prohibited)), PROHIBITED_COMMANDS)
+                self.assertFalse(set(PERMITTED_COMMANDS) & set(PROHIBITED_COMMANDS))
+                self.assertIn("never from the working tree", permitted)
+                self.assertIn("`git diff` between two commits", permitted)
+                # No other Git command and no other ref is named anywhere in the exception.
+                self.assertEqual(set(re.findall(r"`(git [a-z-]+)`", line)),
+                                 set(PERMITTED_COMMANDS) | set(PROHIBITED_COMMANDS))
+                self.assertEqual(set(re.findall(r"`((?:origin/)?main)`", line)), {"main", "origin/main"})
+
+    def test_merged_not_deployed_and_sha_and_date_rules(self):
+        for path, raw in self.raw.items():
+            line = flat(exception_line(raw))
+            with self.subTest(path=path):
+                self.assertIn(EXCEPTION_MERGED_NOT_DEPLOYED, line)
+                self.assertIn(EXCEPTION_SHA_AND_DATE, line)
+                # The rule that the privacy gate applies follows the read rules it limits.
+                self.assertLess(line.find(EXCEPTION_SHA_AND_DATE), line.find(EXCEPTION_PRIVACY))
+
+    def test_reviewer_exception_adds_no_review_authority(self):
+        raw = self.raw[REVIEWER_SOUL_RELATIVE]
+        self.assertEqual(raw.splitlines()[0], REVIEWER_FIRST_LINE)
+        line = exception_line(raw)
+        self.assertTrue(line.startswith(
+            f"{EXCEPTION_LEAD}: only to check citations in the card under review, you may read "))
+        self.assertIn("reject any commit or tracked file that copies it.", line)
+        self.assertTrue(line.endswith(
+            "This exception adds no review authority over those four repositories: accept review only for a card "
+            f"pinned to repository `{REPO}`, as the first paragraph of this file states."))
+        self.assertEqual(raw.count(f"pinned to repository `{REPO}`"), 2)
+        skill = exception_line(self.raw[SKILL_RELATIVE])
+        self.assertIn("`jss-reviewer` has the same read access only to check citations in the card under review, "
+                      "and it gives the reviewer no review authority over those repositories.", skill)
+
+    def test_orchestrator_sources_limit_the_exception_to_two_profiles_and_card_bodies(self):
+        orch = exception_line(self.raw[ORCH_SOUL_RELATIVE])
+        skill = exception_line(self.raw[SKILL_RELATIVE])
+        self.assertTrue(orch.startswith(
+            f"{EXCEPTION_LEAD}: to check or refresh facts about the owner's other projects, you may read "))
+        self.assertTrue(skill.startswith(
+            f"- {EXCEPTION_LEAD}: to check or refresh facts about the owner's other projects, the orchestrator "
+            "may read "))
+        self.assertIn("You may relay a fact with its commit SHA and commit date to a worker in a card body, "
+                      "because card bodies stay local (owner decision, 2026-10-18).", orch)
+        self.assertIn("This exception covers only you and `jss-reviewer`; `jss-worker` and `jss-worker-2` have no "
+                      "access to these repositories.", orch)
+        self.assertIn("The orchestrator may relay a fact with its commit SHA and commit date to a worker in a card "
+                      "body, as the Privacy Gate permits for card bodies.", skill)
+        self.assertTrue(skill.endswith("`jss-worker` and `jss-worker-2` have no access to these repositories."))
+        # The skill states the exception inside Hard Scope.
+        self.assertIn(flat(skill), section(self.raw[SKILL_RELATIVE], "Hard Scope"))
+
+    def test_no_sentence_prohibits_the_permitted_reads(self):
+        expected = {ORCH_SOUL_RELATIVE: 2, REVIEWER_SOUL_RELATIVE: 1, SKILL_RELATIVE: 3}
+        for path, raw in self.raw.items():
+            sentences = [s for s in re.split(r"(?<=[.!?])\s+", flat(without_exception(raw)))
+                         if ACCESS_LIMIT.search(s)]
+            with self.subTest(path=path):
+                self.assertEqual(len(sentences), expected[path], sentences)
+                for sentence in sentences:
+                    self.assertIn(EXCEPTION_REFERENCE, sentence)
+        for old in (
+                "Operate only on board `jss-genr` and repository `/Users/chanbla11mit/projects/jss-genr`. Load",
+                "beyond the read-only harness references your skill names. ",
+                "or another board or repository without explicit owner authorization. ",
+                "repository-owned worktrees under `/Users/chanbla11mit/projects/jss-genr/.worktrees/<task-id>`. ",
+                "profile fleet, or worktree. The portfolio",
+                "reading the portfolio site checkout), jss-genr may not probe"):
+            for path, raw in self.raw.items():
+                with self.subTest(path=path, old=old[:40]):
+                    self.assertNotIn(old, flat(raw) + " ")
+
+    def test_reversing_the_edits_recovers_the_baseline_bytes(self):
+        for path in self.raw:
+            with self.subTest(path=path):
+                original = reverse_read_only_exception_edits(path, (ROOT / path).read_bytes())
+                self.assertEqual(hashlib.sha256(original).hexdigest(), BASELINE_SHA256[path])
+
+    def test_worker_souls_are_unchanged_and_carry_no_exception(self):
+        for profile in (*WORKERS, *GLM_WORKERS):
+            relative = f"policies/profile-souls/{profile}/SOUL.md"
+            text = soul_path(profile).read_text()
+            with self.subTest(profile=profile):
+                self.assertEqual(sha(soul_path(profile)), BASELINE_SHA256[relative])
+                self.assertNotIn(EXCEPTION_LEAD, text)
+                self.assertNotIn("read-only repository exception", text)
+                for repo in FOREIGN_REPOS:
+                    self.assertNotIn(repo, text)
+
+    def test_jss_genr_allowlist_unchanged_so_foreign_repository_cards_fail(self):
+        self.assertEqual(self.verifier.PROJECT_REPOSITORY_ALLOWLISTS["jss-genr"], [REPO])
+        self.assertEqual(load(ROOT / "roster.yaml")["project_fleets"]["jss-genr"]["repositories"], [REPO])
+        for repo in FOREIGN_REPOS:
+            body = REPOSITORY_BODY.replace(f"Repository {REPO} ONLY.", f"Repository {repo} ONLY.")
+            task = card(body, workspace_path=f"{repo}/.worktrees/t_jss")
+            errors = []
+            with redirect_stdout(io.StringIO()):
+                self.verifier.check_jss_card_contract(errors, [task])
+            with self.subTest(repo=repo):
+                self.assertIn("jss-genr card contract drift t_jss: expected exact repository", errors)
+                self.assertIn("jss-genr card contract drift t_jss: isolated worktree mismatch", errors)
 
 
 def fixture_main(fixture):

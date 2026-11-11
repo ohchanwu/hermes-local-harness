@@ -33,6 +33,7 @@ from pathlib import Path
 from test_anki_apply_tool_card_contracts_reference import reverse_apply_tool_reference_edits
 from test_orchestrator_skill_changes_policy import reverse_skill_changes_edits
 from test_jobcron_app_only_deploy_authorization import reverse_app_only_deploy_edits
+from test_jss_fleet_policy import reverse_read_only_exception_edits
 from test_fable_5_2_declared_model import reverse_fable_5_2_edits
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -239,7 +240,8 @@ class InstructionText(unittest.TestCase):
                 # application-only production deploy exception (t_b7455361), the
                 # apply-tool-card-contracts pointer (t_c9d4d5c8) and Skill Changes section
                 # (t_0a8674fe) first.
-                current = reverse_fable_5_2_edits(path, (ROOT / path).read_bytes())
+                current = reverse_read_only_exception_edits(path, (ROOT / path).read_bytes())
+                current = reverse_fable_5_2_edits(path, current)
                 current = reverse_app_only_deploy_edits(path, current)
                 current = reverse_apply_tool_reference_edits(path, current)
                 current = reverse_skill_changes_edits(path, current)
