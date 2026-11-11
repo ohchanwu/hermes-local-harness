@@ -111,7 +111,7 @@ On 2026-11-11 the four profiles had exactly these sixteen auxiliary tasks with a
 
 ### Apply steps (a later card, with separate human authorization for the live writes)
 
-1. The owner completes section 4 for all four profiles. On 2026-11-11 the owner wrote the replacement key to the four profile `.env` files (controller check by variable name and `auth list` source only). Confirm step 7 of section 4 (`auth.adopt_external_logins` is `false`) before step 4 below.
+1. The owner completes section 4 for all four profiles. On 2026-11-11 the owner wrote the replacement key to the four profile `.env` files (controller check by variable name and `auth list` source only). Confirm step 7 of section 4 (`auth.adopt_external_logins` is `false`) before step 4 below. Done by card `t_b399f9f3` on 2026-11-11 (see "Live rollout record" below). In the order that card specified, `auth.adopt_external_logins` was set to `false` directly after step 4 below, in the same run (the last step 4 apply started at 11:14:02 KST).
 2. Read the identifiers (section 5) and complete the compression check above. Done by card `t_731d4476`.
 3. In the repository, add `fallback_providers` and `auxiliary_fallback_chain` to the four roster entries. Update `test_repository_roster_declarations` in `tests/test_fallback_provider_settings.py`, run `python3 tests/gen_fixtures.py` and the test contract, and get the change reviewed and committed. Done by card `t_731d4476`. From that commit until step 4 is done, `scripts/verify-state` in live mode reports `fallback drift` for the four profiles.
 4. For each profile, preview the change, then apply it:
@@ -121,7 +121,8 @@ On 2026-11-11 the four profiles had exactly these sixteen auxiliary tasks with a
    scripts/switch-profile-model --profile <profile> --apply-fallbacks
    ```
 
-5. Run `scripts/verify-state`. The expected result is no `fallback drift` line.
+   Done by card `t_b399f9f3` on 2026-11-11 for all four profiles.
+5. Run `scripts/verify-state`. The expected result is no `fallback drift` line. Done by card `t_b399f9f3` on 2026-11-11: no `fallback drift` line.
 
 ### Live test plan: make the primary provider fail for one run
 
@@ -143,6 +144,40 @@ On 2026-11-11 the four profiles had exactly these sixteen auxiliary tasks with a
    - An environment override of `HERMES_CLAUDE_SUBSCRIPTION_TOKEN_FILE` for one run does not work: the profile `.env` is loaded with `override=True` (`hermes_cli/env_loader.py:507`) and replaces the shell value.
    - The plugin's own failure paths at `client.py:634-641` (rate-limit rejection, runtime and protocol errors) occur only after the Claude CLI has started. They cannot be produced without a subscription request.
 4. **Expected evidence.** The usage file names the `anthropic` provider and the fallback model. The response is "OK". `hermes -p jobcron-worker config get model.default` is unchanged.
+
+### Live rollout record (card `t_b399f9f3`, 2026-11-11)
+
+Authority: owner, Telegram 2026-11-09 (apply to the four profiles after a backup of each `config.yaml`, then a smoke test that does not spend the subscription); owner, Telegram 2026-11-11 (live changes approved to run without the owner present; "Leave the Jobcron board check paused.").
+
+1. **Backups** (`cp -p`, each confirmed identical with `cmp`), one per profile, in `/Users/chanbla11mit/.hermes/profiles/<profile>/`:
+   - `jobcron-orchestrator`: `config.yaml.pre-anthropic-fallback-20261111-111306`
+   - `jobcron-worker`: `config.yaml.pre-anthropic-fallback-20261111-111306`
+   - `jobcron-worker-2`: `config.yaml.pre-anthropic-fallback-20261111-111306`
+   - `jobcron-reviewer`: `config.yaml.pre-anthropic-fallback-20261111-111306`
+
+   `scripts/switch-profile-model` also wrote its own backups: `config.yaml.pre-switch-20261111-111316` (`jobcron-orchestrator`), `-111332` (`jobcron-worker`), `-111347` (`jobcron-worker-2`) and `-111402` (`jobcron-reviewer`).
+2. **Applied values.** The `--dry-run` preview for each profile listed 17 `hermes config set` commands with exactly the values in "Intended values" above: `fallback_providers` and the `fallback_chain` of all 16 helper tasks. The apply run then wrote them (exit status 0 for each profile). Read back with `hermes -p <profile> config get --json fallback_providers`:
+   - `jobcron-orchestrator`, `jobcron-worker`, `jobcron-worker-2`: `[{"provider": "anthropic", "model": "claude-opus-5-5"}]`
+   - `jobcron-reviewer`: `[{"provider": "anthropic", "model": "claude-fable-5-2"}]`
+
+   A comparison of each `config.yaml` with its `pre-anthropic-fallback` backup, by key path only, found exactly 18 changed key paths per profile: `fallback_providers`, the 16 `auxiliary.<task>.fallback_chain` keys and `auth.adopt_external_logins`.
+3. **Primary model unchanged.** `model.provider` is `claude-subscription` on all four profiles. `model.default` is `claude-opus-5-5` on the first three profiles and `claude-fable-5-1` on `jobcron-reviewer`.
+4. **Billing boundary.** `hermes -p <profile> config set auth.adopt_external_logins false` for each of the four profiles; `config get auth.adopt_external_logins` reads `false` on each. `hermes -p <profile> auth list anthropic` lists exactly one entry on each profile: label `ANTHROPIC_API_KEY`, type `api_key`, source `env:ANTHROPIC_API_KEY`. No `claude_code` or `hermes_pkce` entry is listed, and the command reports that external CLI logins are not adopted.
+5. **verify-state (live mode).** No `fallback drift` line and no FAIL line that names one of the four profiles. The run printed 7 FAIL lines, all about board or gateway state, which the card classified as present before this card: one line "multi-board gateway is still pinned to one database via HERMES_KANBAN_DB", one line "unable to read open Cha PT card list", and five lines "unable to read open project card list" (for the boards `jobcron`, `cha-pt`, `harness`, `jss-genr` and `anki`).
+6. **Board check deployment (`jobcron-orchestrator` only).**
+   - Backups in `/Users/chanbla11mit/.hermes/profiles/jobcron-orchestrator/scripts/`: `orchestrator_board_check.py.pre-20261111-112056` and `orchestrator_board_check.json.pre-20261111-112056` (`cp -p`, confirmed with `cmp`).
+   - `scripts/orchestrator-board-check` was copied to `scripts/orchestrator_board_check.py` and `deployment/orchestrator-board-check/jobcron-orchestrator.json` to `scripts/orchestrator_board_check.json` in the profile; both copies were confirmed with `cmp`.
+   - `hermes -p jobcron-orchestrator cron edit 5afc6729a9c4 --prompt "$(cat deployment/orchestrator-board-check/cron-prompt.md)"`. The stored prompt equals `cron-prompt.md` without its final newline (the shell command substitution removes it). A comparison of every other field of the job in `cron/jobs.json` before and after the edit found no change.
+   - Job `5afc6729a9c4` stays paused (`enabled` false, `state` `paused`), by owner decision of 2026-11-11. `cron resume`, `cron run` and `cron tick` were not run.
+   - `python3 <home>/scripts/orchestrator_board_check.py --status` printed `primary claude-subscription` for each of `jobcron-orchestrator`, `jobcron-worker`, `jobcron-worker-2` and `jobcron-reviewer`.
+7. **Live test result: observed.** One run, at 11:21:27 to 11:21:49 KST, of the command in "Live test plan" step 1 on `jobcron-worker`, with the usage file `/Users/chanbla11mit/.hermes/profiles/harness-orchestrator/cache/scratch/t_b399f9f3-jobcron-worker-fallback-usage.json`. Exit status 0.
+   - Reply: "OK".
+   - Usage file: provider `anthropic`, model `claude-opus-5-5`, 1 main API call; input 4, output 4, cache read 0, cache write 30,006, total 30,014 tokens.
+   - Usage file, auxiliary: task `title_generation`, 1 API call; input 2, output 38, cache write 920, total 40 tokens. The usage file does not record which provider that call used. Its configured route is `claude-subscription` with `claude-opus-5-5`, so it was probably the one small subscription request that "Known limits" above describes.
+   - Session row in the profile `state.db` (read-only query of the model and billing columns): model `claude-opus-5-5`, billing provider `anthropic`, billing base URL `https://api.anthropic.com`.
+   - `agent.log` has no `Fallback activated` line from this run, and no line at all from this run. One-shot mode calls `logging.disable(logging.CRITICAL)` (`hermes_cli/oneshot.py:257`), which drops every log record, including records for file handlers. The comment above that call (lines 255-256) says file handlers keep working; that statement does not match the behavior of `logging.disable`.
+   - During the run Hermes ran its own Python dependency sync: stderr printed "Installing Python dependencies", and `logs/update_receipts/latest.json` in the `jobcron-worker` profile records `kind` `sync`, outcome `ok`, from 02:21:39 to 02:21:45 UTC. This card did not start an install; the sync was started by Hermes.
+   - After the run, `hermes -p jobcron-worker config get model.default` is still `claude-opus-5-5`, and `model.provider` is still `claude-subscription`.
 
 ## 7. Revert after 2026-11-19
 
