@@ -283,7 +283,14 @@ Owner-approved and live; GPT is retired from 2026-10-18.
 | --- | --- | --- |
 | default (`~/.hermes`, main orchestrator) | `claude-opus-5-5` | high |
 | `harness-`, `chapt-`, `jobcron-` `worker` and `orchestrator` | `claude-opus-5-5` | high |
-| `harness-`, `chapt-`, `jobcron-` `reviewer`, `advisor` | `claude-fable-5-2` | high |
+| `harness-`, `chapt-`, `jobcron-` `reviewer` | `claude-fable-5-2` (live since 2026-11-11) | high |
+| `advisor` | `claude-fable-5-2` declared; live `claude-fable-5-1` until the gateway restart, then switch | high |
+
+The reviewer and advisor row was `claude-fable-5-1` until 2026-11-11. On
+2026-11-11 (card t_cb1b2a0d) the live smoke test for `claude-fable-5-2` passed
+and five Fable profiles were switched to `claude-fable-5-2`: `anki-reviewer`,
+`chapt-reviewer`, `harness-reviewer`, `jobcron-reviewer` and `jss-reviewer`.
+`advisor` was not switched (see "Claude Fable 5.2 allowlist entry" below).
 
 In all eleven homes, the sixteen `auxiliary.<task>` helpers run on this
 provider with `claude-opus-5-5`. Pinning Opus keeps Fable homes off Fable's
@@ -295,7 +302,7 @@ every `kanban.dispatch_profiles` list; the project orchestrators' own lists are
 
 Verification:
 - live smoke passes for Opus 5.5 and Fable 5.1, including the rebuild and helper
-  checks;
+  checks, and for Fable 5.2 on 2026-11-11;
 - Kanban pilots completed for a worker and a reviewer;
 - one-shot chats completed for an orchestrator, the Advisor and the default
   profile;
@@ -320,21 +327,58 @@ controller on 2026-11-11 (comment on card t_7b6f6fed), lists the model id
 `claude-fable-5-2` with a context window of 1M tokens (1,000,000), which agrees
 with the Hermes built-in value.
 
-The live smoke test for `claude-fable-5-2` has not been run. It runs only on a
-separate card under owner approval (the controller comment on card t_7b6f6fed
-records the owner's approval of 2026-11-11 for that later card, after this
-entry and the roster change are merged). That smoke test also confirms the context length
-from the CLI's reported context window where the CLI reports one.
-
 Card t_a6bbe808 (step 2 of 3) changed the declared Fable model from
 `claude-fable-5-1` to `claude-fable-5-2` in `roster.yaml`,
 `scripts/switch-profile-model`, `scripts/verify-state`, the procedures, the
 orchestrator skill copies and the tests, and in the reviewer and advisor row of
-the rollout table above. That card changed no live profile. The six live Fable
-profiles (`advisor`, `anki-reviewer`, `chapt-reviewer`, `harness-reviewer`,
-`jobcron-reviewer` and `jss-reviewer`) keep `claude-fable-5-1` until the step 3
-card runs the live smoke test and switches them; until then, live
-`scripts/verify-state` reports model drift for those six profiles.
+the rollout table above. That card changed no live profile.
+
+Card t_cb1b2a0d (step 3 of 3, owner approval of 2026-11-11) made the live
+changes on 2026-11-11 KST:
+
+- Live smoke test, run once at 12:14 KST:
+  `SMOKE PASS cli=2.1.302 model=claude-fable-5-2`. `smoke.py` does not print a
+  context window, and the one-shot session record below holds none, so the
+  context length 1000000 is still not confirmed by a value the CLI reported.
+- All 22 installed plugin copies (`~/.hermes` and the 21 profile homes) received
+  `compat.py` and `README.md` from the repository. Every copy matched the
+  repository plugin directory at `77dae22` before the copy. The previous files
+  are in `~/.hermes/backups/fable52-20261111-121515/plugins/<home>/`.
+- Switched with `scripts/switch-profile-model --to claude-fable` (main model
+  `claude-fable-5-2`, helpers stay on `claude-opus-5-5`): `anki-reviewer`
+  (backup `config.yaml.pre-switch-20261111-121741`), `chapt-reviewer`
+  (`config.yaml.pre-switch-20261111-121811`), `harness-reviewer`
+  (`config.yaml.pre-switch-20261111-121841`), `jobcron-reviewer`
+  (`config.yaml.pre-switch-20261111-121912`) and `jss-reviewer`
+  (`config.yaml.pre-switch-20261111-121943`). The `jobcron-reviewer` switch left
+  `fallback_providers` and every `auxiliary.<task>.fallback_chain` unchanged, and
+  `auth.adopt_external_logins` is still false.
+- Not switched, needs gateway restart, then switch: `advisor`. The launchd
+  gateway (PID 3312, started 2026-10-30) records all six Fable profiles in
+  `served_profiles`. The gateway reads `model.default` from the routed profile's
+  `config.yaml` on every turn (`gateway/run.py` `_resolve_gateway_model` at
+  Hermes `9cf7960f`), but it imports a profile's provider plugin once and never
+  reloads it (`providers/__init__.py` `_import_plugin_dir`, which returns when
+  the module name is already in `sys.modules`). The gateway therefore keeps any
+  `compat` module it imported before the copy, and that module's `MODELS`
+  rejects `claude-fable-5-2`. `advisor` has a
+  connected Telegram adapter in the gateway, so its gateway turns would fail
+  after a switch. The five reviewers have no platform adapter, no cron job and no
+  bot relay in the gateway; Kanban starts them as separate processes, which
+  import the new `compat.py` from disk. After the owner restarts the gateway, run
+  `scripts/switch-profile-model --profile advisor --to claude-fable`.
+- The three live `multi-agent-coding-orchestrator` skill files (default,
+  `chapt-orchestrator`, `jobcron-orchestrator`) matched the repository copies at
+  `bed49a9` and now equal the repository copies; the previous files are in
+  `~/.hermes/backups/fable52-20261111-121515/skills/<home>/SKILL.md`.
+- Read-back: the five switched profiles report `model.provider`
+  `claude-subscription` and `model.default` `claude-fable-5-2`. Live
+  `scripts/verify-state` reports model drift for `advisor` only, until its
+  switch.
+- One-shot call `hermes -p harness-reviewer -z "Reply with exactly OK."
+  --usage-file ...`: reply `OK`, provider `claude-subscription`, model
+  `claude-fable-5-2`, 1 main API call (input 2, output 4, cache write 19216
+  tokens).
 
 ## Manual setup and rollback reference
 
