@@ -4,13 +4,13 @@ Private desired state for the local Hermes harness. This repository is not live 
 
 ## Switching a profile's model (Claude, GPT, GLM)
 
-Every active profile currently runs on the [Claude subscription provider](plugins/model-providers/claude-subscription/README.md#rollout-status-2026-10-17-kst). Opus 5.5 serves workers, orchestrators and the default home; Fable 5.1 serves reviewers and the Advisor. To move any profile, use `scripts/switch-profile-model`. It sets the main model and all sixteen helper jobs in one step, after backing up the profile's `config.yaml`:
+Every active profile currently runs on the [Claude subscription provider](plugins/model-providers/claude-subscription/README.md#rollout-status-2026-10-17-kst). Opus 5.5 serves workers, orchestrators and the default home; Fable 5.2 serves reviewers and the Advisor. Under both Claude targets, the six light helper tasks run on Haiku 5.5 and the other ten helper tasks run on Opus 5.5 ([`procedures/haiku-helper-routing.md`](procedures/haiku-helper-routing.md)). To move any profile, use `scripts/switch-profile-model`. It sets the main model and all sixteen helper jobs in one step, after backing up the profile's `config.yaml`:
 
 ```sh
 scripts/switch-profile-model --profile harness-worker --to glm --dry-run            # preview only
 scripts/switch-profile-model --profile harness-worker --to glm                       # GLM 5.3 (z.ai)
 scripts/switch-profile-model --profile harness-worker --to gpt --model gpt-6.1-sol   # back to GPT
-scripts/switch-profile-model --profile harness-reviewer --to claude-fable            # Fable main, Opus helpers
+scripts/switch-profile-model --profile harness-reviewer --to claude-fable            # Fable main, Haiku and Opus helpers
 scripts/switch-profile-model --profile default --to claude-opus                      # the main ~/.hermes home
 scripts/switch-profile-model --profile worker-sol --to gpt --dispatch add            # put a GPT worker back on Kanban
 ```
