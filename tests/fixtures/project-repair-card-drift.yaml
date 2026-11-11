@@ -985,20 +985,556 @@
       "auxiliary": {}
     },
     "jobcron-orchestrator": {
-      "fallback_providers": [],
-      "auxiliary": {}
+      "fallback_providers": [
+        {
+          "provider": "anthropic",
+          "model": "claude-opus-5-5"
+        }
+      ],
+      "auxiliary": {
+        "vision": {
+          "fallback_chain": [
+            {
+              "provider": "anthropic",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "compression": {
+          "fallback_chain": [
+            {
+              "provider": "anthropic",
+              "model": "claude-opus-5-5"
+            }
+          ]
+        },
+        "skills_hub": {
+          "fallback_chain": [
+            {
+              "provider": "anthropic",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "approval": {
+          "fallback_chain": [
+            {
+              "provider": "anthropic",
+              "model": "claude-opus-5-5"
+            }
+          ]
+        },
+        "review": {
+          "fallback_chain": [
+            {
+              "provider": "anthropic",
+              "model": "claude-opus-5-5"
+            }
+          ]
+        },
+        "mcp": {
+          "fallback_chain": [
+            {
+              "provider": "anthropic",
+              "model": "claude-opus-5-5"
+            }
+          ]
+        },
+        "title_generation": {
+          "fallback_chain": [
+            {
+              "provider": "anthropic",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "memory_query_rewrite": {
+          "fallback_chain": [
+            {
+              "provider": "anthropic",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "tts_audio_tags": {
+          "fallback_chain": [
+            {
+              "provider": "anthropic",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "triage_specifier": {
+          "fallback_chain": [
+            {
+              "provider": "anthropic",
+              "model": "claude-opus-5-5"
+            }
+          ]
+        },
+        "kanban_decomposer": {
+          "fallback_chain": [
+            {
+              "provider": "anthropic",
+              "model": "claude-opus-5-5"
+            }
+          ]
+        },
+        "profile_describer": {
+          "fallback_chain": [
+            {
+              "provider": "anthropic",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "goal_judge": {
+          "fallback_chain": [
+            {
+              "provider": "anthropic",
+              "model": "claude-opus-5-5"
+            }
+          ]
+        },
+        "curator": {
+          "fallback_chain": [
+            {
+              "provider": "anthropic",
+              "model": "claude-opus-5-5"
+            }
+          ]
+        },
+        "monitor": {
+          "fallback_chain": [
+            {
+              "provider": "anthropic",
+              "model": "claude-opus-5-5"
+            }
+          ]
+        },
+        "background_review": {
+          "fallback_chain": [
+            {
+              "provider": "anthropic",
+              "model": "claude-opus-5-5"
+            }
+          ]
+        }
+      }
     },
     "jobcron-worker": {
-      "fallback_providers": [],
-      "auxiliary": {}
+      "fallback_providers": [
+        {
+          "provider": "anthropic",
+          "model": "claude-opus-5-5"
+        }
+      ],
+      "auxiliary": {
+        "vision": {
+          "fallback_chain": [
+            {
+              "provider": "anthropic",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "compression": {
+          "fallback_chain": [
+            {
+              "provider": "anthropic",
+              "model": "claude-opus-5-5"
+            }
+          ]
+        },
+        "skills_hub": {
+          "fallback_chain": [
+            {
+              "provider": "anthropic",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "approval": {
+          "fallback_chain": [
+            {
+              "provider": "anthropic",
+              "model": "claude-opus-5-5"
+            }
+          ]
+        },
+        "review": {
+          "fallback_chain": [
+            {
+              "provider": "anthropic",
+              "model": "claude-opus-5-5"
+            }
+          ]
+        },
+        "mcp": {
+          "fallback_chain": [
+            {
+              "provider": "anthropic",
+              "model": "claude-opus-5-5"
+            }
+          ]
+        },
+        "title_generation": {
+          "fallback_chain": [
+            {
+              "provider": "anthropic",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "memory_query_rewrite": {
+          "fallback_chain": [
+            {
+              "provider": "anthropic",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "tts_audio_tags": {
+          "fallback_chain": [
+            {
+              "provider": "anthropic",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "triage_specifier": {
+          "fallback_chain": [
+            {
+              "provider": "anthropic",
+              "model": "claude-opus-5-5"
+            }
+          ]
+        },
+        "kanban_decomposer": {
+          "fallback_chain": [
+            {
+              "provider": "anthropic",
+              "model": "claude-opus-5-5"
+            }
+          ]
+        },
+        "profile_describer": {
+          "fallback_chain": [
+            {
+              "provider": "anthropic",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "goal_judge": {
+          "fallback_chain": [
+            {
+              "provider": "anthropic",
+              "model": "claude-opus-5-5"
+            }
+          ]
+        },
+        "curator": {
+          "fallback_chain": [
+            {
+              "provider": "anthropic",
+              "model": "claude-opus-5-5"
+            }
+          ]
+        },
+        "monitor": {
+          "fallback_chain": [
+            {
+              "provider": "anthropic",
+              "model": "claude-opus-5-5"
+            }
+          ]
+        },
+        "background_review": {
+          "fallback_chain": [
+            {
+              "provider": "anthropic",
+              "model": "claude-opus-5-5"
+            }
+          ]
+        }
+      }
     },
     "jobcron-worker-2": {
-      "fallback_providers": [],
-      "auxiliary": {}
+      "fallback_providers": [
+        {
+          "provider": "anthropic",
+          "model": "claude-opus-5-5"
+        }
+      ],
+      "auxiliary": {
+        "vision": {
+          "fallback_chain": [
+            {
+              "provider": "anthropic",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "compression": {
+          "fallback_chain": [
+            {
+              "provider": "anthropic",
+              "model": "claude-opus-5-5"
+            }
+          ]
+        },
+        "skills_hub": {
+          "fallback_chain": [
+            {
+              "provider": "anthropic",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "approval": {
+          "fallback_chain": [
+            {
+              "provider": "anthropic",
+              "model": "claude-opus-5-5"
+            }
+          ]
+        },
+        "review": {
+          "fallback_chain": [
+            {
+              "provider": "anthropic",
+              "model": "claude-opus-5-5"
+            }
+          ]
+        },
+        "mcp": {
+          "fallback_chain": [
+            {
+              "provider": "anthropic",
+              "model": "claude-opus-5-5"
+            }
+          ]
+        },
+        "title_generation": {
+          "fallback_chain": [
+            {
+              "provider": "anthropic",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "memory_query_rewrite": {
+          "fallback_chain": [
+            {
+              "provider": "anthropic",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "tts_audio_tags": {
+          "fallback_chain": [
+            {
+              "provider": "anthropic",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "triage_specifier": {
+          "fallback_chain": [
+            {
+              "provider": "anthropic",
+              "model": "claude-opus-5-5"
+            }
+          ]
+        },
+        "kanban_decomposer": {
+          "fallback_chain": [
+            {
+              "provider": "anthropic",
+              "model": "claude-opus-5-5"
+            }
+          ]
+        },
+        "profile_describer": {
+          "fallback_chain": [
+            {
+              "provider": "anthropic",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "goal_judge": {
+          "fallback_chain": [
+            {
+              "provider": "anthropic",
+              "model": "claude-opus-5-5"
+            }
+          ]
+        },
+        "curator": {
+          "fallback_chain": [
+            {
+              "provider": "anthropic",
+              "model": "claude-opus-5-5"
+            }
+          ]
+        },
+        "monitor": {
+          "fallback_chain": [
+            {
+              "provider": "anthropic",
+              "model": "claude-opus-5-5"
+            }
+          ]
+        },
+        "background_review": {
+          "fallback_chain": [
+            {
+              "provider": "anthropic",
+              "model": "claude-opus-5-5"
+            }
+          ]
+        }
+      }
     },
     "jobcron-reviewer": {
-      "fallback_providers": [],
-      "auxiliary": {}
+      "fallback_providers": [
+        {
+          "provider": "anthropic",
+          "model": "claude-fable-5-2"
+        }
+      ],
+      "auxiliary": {
+        "vision": {
+          "fallback_chain": [
+            {
+              "provider": "anthropic",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "compression": {
+          "fallback_chain": [
+            {
+              "provider": "anthropic",
+              "model": "claude-opus-5-5"
+            }
+          ]
+        },
+        "skills_hub": {
+          "fallback_chain": [
+            {
+              "provider": "anthropic",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "approval": {
+          "fallback_chain": [
+            {
+              "provider": "anthropic",
+              "model": "claude-opus-5-5"
+            }
+          ]
+        },
+        "review": {
+          "fallback_chain": [
+            {
+              "provider": "anthropic",
+              "model": "claude-opus-5-5"
+            }
+          ]
+        },
+        "mcp": {
+          "fallback_chain": [
+            {
+              "provider": "anthropic",
+              "model": "claude-opus-5-5"
+            }
+          ]
+        },
+        "title_generation": {
+          "fallback_chain": [
+            {
+              "provider": "anthropic",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "memory_query_rewrite": {
+          "fallback_chain": [
+            {
+              "provider": "anthropic",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "tts_audio_tags": {
+          "fallback_chain": [
+            {
+              "provider": "anthropic",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "triage_specifier": {
+          "fallback_chain": [
+            {
+              "provider": "anthropic",
+              "model": "claude-opus-5-5"
+            }
+          ]
+        },
+        "kanban_decomposer": {
+          "fallback_chain": [
+            {
+              "provider": "anthropic",
+              "model": "claude-opus-5-5"
+            }
+          ]
+        },
+        "profile_describer": {
+          "fallback_chain": [
+            {
+              "provider": "anthropic",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "goal_judge": {
+          "fallback_chain": [
+            {
+              "provider": "anthropic",
+              "model": "claude-opus-5-5"
+            }
+          ]
+        },
+        "curator": {
+          "fallback_chain": [
+            {
+              "provider": "anthropic",
+              "model": "claude-opus-5-5"
+            }
+          ]
+        },
+        "monitor": {
+          "fallback_chain": [
+            {
+              "provider": "anthropic",
+              "model": "claude-opus-5-5"
+            }
+          ]
+        },
+        "background_review": {
+          "fallback_chain": [
+            {
+              "provider": "anthropic",
+              "model": "claude-opus-5-5"
+            }
+          ]
+        }
+      }
     },
     "chapt-orchestrator": {
       "fallback_providers": [],

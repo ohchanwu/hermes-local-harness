@@ -2,8 +2,10 @@
 """Fallback providers (t_54fc49fb): roster declaration schema, verify-state drift check in
 fixture and live modes, and scripts/switch-profile-model --apply-fallbacks / --clear-fallbacks.
 
-Every profile, model identifier and credential value here is synthetic. Fixture runs go
-through the real verifier main() under the fixture-isolation guard; the live path runs only
+Every profile, model identifier and credential value here is synthetic, except the repository
+roster declarations of the four Jobcron profiles (t_731d4476), which use the identifiers from the
+live Anthropic model list of 2026-11-11 (procedures/anthropic-api-fallback.md section 5). Fixture
+runs go through the real verifier main() under the fixture-isolation guard; the live path runs only
 with a stubbed command runner, and the switch script only against a temporary home with a
 fake hermes that records its arguments.
 """
@@ -25,6 +27,18 @@ from test_verify_fixture_isolation import ObservedReads, fixture_result
 
 FIXTURES = ROOT / "tests/fixtures"
 JOBCRON_PROFILES = ("jobcron-orchestrator", "jobcron-worker", "jobcron-worker-2", "jobcron-reviewer")
+# Identifiers chosen from the live Anthropic model list of 2026-11-11 (t_731d4476).
+OPUS, FABLE, HAIKU = "claude-opus-5-5", "claude-fable-5-2", "claude-haiku-5-5"
+JOBCRON_MAIN_FALLBACK = {"jobcron-orchestrator": OPUS, "jobcron-worker": OPUS, "jobcron-worker-2": OPUS,
+                         "jobcron-reviewer": FABLE}
+JOBCRON_PRIMARY = {"jobcron-orchestrator": "claude-opus-5-5", "jobcron-worker": "claude-opus-5-5",
+                   "jobcron-worker-2": "claude-opus-5-5", "jobcron-reviewer": "claude-fable-5-1"}
+HAIKU_TASKS = ("title_generation", "memory_query_rewrite", "tts_audio_tags", "profile_describer", "skills_hub",
+               "vision")
+OPUS_TASKS = ("compression", "goal_judge", "review", "background_review", "kanban_decomposer", "triage_specifier",
+              "curator", "monitor", "approval", "mcp")
+JOBCRON_CHAIN = {**{task: [{"provider": "anthropic", "model": HAIKU}] for task in HAIKU_TASKS},
+                 **{task: [{"provider": "anthropic", "model": OPUS}] for task in OPUS_TASKS}}
 SECRET = "synthetic-credential-value"
 PROVIDERS = [{"provider": "anthropic", "model": "synthetic-main-fallback"}]
 CHAINS = {
@@ -32,7 +46,8 @@ CHAINS = {
     "title_generation": [{"provider": "anthropic", "model": "synthetic-small-model"}],
 }
 DRIFT_MESSAGES = [
-    'FAIL: fallback drift jobcron-worker fallback_providers: expected [], actual '
+    'FAIL: fallback drift jobcron-worker fallback_providers: expected '
+    '[{"provider": "anthropic", "model": "claude-opus-5-5"}], actual '
     '[{"provider": "anthropic", "model": "synthetic-fallback-model"}]',
     'FAIL: fallback drift harness-worker auxiliary.title_generation.fallback_chain: expected [], actual '
     '[{"provider": "anthropic", "model": "synthetic-helper-model", "api_key": "<not shown>"}]',
@@ -145,16 +160,33 @@ class DeclarationTests(unittest.TestCase):
         self.assertNotIn(SECRET, out.getvalue())
 
     def test_repository_roster_declarations(self):
+        """t_731d4476: exactly the four Jobcron entries declare the Anthropic API fallback, with the
+        identifiers chosen from the live model list; their primary provider and model are unchanged."""
         roster = json.loads((ROOT / "roster.yaml").read_text())
         errors = []
         with redirect_stdout(io.StringIO()):
             self.verifier.check_fallback_declarations(errors, roster)
         self.assertEqual(errors, [])
-        # The model identifiers are not verified yet: the Jobcron entries declare no fallback.
-        for profile in roster["profiles"]:
-            if profile["name"] in JOBCRON_PROFILES:
-                self.assertNotIn("fallback_providers", profile)
-                self.assertNotIn("auxiliary_fallback_chain", profile)
+        self.assertEqual(set(JOBCRON_CHAIN), set(self.verifier.HELPER_TASKS))
+        declared = {profile["name"]: profile for profile in roster["profiles"]
+                    if "fallback_providers" in profile or "auxiliary_fallback_chain" in profile}
+        self.assertEqual(sorted(declared), sorted(JOBCRON_PROFILES))
+        for name in JOBCRON_PROFILES:
+            with self.subTest(profile=name):
+                profile = declared[name]
+                self.assertEqual((profile["provider"], profile["model"]), ("claude-subscription", JOBCRON_PRIMARY[name]))
+                self.assertEqual(profile["fallback_providers"],
+                                 [{"provider": "anthropic", "model": JOBCRON_MAIN_FALLBACK[name]}])
+                self.assertEqual(profile["auxiliary_fallback_chain"], JOBCRON_CHAIN)
+                entries = profile["fallback_providers"] + [
+                    entry for chain in profile["auxiliary_fallback_chain"].values() for entry in chain]
+                self.assertEqual(len(entries), 17)
+                for entry in entries:
+                    self.assertEqual(entry["provider"], "anthropic")
+                    self.assertEqual(set(entry), {"provider", "model"})
+                    for field in entry:
+                        self.assertFalse(any(part in field.lower() for part in ("key", "token", "secret", "url")),
+                                         field)
 
     def test_helper_tasks_have_one_definition(self):
         switch = load_switch()
@@ -316,6 +348,18 @@ class ProcedureTests(unittest.TestCase):
         self.assertIn("261109-anthropic-api-key-auth-add-dropped-in-named-profile.md", lines[0])
         self.assertNotIn("auth remove anthropic", text)
         self.assertNotIn("sk-" + "ant-", text)  # Anthropic key prefix, split so this file does not contain it
+
+    def test_cron_prompt_reports_on_fallback_lines_without_card_actions(self):
+        """t_731d4476: an ON-FALLBACK line of the board check has no card id; the cron prompt reports it
+        and runs no card action for it (procedures/orchestrator-board-check.md, provider_watch)."""
+        text = (ROOT / "deployment/orchestrator-board-check/cron-prompt.md").read_text(encoding="utf-8")
+        self.assertIn("A line of the form `ON-FALLBACK <profile>: <provider>/<model> at <time>` is not a card "
+                      "finding and has no card id.", text)
+        self.assertIn('report it in your final report as "<profile> is running on fallback provider '
+                      '<provider> / <model> since <time>"', text)
+        self.assertIn("Do not run kanban_show or any other card action for it, and change nothing for it.", text)
+        self.assertIn("Every other finding line has the form `<KIND> <card id>", text)
+        self.assertIn("plus one line for each `ON-FALLBACK` line", text)
 
 
 class SwitchTests(unittest.TestCase):

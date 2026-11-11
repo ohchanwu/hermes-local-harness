@@ -54,24 +54,38 @@ Hermes facts below were read from the installed Hermes source at commit `9cf7960
 
 ## 5. Model identifiers
 
-- **Source.** The identifiers must come from the live Anthropic model list that `hermes -p jobcron-worker model --refresh` shows after the key exists. Do not copy them from documentation or from memory.
-- **Run the picker without selecting.** `hermes model` is an interactive picker (`hermes_cli/subcommands/model.py:8-15`): `--refresh` deletes the model picker disk cache and fetches every provider's live `/v1/models` list. Close the picker without choosing anything. Then confirm that `hermes -p jobcron-worker config get model.provider` still prints `claude-subscription` and `model.default` is unchanged.
-- **Which credential lists the models.** `_fetch_anthropic_models` (`hermes_cli/models.py:2136-2150`) uses `resolve_anthropic_token`: `ANTHROPIC_TOKEN` or `CLAUDE_CODE_OAUTH_TOKEN`, then `ANTHROPIC_API_KEY`, then a pool entry or the Claude Code login (`agent/anthropic_credentials.py:691-709`). After section 4, the list therefore comes from the API key in the profile `.env`. The live test in section 6 is what proves that each identifier works with the API key.
-- **Where the list is cached.** `hermes_cli/models_profile_cache.py` keeps only in-memory values per profile; it writes no file. The disk cache is `~/.hermes/profiles/jobcron-worker/provider_models_cache.json` (`hermes_cli/models.py:1783` and `:1869-1871`, `_provider_models_cache_path`). Each entry is keyed by provider and a credential fingerprint, which is a short hash, not the key (`_credential_fingerprint`, `hermes_cli/models.py:1874`). A later card can read the `anthropic` model identifiers from that file without the key. It must not print any other part of the file.
+- **Source and date.** Card `t_731d4476` requested the live Anthropic model list once, on 2026-11-11 at 10:40 KST, for `jobcron-worker`. The identifiers in this procedure come only from that list, not from documentation or memory.
+- **Why the picker was not used.** The earlier plan was to run `hermes -p jobcron-worker model --refresh` and close the picker without choosing anything. `hermes model` is an interactive picker (`hermes_cli/subcommands/model.py:8-15`), and a wrong key press changes the profile's default model. The card therefore called the function that the picker uses to fetch the Anthropic list, `_fetch_anthropic_models` (`hermes_cli/models.py:2138`), directly. The picker reaches it through `provider_model_ids` and `_anthropic_catalog` (`hermes_cli/models.py:1442-1448`, registered at `:1554`). `_anthropic_catalog` passes `base_url=None` and `api_key=None` when `model.provider` is not `anthropic`; on `jobcron-worker` it is `claude-subscription`. The direct call used the same arguments. The card did not use `provider_model_ids`, because that function returns a built-in catalog when the live request fails (`hermes_cli/models.py:1747-1775`).
+- **How the call ran.** Installed Hermes Python (`~/.hermes/hermes-agent/venv/bin/python`, Hermes commit `9cf7960f`), under `env -i` with only `HOME`, `PATH` and `HERMES_HOME=/Users/chanbla11mit/.hermes/profiles/jobcron-worker`, so no token from the calling environment could be used. The profile environment was loaded only with `load_hermes_dotenv(project_env=<hermes-agent>/.env)` (`hermes_cli/env_loader.py:455`), the same call that the CLI makes at start (`hermes_cli/main.py:713`). The script opened no `.env` or `auth.json` file itself and printed only the returned model identifiers.
+- **Which credential listed the models.** Before the request, the script checked with the Hermes functions, without printing any value:
+  - `_first_env("ANTHROPIC_TOKEN", "CLAUDE_CODE_OAUTH_TOKEN")` is empty, and `ANTHROPIC_API_KEY` is set.
+  - `resolve_anthropic_token()` returns the `ANTHROPIC_API_KEY` value (`agent/anthropic_credentials.py:691-709`, the API key branch at line 702).
+  - `_is_oauth_token` is False for that value (`agent/anthropic_credentials.py:63-67`), so it has the shape of an Anthropic Console API key.
+
+  `_fetch_anthropic_models` therefore sent the value in the `x-api-key` header (`hermes_cli/models.py:2165`), not as an OAuth Bearer token. The list came from the `ANTHROPIC_API_KEY` value in the `jobcron-worker` profile `.env`. The first attempt, on 2026-11-09, stopped at the `_is_oauth_token` check and made no request, because the value then had the shape of an OAuth or setup token; the owner replaced the value on 2026-11-11.
+- **Returned list.** 15 identifiers, in the order Hermes sorts them (Opus, then Sonnet, then Haiku, then others; `hermes_cli/models.py:2196`): `claude-opus-4-5-20251101`, `claude-opus-4-6`, `claude-opus-4-7`, `claude-opus-4-8`, `claude-opus-5`, `claude-opus-5-5`, `claude-sonnet-4-5-20250929`, `claude-sonnet-4-6`, `claude-sonnet-5`, `claude-sonnet-5-5`, `claude-haiku-4-5-20251001`, `claude-haiku-5-5`, `claude-fable-5`, `claude-fable-5-1`, `claude-fable-5-2`.
+- **Chosen identifiers.**
+  - Opus: `claude-opus-5-5`, the only Claude Opus 5.5 identifier in the list.
+  - Fable: `claude-fable-5-2`, the only Claude Fable 5.2 identifier in the list. Owner decision, 2026-11-11: the Fable profiles, including `jobcron-reviewer`, move from Fable 5.1 to Fable 5.2 on a separate card. Until that card, the primary model of `jobcron-reviewer` stays `claude-fable-5-1`.
+  - Haiku: `claude-haiku-5-5`, the newest Haiku identifier in the list. The other one is `claude-haiku-4-5-20251001`, which is also the Hermes built-in default.
+- **Where the list is cached.** `_fetch_anthropic_models` itself writes no cache file; the call above therefore wrote none. The picker's disk cache is written by the `provider_model_ids` cache layer to `~/.hermes/profiles/<profile>/provider_models_cache.json` (`_provider_models_cache_path`, `hermes_cli/models.py:1869`). Each entry is keyed by provider and a credential fingerprint, which is a short hash, not the key (`_credential_fingerprint`, `hermes_cli/models.py:1874`). `hermes_cli/models_profile_cache.py` keeps only in-memory values per profile.
+- **Proof of use.** The list shows which identifiers the key can see. The live test in section 6 is what proves that each identifier works with the API key.
 
 ## 6. Intended values, apply steps and live test plan
 
-### Intended values (a later card fills in the verified identifiers)
+### Intended values (identifiers from section 5; declared in `roster.yaml` by card `t_731d4476`)
 
 | Profile | `fallback_providers` |
 |---|---|
-| `jobcron-orchestrator`, `jobcron-worker`, `jobcron-worker-2` | `[{"provider": "anthropic", "model": "<Opus identifier>"}]` |
-| `jobcron-reviewer` | `[{"provider": "anthropic", "model": "<Fable identifier>"}]` if the list contains a Fable identifier, otherwise the Opus identifier |
+| `jobcron-orchestrator`, `jobcron-worker`, `jobcron-worker-2` | `[{"provider": "anthropic", "model": "claude-opus-5-5"}]` |
+| `jobcron-reviewer` | `[{"provider": "anthropic", "model": "claude-fable-5-2"}]` |
 
 | Auxiliary task | `auxiliary_fallback_chain.<task>` (all four profiles) |
 |---|---|
-| `title_generation`, `memory_query_rewrite`, `tts_audio_tags`, `profile_describer`, `skills_hub`, `vision` | `[{"provider": "anthropic", "model": "<Haiku identifier>"}]` |
-| `compression`, `goal_judge`, `review`, `background_review`, `kanban_decomposer`, `triage_specifier`, `curator`, `monitor`, `approval`, `mcp` | `[{"provider": "anthropic", "model": "<Opus identifier>"}]` |
+| `title_generation`, `memory_query_rewrite`, `tts_audio_tags`, `profile_describer`, `skills_hub`, `vision` | `[{"provider": "anthropic", "model": "claude-haiku-5-5"}]` |
+| `compression`, `goal_judge`, `review`, `background_review`, `kanban_decomposer`, `triage_specifier`, `curator`, `monitor`, `approval`, `mcp` | `[{"provider": "anthropic", "model": "claude-opus-5-5"}]` |
+
+On 2026-11-11 the four profiles had exactly these sixteen auxiliary tasks with a `provider` and `model` (all `claude-subscription` / `claude-opus-5-5`), read by name with `hermes -p <profile> config get --json auxiliary`. The `auxiliary` section also has `moa_reference` and `moa_aggregator`. These are Hermes default entries (`hermes_cli/config_defaults.py:817-818`, provider `auto`, no model) and are not in `HELPER_TASKS`, so they get no fallback chain.
 
 ### Compression fallback model check
 
@@ -80,13 +94,26 @@ Hermes facts below were read from the installed Hermes source at commit `9cf7960
    - A context window below `MINIMUM_CONTEXT_LENGTH` = 64,000 tokens (`agent/model_metadata.py:272`) raises an error, and the session does not start.
    - A context window below the profile's `compression.threshold_tokens` lowers that threshold for the session.
 3. When the chain is used later, after a compression call fails, an entry whose context window is below 64,000 tokens is skipped (`_task_minimum_context_length` and `_context_too_small`, `agent/auxiliary_client.py:4380-4382` and `:4397`).
-4. The later card resolves the context window that Hermes reports for the Opus identifier on provider `anthropic` (`get_model_context_length`, `agent/model_metadata.py`). It confirms that the window is at least 64,000 and at least `compression.threshold_tokens` of each of the four profiles. `jobcron-orchestrator` has 150,000 (`managed_profile_settings` in `roster.yaml`). For the other three, read the value with `hermes -p <profile> config get compression.threshold_tokens`.
+4. The check also runs again after the main runtime changes, for example when a fallback activates (`revalidate_compression_feasibility`, `agent/conversation_compression.py:2177`), and it can be deferred until a request first reaches 64,000 tokens (`ensure_compression_feasibility_checked`, line 2193).
+5. **Result (card `t_731d4476`, 2026-11-11; no model call and no network request).** `claude-opus-5-5` as the `compression` fallback chain model on provider `anthropic` passes the check for all four profiles.
+
+   | Profile | Main model (provider `claude-subscription`) | Main context window | Compression trigger (`threshold_tokens`) | Fallback model context window | Result |
+   |---|---|---|---|---|---|
+   | `jobcron-orchestrator` | `claude-opus-5-5` | 1,000,000 | 150,000 (configured cap) | 1,000,000 | pass |
+   | `jobcron-worker` | `claude-opus-5-5` | 1,000,000 | 500,000 | 1,000,000 | pass |
+   | `jobcron-worker-2` | `claude-opus-5-5` | 1,000,000 | 500,000 | 1,000,000 | pass |
+   | `jobcron-reviewer` | `claude-fable-5-1` | 1,000,000 | 500,000 | 1,000,000 | pass |
+
+   - **How the numbers were obtained.** `get_model_context_length` (`agent/model_metadata.py:2245`) was run with the installed Hermes Python for each profile home, with network connections blocked, no `.env` loaded and no API key. For `claude-opus-5-5` on `anthropic` at `https://api.anthropic.com` it returned 1,000,000: no persistent cache entry (step 1, line 2303); the live `/v1/models` step is skipped without a key (step 4, lines 2325-2329; `_query_anthropic_context_length` at line 1670 returns nothing for an empty key); the models.dev lookup without network (`lookup_models_dev_context`, step 5, line 2330) gives 1,000,000; the built-in table entry `claude-opus-5` also gives 1,000,000 (line 293, used in step 8, line 2353). Each main model on `claude-subscription` also resolves to 1,000,000, which matches `MODELS` in `plugins/model-providers/claude-subscription/compat.py`.
+   - **Trigger.** Each profile has `compression.threshold` 0.5 and no `model.max_tokens`. `_compute_threshold_tokens` (`agent/context_compressor.py:2863`) gives 1,000,000 × 0.5 = 500,000. `jobcron-orchestrator` has `compression.threshold_tokens` 150,000, which caps its trigger (`_effective_threshold_cap`, line 2759); the other three profiles have no value.
+   - **Comparison.** 1,000,000 is at least `MINIMUM_CONTEXT_LENGTH` 64,000 (`agent/model_metadata.py:272`), so no error is raised (`agent/conversation_compression.py:2149`). 1,000,000 is at least each trigger, so the trigger is not lowered (line 2160). When the main runtime itself is on the fallback (`claude-opus-5-5`, or `claude-fable-5-2` for `jobcron-reviewer`, both 1,000,000 by the same offline lookup), the triggers stay 150,000 and 500,000, and the result is the same.
+   - **Limit.** At run time, with the Console key, Hermes first asks Anthropic's `/v1/models` for `max_input_tokens` (step 4). This card did not read that value: the single allowed request returned identifiers only. If Anthropic reports a value below the trigger but at least 64,000, Hermes lowers the trigger for that session (lines 2160-2164); the session still starts.
 
 ### Apply steps (a later card, with separate human authorization for the live writes)
 
-1. The owner completes section 4 for all four profiles.
-2. Read the identifiers (section 5) and complete the compression check above.
-3. In the repository, add `fallback_providers` and `auxiliary_fallback_chain` to the four roster entries. Update `test_repository_roster_declarations` in `tests/test_fallback_provider_settings.py`, run `python3 tests/gen_fixtures.py` and the test contract, and get the change reviewed and committed.
+1. The owner completes section 4 for all four profiles. On 2026-11-11 the owner wrote the replacement key to the four profile `.env` files (controller check by variable name and `auth list` source only). Confirm step 7 of section 4 (`auth.adopt_external_logins` is `false`) before step 4 below.
+2. Read the identifiers (section 5) and complete the compression check above. Done by card `t_731d4476`.
+3. In the repository, add `fallback_providers` and `auxiliary_fallback_chain` to the four roster entries. Update `test_repository_roster_declarations` in `tests/test_fallback_provider_settings.py`, run `python3 tests/gen_fixtures.py` and the test contract, and get the change reviewed and committed. Done by card `t_731d4476`. From that commit until step 4 is done, `scripts/verify-state` in live mode reports `fallback drift` for the four profiles.
 4. For each profile, preview the change, then apply it:
 
    ```sh
