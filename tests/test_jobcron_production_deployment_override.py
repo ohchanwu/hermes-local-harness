@@ -35,7 +35,7 @@ class JobcronProductionDeploymentOverride(unittest.TestCase):
                 self.assertEqual(self.overrides[PROFILE][path], "tracked-source")
 
     def test_skill_override_version(self):
-        self.assertIn("\nversion: 0.2.5-jobcron.2\n", self.skill)
+        self.assertIn("\nversion: 0.2.5-jobcron.3\n", self.skill)
 
     def test_skill_override_keeps_tracked_side_changes(self):
         for marker in ("## Release change selection", "application-only"):

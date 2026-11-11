@@ -15,7 +15,7 @@ import subprocess
 from pathlib import Path
 import unittest
 
-from test_jobcron_app_only_deploy_authorization import reverse_app_only_deploy_edits
+from test_jobcron_app_only_deploy_authorization import reverse_app_only_deploy_edits, reverse_deploy_campaign_edits
 
 ROOT = Path(__file__).resolve().parents[1]
 BASELINE = "bcf811b63da0393484b4a4403eb9ae4e1e7286c0"
@@ -101,8 +101,10 @@ class ProductionDeploymentTerminologyTests(unittest.TestCase):
         for path in REWRITES:
             with self.subTest(path=path):
                 # The later owner-requested application-only production deploy exception
-                # (t_b7455361) changed O; reverse it first.
-                current = reverse_app_only_deploy_edits(path, (ROOT / path).read_text())
+                # (t_b7455361) and the later deploy campaign change (t_90a548ad) changed O;
+                # reverse them first, the later change first.
+                current = reverse_deploy_campaign_edits(path, (ROOT / path).read_text())
+                current = reverse_app_only_deploy_edits(path, current)
                 self.assertEqual(reverse_rewrites(path, current), baseline_text(path))
 
     def test_override_keeps_every_shared_line_it_had_at_the_baseline(self):
