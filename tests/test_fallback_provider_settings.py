@@ -402,6 +402,14 @@ class ProcedureTests(unittest.TestCase):
                       "owner decision needed.**", section)
         self.assertIn("--apply-fallbacks", section)
         self.assertIn("auth.adopt_external_logins false", section)
+        # A `hermes` command without -p follows the HERMES_HOME of a dispatched terminal, so every
+        # command for the default profile names it explicitly (review round 1).
+        self.assertIn("`hermes -p default config set auth.adopt_external_logins false`", section)
+        self.assertNotIn("`hermes config set auth.adopt_external_logins false`", section)
+        self.assertIn("env -u HERMES_HOME scripts/switch-profile-model --profile default --apply-fallbacks", section)
+        # Owner decision option A, 2026-11-11: the default profile gets the fallback values and no key.
+        self.assertIn("4. **Owner decision (option A).**", section)
+        self.assertIn("none in `~/.hermes/.env` and none in `~/.hermes/auth.json`", section)
         for url in ("https://support.anthropic.com/en/articles/8977456-how-do-i-pay-for-my-claude-api-usage",
                     "https://platform.claude.com/docs/en/about-claude/api-credits-for-subscribers"):
             self.assertIn(url, section)
