@@ -1,9 +1,98 @@
 # Light auxiliary helper tasks on claude-haiku-5-5: live procedure
 
 Repository step: card `t_e7efc35f` (2026-11-11). This document is the input for
-a later live card. Nothing in it has been run. Every step that writes under
+a later live card. It was run on 2026-11-11 by the cards `t_cd353076` and
+`t_216bb355`; the live record follows. Every step that writes under
 `~/.hermes`, calls a model or restarts the gateway needs that later card's
 separate human authorization.
+
+## Live record (2026-11-11, KST)
+
+Authority: owner, Telegram 2026-11-11 (section 1), and the owner's standing
+instruction that approved live changes run without the owner present.
+
+- Card `t_cd353076` (steps a and b, no commit):
+  - Step a, one `smoke.py` run, 19:28:56 to 19:29:16:
+    `SMOKE PASS cli=2.1.302 model=claude-haiku-5-5`.
+  - Step b: check before the copy `copies: 22`, no `STOP` line. `compat.py` and
+    `README.md` copied into all 22 installed plugin copies; backups in
+    `/Users/chanbla11mit/.hermes/backups/haiku55-20261111-192936/plugins/<name>/`
+    (22 directories). The copy finished at 19:29:37.
+- Step c: the owner restarted the gateway. New gateway process 23372, started
+  2026-11-11 19:49:01, after the step b copy. Other processes whose command
+  line contains `hermes` and that started before 19:29:37 were only
+  `browser_harness.daemon` processes and one `cua-driver serve` process (33100);
+  no Hermes agent session and no dashboard process. None was stopped.
+- Card `t_216bb355` (section 3 and steps d, e and f). Evidence directory
+  `/Users/chanbla11mit/.hermes/backups/haiku55-switch-20261111-201312`
+  (`TS` = `20261111-201312`); every Hermes command ran with a clean
+  environment (`env -i` with `HOME`, `USER`, `LOGNAME`, `SHELL`, `LANG` and
+  `PATH` only), so no variable of the Kanban worker session reached the
+  profile commands.
+  - Section 3, `verify-before.txt` (20:13 to 20:19): exit 1, 126 lines, all
+    126 are `auxiliary model drift` lines (6 for each of the 21 profiles), no
+    other `FAIL` line.
+  - Step d, 20:20 to 20:36, in the order of section 1: all 21 profiles
+    switched. Each has the backup `config.yaml.pre-haiku55-20261111-201312`
+    and the backup that `scripts/switch-profile-model` wrote itself:
+
+    | Profile | Target | `pre-switch` backup |
+    |---|---|---|
+    | `advisor` | `claude-fable` | `config.yaml.pre-switch-20261111-202023` |
+    | `anki-reviewer` | `claude-fable` | `config.yaml.pre-switch-20261111-202128` |
+    | `chapt-reviewer` | `claude-fable` | `config.yaml.pre-switch-20261111-202216` |
+    | `harness-reviewer` | `claude-fable` | `config.yaml.pre-switch-20261111-202258` |
+    | `jobcron-reviewer` | `claude-fable` | `config.yaml.pre-switch-20261111-202340` |
+    | `jss-reviewer` | `claude-fable` | `config.yaml.pre-switch-20261111-202427` |
+    | `anki-orchestrator` | `claude-opus` | `config.yaml.pre-switch-20261111-202509` |
+    | `anki-worker` | `claude-opus` | `config.yaml.pre-switch-20261111-202551` |
+    | `anki-worker-2` | `claude-opus` | `config.yaml.pre-switch-20261111-202634` |
+    | `chapt-orchestrator` | `claude-opus` | `config.yaml.pre-switch-20261111-202716` |
+    | `chapt-worker` | `claude-opus` | `config.yaml.pre-switch-20261111-202903` (also `config.yaml.pre-switch-20261111-202757`, see below) |
+    | `chapt-worker-2` | `claude-opus` | `config.yaml.pre-switch-20261111-202943` |
+    | `harness-orchestrator` | `claude-opus` | `config.yaml.pre-switch-20261111-203023` |
+    | `harness-worker` | `claude-opus` | `config.yaml.pre-switch-20261111-203109` |
+    | `harness-worker-2` | `claude-opus` | `config.yaml.pre-switch-20261111-203155` |
+    | `jobcron-orchestrator` | `claude-opus` | `config.yaml.pre-switch-20261111-203238` |
+    | `jobcron-worker` | `claude-opus` | `config.yaml.pre-switch-20261111-203323` |
+    | `jobcron-worker-2` | `claude-opus` | `config.yaml.pre-switch-20261111-203406` |
+    | `jss-orchestrator` | `claude-opus` | `config.yaml.pre-switch-20261111-203452` |
+    | `jss-worker` | `claude-opus` | `config.yaml.pre-switch-20261111-203536` |
+    | `jss-worker-2` | `claude-opus` | `config.yaml.pre-switch-20261111-203619` |
+
+    For every profile the dry run matched the expected 35 `config set` lines
+    and the roster note exactly (no `auxiliary_models` note); the read-back
+    showed 16 tasks on `claude-subscription`, `claude-haiku-5-5` on the six
+    light tasks and `claude-opus-5-5` on the other ten; the `diff` of
+    `fallback_providers`, `auth.adopt_external_logins` and `model.default`
+    printed nothing; `git status --porcelain roster.yaml` printed nothing.
+    `chapt-worker`: the first apply was stopped at about 20:28 by the time
+    limit of the terminal tool after a part of its `config set` writes
+    (backup `config.yaml.pre-switch-20261111-202757`). The profile was
+    restored from `config.yaml.pre-haiku55-20261111-201312` (`cmp` found the
+    restored `config.yaml` equal to that backup, and the values of
+    `fallback_providers`, `auth.adopt_external_logins` and `model.default`
+    read back after the restore equal the values in `chapt-worker-before.txt`
+    of the evidence directory), then dry run, apply and read-back ran again
+    with the results above.
+  - Step e, `verify-after.txt` (20:37 to 20:43): exit 0,
+    `OK: desired state matches observed state`; no `auxiliary model drift`
+    line and no `FAIL` line.
+  - Step f, 20:43:21 to 20:43:43: one
+    `hermes -p <p> -z "Reply with exactly OK."` per profile, no retry. All 21
+    calls exited 0 and printed `OK`. Each created one session with source
+    `oneshot` in the profile's `state.db`, with one `session_model_usage` row
+    of the main model on `claude-subscription`. Each session except the
+    `advisor` session received the instant title `Reply with exactly OK.`
+    (`title_source` `derived`); the `advisor` session has no title. The
+    one-shot runs wrote no line to the profiles' `agent.log`. Result for all
+    21 profiles: no light-task call recorded. No profile has a
+    `claude-haiku-5-5` route line of item 1, a fallback line of item 1 or a
+    row of item 2 (with either `billing_provider`) dated after its switch, so
+    no failed primary route was found. The evidence for each profile is the
+    step d read-back and the step e result above.
+- Revert, if needed: section 4, step g, with `TS` = `20261111-201312` and
+  `B` = `/Users/chanbla11mit/.hermes/backups/haiku55-20261111-192936`.
 
 ## 1. Decision and scope
 
@@ -391,7 +480,8 @@ step b), and does not count it as acceptance.
 
 ## 5. Not changed by card t_e7efc35f
 
-`procedures/switching-hermes-models.md` still says that `--to claude-fable`
-keeps the helpers on Opus. That file was outside the files card `t_e7efc35f`
-was allowed to change; after this change the light tasks go to
-`claude-haiku-5-5` under both Claude targets.
+Card `t_e7efc35f` left in place the statement in
+`procedures/switching-hermes-models.md` that `--to claude-fable` keeps the
+helpers on Opus, because that file was outside the files card `t_e7efc35f` was
+allowed to change. Card `t_216bb355` corrected that statement on 2026-11-11:
+the six light tasks go to `claude-haiku-5-5` under both Claude targets.

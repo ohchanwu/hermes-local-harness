@@ -23,17 +23,18 @@ The owner retired the GLM workers on 2026-10-18. The same day the owner added a 
 ```sh
 scripts/switch-profile-model --profile harness-worker --to glm                       # GLM 5.3 everywhere
 scripts/switch-profile-model --profile harness-worker --to gpt --model gpt-6.1-sol   # back to GPT
-scripts/switch-profile-model --profile harness-reviewer --to claude-fable            # Fable main, Opus helpers
+scripts/switch-profile-model --profile harness-reviewer --to claude-fable            # Fable main, Haiku and Opus helpers
 scripts/switch-profile-model --profile default --to claude-opus                      # the main ~/.hermes home
 scripts/switch-profile-model --profile worker-sol --to gpt --dispatch add            # put a GPT worker back on Kanban
 ```
 
 - **Targets:**
   - `claude-opus`: `claude-opus-5-5`.
-  - `claude-fable`: `claude-fable-5-2`, with helpers on Opus.
+  - `claude-fable`: `claude-fable-5-2`.
   - `gpt`: `openai-codex`, default `gpt-5.6-sol`.
   - `glm`: `zai`, default `glm-5.3`.
-- **Helpers follow the main model**, except under `claude-fable`. Pass `--model` to choose another model id.
+- **Helpers under both Claude targets (`claude-opus` and `claude-fable`):** the six light helper tasks (`LIGHT_HELPER_TASKS` in `scripts/verify-state`: `title_generation`, `memory_query_rewrite`, `tts_audio_tags`, `profile_describer`, `skills_hub`, `vision`) go to `claude-haiku-5-5`, and the other ten helper tasks go to `claude-opus-5-5`, all on `claude-subscription` (card `t_e7efc35f`; live record in [`haiku-helper-routing.md`](haiku-helper-routing.md)). Under `claude-fable` this means the helpers do not follow the Fable main model.
+- **Helpers under `gpt` and `glm`** follow the main model. Pass `--model` to choose another main model id; under the Claude targets it changes only the main model.
 - **Before switching to GPT:** the OpenAI login must be valid again (`hermes -p <profile> auth status openai-codex`). Use a model your plan offers.
 - **Before switching to Claude:** the profile needs the plugin in `plugins/model-providers/claude-subscription/`, and `HERMES_CLAUDE_SUBSCRIPTION_CLI` and `HERMES_CLAUDE_SUBSCRIPTION_TOKEN_FILE` in its `.env`.
 - **When changes take effect:** new Kanban tasks and new gateway turns pick up the change. Running tasks finish on their current model.
