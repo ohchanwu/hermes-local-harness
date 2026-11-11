@@ -942,6 +942,16 @@ class ClientTests(unittest.TestCase):
             self.c.create(model='claude-unlisted', messages=[{'role': 'user', 'content': 'unused'}])
         self.assertEqual(self.launches, [])
 
+    def test_validate_accepts_fable_5_2_and_existing_ids_and_rejects_unlisted_id(self):
+        messages = [{'role': 'user', 'content': 'unused'}]
+        for model in ('claude-fable-5-2', 'claude-fable-5-1', 'claude-opus-5-5'):
+            with self.subTest(model=model):
+                self.assertEqual(self.c._validate({'model': model, 'messages': messages})[0], model)
+                self.assertEqual(client.compat.MODELS[model]['context_length'], 1000000)
+        with self.assertRaisesRegex(client.ProviderError, 'exact model id from its allowlist'):
+            self.c._validate({'model': 'claude-fable-5-3', 'messages': messages})
+        self.assertEqual(self.launches, [])
+
     def test_concurrent_callers_on_one_client_are_queued(self):
         results, errors = [], []
         def call(text):
