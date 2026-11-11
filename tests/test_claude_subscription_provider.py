@@ -952,6 +952,19 @@ class ClientTests(unittest.TestCase):
             self.c._validate({'model': 'claude-fable-5-3', 'messages': messages})
         self.assertEqual(self.launches, [])
 
+    def test_validate_accepts_haiku_5_5_with_its_documented_context_and_rejects_other_haiku_ids(self):
+        # t_e7efc35f: the light auxiliary helper tasks run on claude-haiku-5-5; context window
+        # 1,000,000 tokens per https://platform.claude.com/docs/en/models/haiku-5-5/overview.
+        messages = [{'role': 'user', 'content': 'unused'}]
+        self.assertEqual(self.c._validate({'model': 'claude-haiku-5-5', 'messages': messages})[0], 'claude-haiku-5-5')
+        self.assertEqual(client.compat.MODELS['claude-haiku-5-5'], {'context_length': 1000000})
+        self.assertEqual(client.compat.served_names('claude-haiku-5-5'), {'claude-haiku-5-5'})
+        for model in ('claude-haiku-4-5-20251001', 'claude-haiku-5'):
+            with self.subTest(model=model), \
+                    self.assertRaisesRegex(client.ProviderError, 'exact model id from its allowlist'):
+                self.c._validate({'model': model, 'messages': messages})
+        self.assertEqual(self.launches, [])
+
     def test_concurrent_callers_on_one_client_are_queued(self):
         results, errors = [], []
         def call(text):

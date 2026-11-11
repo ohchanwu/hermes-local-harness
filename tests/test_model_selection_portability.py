@@ -55,7 +55,9 @@ class RegistrationTests(unittest.TestCase):
         self.assertEqual(self.profile.process_command_env_vars, ('HERMES_CLAUDE_SUBSCRIPTION_CLI',))
 
     def test_model_catalog_is_not_a_request_fallback_chain(self):
-        self.assertEqual(self.profile.fallback_models, ('claude-opus-5-5', 'claude-fable-5-1', 'claude-fable-5-2'))
+        # The picker catalog lists every allowlisted id (claude-haiku-5-5 added by t_e7efc35f).
+        self.assertEqual(self.profile.fallback_models,
+                         ('claude-opus-5-5', 'claude-fable-5-1', 'claude-fable-5-2', 'claude-haiku-5-5'))
         self.assertEqual(self.profile.model_aliases, {})
         self.assertFalse(self.profile.supports_model_listing)
         self.assertFalse(self.profile.supports_health_check)

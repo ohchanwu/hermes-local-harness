@@ -282,6 +282,10 @@
       "toolsets": "read-only",
       "credential_required": true,
       "credential_present": true,
+      "auxiliary_models": {
+        "light_tasks": "claude-haiku-5-5",
+        "other_tasks": "claude-opus-5-5"
+      },
       "fallback_providers": [
         {
           "provider": "anthropic",
@@ -656,6 +660,10 @@
       "installed_disabled_plugins": [
         "hermes-terminal-outcome-notification"
       ],
+      "auxiliary_models": {
+        "light_tasks": "claude-haiku-5-5",
+        "other_tasks": "claude-opus-5-5"
+      },
       "fallback_providers": [
         {
           "provider": "anthropic",
@@ -783,6 +791,10 @@
         "ponytail",
         "hermes-terminal-outcome-notification"
       ],
+      "auxiliary_models": {
+        "light_tasks": "claude-haiku-5-5",
+        "other_tasks": "claude-opus-5-5"
+      },
       "fallback_providers": [
         {
           "provider": "anthropic",
@@ -910,6 +922,10 @@
         "ponytail",
         "hermes-terminal-outcome-notification"
       ],
+      "auxiliary_models": {
+        "light_tasks": "claude-haiku-5-5",
+        "other_tasks": "claude-opus-5-5"
+      },
       "fallback_providers": [
         {
           "provider": "anthropic",
@@ -1036,6 +1052,10 @@
       "installed_disabled_plugins": [
         "hermes-terminal-outcome-notification"
       ],
+      "auxiliary_models": {
+        "light_tasks": "claude-haiku-5-5",
+        "other_tasks": "claude-opus-5-5"
+      },
       "fallback_providers": [
         {
           "provider": "anthropic",
@@ -1162,6 +1182,10 @@
       "installed_disabled_plugins": [
         "hermes-terminal-outcome-notification"
       ],
+      "auxiliary_models": {
+        "light_tasks": "claude-haiku-5-5",
+        "other_tasks": "claude-opus-5-5"
+      },
       "fallback_providers": [
         {
           "provider": "anthropic",
@@ -1289,6 +1313,10 @@
         "ponytail",
         "hermes-terminal-outcome-notification"
       ],
+      "auxiliary_models": {
+        "light_tasks": "claude-haiku-5-5",
+        "other_tasks": "claude-opus-5-5"
+      },
       "fallback_providers": [
         {
           "provider": "anthropic",
@@ -1416,6 +1444,10 @@
         "ponytail",
         "hermes-terminal-outcome-notification"
       ],
+      "auxiliary_models": {
+        "light_tasks": "claude-haiku-5-5",
+        "other_tasks": "claude-opus-5-5"
+      },
       "fallback_providers": [
         {
           "provider": "anthropic",
@@ -1542,6 +1574,10 @@
       "installed_disabled_plugins": [
         "hermes-terminal-outcome-notification"
       ],
+      "auxiliary_models": {
+        "light_tasks": "claude-haiku-5-5",
+        "other_tasks": "claude-opus-5-5"
+      },
       "fallback_providers": [
         {
           "provider": "anthropic",
@@ -1668,6 +1704,10 @@
       "installed_disabled_plugins": [
         "hermes-terminal-outcome-notification"
       ],
+      "auxiliary_models": {
+        "light_tasks": "claude-haiku-5-5",
+        "other_tasks": "claude-opus-5-5"
+      },
       "fallback_providers": [
         {
           "provider": "anthropic",
@@ -1795,6 +1835,10 @@
         "ponytail",
         "hermes-terminal-outcome-notification"
       ],
+      "auxiliary_models": {
+        "light_tasks": "claude-haiku-5-5",
+        "other_tasks": "claude-opus-5-5"
+      },
       "fallback_providers": [
         {
           "provider": "anthropic",
@@ -1922,6 +1966,10 @@
         "ponytail",
         "hermes-terminal-outcome-notification"
       ],
+      "auxiliary_models": {
+        "light_tasks": "claude-haiku-5-5",
+        "other_tasks": "claude-opus-5-5"
+      },
       "fallback_providers": [
         {
           "provider": "anthropic",
@@ -2048,6 +2096,10 @@
       "installed_disabled_plugins": [
         "hermes-terminal-outcome-notification"
       ],
+      "auxiliary_models": {
+        "light_tasks": "claude-haiku-5-5",
+        "other_tasks": "claude-opus-5-5"
+      },
       "fallback_providers": [
         {
           "provider": "anthropic",
@@ -2174,6 +2226,10 @@
       "installed_disabled_plugins": [
         "hermes-terminal-outcome-notification"
       ],
+      "auxiliary_models": {
+        "light_tasks": "claude-haiku-5-5",
+        "other_tasks": "claude-opus-5-5"
+      },
       "fallback_providers": [
         {
           "provider": "anthropic",
@@ -2301,6 +2357,10 @@
         "ponytail",
         "hermes-terminal-outcome-notification"
       ],
+      "auxiliary_models": {
+        "light_tasks": "claude-haiku-5-5",
+        "other_tasks": "claude-opus-5-5"
+      },
       "fallback_providers": [
         {
           "provider": "anthropic",
@@ -2428,6 +2488,10 @@
         "ponytail",
         "hermes-terminal-outcome-notification"
       ],
+      "auxiliary_models": {
+        "light_tasks": "claude-haiku-5-5",
+        "other_tasks": "claude-opus-5-5"
+      },
       "fallback_providers": [
         {
           "provider": "anthropic",
@@ -2554,6 +2618,10 @@
       "installed_disabled_plugins": [
         "hermes-terminal-outcome-notification"
       ],
+      "auxiliary_models": {
+        "light_tasks": "claude-haiku-5-5",
+        "other_tasks": "claude-opus-5-5"
+      },
       "fallback_providers": [
         {
           "provider": "anthropic",
@@ -2856,6 +2924,10 @@
       "installed_disabled_plugins": [
         "hermes-terminal-outcome-notification"
       ],
+      "auxiliary_models": {
+        "light_tasks": "claude-haiku-5-5",
+        "other_tasks": "claude-opus-5-5"
+      },
       "fallback_providers": [
         {
           "provider": "anthropic",
@@ -2983,6 +3055,10 @@
         "ponytail",
         "hermes-terminal-outcome-notification"
       ],
+      "auxiliary_models": {
+        "light_tasks": "claude-haiku-5-5",
+        "other_tasks": "claude-opus-5-5"
+      },
       "fallback_providers": [
         {
           "provider": "anthropic",
@@ -3110,6 +3186,10 @@
         "ponytail",
         "hermes-terminal-outcome-notification"
       ],
+      "auxiliary_models": {
+        "light_tasks": "claude-haiku-5-5",
+        "other_tasks": "claude-opus-5-5"
+      },
       "fallback_providers": [
         {
           "provider": "anthropic",
@@ -3236,6 +3316,10 @@
       "installed_disabled_plugins": [
         "hermes-terminal-outcome-notification"
       ],
+      "auxiliary_models": {
+        "light_tasks": "claude-haiku-5-5",
+        "other_tasks": "claude-opus-5-5"
+      },
       "fallback_providers": [
         {
           "provider": "anthropic",

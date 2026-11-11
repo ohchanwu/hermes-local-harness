@@ -55,17 +55,24 @@ class SwitchTests(unittest.TestCase):
         self.assertTrue(all(c[5] == "gpt-5.6-luna" for c in helpers))
         self.assertEqual(len(list((self.root / "profiles/worker-sol").glob("config.yaml.pre-switch-*"))), 1)
 
-    def test_fable_keeps_helpers_on_opus_and_default_profile_has_no_flag(self):
+    def test_fable_keeps_helpers_off_fable_and_default_profile_has_no_flag(self):
         (self.root / "config.yaml").write_text((self.root / "config.yaml").read_text() + "model:\n  default: x\n")
-        self.run_switch("--profile", "default", "--to", "claude-fable")
+        _, out = self.run_switch("--profile", "default", "--to", "claude-fable")
         calls = self.calls_made()
         self.assertTrue(all(c[0] == "config" for c in calls))
         _, _, fable_model, helper_model = switch.TARGETS["claude-fable"]
+        light_model = switch.LIGHT_HELPER_MODELS["claude-fable"]
         self.assertIn(["config", "set", "model.default", fable_model], calls)
-        helpers = [c for c in calls if c[2].startswith("auxiliary.") and c[2].endswith(".model")]
+        helpers = {c[2][len("auxiliary."):-len(".model")]: c[3] for c in calls
+                   if c[2].startswith("auxiliary.") and c[2].endswith(".model")}
         self.assertEqual(len(helpers), 16)
-        self.assertTrue(all(c[3] == helper_model for c in helpers))
-        self.assertNotEqual(helper_model, fable_model)  # the helpers keep their own model
+        # t_e7efc35f: the light tasks run on Haiku, the other tasks on the target's helper model.
+        self.assertEqual(helpers, {task: light_model if task in switch.LIGHT_HELPER_TASKS else helper_model
+                                   for task in switch.HELPER_TASKS})
+        self.assertEqual((light_model, helper_model), ("claude-haiku-5-5", "claude-opus-5-5"))
+        self.assertNotIn(fable_model, helpers.values())  # the helpers keep their own models
+        self.assertIn(f"helpers on {light_model} for the light tasks ({', '.join(switch.LIGHT_HELPER_TASKS)}) "
+                      f"and on {helper_model} for the other tasks; backup config.yaml.pre-switch-", out)
 
     def test_dispatch_add_and_remove(self):
         self.run_switch("--profile", "worker-sol", "--to", "gpt", "--dispatch", "add")

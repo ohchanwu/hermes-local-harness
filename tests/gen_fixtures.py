@@ -109,6 +109,19 @@ clean["profile_fallback_settings"] = {
                       for task, chain in profile.get("auxiliary_fallback_chain", {}).items()},
     }
     for profile in roster["profiles"] if profile.get("lifecycle") != "retired"}
+# Observed helper models of every non-retired roster profile that declares auxiliary_models,
+# as the roster declares them: the provider and model values inside `hermes config get --json
+# auxiliary`. The task lists come from scripts/verify-state (HELPER_TASKS, LIGHT_HELPER_TASKS).
+verifier_namespace: dict = {"__file__": str(ROOT / "scripts" / "verify-state"), "__name__": "gen_fixtures_verifier"}
+exec(compile((ROOT / "scripts" / "verify-state").read_text(), str(ROOT / "scripts" / "verify-state"), "exec"),
+     verifier_namespace)
+clean["profile_auxiliary_settings"] = {
+    profile["name"]: {"auxiliary": {
+        task: {"provider": provider, "model": model}
+        for task, (provider, model) in verifier_namespace["expected_auxiliary_models"](
+            profile["auxiliary_models"]).items()}}
+    for profile in roster["profiles"]
+    if profile.get("lifecycle") != "retired" and "auxiliary_models" in profile}
 clean["dispatch_profiles"] = copy.deepcopy(desired["kanban"]["dispatch_profiles"])
 clean["kanban"] = {key: copy.deepcopy(value) for key, value in desired["kanban"].items()
                    if key != "dispatch_profiles"}
@@ -209,6 +222,20 @@ def fallback_drift(d):
 
 
 write("fallback-drift.yaml", delta(fallback_drift))
+
+
+def auxiliary_model_drift(d):
+    # One profile still has a light task on the other-task model (helpers not switched yet);
+    # another has a light task on a different provider; a third has an unset other-task model;
+    # a fourth cannot report its auxiliary mapping.
+    settings = d["profile_auxiliary_settings"]
+    settings["harness-worker"]["auxiliary"]["title_generation"]["model"] = "claude-opus-5-5"
+    settings["jss-reviewer"]["auxiliary"]["vision"]["provider"] = "anthropic"
+    del settings["advisor"]["auxiliary"]["compression"]["model"]
+    del settings["anki-worker"]["auxiliary"]
+
+
+write("auxiliary-model-drift.yaml", delta(auxiliary_model_drift))
 
 
 def rogue(d):

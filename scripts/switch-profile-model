@@ -8,7 +8,10 @@
     scripts/switch-profile-model --profile jobcron-worker --clear-fallbacks
 
 Backs up the profile's config.yaml first, then uses `hermes config set` for
-model.provider, model.default, model.base_url and every auxiliary helper task.
+model.provider, model.default, model.base_url and the provider and model of every
+auxiliary helper task. For claude-opus and claude-fable the LIGHT_HELPER_TASKS
+tasks of scripts/verify-state get claude-haiku-5-5 and the other helper tasks
+claude-opus-5-5; for gpt and glm every helper task gets the main model.
 It also updates the profile's model/provider expectation in the roster.yaml of
 the repository checkout it runs from (or --roster), so scripts/verify-state does
 not go stale; that roster change must then be committed. --dry-run prints both
@@ -43,14 +46,19 @@ def load_verifier():
 
 VERIFIER = load_verifier()
 
-# Each target: provider, base URL, default main model, and the helper model.
+# Each target: provider, base URL, default main model, and the helper model of the
+# helper tasks outside LIGHT_HELPER_TASKS (None: the main model).
 TARGETS = {
     "claude-opus": ("claude-subscription", "acp://claude-subscription", "claude-opus-5-5", "claude-opus-5-5"),
     "claude-fable": ("claude-subscription", "acp://claude-subscription", "claude-fable-5-2", "claude-opus-5-5"),
     "gpt": ("openai-codex", "https://chatgpt.com/backend-api/codex", "gpt-5.6-sol", None),
     "glm": ("zai", "https://api.z.ai/api/coding/paas/v4", "glm-5.3", None),
 }
+# The helper model of the LIGHT_HELPER_TASKS tasks per target (card t_e7efc35f); a target
+# not named here uses its other-task helper model for them as well.
+LIGHT_HELPER_MODELS = {"claude-opus": "claude-haiku-5-5", "claude-fable": "claude-haiku-5-5"}
 HELPER_TASKS = VERIFIER.HELPER_TASKS
+LIGHT_HELPER_TASKS = VERIFIER.LIGHT_HELPER_TASKS
 DISPATCH = re.compile(r"^  dispatch_profiles:(?: \[\])?\n((?:    - .*\n)*)", re.M)
 
 
@@ -58,13 +66,36 @@ def home_of(root, profile):
     return root if profile == "default" else root / "profiles" / profile
 
 
+def helper_models(target, model):
+    """(light-task helper model, other-task helper model) of a target; model is the main model."""
+    other = TARGETS[target][3] or model
+    return LIGHT_HELPER_MODELS.get(target, other), other
+
+
 def settings(target, model):
-    provider, base_url, default_model, helper_model = TARGETS[target]
+    provider, base_url, default_model, _ = TARGETS[target]
     model = model or default_model
+    light, other = helper_models(target, model)
     pairs = [("model.provider", provider), ("model.default", model), ("model.base_url", base_url)]
     for task in HELPER_TASKS:
-        pairs += [(f"auxiliary.{task}.provider", provider), (f"auxiliary.{task}.model", helper_model or model)]
+        pairs += [(f"auxiliary.{task}.provider", provider),
+                  (f"auxiliary.{task}.model", light if task in LIGHT_HELPER_TASKS else other)]
     return pairs
+
+
+def auxiliary_models_note(roster_path, profile, entry, target, model):
+    """A reminder when the roster entry's auxiliary_models declaration differs from the helper
+    models this switch writes, or None when they agree or the entry declares none."""
+    declared = entry.get("auxiliary_models")
+    if declared is None:
+        return None
+    provider = TARGETS[target][0]
+    light, other = helper_models(target, model)
+    if provider == VERIFIER.AUXILIARY_MODEL_PROVIDER and declared == {"light_tasks": light, "other_tasks": other}:
+        return None
+    return (f"roster: {roster_path} declares auxiliary_models {json.dumps(declared)} for {profile}, but this "
+            f"switch writes {light} for the light tasks and {other} for the other tasks on {provider}: "
+            "update or remove that declaration, or scripts/verify-state reports auxiliary model drift")
 
 
 def fallback_settings(entry, clear):
@@ -136,7 +167,7 @@ def main(argv=None):
     if not args.roster.is_file():
         parser.error(f"no roster at {args.roster}")
     change = roster_change(args.roster, args.profile)
-    pairs, roster_note, fallback_note = [], None, None
+    pairs, roster_note, auxiliary_note, fallback_note = [], None, None, None
     if args.to:
         pairs = settings(args.to, args.model)
         provider, model = pairs[0][1], pairs[1][1]
@@ -146,6 +177,7 @@ def main(argv=None):
             old_model, old_provider = change[2]
             roster_note = (f"roster: {args.roster} {args.profile} model {old_model} -> {model}, "
                            f"provider {old_provider} -> {provider}")
+            auxiliary_note = auxiliary_models_note(args.roster, args.profile, change[1], args.to, model)
     if args.apply_fallbacks:
         if change is None:
             parser.error(f"--apply-fallbacks: {args.profile} is not declared in {args.roster}")
@@ -169,7 +201,7 @@ def main(argv=None):
         print("live:")
         for key, value in pairs:
             print(" ".join(prefix + ["config", "set", key, value]))
-        for note in (roster_note, fallback_note):
+        for note in (roster_note, auxiliary_note, fallback_note):
             if note:
                 print(note + " (dry run: nothing written)")
         return 0
@@ -180,7 +212,9 @@ def main(argv=None):
     if args.dispatch:
         set_dispatch(args.home_root / "config.yaml", args.profile, args.dispatch)
     if args.to:
-        print(f"{args.profile}: {args.to} ({pairs[1][1]}); helpers on {pairs[4][1]}; backup {backup.name}")
+        light, other = helper_models(args.to, pairs[1][1])
+        print(f"{args.profile}: {args.to} ({pairs[1][1]}); helpers on {light} for the light tasks "
+              f"({', '.join(LIGHT_HELPER_TASKS)}) and on {other} for the other tasks; backup {backup.name}")
         if change is not None:
             roster, entry, _ = change
             entry["model"], entry["provider"] = pairs[1][1], pairs[0][1]
@@ -188,6 +222,8 @@ def main(argv=None):
             print(roster_note)
             print("commit the roster.yaml change (and keep it inside the owner model policy), "
                   "or scripts/verify-state reports model drift")
+            if auxiliary_note:
+                print(auxiliary_note)
         else:
             print(roster_note)
         if TARGETS[args.to][0] == "claude-subscription":

@@ -20,6 +20,7 @@ mode alone resolves to the tracked source's sha256 at check time
 Retired roster profiles are excluded from shared-skill deployment checks.
 """
 import argparse
+import ast
 import hashlib
 import json
 import math
@@ -409,6 +410,13 @@ def check_model_policy(errors, roster):
 HELPER_TASKS = ("vision", "compression", "skills_hub", "approval", "review", "mcp", "title_generation",
                 "memory_query_rewrite", "tts_audio_tags", "triage_specifier", "kanban_decomposer",
                 "profile_describer", "goal_judge", "curator", "monitor", "background_review")
+# The light auxiliary tasks (owner decision of 2026-11-11, card t_e7efc35f): they only
+# generate titles, query rewrites, audio tags, descriptions, skill hub text or image
+# descriptions, so they run on a smaller model than the other HELPER_TASKS. This tuple is
+# the one definition; scripts/switch-profile-model imports it, and every element must be
+# a member of HELPER_TASKS (light_helper_task_errors).
+LIGHT_HELPER_TASKS = ("title_generation", "memory_query_rewrite", "tts_audio_tags", "profile_describer",
+                      "skills_hub", "vision")
 FALLBACK_PROVIDER_FIELDS = ("provider", "model")
 FALLBACK_CHAIN_FIELDS = ("provider", "model", "timeout")
 CREDENTIAL_NAME_PARTS = ("key", "token", "secret")
@@ -528,6 +536,128 @@ def check_fallback_settings(errors, roster, read):
             if not fallback_matches(actual, want):
                 fail(errors, f"fallback drift {name} auxiliary.{task}.fallback_chain: expected "
                              f"{fallback_display(want)}, actual {fallback_display(actual)}")
+
+
+# Helper models per auxiliary task (card t_e7efc35f, procedures/haiku-helper-routing.md).
+# A roster profile entry may declare `auxiliary_models`, an object with exactly two keys:
+# `light_tasks` (the model of every LIGHT_HELPER_TASKS task) and `other_tasks` (the model
+# of every other HELPER_TASKS task). Both values must be model ids in the claude-subscription
+# allowlist (MODELS in plugins/model-providers/claude-subscription/compat.py), and the entry's
+# own `provider` must be claude-subscription, which is then the expected provider of every
+# task. The expected Hermes keys are auxiliary.<task>.provider and auxiliary.<task>.model.
+# A profile without the field (the default profile, GLM and retired profiles) has no
+# helper model expectation.
+AUXILIARY_MODEL_GROUPS = ("light_tasks", "other_tasks")
+AUXILIARY_MODEL_PROVIDER = "claude-subscription"
+CLAUDE_SUBSCRIPTION_COMPAT = ROOT / "plugins/model-providers/claude-subscription/compat.py"
+
+
+def claude_subscription_models(path=CLAUDE_SUBSCRIPTION_COMPAT):
+    """The model ids of MODELS in the claude-subscription compat.py, read as a literal
+    (the file is parsed, never executed); None when the file or the literal is unreadable."""
+    try:
+        tree = ast.parse(Path(path).read_text())
+    except (OSError, SyntaxError, ValueError):
+        return None
+    for node in tree.body:
+        if (isinstance(node, ast.Assign) and len(node.targets) == 1
+                and isinstance(node.targets[0], ast.Name) and node.targets[0].id == "MODELS"):
+            try:
+                models = ast.literal_eval(node.value)
+            except ValueError:
+                return None
+            return frozenset(models) if isinstance(models, dict) else None
+    return None
+
+
+def light_helper_task_errors(light_tasks=None, helper_tasks=None):
+    """Errors of the shared light-task definition: each task once, each one a HELPER_TASKS task."""
+    light_tasks = LIGHT_HELPER_TASKS if light_tasks is None else light_tasks
+    helper_tasks = HELPER_TASKS if helper_tasks is None else helper_tasks
+    errors = [f"light helper task definition invalid: {task!r} is not an auxiliary task in HELPER_TASKS"
+              for task in light_tasks if task not in helper_tasks]
+    if len(set(light_tasks)) != len(light_tasks):
+        errors.append("light helper task definition invalid: a task is listed more than once")
+    if not light_tasks:
+        errors.append("light helper task definition invalid: no task listed")
+    return errors
+
+
+def auxiliary_model_declaration_errors(profile, allowed_models):
+    """Roster schema errors of one profile entry's auxiliary_models declaration (empty when
+    valid or absent). allowed_models is the claude-subscription allowlist, or None when unreadable."""
+    if "auxiliary_models" not in profile:
+        return []
+    prefix = f"auxiliary model declaration invalid {profile.get('name')}"
+    declared = profile["auxiliary_models"]
+    if not isinstance(declared, dict):
+        return [f"{prefix}: expected an object with the keys {' and '.join(AUXILIARY_MODEL_GROUPS)}"]
+    errors = [f"{prefix}: unknown key {key!r} (allowed: {', '.join(AUXILIARY_MODEL_GROUPS)})"
+              for key in declared if key not in AUXILIARY_MODEL_GROUPS]
+    if allowed_models is None:
+        errors.append(f"{prefix}: the claude-subscription allowlist (MODELS in "
+                      f"{CLAUDE_SUBSCRIPTION_COMPAT.relative_to(ROOT)}) is unreadable")
+    for key in AUXILIARY_MODEL_GROUPS:
+        model = declared.get(key)
+        if not isinstance(model, str) or not model.strip():
+            errors.append(f"{prefix}: {key} must be a non-empty model id")
+        elif allowed_models is not None and model not in allowed_models:
+            errors.append(f"{prefix}: {key} model {model!r} is not in the claude-subscription allowlist")
+    if profile.get("provider") != AUXILIARY_MODEL_PROVIDER:
+        errors.append(f"{prefix}: the profile provider {profile.get('provider')!r} is not "
+                      f"{AUXILIARY_MODEL_PROVIDER}")
+    return errors
+
+
+def check_auxiliary_model_declarations(errors, roster, allowed_models):
+    for message in light_helper_task_errors():
+        fail(errors, message)
+    for profile in roster.get("profiles", []):
+        if isinstance(profile, dict):
+            for message in auxiliary_model_declaration_errors(profile, allowed_models):
+                fail(errors, message)
+
+
+def expected_auxiliary_models(declaration):
+    """task -> (provider, model) for every HELPER_TASKS task of a valid auxiliary_models declaration."""
+    return {task: (AUXILIARY_MODEL_PROVIDER,
+                   declaration["light_tasks"] if task in LIGHT_HELPER_TASKS else declaration["other_tasks"])
+            for task in HELPER_TASKS}
+
+
+def setting_display(value):
+    """An observed provider or model value as a drift message shows it."""
+    if value is None:
+        return "unset"
+    return value if isinstance(value, str) else f"<{type(value).__name__}>"
+
+
+def check_auxiliary_models(errors, roster, read, allowed_models):
+    """Compare auxiliary.<task>.provider and auxiliary.<task>.model of every non-retired roster
+    profile that declares auxiliary_models with that declaration. read(profile, key) is
+    json_config live and fixture_setting_reader over the fixture's profile_auxiliary_settings;
+    the auxiliary mapping is read once per profile."""
+    if light_helper_task_errors():
+        return  # check_auxiliary_model_declarations reports the invalid definition
+    for profile in roster.get("profiles", []):
+        if (not isinstance(profile, dict) or profile.get("lifecycle") == RETIRED_LIFECYCLE
+                or "auxiliary_models" not in profile):
+            continue
+        if auxiliary_model_declaration_errors(profile, allowed_models):
+            continue  # check_auxiliary_model_declarations reports the invalid declaration
+        name = profile.get("name")
+        auxiliary = read(name, "auxiliary")
+        if auxiliary is UNREADABLE or not isinstance(auxiliary, dict):
+            fail(errors, f"auxiliary model drift {name} auxiliary: expected a readable auxiliary mapping, actual "
+                         f"{'<unreadable>' if auxiliary is UNREADABLE else '<' + type(auxiliary).__name__ + '>'}")
+            continue
+        for task, wanted in expected_auxiliary_models(profile["auxiliary_models"]).items():
+            section = auxiliary.get(task)
+            for field, want in zip(("provider", "model"), wanted):
+                actual = section.get(field) if isinstance(section, dict) else None
+                if not same_setting_value(actual, want):
+                    fail(errors, f"auxiliary model drift {name} auxiliary.{task}.{field}: expected {want}, "
+                                 f"actual {setting_display(actual)}")
 
 
 def check_fleet_dispatch(errors, label, fleets, profiles, exact=False):
@@ -1952,6 +2082,8 @@ def main():
     check_retired_profiles(errors, roster)
     check_model_policy(errors, roster)
     check_fallback_declarations(errors, roster)
+    allowed_models = claude_subscription_models()
+    check_auxiliary_model_declarations(errors, roster, allowed_models)
     check_retired_dispatch(errors, "desired dispatch_profiles", dispatch_profiles, retired)
     fleets = snapshot.get("project_isolation")
     check_fleet_dispatch(errors, "desired dispatch_profiles", fleets, dispatch_profiles)
@@ -1968,7 +2100,7 @@ def main():
             return 2
         # Fail-closed fixture schema: a passing fixture must represent every required
         # observed field and every installed roster profile; omission is drift, not success.
-        for section in ("profile_models", "profile_providers", "profile_approval_modes", "plugins", "dispatch_profiles", "kanban", "skill_files", "profile_local_skill_overrides", "profile_soul_hashes", "repository_policy_hashes", "adapters", "terminal_notification_runtime", "terminal_retry_policy", "project_isolation", "project_repair_policy", "project_repair_cards", "profile_managed_settings", "profile_fallback_settings"):
+        for section in ("profile_models", "profile_providers", "profile_approval_modes", "plugins", "dispatch_profiles", "kanban", "skill_files", "profile_local_skill_overrides", "profile_soul_hashes", "repository_policy_hashes", "adapters", "terminal_notification_runtime", "terminal_retry_policy", "project_isolation", "project_repair_policy", "project_repair_cards", "profile_managed_settings", "profile_fallback_settings", "profile_auxiliary_settings"):
             if section not in observed:
                 fail(errors, f"incomplete fixture: missing required section '{section}'")
         # None is a live/desired-only sentinel in these helpers, not a fixture
@@ -2019,6 +2151,8 @@ def main():
         check_managed_setting_groups(errors, roster, fleets, expected,
                                      fixture_setting_reader(observed.get("profile_managed_settings")))
         check_fallback_settings(errors, roster, fixture_setting_reader(observed.get("profile_fallback_settings")))
+        check_auxiliary_models(errors, roster, fixture_setting_reader(observed.get("profile_auxiliary_settings")),
+                               allowed_models)
         plugins = observed.get("plugins", {})
         check_terminal_notification_observed(errors, plugins, snapshot["terminal_notification"]["producer_profiles"])
         check_terminal_notification_runtime(errors, observed.get("terminal_notification_runtime", {}),
@@ -2088,6 +2222,7 @@ def main():
                                   profile.get("installed_disabled_plugins"))
         check_managed_setting_groups(errors, roster, fleets, expected, json_config)
         check_fallback_settings(errors, roster, json_config)
+        check_auxiliary_models(errors, roster, json_config, allowed_models)
         check_live_terminal_notification_runtime(errors, snapshot["terminal_notification"]["producer_profiles"])
         for key, want in snapshot["kanban"].items():
             actual = json_config("default", f"kanban.{key}")

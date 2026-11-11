@@ -2,8 +2,8 @@
 
 Repository source only. No live installation, profile/model change or rollout
 has been performed. Provider name: `claude-subscription`; models: the exact ids
-allowlisted in `compat.MODELS` (currently `claude-opus-5-5`, `claude-fable-5-1`
-and `claude-fable-5-2`). It does not
+allowlisted in `compat.MODELS` (currently `claude-opus-5-5`, `claude-fable-5-1`,
+`claude-fable-5-2` and `claude-haiku-5-5`). It does not
 replace `anthropic` or the native `claude-code` alias. Independent review of the
 local candidate is still required. Design: [hardening specification](../../../docs/specs/261017-claude-subscription-provider-hardening.md).
 
@@ -385,6 +385,27 @@ changes on 2026-11-11 KST:
   --usage-file ...`: reply `OK`, provider `claude-subscription`, model
   `claude-fable-5-2`, 1 main API call (input 2, output 4, cache write 19216
   tokens).
+
+### Claude Haiku 5.5 allowlist entry (2026-11-11 KST, repository only)
+
+`claude-haiku-5-5` is in `compat.MODELS` (card t_e7efc35f). The id is the
+newest Haiku id in the live Anthropic model id list of 2026-11-11 (card
+t_731d4476, `procedures/anthropic-api-fallback.md`), and the owner confirmed it
+on 2026-11-11 (card t_6996b4d0). Installed Hermes has no built-in
+`claude-haiku` context entry, so its `context_length` 1000000 is the context
+window of 1M tokens (1,000,000) stated on the Anthropic model page
+<https://platform.claude.com/docs/en/models/haiku-5-5/overview>, read by the
+controller on 2026-11-11; it is not a live measurement.
+
+The entry is for six light auxiliary helper tasks: `title_generation`,
+`memory_query_rewrite`, `tts_audio_tags`, `profile_describer`, `skills_hub` and
+`vision` (`LIGHT_HELPER_TASKS` in `scripts/verify-state`). The other ten helper
+tasks stay on `claude-opus-5-5`. `roster.yaml` declares this split for the 21
+claude-subscription profiles in the field `auxiliary_models`, and
+`scripts/switch-profile-model --to claude-opus` or `--to claude-fable` writes
+it. No live profile and no installed plugin copy changed with this card; the
+live steps are in `procedures/haiku-helper-routing.md`. Until a later card
+applies them, the live helpers stay on `claude-opus-5-5` as described above.
 
 ## Manual setup and rollback reference
 
