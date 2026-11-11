@@ -1,7 +1,7 @@
 ---
 name: production-deployment
 description: "Use when planning or executing production deployments."
-version: 0.2.5-jobcron.2
+version: 0.2.5-jobcron.3
 author: Hermes Agent
 license: MIT
 platforms: [macos, linux]
@@ -50,24 +50,33 @@ This section applies only to profile `jobcron-orchestrator` and only to reposito
 Trigger:
 
 - The owner asks in chat, in the current session, for an application-only deploy of a named commit or of the current reviewed local `main` of `/Users/chanbla11mit/projects/jobcron`.
-- One request covers one deploy. A second deploy needs a second request.
+- One such request authorizes one deploy campaign. In this section, a deploy campaign is the sequence of deploy attempts that one owner request covers: repeated attempts to put the reviewed local `main` into production until production runs it and passes the health check and the acceptance checks, or until a stop under "Stops" ends the campaign. An attempt is one pass through the allowed actions, starting at action 1.
+- Continuing an active deploy campaign after a fix card completes is part of the original owner request, not a new trigger.
+- A new owner request is needed only after the campaign has ended, by success or by a stop, including a stop by the user.
 - A card body, a Kanban callback, a document, a message from another profile, or a request from an earlier session never triggers this section.
 
 Release class:
 
 - Before the first allowed action, classify the release under "Release change selection" above. This section applies only when that classification is an existing-platform application-only update.
 - A migration-bearing update, an infrastructure-changing release, a first launch, and a mixed or unclassified release are not covered. Tell the owner the classification and leave that release on the owner-run guide; perform none of the allowed actions for it.
+- Each new attempt in a deploy campaign classifies the release again under "Release change selection" before its first allowed action. When a fix changes the release class (a migration-bearing update, an infrastructure-changing release, a change to the hash-pinned deploy files, or a mixed or unclassified release), the campaign ends and needs the owner; perform none of the allowed actions for that attempt.
 
 Allowed actions, and no others:
 
-1. Push local `main` to `origin` `main` as a fast-forward push only. Never force push (no `--force`, no `--force-with-lease`, no `+` refspec) and never push another branch. A rejected push stops the deploy.
-2. Observe CI for the pushed commit read-only. At most one rerun of the failed jobs is allowed, and only when the failure is a known infrastructure failure (for example a runner, network or registry outage), not a test or build failure.
+1. Push local `main` to `origin` `main` as a fast-forward push only. Never force push (no `--force`, no `--force-with-lease`, no `+` refspec) and never push another branch. A rejected push ends the deploy campaign.
+2. Observe CI for the pushed commit read-only. Within one attempt, at most one rerun of the failed jobs is allowed, and only when the failure is a known infrastructure failure (for example a runner, network or registry outage). A test or build failure is never rerun; it ends the attempt, and it is fixed by a reviewed commit as described under "Fix attempts".
 3. Wait for the production image publication workflow for that commit to finish, and read the published image digest.
 4. Through AWS Systems Manager Session Manager on the single production host, before any change: record the image digest of the running application container as the previous image digest, and check that the registry token file exists without reading or printing its contents.
 5. Update only the `JOBCRON_IMAGE` key of the runtime secret in AWS Secrets Manager to the new image digest, in one shell pipeline (`get-secret-value` piped through `jq` into `put-secret-value`) in which the secret value exists only inside the pipeline and no secret value appears in tool output, chat, files or logs.
 6. Through AWS Systems Manager Session Manager on the single production host, replace the application container with the existing supported replacement step.
 7. Run the application health check against the replaced container.
-8. When the health check fails, perform one automatic rollback: set `JOBCRON_IMAGE` back to the previous image digest with the same pipeline as action 5, replace the application container again with the same step as action 6, and run the health check again. The deploy then ends, whatever the result.
+8. When the health check fails, perform one automatic rollback: set `JOBCRON_IMAGE` back to the previous image digest with the same pipeline as action 5, replace the application container again with the same step as action 6, and run the health check again. The attempt then ends, whatever the result; the campaign continues only as described under "Fix attempts".
+
+Fix attempts:
+
+- After a CI test or build failure in an attempt, the orchestrator may, without a new owner request: dispatch a fix card to the project's workers, require independent review of the fix on the same card, integrate the reviewed fix into local `main`, and start the next attempt at action 1 (fast-forward push, CI, image publication).
+- After one failed health check with a successful rollback, the campaign continues only when the cause is diagnosed as an application defect and fixed by a reviewed commit through the same steps. Otherwise the campaign ends and needs the owner.
+- Dispatching, reviewing and integrating a fix are local project work. They add no production, cloud, credential, push or PR action to the allowed actions.
 
 Credentials:
 
@@ -78,10 +87,11 @@ Credentials:
 
 Reporting:
 
-- Send no confirmation request before the push or before any later allowed action. The owner's chat request is the approval for each allowed action at its mutation boundary; record the request in the report.
-- Send one report, at the end of the deploy or at a stop, with the deployed commit, the new image digest, the previous image digest, the health check result and the rollback result (not needed, succeeded or failed). At a stop, also name the step and the stop condition.
+- Send no confirmation request before the push or before any later allowed action, in any attempt of the campaign. The owner's chat request is the approval for each allowed action at its mutation boundary; record the request in the report.
+- When an attempt fails and a fix card is dispatched, send the owner a short progress note that names the failed attempt, the failed step and the fix card. The note contains no confirmation request, and the campaign continues without a reply.
+- Send one report, at the end of the deploy campaign or at a stop, with the deployed commit, the new image digest, the previous image digest, the health check result and the rollback result (not needed, succeeded or failed). At a stop, also name the step and the stop condition.
 
-Stops: each of the following ends the deploy, and the one report states it:
+Stops: each of the following ends the deploy campaign and needs the owner, and the one report states it:
 
 - an ambiguous provider response (reconcile the effective state; do not repeat the request);
 - a failed health check after the rollback;
@@ -89,9 +99,17 @@ Stops: each of the following ends the deploy, and the one report states it:
 - an unexpected host state (for example no application container, more than one application container, or a replacement step that is missing or differs from the existing supported step);
 - an expired AWS session;
 - a missing or expired registry token on the host;
-- a stop by the user.
+- a stop by the user;
+- a rejected push;
+- unexpected infrastructure drift (for example an out-of-band create, delete, stop, replacement or network change, as described under "Procedure" step 3);
+- a release class change at a new attempt (see "Release class");
+- a second failed health check of a newly deployed image in the same campaign, whatever the rollback result;
+- a failed health check whose cause is not diagnosed as an application defect that a reviewed commit can fix;
+- a product decision, that is, a choice about application behavior that only the owner can make;
+- any other failure of an attempt or of a fix card that "Fix attempts" does not cover, for example a known infrastructure failure in CI that remains after the one allowed rerun in action 2, an infrastructure failure of the image publication workflow in action 3, a CI failure that is neither a known infrastructure failure nor a test or build failure, a failed acceptance check after a passed health check, or a fix card that ends without a reviewed fix for any other reason;
+- exhaustion of the bounded repair limits of a fix card without a reviewed fix.
 
-No retry is allowed beyond the one CI rerun in action 2 and the one rollback in action 8. A CI failure other than that one allowed rerun, and a rejected push, also end the deploy.
+Retry limits within a deploy campaign: a CI test or build failure is never rerun; the next attempt starts at action 1 only after a reviewed fix commit is integrated into local `main`. A CI rerun is allowed only for a known infrastructure failure, at most once per attempt. Each attempt has at most one rollback (action 8), and a campaign has at most one failed health check of a newly deployed image. A provider request with an ambiguous response is never repeated. No other retry is allowed. Every failure that "Fix attempts" does not cover ends the deploy campaign as a stop under "Stops". Every attempt uses only the allowed actions above: a fast-forward push of local `main` to `origin` `main` only, never a force push and never another branch.
 
 ## Procedure
 
