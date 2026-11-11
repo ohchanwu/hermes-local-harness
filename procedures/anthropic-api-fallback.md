@@ -1,15 +1,15 @@
-# Anthropic API fallback for the Jobcron profiles
+# Anthropic API fallback for the claude-subscription profiles
 
-Procedure owner: harness board. Card `t_54fc49fb` added the repository mechanism and this procedure. The live configuration, the model identifiers and the live test are done on later cards, after the owner has added the API key.
+Procedure owner: harness board. Card `t_54fc49fb` added the repository mechanism and this procedure. The live configuration, the model identifiers and the live test are done on later cards, after the owner has added the API key. Sections 1 to 7 describe the four Jobcron profiles. Section 8 extends the fallback to the 18 other claude-subscription profiles.
 
 Hermes facts below were read from the installed Hermes source at commit `9cf7960f` (`~/.hermes/hermes-agent`). Re-read them after a Hermes upgrade.
 
 ## 1. Owner decision and scope
 
 - **Decision.** Owner, Telegram, 2026-11-09: "Harness change request: Anthropic API fallback behind the Claude subscription for the Jobcron fleet."
-- **Scope.** Only `jobcron-orchestrator`, `jobcron-worker`, `jobcron-worker-2` and `jobcron-reviewer`. These four profiles keep `claude-subscription` as the primary provider. They gain a fallback provider: the native Hermes `anthropic` provider.
-- **Payment.** The fallback is paid from USD 200 of Anthropic Console promotional credits. The credits expire on 2026-11-19. After that date, follow section 7.
-- **Recorded override.** `plugins/model-providers/claude-subscription/README.md` says "never configure an API-key substitute for this provider". It also says "pause on failure rather than silently substituting a provider". For these four profiles only, and only until the revert in section 7, the owner's decision overrides both statements. The README is unchanged. Every other profile keeps both rules.
+- **Scope.** `jobcron-orchestrator`, `jobcron-worker`, `jobcron-worker-2` and `jobcron-reviewer`, and since the owner decision of 2026-11-11 also the 18 profiles listed in section 8. These profiles keep `claude-subscription` as the primary provider. They gain a fallback provider: the native Hermes `anthropic` provider.
+- **Payment.** The fallback is paid from Anthropic API credits. USD 200 of Anthropic Console promotional credits expire on 2026-11-19. For what happens after that date, see section 8, "Credit behaviour and owner decision".
+- **Recorded override.** `plugins/model-providers/claude-subscription/README.md` says "never configure an API-key substitute for this provider". It also says "pause on failure rather than silently substituting a provider". For the four Jobcron profiles and the 18 profiles in section 8 only, and only until a revert under section 7, the owner's decision overrides both statements. The README is unchanged. Every other profile keeps both rules.
 
 ## 2. Hermes configuration keys
 
@@ -179,7 +179,9 @@ Authority: owner, Telegram 2026-11-09 (apply to the four profiles after a backup
    - During the run Hermes ran its own Python dependency sync: stderr printed "Installing Python dependencies", and `logs/update_receipts/latest.json` in the `jobcron-worker` profile records `kind` `sync`, outcome `ok`, from 02:21:39 to 02:21:45 UTC. This card did not start an install; the sync was started by Hermes.
    - After the run, `hermes -p jobcron-worker config get model.default` is still `claude-opus-5-5`, and `model.provider` is still `claude-subscription`.
 
-## 7. Revert after 2026-11-19
+## 7. Revert
+
+Owner decision, 2026-11-11: the fallback stays configured after 2026-11-19 (section 8, "Credit behaviour and owner decision"). Run this section only after a new owner decision to remove the fallback.
 
 1. For each of the four profiles, preview and then clear the fallback values:
 
@@ -201,3 +203,82 @@ Authority: owner, Telegram 2026-11-09 (apply to the four profiles after a backup
    - Then `hermes -p <profile> auth list anthropic` must list no entry with source `env:ANTHROPIC_API_KEY`.
 4. The owner deletes (revokes) the key in the Anthropic Console, under API keys.
 5. Run `scripts/verify-state`. The expected result is no `fallback drift` line, and `hermes -p <profile> config get --json fallback_providers` prints `[]` for each profile.
+
+## 8. The 18 other claude-subscription profiles
+
+Card `t_875f53f3` (repository step, no live change). A later card applies the values to the live profiles.
+
+- **Owner decision.** Owner, Telegram, 2026-11-11: "Fallback all plus main. I want to keep it as a backup, but I'm not going to fill it up myself. I want to keep it just in case Claude adds more credits or I get credits somehow."
+- **Profiles.** `default`, `advisor`; `chapt-orchestrator`, `chapt-worker`, `chapt-worker-2`, `chapt-reviewer`; `harness-orchestrator`, `harness-worker`, `harness-worker-2`, `harness-reviewer`; `jss-orchestrator`, `jss-worker`, `jss-worker-2`, `jss-reviewer`; `anki-orchestrator`, `anki-worker`, `anki-worker-2`, `anki-reviewer`. The GLM (`zai`) profiles and the retired entries get no fallback declaration.
+
+### Declared values
+
+| Profile | `fallback_providers` |
+|---|---|
+| `advisor`, `chapt-reviewer`, `harness-reviewer`, `jss-reviewer`, `anki-reviewer` | `[{"provider": "anthropic", "model": "claude-fable-5-2"}]` |
+| the other 13 profiles | `[{"provider": "anthropic", "model": "claude-opus-5-5"}]` |
+
+`auxiliary_fallback_chain` is the same for all 18 profiles as for the four Jobcron profiles (the auxiliary task table in section 6): `claude-haiku-5-5` for the six tasks `title_generation`, `memory_query_rewrite`, `tts_audio_tags`, `profile_describer`, `skills_hub` and `vision`, and `claude-opus-5-5` for the other ten tasks, all with provider `anthropic` and no `timeout`.
+
+On 2026-11-11 each of the 18 profiles had exactly the sixteen auxiliary tasks of `HELPER_TASKS`, each with provider `claude-subscription` and model `claude-opus-5-5`. None had `fallback_providers`, `fallback_model` or a non-empty `fallback_chain`, and none had `auth.adopt_external_logins` set (the default `true` applies). These values were read by key name from each `config.yaml` (`~/.hermes/config.yaml` for `default`), without running Hermes. The auxiliary task list therefore does not differ from the Jobcron list.
+
+### Credential: the 17 named profiles (the owner does this)
+
+Run the three commands below in zsh, once, in one terminal. They work in the same way as section 4 step 2: `read -rs` keeps the key only in the shell variable `K`, and each `config set` writes it to the `.env` file of that profile.
+
+```zsh
+read -rs "K?Anthropic API key: "; echo
+for p in advisor chapt-orchestrator chapt-worker chapt-worker-2 chapt-reviewer harness-orchestrator harness-worker harness-worker-2 harness-reviewer jss-orchestrator jss-worker jss-worker-2 jss-reviewer anki-orchestrator anki-worker anki-worker-2 anki-reviewer; do hermes -p "$p" config set ANTHROPIC_API_KEY "$K"; done
+unset K
+```
+
+Section 4 steps 3 to 5 apply unchanged to these 17 profiles. Then, for each of the 17 profiles, run `hermes -p <profile> auth list anthropic`. The expected output is one entry, with label `ANTHROPIC_API_KEY` and source `env:ANTHROPIC_API_KEY`. If an entry with another source is listed, do not continue with the live apply steps below for that profile, and report it to the owner (section 4 step 6).
+
+### Credential: the default profile
+
+**Result: default profile: no supported key location without the root .env; owner decision needed.**
+
+The owner decided on 2026-11-11: the default profile gets the fallback values and no key (item 4).
+
+1. **The root `.env` stays forbidden.** The `.env` file of the default profile is `~/.hermes/.env`. Section 4 step 5 forbids writing the key there, because the gateway process of the default profile loads that file into the environment that it shares with every profile it serves. That prohibition stays.
+2. **What `hermes auth add anthropic --type api-key` does in the default profile (read from source, not run).**
+   - Which profile a `hermes` command without `-p` uses depends on its environment (`_apply_profile_override`, `hermes_cli/main.py:594-626`). If the environment variable `HERMES_HOME` names a directory whose parent directory is named `profiles`, the command uses that profile (lines 607-609). Every terminal of a dispatched worker or reviewer has `HERMES_HOME` set in this way, for example `~/.hermes/profiles/harness-worker`. Otherwise the command uses the default profile, unless the file `~/.hermes/active_profile` names another profile (lines 611-624); that file is not read when `HERMES_SUPERVISED_CHILD` is set, which is the case in a dispatched session (`_under_gateway_supervisor`, line 557). On 2026-11-11 that file did not exist. With `-p default` a command uses the root `~/.hermes` in every one of these cases (`resolve_profile_env`, `hermes_cli/profiles.py:2573-2575`; `profile_root_for_env_home`, lines 2551-2559). Every command for the default profile in this section therefore has the form `hermes -p default ...`.
+   - Without `--api-key`, the command asks for the key with a prompt that does not show the typed text (`masked_secret_prompt`, `hermes_cli/auth_commands.py:360-362`), and stores it as a pool entry with source `manual` (lines 368-373).
+   - In the default profile the profile home is the root, so `_global_auth_file_path()` returns `None` (`hermes_cli/auth.py:509-518`). `load_pool` therefore records no borrowed rows (`agent/credential_pool.py:3136-3143`), `add_entry` calls `_persist` (`agent/credential_pool_admin.py:131-132`), `_profile_owns_pool_provider` returns `True` (`agent/credential_pool.py:845-848`), and `persist_pool_entries` calls `write_credential_pool` (`agent/credential_pool.py:930` and `:948`). That function writes `credential_pool.anthropic` in the active `auth.json` (`hermes_cli/auth.py:1099-1117`), which is `~/.hermes/auth.json` (`_auth_file_path`, lines 496-497). The merge that only updates existing rows and drops the new row (`_update_root_pool_rows`, `agent/credential_pool.py:868-908`; [bug report](../docs/bugs/261109-anthropic-api-key-auth-add-dropped-in-named-profile.md)) is reached only in a named profile. **The key is stored correctly in the default profile.**
+   - **The fallback uses the stored entry.** On fallback activation, `try_activate_fallback` calls `resolve_provider_client` for the entry's provider (`agent/chat_completion_helpers.py:2074` and `:2110`). For `anthropic`, `_resolve_registry_branch` calls `_resolve_api_key_branch` (`agent/auxiliary_client.py:5417`), which calls `_try_anthropic` (lines 5299-5302). `_try_anthropic` uses the selected entry of the `anthropic` credential pool first (lines 3069-3071). `_rebind_fallback_credential_pool` also attaches `load_pool("anthropic")` to the agent (`agent/chat_completion_helpers.py:1896-1913`).
+3. **Why this is still not a supported location.** `~/.hermes/auth.json` is also the root store that every named profile reads. A named profile with no `credential_pool.anthropic` rows of its own reads the rows of the root store (`read_credential_pool`, `hermes_cli/auth.py:952-976`; `load_pool`, `agent/credential_pool.py:3076`). The entry that Hermes adds from the profile `.env` key (section 4 step 4) does not give a named profile its own rows: `persist_pool_entries` sends it to the merge into the root store that only updates existing rows, which adds no row (`agent/credential_pool.py:930-934` and `:868-908`). An `anthropic` row in `~/.hermes/auth.json` therefore has these effects:
+   - The key reaches every named profile that has no `anthropic` rows of its own, including the GLM (`zai`) profiles and the retired profiles. This is the same sharing for which section 4 step 5 forbids `~/.hermes/.env`.
+   - In each of those profiles the row counts as an explicit `anthropic` configuration (`_explicit_pool_entry_present`, `hermes_cli/auth.py:1262-1265`; `_pool_entry_is_explicit`, lines 1310-1321). In a profile whose auxiliary route is automatic provider selection, this allows the auxiliary client to select `anthropic` (`agent/auxiliary_client.py:2187-2193`).
+   - `hermes -p <profile> auth list anthropic` lists the borrowed row, with source `manual`, next to the `env:ANTHROPIC_API_KEY` row (`auth_list_command` loads the pool at `hermes_cli/auth_commands.py:520`). Section 4 step 6 and the check above treat an entry with another source as a reason to stop. This applies also to the four Jobcron profiles, which are live.
+4. **Owner decision (option A).** Owner, Telegram, 2026-11-11, relayed by `harness-orchestrator` on card `t_875f53f3`: the default profile receives the fallback values and `auth.adopt_external_logins` `false` (with `hermes -p default`), and it receives no API key: none in `~/.hermes/.env` and none in `~/.hermes/auth.json`. Its fallback stays inactive until a key exists. Without a key, the fallback of the default profile can still obtain an OAuth token:
+   - While `auth.adopt_external_logins` is `true` (the current value, by default), the fallback can run on the Claude Code login in the macOS Keychain or in `~/.claude/.credentials.json`. With no `anthropic` pool entry, `_try_anthropic` calls `resolve_anthropic_token` (`agent/auxiliary_client.py:3069-3075`). With none of `ANTHROPIC_TOKEN`, `CLAUDE_CODE_OAUTH_TOKEN` and `ANTHROPIC_API_KEY` in the environment, that function reads the Claude Code login directly (`agent/anthropic_credentials.py:691-709`; `_resolve_claude_code_token_from_credentials`, lines 611-627; `read_claude_code_credentials`, lines 351-368). The fallback would then run on the Claude Code login, which uses the same Max plan allowance as `claude-subscription`. Section 4 step 7 exists to prevent this.
+   - `load_pool` adds a `claude_code` pool entry only when `anthropic` counts as explicitly configured in the profile (`_seed_anthropic_singletons`, `agent/credential_pool.py:2587-2594` and 2617-2625; `is_provider_explicitly_configured`, `hermes_cli/auth.py:1344-1364`). The fallback values do not count: `_config_selects_provider` checks `model.provider`, the `provider` of each auxiliary task and the MoA slots, and does not check `fallback_providers` or `fallback_chain` (`hermes_cli/auth.py:1232-1259`). In `~/.hermes/config.yaml` on 2026-11-11 (read by key name), `model.provider` and the `provider` of all 16 auxiliary tasks were `claude-subscription`, and there was no `moa` section, so the default MoA presets apply; they name `openai-codex` and `openrouter` (`hermes_cli/config_defaults.py:1437-1443`). Without a key, the default profile therefore gets no `claude_code` pool entry, and nothing is written to `~/.hermes/auth.json`.
+   - With `false`, Hermes does not read the Claude Code login (`agent/anthropic_credentials.py:358-360`) and removes a stored `claude_code` entry (`agent/credential_pool.py:2626-2629`). A `hermes_pkce` entry is added only from `~/.hermes/.anthropic_oauth.json` (`read_hermes_oauth_credentials`, `agent/anthropic_credentials.py:809-812`); on 2026-11-11 that file did not exist (checked by file name only). With no pool entry and none of `ANTHROPIC_TOKEN`, `CLAUDE_CODE_OAUTH_TOKEN` and `ANTHROPIC_API_KEY` in the environment, `_try_anthropic` builds no client (`agent/auxiliary_client.py:3072-3077`; `resolve_anthropic_token`, `agent/anthropic_credentials.py:691-709`), and the fallback entry is skipped with the log line "Fallback to anthropic failed: provider not configured" (`agent/chat_completion_helpers.py:2112-2115`).
+   - For this reason the live apply steps below set `auth.adopt_external_logins` to `false` on the default profile before they apply its fallback values.
+
+### Live apply steps (a later card, with separate human authorization for the live writes)
+
+1. The owner completes the credential step for the 17 named profiles, and the `auth list anthropic` check passes for each of them. The default profile gets no key ("Credential: the default profile", item 4, owner decision option A).
+2. **Backups.** For each of the 18 profiles, copy `config.yaml` with `cp -p` to `config.yaml.pre-anthropic-fallback-<timestamp>` in the same directory, and confirm the copy with `cmp`, as in section 6, "Live rollout record", step 1. For `default` the file is `~/.hermes/config.yaml`; for a named profile it is `~/.hermes/profiles/<profile>/config.yaml`.
+3. **Apply.** For each profile, run section 6, "Apply steps", step 4: `scripts/switch-profile-model --profile <profile> --apply-fallbacks --dry-run`, compare the 17 planned `hermes config set` commands with "Declared values" above, then run `scripts/switch-profile-model --profile <profile> --apply-fallbacks`. For `default` the script runs `hermes` without `-p` (`scripts/switch-profile-model`, `prefix` at line 167) and passes its own environment to that command (`subprocess.run` without an `env` argument, line 179). A `hermes` command without `-p` follows an exported `HERMES_HOME` that names a profile directory (`hermes_cli/main.py:607-609`; "Credential: the default profile", item 2), so in a terminal of a dispatched worker the script would back up `~/.hermes/config.yaml` but write the 17 values to the worker's own `config.yaml`. For `default`, therefore run both commands with `HERMES_HOME` removed from the environment:
+
+   ```sh
+   env -u HERMES_HOME scripts/switch-profile-model --profile default --apply-fallbacks --dry-run
+   env -u HERMES_HOME scripts/switch-profile-model --profile default --apply-fallbacks
+   ```
+
+   Without `HERMES_HOME` and without `HERMES_DATA_DIR_SUFFIX`, Hermes uses `~/.hermes` (`get_hermes_home`, `hermes_constants.py:111-118`; `get_process_hermes_home`, lines 160-169; `_get_platform_default_hermes_home`, lines 51-58). Outside a dispatched session the command then follows `~/.hermes/active_profile` if that file exists (`hermes_cli/main.py:611-624`), so confirm first that it does not exist. The script finds and backs up `~/.hermes/config.yaml` through its `--home-root` option, which does not depend on `HERMES_HOME` (`scripts/switch-profile-model`, lines 57-58 and 119).
+4. **Billing boundary.** For each profile, set `auth.adopt_external_logins` to `false` as in section 4 step 7: `hermes -p <profile> config set auth.adopt_external_logins false`, and `hermes -p default config set auth.adopt_external_logins false` for `default`. Do not use the form without `-p` for `default`: in a terminal of a dispatched worker it writes to the worker's own profile ("Credential: the default profile", item 2). For `default`, do this step before step 3, because the default profile has no API key (see "Credential: the default profile", item 4).
+5. **Read-back**, as in section 6, "Live rollout record", steps 2 to 4: `hermes -p <profile> config get --json fallback_providers`, `hermes -p <profile> config get auth.adopt_external_logins` and `hermes -p <profile> auth list anthropic` for each profile, with `-p default` for `default`, so that the read-back for `default` reads `~/.hermes/config.yaml` and not the configuration of the terminal's own profile; a comparison of each `config.yaml` with its backup from step 2 by key path only, which is expected to find exactly 18 changed key paths (`fallback_providers`, the 16 `auxiliary.<task>.fallback_chain` keys and `auth.adopt_external_logins`); and `model.provider` and `model.default` unchanged. If the comparison for `default` finds no changed key path, the values were written to another profile: stop and report it to the owner. The expected `auth list anthropic` result is one entry with source `env:ANTHROPIC_API_KEY` for each of the 17 named profiles, and no entry for `default`, which has no key.
+6. **verify-state.** Run `scripts/verify-state` in live mode. The expected result is no `fallback drift` line. From the commit of card `t_875f53f3` until step 3 is done for all 18 profiles, live `scripts/verify-state` reports `fallback drift` for these profiles.
+
+Revert: section 7 applies to these 18 profiles in the same way. For `default`, run the commands of its step 1 with `env -u HERMES_HOME`, as in step 3 above, and use `hermes -p default` for every direct `hermes` command. Its step 3 applies to the 17 named profiles, and not to the default profile, which has no key (owner decision option A); `auth.adopt_external_logins` of `default` is restored with `hermes -p default config set auth.adopt_external_logins true`.
+
+### Credit behaviour and owner decision
+
+Anthropic documentation (cited, not fetched on card `t_875f53f3`):
+
+- https://support.anthropic.com/en/articles/8977456-how-do-i-pay-for-my-claude-api-usage: API usage is paid from prepaid credits. Failed requests are not charged. When the credits run out, requests stop, unless auto-reload buys more credits.
+- https://platform.claude.com/docs/en/about-claude/api-credits-for-subscribers: Max, Ultra and Team plans receive monthly API credits, which expire at the end of each billing cycle. When these credits are used up, requests stop until the next monthly credits arrive, and the API returns "Your credit balance is too low to access the Anthropic API".
+
+Owner decision, 2026-11-11: the fallback stays configured after 2026-11-19, when the USD 200 of Console promotional credits expire, and the owner does not buy new credits. With no credits, a fallback request fails with the error "Your credit balance is too low to access the Anthropic API", and nothing is charged while auto-reload is off. Owner, Telegram, 2026-11-11: Console auto-reload is off. When credits are added again (monthly plan credits or other credits), the configured fallback uses them without a configuration change.

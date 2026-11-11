@@ -3,8 +3,9 @@
 fixture and live modes, and scripts/switch-profile-model --apply-fallbacks / --clear-fallbacks.
 
 Every profile, model identifier and credential value here is synthetic, except the repository
-roster declarations of the four Jobcron profiles (t_731d4476), which use the identifiers from the
-live Anthropic model list of 2026-11-11 (procedures/anthropic-api-fallback.md section 5). Fixture
+roster declarations of the four Jobcron profiles (t_731d4476) and of the 18 other claude-subscription
+profiles (t_875f53f3), which use the identifiers from the live Anthropic model list of 2026-11-11
+(procedures/anthropic-api-fallback.md sections 5 and 8). Fixture
 runs go through the real verifier main() under the fixture-isolation guard; the live path runs only
 with a stubbed command runner, and the switch script only against a temporary home with a
 fake hermes that records its arguments.
@@ -39,6 +40,15 @@ OPUS_TASKS = ("compression", "goal_judge", "review", "background_review", "kanba
               "curator", "monitor", "approval", "mcp")
 JOBCRON_CHAIN = {**{task: [{"provider": "anthropic", "model": HAIKU}] for task in HAIKU_TASKS},
                  **{task: [{"provider": "anthropic", "model": OPUS}] for task in OPUS_TASKS}}
+# t_875f53f3: the 18 other claude-subscription profiles; advisor and the reviewers fall back to Fable,
+# the others to Opus. Their auxiliary chains equal JOBCRON_CHAIN.
+OTHER_PROFILES = ("default", "advisor", *(f"{project}-{role}" for project in ("chapt", "harness", "jss", "anki")
+                                          for role in ("orchestrator", "worker", "worker-2", "reviewer")))
+FABLE_PRIMARY = {"advisor", "chapt-reviewer", "harness-reviewer", "jss-reviewer", "anki-reviewer"}
+OTHER_MAIN_FALLBACK = {name: FABLE if name in FABLE_PRIMARY else OPUS for name in OTHER_PROFILES}
+OTHER_PRIMARY = {name: "claude-fable-5-2" if name in FABLE_PRIMARY else "claude-opus-5-5" for name in OTHER_PROFILES}
+MAIN_FALLBACK = {**JOBCRON_MAIN_FALLBACK, **OTHER_MAIN_FALLBACK}
+PRIMARY = {**JOBCRON_PRIMARY, **OTHER_PRIMARY}
 SECRET = "synthetic-credential-value"
 PROVIDERS = [{"provider": "anthropic", "model": "synthetic-main-fallback"}]
 CHAINS = {
@@ -49,7 +59,8 @@ DRIFT_MESSAGES = [
     'FAIL: fallback drift jobcron-worker fallback_providers: expected '
     '[{"provider": "anthropic", "model": "claude-opus-5-5"}], actual '
     '[{"provider": "anthropic", "model": "synthetic-fallback-model"}]',
-    'FAIL: fallback drift harness-worker auxiliary.title_generation.fallback_chain: expected [], actual '
+    'FAIL: fallback drift harness-worker auxiliary.title_generation.fallback_chain: expected '
+    '[{"provider": "anthropic", "model": "claude-haiku-5-5"}], actual '
     '[{"provider": "anthropic", "model": "synthetic-helper-model", "api_key": "<not shown>"}]',
     "FAIL: fallback drift anki-worker auxiliary: expected a readable auxiliary mapping, actual <unreadable>",
 ]
@@ -160,23 +171,39 @@ class DeclarationTests(unittest.TestCase):
         self.assertNotIn(SECRET, out.getvalue())
 
     def test_repository_roster_declarations(self):
-        """t_731d4476: exactly the four Jobcron entries declare the Anthropic API fallback, with the
-        identifiers chosen from the live model list; their primary provider and model are unchanged."""
+        """t_731d4476 and t_875f53f3: exactly the four Jobcron entries and the 18 other claude-subscription
+        entries declare the Anthropic API fallback, with the identifiers chosen from the live model list;
+        their primary provider and model are unchanged. GLM (zai) and retired entries declare none."""
         roster = json.loads((ROOT / "roster.yaml").read_text())
         errors = []
         with redirect_stdout(io.StringIO()):
             self.verifier.check_fallback_declarations(errors, roster)
         self.assertEqual(errors, [])
         self.assertEqual(set(JOBCRON_CHAIN), set(self.verifier.HELPER_TASKS))
+        self.assertEqual(len(OTHER_PROFILES), 18)
+        self.assertFalse(set(OTHER_PROFILES) & set(JOBCRON_PROFILES))
         declared = {profile["name"]: profile for profile in roster["profiles"]
                     if "fallback_providers" in profile or "auxiliary_fallback_chain" in profile}
-        self.assertEqual(sorted(declared), sorted(JOBCRON_PROFILES))
+        self.assertEqual(sorted(declared), sorted(JOBCRON_PROFILES + OTHER_PROFILES))
+        # The declared set is every non-retired claude-subscription profile and nothing else.
+        self.assertEqual(sorted(declared), sorted(
+            profile["name"] for profile in roster["profiles"]
+            if profile["provider"] == "claude-subscription" and profile.get("lifecycle") != "retired"))
+        for profile in roster["profiles"]:
+            if profile["provider"] == "zai" or profile.get("lifecycle") == "retired":
+                self.assertNotIn(profile["name"], declared)
         for name in JOBCRON_PROFILES:
             with self.subTest(profile=name):
                 profile = declared[name]
                 self.assertEqual((profile["provider"], profile["model"]), ("claude-subscription", JOBCRON_PRIMARY[name]))
                 self.assertEqual(profile["fallback_providers"],
                                  [{"provider": "anthropic", "model": JOBCRON_MAIN_FALLBACK[name]}])
+                self.assertEqual(profile["auxiliary_fallback_chain"], JOBCRON_CHAIN)
+        for name in JOBCRON_PROFILES + OTHER_PROFILES:
+            with self.subTest(profile=name):
+                profile = declared[name]
+                self.assertEqual((profile["provider"], profile["model"]), ("claude-subscription", PRIMARY[name]))
+                self.assertEqual(profile["fallback_providers"], [{"provider": "anthropic", "model": MAIN_FALLBACK[name]}])
                 self.assertEqual(profile["auxiliary_fallback_chain"], JOBCRON_CHAIN)
                 entries = profile["fallback_providers"] + [
                     entry for chain in profile["auxiliary_fallback_chain"].values() for entry in chain]
@@ -341,13 +368,57 @@ class ProcedureTests(unittest.TestCase):
         self.assertIn("auth.adopt_external_logins false", text)
         self.assertIn("auth.adopt_external_logins true", text)
         self.assertIn("env:ANTHROPIC_API_KEY", text)
-        # `auth add anthropic` appears only in the sentence that says not to use it.
-        lines = [line for line in text.splitlines() if "auth add anthropic" in line]
-        self.assertEqual(len(lines), 1, lines)
-        self.assertIn("Do not use `hermes auth add anthropic --type api-key`", lines[0])
-        self.assertIn("261109-anthropic-api-key-auth-add-dropped-in-named-profile.md", lines[0])
+        # `auth add anthropic` appears in the sentence that says not to use it in a named profile, and
+        # otherwise only in the default profile finding (t_875f53f3); never in a code block to run.
+        lines = text.splitlines()
+        uses = [index for index, line in enumerate(lines) if "auth add anthropic" in line]
+        named = [index for index in uses if "Do not use `hermes auth add anthropic --type api-key`" in lines[index]]
+        self.assertEqual(len(named), 1, uses)
+        self.assertIn("261109-anthropic-api-key-auth-add-dropped-in-named-profile.md", lines[named[0]])
+        start = lines.index("### Credential: the default profile")
+        end = next(index for index in range(start + 1, len(lines)) if lines[index].startswith("#"))
+        self.assertTrue(all(start < index < end for index in uses if index not in named), uses)
+        fenced = False
+        for line in lines:
+            if line.lstrip().startswith("```"):
+                fenced = not fenced
+            elif fenced:
+                self.assertNotIn("auth add", line)
         self.assertNotIn("auth remove anthropic", text)
         self.assertNotIn("sk-" + "ant-", text)  # Anthropic key prefix, split so this file does not contain it
+
+    def test_other_claude_subscription_profiles_section(self):
+        """t_875f53f3: section 8 covers the key step of the 17 named profiles, the default profile
+        finding, the live apply steps and the credit behaviour."""
+        text = (ROOT / "procedures/anthropic-api-fallback.md").read_text(encoding="utf-8")
+        section = text[text.index("## 8. The 18 other claude-subscription profiles"):]
+        loop = next(line for line in section.splitlines() if line.startswith("for p in "))
+        self.assertEqual(loop.split(";")[0].split()[3:], [name for name in OTHER_PROFILES if name != "default"])
+        self.assertTrue(loop.endswith('do hermes -p "$p" config set ANTHROPIC_API_KEY "$K"; done'))
+        self.assertIn('read -rs "K?Anthropic API key: "; echo', section)
+        self.assertIn("unset K", section)
+        self.assertIn("auth list anthropic", section)
+        self.assertIn("**Result: default profile: no supported key location without the root .env; "
+                      "owner decision needed.**", section)
+        self.assertIn("--apply-fallbacks", section)
+        self.assertIn("auth.adopt_external_logins false", section)
+        # A `hermes` command without -p follows the HERMES_HOME of a dispatched terminal, so every
+        # command for the default profile names it explicitly (review round 1).
+        self.assertIn("`hermes -p default config set auth.adopt_external_logins false`", section)
+        self.assertNotIn("`hermes config set auth.adopt_external_logins false`", section)
+        self.assertIn("env -u HERMES_HOME scripts/switch-profile-model --profile default --apply-fallbacks", section)
+        # Owner decision option A, 2026-11-11: the default profile gets the fallback values and no key.
+        self.assertIn("4. **Owner decision (option A).**", section)
+        self.assertIn("none in `~/.hermes/.env` and none in `~/.hermes/auth.json`", section)
+        for url in ("https://support.anthropic.com/en/articles/8977456-how-do-i-pay-for-my-claude-api-usage",
+                    "https://platform.claude.com/docs/en/about-claude/api-credits-for-subscribers"):
+            self.assertIn(url, section)
+        self.assertIn("Your credit balance is too low to access the Anthropic API", section)
+        self.assertIn("the fallback stays configured after 2026-11-19", section)
+        self.assertIn("nothing is charged while auto-reload is off", section)
+        # The earlier "after that date, follow section 7" instruction points to the credit behaviour now.
+        self.assertNotIn("After that date, follow section 7", text)
+        self.assertNotIn("## 7. Revert after 2026-11-19", text)
 
     def test_cron_prompt_reports_on_fallback_lines_without_card_actions(self):
         """t_731d4476: an ON-FALLBACK line of the board check has no card id; the cron prompt reports it
