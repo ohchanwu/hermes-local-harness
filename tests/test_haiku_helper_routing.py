@@ -412,6 +412,31 @@ class ProcedureTests(unittest.TestCase):
         self.assertIn("session_model_usage", self.text)
         self.assertIn("config.yaml.pre-haiku55-$TS", self.text)
 
+    def test_usage_query_accepts_only_rows_of_the_primary_route(self):
+        # The fallback chain of the light tasks answers on the same model id (anthropic / claude-haiku-5-5)
+        # and writes a row with an empty billing_provider; only the provider column tells the routes apart.
+        section = self.text[self.text.index("### f. Acceptance evidence"):self.text.index("### g. Revert")]
+        query = " ".join(section[section.index("sqlite3 -readonly"):].split("```", 1)[0].split())
+        self.assertIn("WHERE model = 'claude-haiku-5-5' AND billing_provider = 'claude-subscription' AND task IN", query)
+        flat = " ".join(section.split())
+        self.assertIn("is a fallback row", flat)
+        self.assertIn("It is not acceptance evidence, and the live card records it as a failed primary route", flat)
+        self.assertIn("This line is evidence of the route only", flat)
+        for source in ("line 7889", "line 4460", "trying fallback|configured fallback to"):
+            self.assertIn(source, flat)
+
+    def test_a_profile_without_evidence_has_an_end_state(self):
+        flat = " ".join(self.text[self.text.index("### f. Acceptance evidence"):self.text.index("### g. Revert")].split())
+        self.assertIn('records "no light-task call recorded" for that profile', flat)
+        self.assertIn("treats that profile as complete. It does not repeat the call and does not wait for a "
+                      "later gateway or interactive session.", flat)
+        self.assertNotIn("takes the evidence from the next ordinary session", flat)
+
+    def test_the_revert_asks_for_no_gateway_restart(self):
+        revert = " ".join(self.text[self.text.index("### g. Revert"):self.text.index("## 5.")].split())
+        self.assertIn("The revert needs no gateway restart", revert)
+        self.assertNotIn("The owner then restarts the gateway", revert)
+
     def test_profile_lists_match_the_roster(self):
         section = self.text[self.text.index("- Profiles (21)"):self.text.index("- Out of scope")]
         roster_names = {p["name"] for p in json.loads((ROOT / "roster.yaml").read_text())["profiles"]}

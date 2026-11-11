@@ -150,7 +150,11 @@ provider plugin once and never reloads it (`providers/__init__.py`
 rejects a model id added after its start. After a profile switch, a helper task
 of a gateway-served session would ask for `claude-haiku-5-5` and the old
 allowlist would reject it until the gateway restarts. Kanban workers start as
-separate processes and import the new `compat.py` from disk.
+separate processes and import the new `compat.py` from disk. Any other Hermes
+process started before step b (an open interactive session, a dashboard
+process) also keeps the old allowlist; after step d, the Anthropic API fallback
+chain answers its light tasks until that process restarts. The live card closes
+or restarts such processes before step d, or records them.
 
 The owner restarts the gateway. The live card records the new gateway process
 ID and its start time (`ps -o pid,lstart -p <pid>`) and confirms that the start
@@ -230,10 +234,9 @@ run that was not in the first run.
 Hermes records two kinds of evidence (installed Hermes source, read only,
 commit `9cf7960f`):
 
-1. Log line, written before the request is sent (it shows the route, not a
-   completed response). `agent/auxiliary_client.py`, function
-   `_prepare_aux_request` (line 7490), lines 7536 to 7538: for a synchronous
-   call with a task name it logs at INFO
+1. Log line, written before the request is sent. `agent/auxiliary_client.py`,
+   function `_prepare_aux_request` (line 7490), lines 7536 to 7538: for a
+   synchronous call with a task name it logs at INFO
    `Auxiliary %s: using %s (%s)%s` with the task, the provider and the model.
    The logger is `agent.auxiliary_client` (line 133). Asynchronous calls
    (`async_mode`) do not write this line. The file is the profile's
@@ -247,6 +250,31 @@ commit `9cf7960f`):
      ~/.hermes/profiles/<p>/logs/agent.log | tail -1
    ```
 
+   This line is evidence of the route only: it is written before the request
+   is sent, so it does not show that `claude-subscription` answered. When the
+   `claude-subscription` request fails, the same `agent.log` later shows one
+   of these lines for the same task:
+   - `agent/auxiliary_client.py` line 7889, INFO
+     `Auxiliary %s%s: %s on %s (%s), trying fallback` (line 7884, WARNING
+     `... timed out after %ss ... on %s, trying fallback`, for a timeout);
+   - `agent/auxiliary_client.py` line 4460, INFO
+     `Auxiliary %s: %s on %s — configured fallback to %s (%s)`, which names
+     the fallback chain entry that answers instead, for example
+     `configured fallback to fallback_chain[0](anthropic) (claude-haiku-5-5)`.
+
+   Pattern for these lines (`<task>` is the task of the route line):
+
+   ```sh
+   grep -E 'agent\.auxiliary_client: Auxiliary <task>.*(trying fallback|configured fallback to)' \
+     ~/.hermes/profiles/<p>/logs/agent.log | tail -3
+   ```
+
+   A route line followed by such a line for the same task is a failed primary
+   route, not acceptance evidence. Because the model id of the fallback chain
+   of the six light tasks is also `claude-haiku-5-5`
+   (`auxiliary_fallback_chain` in `roster.yaml`, provider `anthropic`), the
+   model id alone never shows which provider answered.
+
 2. Session record of a completed response. `agent/auxiliary_client.py`
    `_validate_llm_response` (line 6863) calls `record_aux_usage` (line 6879), which
    (`agent/aux_accounting.py` line 84) calls `record_auxiliary_usage`
@@ -256,14 +284,37 @@ commit `9cf7960f`):
    column is the model of the response (`aux_accounting.py`, docstring of
    `record_aux_usage`). A row is written only inside an agent turn (an
    accounting context exists) and only when the response reports token usage.
-   Read only:
+   The `billing_provider` column is the provider hint that the caller passed
+   to `_validate_llm_response`. For a synchronous call, only the first primary
+   request passes it (`agent/auxiliary_client.py` line 8230,
+   `_primary(provider=request_provider, base_url=req.base_info)`). The other
+   synchronous paths pass the task only: a fallback chain entry
+   (`_call_fallback_candidate_sync`, line 4169), a same-provider retry of the
+   recovery steps (`_retry_same_provider_sync`, line 3832), a retry after a
+   transient transport error (line 8243, `_primary()`) and the recovery call
+   step (line 8253). Their responses give a row with an empty
+   `billing_provider`; a row of an auxiliary task does not inherit the
+   provider of the session (`hermes_state_usage.py` line 357, docstring of
+   `_record_model_usage` at line 337, and the docstring of
+   `_validate_llm_response`, lines 6866 to 6875). Read only:
 
    ```sh
    sqlite3 -readonly ~/.hermes/profiles/<p>/state.db "SELECT session_id, task, model, billing_provider, api_call_count,
      datetime(last_seen, 'unixepoch', 'localtime') FROM session_model_usage
-     WHERE model = 'claude-haiku-5-5' AND task IN ('title_generation', 'memory_query_rewrite', 'tts_audio_tags',
+     WHERE model = 'claude-haiku-5-5' AND billing_provider = 'claude-subscription'
+     AND task IN ('title_generation', 'memory_query_rewrite', 'tts_audio_tags',
      'profile_describer', 'skills_hub', 'vision') ORDER BY last_seen DESC LIMIT 3;"
    ```
+
+   A `claude-haiku-5-5` row of a light task with an empty or different
+   `billing_provider` is a fallback row: the first `claude-subscription`
+   request failed, and a path from the list above answered. It is not
+   acceptance evidence, and the live card records it as a failed primary route
+   for that profile and task (the `agent.log` lines of item 1 show whether the
+   fallback chain or a same-provider retry answered). Example from the live state of 2026-11-11,
+   before any switch (review round 1 of card `t_e7efc35f`, read only): `jss-worker-2` has the row
+   `vision|claude-haiku-5-5||2026-11-11 16:44:09`, after the `agent.log` line
+   `Auxiliary vision: request timed out on claude-subscription — configured fallback to fallback_chain[0](anthropic) (claude-haiku-5-5)`.
 
 Trigger: `title_generation` runs at the start of a new session's first turn
 (`agent/title_generator.py` `maybe_auto_title`, line 736; the model call is the
@@ -274,16 +325,38 @@ evidence for no profile; they can give evidence for another light task (for
 example `vision` or `skills_hub`) when the run uses it. For each profile, the
 live card starts one new non-Kanban session with a message that asks for no
 tool, for example `hermes -p <p> -z "Reply with exactly OK."`, and then reads
-both kinds of evidence. The title model call runs in a background thread
-(`spawn_context_thread`, `agent/title_generator.py` line 791). This card did not verify whether
-that thread finishes before a one-shot process exits. If neither the log line
-nor the row appears, the live card records that, and takes the evidence from
-the next ordinary session of that profile (a gateway or interactive session)
-instead of repeating calls.
+both kinds of evidence once. The title model call runs in a background thread
+(`spawn_context_thread`, `agent/title_generator.py` line 791). The repository
+already records that title generation in a one-shot run can be cut off when
+the process exits ("client closed or cancelled";
+`docs/bugs/261017-claude-subscription-cli-retries-and-title-helper-rejected.md`,
+section "Remaining limits"), so the one call may leave no evidence.
 
-Acceptance per profile: one `agent.log` line or one `session_model_usage` row
-from the patterns above, dated after that profile's switch in step d. Record
-the profile, the evidence kind, the task and the time.
+Acceptance per profile, dated after that profile's switch in step d, one of:
+
+- Completed response on the primary route: one `session_model_usage` row from
+  the query of item 2 (`billing_provider = 'claude-subscription'`). Record the
+  profile, the evidence kind, the task and the time.
+- Route only: one `agent.log` route line from item 1 with no `trying fallback`
+  or `configured fallback to` line for the same task after it. Record it as
+  "route line only, no completed-response row", with the profile, the task and
+  the time.
+
+End state for a profile with no evidence: if, after the one call, the profile
+has neither a row from item 2 nor a route line from item 1, the live card
+records "no light-task call recorded" for that profile, names the evidence that
+does exist for it (the step d read-back of the 16 `auxiliary.<task>.provider`
+and `.model` values, and the step e result with no `auxiliary model drift`
+line for that profile), and treats that profile as complete. It does not
+repeat the call and does not wait for a later gateway or interactive session.
+The step a smoke test and the step b read-back of the plugin copies cover the
+allowlist for every profile.
+
+Failed primary route: a fallback row from item 2, or a route line followed by a
+fallback line from item 1, dated after the switch, is a finding. The live card
+records it with the profile, the task, the time and the fallback line, checks
+the step c condition for the process that wrote it (a process started before
+step b), and does not count it as acceptance.
 
 ### g. Revert
 
@@ -307,7 +380,10 @@ the profile, the evidence kind, the task and the time.
 
    Restore the profile `config.yaml` files (item 1) before the plugin copies,
    so that no profile asks for `claude-haiku-5-5` after the allowlist loses it.
-   The owner then restarts the gateway, for the reason in step c.
+   The revert needs no gateway restart: after item 1 no profile requests
+   `claude-haiku-5-5` on `claude-subscription`, and the allowlist that the
+   running gateway loaded in step c contains every model id of the restored
+   `compat.py`, so it rejects no request.
 3. The repository stays as it is; while the live profiles are reverted, a live
    `scripts/verify-state` reports the six `auxiliary model drift` lines per
    profile from section 2. A full repository revert is a separate reviewed
