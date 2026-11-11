@@ -46,7 +46,7 @@ VERIFIER = load_verifier()
 # Each target: provider, base URL, default main model, and the helper model.
 TARGETS = {
     "claude-opus": ("claude-subscription", "acp://claude-subscription", "claude-opus-5-5", "claude-opus-5-5"),
-    "claude-fable": ("claude-subscription", "acp://claude-subscription", "claude-fable-5-1", "claude-opus-5-5"),
+    "claude-fable": ("claude-subscription", "acp://claude-subscription", "claude-fable-5-2", "claude-opus-5-5"),
     "gpt": ("openai-codex", "https://chatgpt.com/backend-api/codex", "gpt-5.6-sol", None),
     "glm": ("zai", "https://api.z.ai/api/coding/paas/v4", "glm-5.3", None),
 }

@@ -122,7 +122,7 @@ class FleetDesiredState(unittest.TestCase):
             ORCH: ("claude-opus-5-5", "claude-subscription", "orchestrator", False),
             WORKER: ("claude-opus-5-5", "claude-subscription", "implementation", True),
             WORKER2: ("claude-opus-5-5", "claude-subscription", "implementation", True),
-            REVIEWER: ("claude-fable-5-1", "claude-subscription", "review", True),
+            REVIEWER: ("claude-fable-5-2", "claude-subscription", "review", True),
         }
         for name, (model, provider, toolsets, dispatchable) in expected.items():
             with self.subTest(profile=name):

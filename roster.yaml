@@ -166,7 +166,7 @@
     {
       "name": "advisor",
       "role": "advisor",
-      "model": "claude-fable-5-1",
+      "model": "claude-fable-5-2",
       "provider": "claude-subscription",
       "installed": true,
       "dispatch_eligible": false,
@@ -810,7 +810,7 @@
     {
       "name": "jobcron-reviewer",
       "role": "project independent reviewer",
-      "model": "claude-fable-5-1",
+      "model": "claude-fable-5-2",
       "provider": "claude-subscription",
       "installed": true,
       "dispatch_eligible": true,
@@ -1004,7 +1004,7 @@
     {
       "name": "chapt-reviewer",
       "role": "project independent reviewer",
-      "model": "claude-fable-5-1",
+      "model": "claude-fable-5-2",
       "provider": "claude-subscription",
       "installed": true,
       "dispatch_eligible": true,
@@ -1094,7 +1094,7 @@
     {
       "name": "harness-reviewer",
       "role": "project independent reviewer",
-      "model": "claude-fable-5-1",
+      "model": "claude-fable-5-2",
       "provider": "claude-subscription",
       "installed": true,
       "dispatch_eligible": true,
@@ -1184,7 +1184,7 @@
     {
       "name": "jss-reviewer",
       "role": "project independent reviewer",
-      "model": "claude-fable-5-1",
+      "model": "claude-fable-5-2",
       "provider": "claude-subscription",
       "installed": true,
       "dispatch_eligible": true,
@@ -1450,7 +1450,7 @@
     {
       "name": "anki-reviewer",
       "role": "project independent reviewer",
-      "model": "claude-fable-5-1",
+      "model": "claude-fable-5-2",
       "provider": "claude-subscription",
       "installed": true,
       "dispatch_eligible": true,

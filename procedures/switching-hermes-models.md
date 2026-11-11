@@ -18,7 +18,7 @@ The owner retired the GLM workers on 2026-10-18. The same day the owner added a 
 
 ## Switching one profile
 
-`scripts/switch-profile-model` sets a profile's main model, base URL and all sixteen helper tasks in one step, after backing up its `config.yaml`. It also updates that profile's `model` and `provider` in the `roster.yaml` of the checkout it runs from (`--roster` picks another file); commit that change, or `scripts/verify-state` reports model drift. Preview both the live and the roster changes with `--dry-run`, which writes nothing. `scripts/verify-state` also fails when a non-retired roster profile is outside the owner model policy (provider `claude-subscription`; `claude-opus-5-5` for orchestrators, workers and default/helpers; `claude-fable-5-1` for reviewers and the advisor), so an out-of-policy switch stays red until the policy itself is changed.
+`scripts/switch-profile-model` sets a profile's main model, base URL and all sixteen helper tasks in one step, after backing up its `config.yaml`. It also updates that profile's `model` and `provider` in the `roster.yaml` of the checkout it runs from (`--roster` picks another file); commit that change, or `scripts/verify-state` reports model drift. Preview both the live and the roster changes with `--dry-run`, which writes nothing. `scripts/verify-state` also fails when a non-retired roster profile is outside the owner model policy (provider `claude-subscription`; `claude-opus-5-5` for orchestrators, workers and default/helpers; `claude-fable-5-2` for reviewers and the advisor), so an out-of-policy switch stays red until the policy itself is changed.
 
 ```sh
 scripts/switch-profile-model --profile harness-worker --to glm                       # GLM 5.3 everywhere
@@ -30,7 +30,7 @@ scripts/switch-profile-model --profile worker-sol --to gpt --dispatch add       
 
 - **Targets:**
   - `claude-opus`: `claude-opus-5-5`.
-  - `claude-fable`: `claude-fable-5-1`, with helpers on Opus.
+  - `claude-fable`: `claude-fable-5-2`, with helpers on Opus.
   - `gpt`: `openai-codex`, default `gpt-5.6-sol`.
   - `glm`: `zai`, default `glm-5.3`.
 - **Helpers follow the main model**, except under `claude-fable`. Pass `--model` to choose another model id.

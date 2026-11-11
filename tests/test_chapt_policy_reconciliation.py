@@ -12,6 +12,7 @@ import unittest
 import test_orchestrator_skill_terminology as terminology
 from test_orchestrator_skill_terminology import CHAPT, reverse_terminology_edits
 from test_card_contract_line_start_policy import reverse_owner_path_edits
+from test_fable_5_2_declared_model import reverse_fable_5_2_edits
 from test_orchestrator_skill_changes_policy import reverse_skill_changes_edits
 from test_repair_history_candidate_rules_policy import reverse_candidate_rule_edits
 from test_repair_history_format_policy import reverse_repair_format_edits
@@ -153,10 +154,11 @@ def digest(content):
 class ChaptPolicyReconciliationTests(unittest.TestCase):
     def setUp(self):
         self.source = SOURCE.read_bytes()
-        # Reverse the later Skill Changes section (t_0a8674fe), the repair_history
-        # candidate rule change (t_6436ac1c) and the owner shell command path change
-        # (t_bd860536) first.
-        current = reverse_candidate_rule_edits(CHAPT, reverse_skill_changes_edits(CHAPT, self.source))
+        # Reverse the later declared Fable model change (t_a6bbe808), the Skill Changes
+        # section (t_0a8674fe), the repair_history candidate rule change (t_6436ac1c) and the
+        # owner shell command path change (t_bd860536) first.
+        current = reverse_skill_changes_edits(CHAPT, reverse_fable_5_2_edits(CHAPT, self.source))
+        current = reverse_candidate_rule_edits(CHAPT, current)
         self.merged = reverse_repair_format_edits(CHAPT, reverse_owner_path_edits(CHAPT, current))
         self.skill = json.loads((ROOT / "snapshots/sanitized-current-state.yaml").read_bytes())["skill"]
 
@@ -232,8 +234,9 @@ class ChaptPolicyReconciliationTests(unittest.TestCase):
         self.assertEqual(digest(self.merged), MERGED_SHA256)
 
     def test_upgrade_selection_is_byte_unchanged(self):
-        # Unchanged apart from the one t_c836d2a4 wording edit in this section.
-        original = reverse_terminology_edits(CHAPT, self.source)
+        # Unchanged apart from the one t_c836d2a4 wording edit in this section. The later
+        # declared Fable model change (t_a6bbe808) is reversed first.
+        original = reverse_terminology_edits(CHAPT, reverse_fable_5_2_edits(CHAPT, self.source))
         section = original.split(b"## Routine upgrade selection", 1)[1].split(b"\n## ", 1)[0]
         self.assertEqual(digest(section), UPGRADE_SHA256)
         section = self.source.split(b"## Routine upgrade selection", 1)[1].split(b"\n## ", 1)[0]

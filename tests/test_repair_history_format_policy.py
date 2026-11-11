@@ -27,6 +27,7 @@ from pathlib import Path
 from test_anki_apply_tool_card_contracts_reference import reverse_apply_tool_reference_edits
 from test_card_contract_line_start_policy import reverse_owner_path_edits
 from test_jobcron_app_only_deploy_authorization import reverse_app_only_deploy_edits
+from test_fable_5_2_declared_model import reverse_fable_5_2_edits
 from test_orchestrator_skill_changes_policy import reverse_skill_changes_edits
 from test_repair_history_candidate_rules_policy import reverse_candidate_rule_edits
 
@@ -481,11 +482,13 @@ class InstructionTextTests(unittest.TestCase):
     def test_reversing_the_edits_recovers_the_baseline_bytes(self):
         for path, want in PRE_REPAIR_FORMAT_SHA256.items():
             with self.subTest(path=path):
-                # Reverse the later owner-requested application-only production deploy
-                # exception (t_b7455361), the apply-tool-card-contracts pointer (t_c9d4d5c8), the
-                # Skill Changes section (t_0a8674fe), the repair_history candidate rule change
-                # (t_6436ac1c) and the owner shell command path change (t_bd860536) first.
-                current = reverse_app_only_deploy_edits(path, (ROOT / path).read_bytes())
+                # Reverse the later declared Fable model change (t_a6bbe808), the owner-requested
+                # application-only production deploy exception (t_b7455361), the
+                # apply-tool-card-contracts pointer (t_c9d4d5c8), the Skill Changes section
+                # (t_0a8674fe), the repair_history candidate rule change (t_6436ac1c) and the
+                # owner shell command path change (t_bd860536) first.
+                current = reverse_fable_5_2_edits(path, (ROOT / path).read_bytes())
+                current = reverse_app_only_deploy_edits(path, current)
                 current = reverse_apply_tool_reference_edits(path, current)
                 current = reverse_skill_changes_edits(path, current)
                 current = reverse_candidate_rule_edits(path, current)

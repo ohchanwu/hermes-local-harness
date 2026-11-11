@@ -333,9 +333,9 @@ MODEL_POLICY_BY_ROLE = {
     "project orchestrator": "claude-opus-5-5",
     "project implementation": "claude-opus-5-5",
     "implementation": "claude-opus-5-5",
-    "advisor": "claude-fable-5-1",
-    "independent reviewer": "claude-fable-5-1",
-    "project independent reviewer": "claude-fable-5-1",
+    "advisor": "claude-fable-5-2",
+    "independent reviewer": "claude-fable-5-2",
+    "project independent reviewer": "claude-fable-5-2",
 }
 
 

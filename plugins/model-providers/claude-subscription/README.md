@@ -283,7 +283,7 @@ Owner-approved and live; GPT is retired from 2026-10-18.
 | --- | --- | --- |
 | default (`~/.hermes`, main orchestrator) | `claude-opus-5-5` | high |
 | `harness-`, `chapt-`, `jobcron-` `worker` and `orchestrator` | `claude-opus-5-5` | high |
-| `harness-`, `chapt-`, `jobcron-` `reviewer`, `advisor` | `claude-fable-5-1` | high |
+| `harness-`, `chapt-`, `jobcron-` `reviewer`, `advisor` | `claude-fable-5-2` | high |
 
 In all eleven homes, the sixteen `auxiliary.<task>` helpers run on this
 provider with `claude-opus-5-5`. Pinning Opus keeps Fable homes off Fable's
@@ -324,9 +324,17 @@ The live smoke test for `claude-fable-5-2` has not been run. It runs only on a
 separate card under owner approval (the controller comment on card t_7b6f6fed
 records the owner's approval of 2026-11-11 for that later card, after this
 entry and the roster change are merged). That smoke test also confirms the context length
-from the CLI's reported context window where the CLI reports one. The rollout
-table above is unchanged until the live change of the profiles that use
-`claude-fable-5-1`; those profiles keep `claude-fable-5-1` until then.
+from the CLI's reported context window where the CLI reports one.
+
+Card t_a6bbe808 (step 2 of 3) changed the declared Fable model from
+`claude-fable-5-1` to `claude-fable-5-2` in `roster.yaml`,
+`scripts/switch-profile-model`, `scripts/verify-state`, the procedures, the
+orchestrator skill copies and the tests, and in the reviewer and advisor row of
+the rollout table above. That card changed no live profile. The six live Fable
+profiles (`advisor`, `anki-reviewer`, `chapt-reviewer`, `harness-reviewer`,
+`jobcron-reviewer` and `jss-reviewer`) keep `claude-fable-5-1` until the step 3
+card runs the live smoke test and switches them; until then, live
+`scripts/verify-state` reports model drift for those six profiles.
 
 ## Manual setup and rollback reference
 

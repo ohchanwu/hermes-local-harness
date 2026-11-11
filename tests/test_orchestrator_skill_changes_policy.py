@@ -24,6 +24,7 @@ import unittest
 
 from test_anki_apply_tool_card_contracts_reference import reverse_apply_tool_reference_edits
 from test_jobcron_app_only_deploy_authorization import reverse_app_only_deploy_edits
+from test_fable_5_2_declared_model import reverse_fable_5_2_edits
 
 ROOT = Path(__file__).resolve().parents[1]
 RELATIVE = "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md"
@@ -155,9 +156,11 @@ class SkillChangesSection(unittest.TestCase):
     def test_reversing_the_edits_recovers_the_baseline_bytes(self):
         for path in SKILL_FILES:
             with self.subTest(path=path):
-                # Reverse the later owner-requested application-only production deploy
-                # exception (t_b7455361) and apply-tool-card-contracts pointer (t_c9d4d5c8) first.
-                current = reverse_app_only_deploy_edits(path, (ROOT / path).read_bytes())
+                # Reverse the later declared Fable model change (t_a6bbe808), the owner-requested
+                # application-only production deploy exception (t_b7455361) and
+                # apply-tool-card-contracts pointer (t_c9d4d5c8) first.
+                current = reverse_fable_5_2_edits(path, (ROOT / path).read_bytes())
+                current = reverse_app_only_deploy_edits(path, current)
                 current = reverse_apply_tool_reference_edits(path, current)
                 original = reverse_skill_changes_edits(path, current)
                 self.assertEqual(hashlib.sha256(original).hexdigest(), PRE_SKILL_CHANGES_SHA256[path])

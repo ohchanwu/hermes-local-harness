@@ -149,7 +149,7 @@ class FleetDesiredState(unittest.TestCase):
             ORCH: ("claude-opus-5-5", "project orchestrator", "orchestrator", False),
             WORKER: ("claude-opus-5-5", "project implementation", "implementation", True),
             WORKER2: ("claude-opus-5-5", "project implementation", "implementation", True),
-            REVIEWER: ("claude-fable-5-1", "project independent reviewer", "review", True),
+            REVIEWER: ("claude-fable-5-2", "project independent reviewer", "review", True),
         }
         sibling = {ORCH: "jss-orchestrator", WORKER: "jss-worker", WORKER2: "jss-worker-2",
                    REVIEWER: "jss-reviewer"}

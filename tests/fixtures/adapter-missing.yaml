@@ -1,7 +1,7 @@
 {
   "profile_models": {
     "default": "claude-opus-5-5",
-    "advisor": "claude-fable-5-1",
+    "advisor": "claude-fable-5-2",
     "reviewer-sol": "gpt-5.6-sol",
     "worker-flash-1": "glm-5.3-flash",
     "worker-flash-2": "glm-5.3-flash",
@@ -16,19 +16,19 @@
     "jobcron-orchestrator": "claude-opus-5-5",
     "jobcron-worker": "claude-opus-5-5",
     "jobcron-worker-2": "claude-opus-5-5",
-    "jobcron-reviewer": "claude-fable-5-1",
+    "jobcron-reviewer": "claude-fable-5-2",
     "chapt-orchestrator": "claude-opus-5-5",
     "chapt-worker": "claude-opus-5-5",
     "chapt-worker-2": "claude-opus-5-5",
-    "chapt-reviewer": "claude-fable-5-1",
+    "chapt-reviewer": "claude-fable-5-2",
     "harness-orchestrator": "claude-opus-5-5",
     "harness-worker": "claude-opus-5-5",
     "harness-worker-2": "claude-opus-5-5",
-    "harness-reviewer": "claude-fable-5-1",
+    "harness-reviewer": "claude-fable-5-2",
     "jss-orchestrator": "claude-opus-5-5",
     "jss-worker": "claude-opus-5-5",
     "jss-worker-2": "claude-opus-5-5",
-    "jss-reviewer": "claude-fable-5-1",
+    "jss-reviewer": "claude-fable-5-2",
     "jobcron-worker-glm-1": "glm-5.3",
     "jobcron-worker-glm-2": "glm-5.3",
     "chapt-worker-glm-1": "glm-5.3",
@@ -40,7 +40,7 @@
     "anki-orchestrator": "claude-opus-5-5",
     "anki-worker": "claude-opus-5-5",
     "anki-worker-2": "claude-opus-5-5",
-    "anki-reviewer": "claude-fable-5-1"
+    "anki-reviewer": "claude-fable-5-2"
   },
   "profile_providers": {
     "default": "claude-subscription",

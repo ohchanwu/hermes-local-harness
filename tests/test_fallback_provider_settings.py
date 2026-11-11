@@ -32,7 +32,7 @@ OPUS, FABLE, HAIKU = "claude-opus-5-5", "claude-fable-5-2", "claude-haiku-5-5"
 JOBCRON_MAIN_FALLBACK = {"jobcron-orchestrator": OPUS, "jobcron-worker": OPUS, "jobcron-worker-2": OPUS,
                          "jobcron-reviewer": FABLE}
 JOBCRON_PRIMARY = {"jobcron-orchestrator": "claude-opus-5-5", "jobcron-worker": "claude-opus-5-5",
-                   "jobcron-worker-2": "claude-opus-5-5", "jobcron-reviewer": "claude-fable-5-1"}
+                   "jobcron-worker-2": "claude-opus-5-5", "jobcron-reviewer": "claude-fable-5-2"}
 HAIKU_TASKS = ("title_generation", "memory_query_rewrite", "tts_audio_tags", "profile_describer", "skills_hub",
                "vision")
 OPUS_TASKS = ("compression", "goal_judge", "review", "background_review", "kanban_decomposer", "triage_specifier",
