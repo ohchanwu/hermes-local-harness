@@ -1,0 +1,188 @@
+#!/usr/bin/env python3
+"""Hold and release GLM cards around the Z.ai peak hours (jev plugin, Part E).
+
+Commands:
+  run     (default) Inside the window (Monday to Friday, 15:00 to 19:00
+          Asia/Seoul, start inclusive, end exclusive) hold every ready or todo
+          card assigned to a GLM worker profile listed in plugins/jev/config.json.
+          Outside the window, or when the hold is turned off, release every card
+          held with the marker jev-peak-hold. Without --apply nothing changes and
+          the planned holds and releases are printed. Idempotent.
+  off     Turn the hold off (switch file enabled: false), then release every
+          card held with the marker at once.
+  on      Turn the hold on (switch file enabled: true). Cards are held again
+          from the next run inside the window.
+  status  Print on or off, when and by whom the switch was changed, and the
+          number of held cards.
+
+A hold is `hermes kanban --board <board> schedule <id> "jev-peak-hold until <time>"`;
+a release is `hermes kanban --board <board> unblock <id>`. Only cards in the
+scheduled status whose latest scheduled reason carries the marker are released.
+Python standard library only.
+"""
+from __future__ import annotations
+
+import argparse
+import getpass
+import os
+import sys
+from datetime import datetime
+from pathlib import Path
+
+REPO = Path(__file__).resolve().parent.parent
+PLUGIN_DIR = REPO / "plugins" / "jev"
+sys.path.insert(0, str(PLUGIN_DIR))
+
+import jev_log  # noqa: E402
+import peak_hold  # noqa: E402
+
+
+def _load_config(path: Path) -> dict:
+    import json
+    data = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(data, dict):
+        raise SystemExit(f"jev-peak-hold: {path} is not a JSON object")
+    return data
+
+
+def _parse_now(value: str | None) -> datetime:
+    if not value:
+        return datetime.now().astimezone()
+    parsed = datetime.fromisoformat(value)
+    return parsed if parsed.tzinfo else parsed.astimezone()
+
+
+def _boards(config: dict, args: argparse.Namespace) -> dict:
+    names = args.board or sorted(peak_hold.glm_workers_by_board(config))
+    if args.kanban_db:
+        if len(names) != 1:
+            raise SystemExit("jev-peak-hold: --kanban-db needs exactly one --board")
+        return {names[0]: Path(args.kanban_db)}
+    boards = {}
+    for name in names:
+        path = peak_hold.kanban_db_path(config, name)
+        if path.exists():
+            boards[name] = path
+        else:
+            print(f"skip {name}: no board database")
+    return boards
+
+
+def _print_actions(actions: list, prefix: str) -> None:
+    for item in actions:
+        if item["action"] == "hold":
+            print(f"{prefix}hold {item['board']} {item['task_id']} assignee={item['assignee']} "
+                  f"until={item['held_until']}")
+        else:
+            print(f"{prefix}release {item['board']} {item['task_id']} assignee={item['assignee']}")
+
+
+def _print_results(results: list) -> int:
+    failures = 0
+    for item in results:
+        verb = "held" if item["action"] == "hold" else "released"
+        if item["applied"]:
+            print(f"{verb} {item['board']} {item['task_id']}")
+        else:
+            failures += 1
+            print(f"failed {item['action']} {item['board']} {item['task_id']} error_class={item['error_class']}")
+    return 1 if failures else 0
+
+
+def _changed_by(args: argparse.Namespace) -> str:
+    if args.by:
+        return args.by
+    for name in ("HERMES_PROFILE", "USER"):
+        value = os.environ.get(name, "").strip()
+        if value:
+            return value
+    try:
+        return getpass.getuser()
+    except Exception:
+        return "unknown"
+
+
+def _toggle(config: dict, args: argparse.Namespace, enabled: bool) -> int:
+    current, content, error_class = peak_hold.read_switch()
+    peak_hold.log_switch_error(error_class)
+    now = _parse_now(args.now)
+    changed = error_class is not None or current != enabled
+    if args.dry_run:
+        print(f"planned switch {'on' if enabled else 'off'} (changed={str(changed).lower()})")
+    elif changed:
+        peak_hold.write_switch(enabled, _changed_by(args), now)
+        jev_log.write("decisions", {"event": "toggle", "applied": True, "enabled": enabled,
+                                    "changed_by": _changed_by(args)})
+        print(f"peak-hours hold turned {'on' if enabled else 'off'}")
+    else:
+        print(f"peak-hours hold already {'on' if enabled else 'off'}")
+    if enabled:
+        return 0
+    boards = _boards(config, args)
+    actions, _ = peak_hold.plan(config, now, boards, force_release=True)
+    if args.dry_run:
+        _print_actions(actions, "planned ")
+        return 0
+    return _print_results(peak_hold.apply(config, actions, args.hermes))
+
+
+def _status(config: dict, args: argparse.Namespace) -> int:
+    enabled, content, error_class = peak_hold.read_switch()
+    now = _parse_now(args.now)
+    cfg = config.get("peak_hold") or {}
+    print(f"peak-hours hold: {'on' if enabled else 'off'}")
+    print(f"switch file: {peak_hold.switch_path()}" + ("" if content or error_class else " (absent, means on)"))
+    if error_class:
+        print(f"switch file error: {error_class} (treated as on)")
+    print(f"changed_at: {content.get('changed_at') or '-'}")
+    print(f"changed_by: {content.get('changed_by') or '-'}")
+    print(f"config peak_hold.enabled: {str(bool(cfg.get('enabled', False))).lower()}")
+    print(f"inside window now: {str(peak_hold.in_window(now, cfg)).lower()}")
+    print(f"held cards: {peak_hold.count_held(config, _boards(config, args))}")
+    return 0
+
+
+def _run(config: dict, args: argparse.Namespace) -> int:
+    now = _parse_now(args.now)
+    actions, switch_error = peak_hold.plan(config, now, _boards(config, args))
+    if switch_error:
+        print(f"switch file error: {switch_error} (treated as on)")
+        if args.apply:
+            peak_hold.log_switch_error(switch_error)
+    if not args.apply:
+        _print_actions(actions, "planned ")
+        if not actions:
+            print("nothing to hold or release")
+        return 0
+    if not actions:
+        print("nothing to hold or release")
+        return 0
+    return _print_results(peak_hold.apply(config, actions, args.hermes))
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(prog="jev-peak-hold", description=__doc__,
+                                     formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("command", nargs="?", default="run", choices=["run", "off", "on", "status"])
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--dry-run", action="store_true", help="print planned changes only (default for run)")
+    mode.add_argument("--apply", action="store_true", help="run: perform the holds and releases")
+    parser.add_argument("--now", help="ISO 8601 time to use instead of the current time (tests)")
+    parser.add_argument("--kanban-db", help="board database path (tests); needs exactly one --board")
+    parser.add_argument("--board", action="append", help="board name (repeatable); default: boards with GLM workers")
+    parser.add_argument("--config", default=str(PLUGIN_DIR / "config.json"), help="plugin config.json path")
+    parser.add_argument("--hermes", help="hermes command (default: kanban.hermes_command in config.json)")
+    parser.add_argument("--by", help="name recorded as changed_by for off and on")
+    args = parser.parse_args(argv)
+    config = _load_config(Path(args.config))
+    if args.command == "off":
+        return _toggle(config, args, False)
+    if args.command == "on":
+        return _toggle(config, args, True)
+    if args.command == "status":
+        return _status(config, args)
+    return _run(config, args)
+
+
+if __name__ == "__main__":
+    sys.exit(main())
