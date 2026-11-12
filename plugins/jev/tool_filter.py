@@ -45,7 +45,8 @@ QUESTION_TEXT = (
     "the command was run for?"
 )
 
-REMOVAL_LINE = "[jev: {lines} lines removed here; the full output is saved in {path}]"
+REMOVAL_LINE = ("[jev: {lines} lines removed here; the full output is saved in {path}; "
+                "read it with read_file]")
 
 DEFAULTS = {
     "tools": ["terminal", "execute_code", "search_files", "browser_exec"],
@@ -69,10 +70,26 @@ class UnexpectedAnswer(Exception):
     """Jev returned no usable probability for a chunk question."""
 
 
+class InvalidSetting(Exception):
+    """A tool_results setting has a value the filter cannot use."""
+
+
 def _setting(settings, key):
     if isinstance(settings, dict) and key in settings:
         return settings[key]
     return DEFAULTS[key]
+
+
+def _int_setting(settings, key, minimum):
+    """Return the setting as an int of at least ``minimum``, else raise InvalidSetting.
+
+    Booleans, floats, strings and other types are rejected rather than converted,
+    so that a value such as 0.5 cannot become 0.
+    """
+    value = _setting(settings, key)
+    if isinstance(value, bool) or not isinstance(value, int) or value < minimum:
+        raise InvalidSetting(key)
+    return value
 
 
 def _now_iso():
@@ -104,12 +121,8 @@ def _is_inside(path, directory):
         return False
 
 
-def _locate_text(result, field):
-    """Return (parsed, text, encoded, ensure_ascii) for the field, or None if unrecognised.
-
-    ``encoded`` is the JSON string literal of the field value exactly as it
-    appears once in ``result``.
-    """
+def _field_text(result, field):
+    """Return the string value of the field in the JSON object ``result``, or None."""
     if not isinstance(result, str):
         return None
     try:
@@ -119,17 +132,27 @@ def _locate_text(result, field):
     if not isinstance(parsed, dict):
         return None
     text = parsed.get(field)
-    if not isinstance(text, str):
-        return None
+    return text if isinstance(text, str) else None
+
+
+def _encoded_literal(result, text):
+    """Return (encoded, ensure_ascii) where ``encoded`` occurs exactly once in ``result``.
+
+    ``encoded`` is the JSON string literal of ``text``. Returns None when neither
+    serialized form occurs exactly once.
+    """
     for ensure_ascii in (False, True):
         encoded = json.dumps(text, ensure_ascii=ensure_ascii)
         if result.count(encoded) == 1:
-            return parsed, text, encoded, ensure_ascii
+            return encoded, ensure_ascii
     return None
 
 
 def _split_units(text, chunk_chars):
     """Split text into line units; a line longer than chunk_chars is cut into pieces."""
+    if isinstance(chunk_chars, bool) or not isinstance(chunk_chars, int) or chunk_chars < 1:
+        # A value below 1 would make the loop below run without end.
+        raise InvalidSetting("chunk_chars")
     units = []
     for line in text.splitlines(keepends=True):
         while len(line) > chunk_chars:
@@ -145,6 +168,8 @@ def _make_chunks(text, chunk_lines, chunk_chars):
 
     ``"".join(chunks) == text`` always holds.
     """
+    if isinstance(chunk_lines, bool) or not isinstance(chunk_lines, int) or chunk_lines < 1:
+        raise InvalidSetting("chunk_lines")
     chunks, current, size = [], [], 0
     for unit in _split_units(text, chunk_chars):
         if current and (len(current) >= chunk_lines or size + len(unit) > chunk_chars):
@@ -221,6 +246,8 @@ def _append_removal(parts, removed, saved_path):
 
 
 def _filter(*, tool_name, args, result, session_id, profile, settings, ask, log, cache_dir):
+    if isinstance(settings, dict) and settings.get("enabled") is False:
+        return None
     if tool_name in NEVER_FILTERED:
         path = args.get("path") if isinstance(args, dict) else None
         if isinstance(path, str) and path and _is_inside(path, cache_dir):
@@ -229,17 +256,14 @@ def _filter(*, tool_name, args, result, session_id, profile, settings, ask, log,
         return None
     if not isinstance(tool_name, str) or tool_name.startswith("kanban_"):
         return None
-    if isinstance(settings, dict) and settings.get("enabled") is False:
-        return None
     if tool_name not in _setting(settings, "tools") or tool_name not in TEXT_FIELDS:
         return None
 
-    located = _locate_text(result, TEXT_FIELDS[tool_name])
-    if located is None:
+    text = _field_text(result, TEXT_FIELDS[tool_name])
+    if text is None:
         _write_log(log, _record(profile, session_id, tool_name, action="skipped",
                                 reason="unrecognised_format"))
         return None
-    _parsed, text, encoded, ensure_ascii = located
     before = len(text)
     if before <= _setting(settings, "min_chars"):
         _write_log(log, _record(profile, session_id, tool_name, action="skipped",
@@ -249,13 +273,30 @@ def _filter(*, tool_name, args, result, session_id, profile, settings, ask, log,
         _write_log(log, _record(profile, session_id, tool_name, action="skipped",
                                 reason="above_max_chars", chars_before=before, chars_after=before))
         return None
+    located = _encoded_literal(result, text)
+    if located is None:
+        _write_log(log, _record(profile, session_id, tool_name, action="skipped",
+                                reason="unrecognised_format", chars_before=before,
+                                chars_after=before))
+        return None
+    encoded, ensure_ascii = located
+    try:
+        chunk_lines = _int_setting(settings, "chunk_lines", 1)
+        chunk_chars = _int_setting(settings, "chunk_chars", 1)
+        args_chars = _int_setting(settings, "args_chars", 0)
+    except InvalidSetting as exc:
+        # Checked before the original is saved, so no file is left in cache_dir.
+        _write_log(log, _record(profile, session_id, tool_name, action="unchanged",
+                                reason=f"invalid_setting_{exc.args[0]}",
+                                error_class="InvalidSetting", chars_before=before,
+                                chars_after=before))
+        return None
 
     saved_path = _save_original(cache_dir, tool_name, text)
     record = _record(profile, session_id, tool_name, chars_before=before, chars_after=before,
                      saved_file=saved_path)
     try:
-        chunks = _make_chunks(text, int(_setting(settings, "chunk_lines")),
-                              int(_setting(settings, "chunk_chars")))
+        chunks = _make_chunks(text, chunk_lines, chunk_chars)
         record["chunks_total"] = len(chunks)
         if len(chunks) < 3:
             # First and last chunks are always kept, so nothing could be removed.
@@ -266,7 +307,7 @@ def _filter(*, tool_name, args, result, session_id, profile, settings, ask, log,
             return None
         state = {
             "tool": tool_name,
-            "arguments": _args_text(args, int(_setting(settings, "args_chars"))),
+            "arguments": _args_text(args, args_chars),
             "chunks": {str(n): chunk for n, chunk in enumerate(chunks, start=1)},
         }
         questions = {

@@ -87,7 +87,9 @@ def read_log(log_dir, stream, cutoff):
     path = os.path.join(log_dir, f"{stream}.jsonl")
     records = []
     try:
-        with open(path, encoding="utf-8") as handle:
+        # errors="replace": a byte that is not valid UTF-8 turns its line into
+        # text that is not valid JSON, and that line is skipped below.
+        with open(path, encoding="utf-8", errors="replace") as handle:
             for line in handle:
                 try:
                     record = json.loads(line)

@@ -8,6 +8,7 @@ import importlib.machinery
 import importlib.util
 import json
 import os
+import signal
 import stat
 import tempfile
 import unittest
@@ -74,6 +75,10 @@ class FakeAsk:
         return FakeAnswer({
             name: {"noul": self.probability(int(name.split("_")[1]), total)} for name in questions
         })
+
+
+def _alarm(signum, frame):
+    raise TimeoutError("transform did not return within the time limit")
 
 
 def make_text(lines=400, width=40, marker=SENTINEL):
@@ -220,7 +225,8 @@ class FilteredResultTests(FilterTestCase):
         chunks = tool_filter._make_chunks(text, 40, 2000)
         self.assertEqual(output, chunks[0] + "[jev: "
                          f"{sum(len(c.splitlines()) for c in chunks[1:-1])} lines removed here; the full "
-                         f"output is saved in {self.saved_files()[0]}]\n" + chunks[-1])
+                         f"output is saved in {self.saved_files()[0]}; read it with read_file]\n"
+                         + chunks[-1])
         self.assertEqual(self.records()[0]["chunks_kept"], 2)
 
     def test_search_files_matches_text_filtered(self):
@@ -292,6 +298,52 @@ class UnchangedResultTests(FilterTestCase):
                              ("unchanged", "kept_ratio_at_or_above_max"))
             self.assertEqual(record["chunks_total"], total)
             self.assertIsNone(record["saved_file"])
+
+    def test_short_output_with_repeated_literal_is_below_min_chars(self):
+        # The literal "error" is also a key, so it occurs twice; the length test comes first.
+        ask = FakeAsk()
+        self.assert_unchanged(self.run_transform(
+            "terminal", json.dumps({"output": "error", "exit_code": 1, "error": None}), ask), ask)
+        self.assertEqual(self.records()[-1]["reason"], "below_min_chars")
+
+    def test_long_output_repeated_in_result_unchanged(self):
+        text = make_text()
+        ask = FakeAsk()
+        result = json.dumps({"output": text, "copy": text})
+        self.assert_unchanged(self.run_transform("terminal", result, ask), ask)
+        record = self.records()[-1]
+        self.assertEqual((record["action"], record["reason"], record["chars_before"]),
+                         ("skipped", "unrecognised_format", len(text)))
+
+    def test_invalid_chunk_settings_return_in_bounded_time(self):
+        # chunk_chars 0 or below once made _split_units loop without end.
+        text = "w" * 40000  # one line, so every piece comes from cutting it at chunk_chars
+        result = json.dumps({"output": text, "exit_code": 0})
+        cases = [("chunk_chars", value) for value in (0, -5, 0.5, 40.0, "2000", None, True)]
+        cases += [("chunk_lines", value) for value in (0, -1, 0.9, "40", None, False)]
+        cases += [("args_chars", value) for value in (-1, 1.5, "2000")]
+        previous = signal.signal(signal.SIGALRM, _alarm)
+        try:
+            for key, value in cases:
+                with self.subTest(key=key, value=value):
+                    ask = FakeAsk()
+                    signal.alarm(5)
+                    try:
+                        value_returned = self.run_transform(
+                            "terminal", result, ask, settings=dict(SETTINGS, **{key: value}))
+                    finally:
+                        signal.alarm(0)
+                    self.assert_unchanged(value_returned, ask)
+                    record = self.records()[-1]
+                    self.assertEqual(
+                        (record["action"], record["reason"], record["error_class"],
+                         record["saved_file"], record["chars_before"]),
+                        ("unchanged", f"invalid_setting_{key}", "InvalidSetting", None, 40000))
+        finally:
+            signal.signal(signal.SIGALRM, previous)
+        for chunk_lines, chunk_chars in ((40, 0), (40, -5), (0, 2000), (-3, 2000)):
+            with self.assertRaises(tool_filter.InvalidSetting):
+                tool_filter._make_chunks(text, chunk_lines, chunk_chars)
 
     def test_read_file_and_kanban_tools_never_filtered(self):
         text = make_text()
@@ -371,6 +423,13 @@ class SavedReadTests(FilterTestCase):
         self.assertEqual(record["tool"], "read_file")
         self.assertEqual(record["saved_file"], os.path.realpath(saved))
         self.assertEqual(record["session_id"], "session-1")
+
+    def test_read_of_saved_file_not_logged_when_section_disabled(self):
+        self.cache_dir.mkdir(parents=True)
+        inside = self.cache_dir / "20260101T000000Z-terminal-0123abcd.txt"
+        self.assertIsNone(self.run_transform("read_file", "{}", FakeAsk(), args={"path": str(inside)},
+                                             settings=dict(SETTINGS, enabled=False)))
+        self.assertEqual(self.records(), [])
 
     def test_read_outside_cache_dir_not_logged(self):
         self.cache_dir.mkdir(parents=True)

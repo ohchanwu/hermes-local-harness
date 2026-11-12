@@ -205,6 +205,23 @@ class EmptyInputTests(unittest.TestCase):
                                        [os.path.join(tmp, "absent-state.db")], now=NOW)
             self.assert_all_sections_empty(text)
 
+    def test_line_with_invalid_utf8_is_skipped(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            logs = os.path.join(tmp, "logs")
+            os.makedirs(logs)
+            good = json.dumps(route("t_a", "easy", True, 1000)).encode("utf-8")
+            with open(os.path.join(logs, "decisions.jsonl"), "wb") as handle:
+                handle.write(b'{"ts": "\xff"}\n\xff\xfe not json\n' + good + b"\n")
+            records = report.read_log(logs, "decisions", 0)
+            self.assertEqual([r["task_id"] for r in records], ["t_a"])
+            env = dict(os.environ, HERMES_JEV_LOG_DIR=logs)
+            proc = subprocess.run(
+                [sys.executable, str(SCRIPT), "--kanban-db", os.devnull, "--state-db", os.devnull,
+                 "--since", "100000"],
+                capture_output=True, text=True, encoding="utf-8", env=env, check=False)
+            self.assertEqual(proc.returncode, 0, proc.stderr)
+            self.assertEqual(proc.stderr, "")
+
     def test_logs_without_databases(self):
         with tempfile.TemporaryDirectory() as tmp:
             logs = os.path.join(tmp, "logs")
