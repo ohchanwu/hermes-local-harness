@@ -195,7 +195,7 @@ check("--fixture", str(FIXTURES / "deployed-skill-divergence.yaml"), code=1, tex
 # The canonical orchestration policy is versioned and its source-to-live hash
 # enforcement covers the default profile's deployed orchestrator skill.
 orchestrator = (ROOT / "skills" / "multi-agent-coding-orchestrator" / "SKILL.md").read_text()
-assert "version: 0.6.5" in orchestrator
+assert "version: 0.6.13" in orchestrator
 assert "Routing validation and dispatch receipt" in orchestrator
 assert "Authentication expiry blocks a fresh observation" in orchestrator
 assert "currently_actionable" in orchestrator
@@ -203,9 +203,9 @@ assert "jobcron-orchestrator" in orchestrator
 assert "chapt-reviewer" in orchestrator
 assert "harness-orchestrator" in orchestrator
 assert "docs/bugs" in orchestrator
-assert "gpt-6.1-sol" in orchestrator
+assert "claude-opus-5-5" in orchestrator
 # Terminal retry remains an explicit card-scoped v2 policy, never the default.
-assert "version: 0.6.5" in orchestrator
+assert "version: 0.6.13" in orchestrator
 assert "RETRY_TERMINAL" in orchestrator
 assert "terminal_retry_policy: astra-until-approve-v1" in orchestrator
 assert "glm-review-v2" in orchestrator
@@ -243,7 +243,7 @@ project_repair_policy = {
     "max_approaches": 3,
     "max_attempts_per_approach": 3,
     "max_infrastructure_retries_per_attempt": 1,
-    "project_boards": ["jobcron", "cha-pt", "harness", "jss-genr"],
+    "project_boards": ["jobcron", "cha-pt", "harness", "jss-genr", "anki"],
 }
 assert roster["project_repair_policy"] == project_repair_policy
 assert snapshot["project_repair_policy"] == project_repair_policy
@@ -838,8 +838,13 @@ assert "project isolation preview port invalid: harness" in errors, errors
 
 harness_skill = (ROOT / "policies" / "profile-skills" / "harness-orchestrator" /
                  "autonomous-ai-agents" / "multi-agent-coding-orchestrator" / "SKILL.md").read_text()
+# The one Card Setup sentence that records the 2026-10-20 stalls (t_b6d0e590)
+# names the Jobcron orchestrator as history only; tests/test_orchestrator_card_creation_policy.py
+# requires it in every orchestrator skill, and it routes no work to that fleet.
+stall_history = "This caused the 2026-10-20 stalls of the JSS and Jobcron orchestrators."
+assert harness_skill.count(stall_history) == 1
 for foreign in ("jobcron", "cha-pt", "chapt-", "worker-astra", "reviewer-sol"):
-    assert foreign not in harness_skill.lower(), foreign
+    assert foreign not in harness_skill.replace(stall_history, "").lower(), foreign
 for line in harness_skill.splitlines():
     if "hermes kanban " in line:
         assert "--board harness" in line, line
@@ -848,11 +853,20 @@ for tool_name in ("kanban_create", "kanban_show", "kanban_list", "kanban_comment
                   "kanban_request_changes"):
     if tool_name in harness_skill:
         assert "board: harness" in harness_skill
-drifted_overrides = json.loads(json.dumps(local_overrides))
+# Observed hashes are compared per declared file (7a4ed4b): one changed live hash
+# is one drift error for that file, and an observed file that is not declared is
+# a declaration drift.
+drifted_overrides = json.loads(json.dumps(observed_overrides))
 drifted_overrides["worker-astra"]["software-development/spike/SKILL.md"] = "0" * 64
 errors = []
 with redirect_stdout(io.StringIO()):
     verify_state.check_profile_local_skill_overrides(errors, local_overrides, drifted_overrides)
+assert errors == ["profile-local skill override drift: worker-astra/software-development/spike/SKILL.md"], errors
+undeclared_overrides = json.loads(json.dumps(observed_overrides))
+undeclared_overrides["worker-astra"]["software-development/undeclared/SKILL.md"] = "0" * 64
+errors = []
+with redirect_stdout(io.StringIO()):
+    verify_state.check_profile_local_skill_overrides(errors, local_overrides, undeclared_overrides)
 assert errors == ["profile-local skill override declaration drift"], errors
 # the implementation skill must not impose Ponytail's mandatory source-comment convention
 assert "ponytail:" not in (ROOT / "skills" / "minimal-implementation" / "SKILL.md").read_text(), \
