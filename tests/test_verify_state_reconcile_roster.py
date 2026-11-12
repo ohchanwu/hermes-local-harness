@@ -25,13 +25,17 @@ OPUS = _POLICY.MODEL_POLICY_BY_ROLE["implementation"]
 FABLE = _POLICY.MODEL_POLICY_BY_ROLE["independent reviewer"]
 CLAUDE = _POLICY.MODEL_POLICY_PROVIDER
 GLM = tuple(f"{prefix}-worker-glm-{n}" for prefix in ("jobcron", "chapt", "harness", "jss") for n in (1, 2))
+# Owner decision of 2026-11-12 (card t_4f7740d0): the GLM workers of jobcron, cha-pt and
+# harness are back in service for the jev plugin; the jss-genr GLM workers stay retired.
+GLM_IN_SERVICE = tuple(f"{prefix}-worker-glm-{n}" for prefix in ("jobcron", "chapt", "harness") for n in (1, 2))
+GLM_RETIRED = ("jss-worker-glm-1", "jss-worker-glm-2")
 GPT_ERA = ("reviewer-sol", "worker-flash-1", "worker-flash-2", "worker-flash-3", "worker-luna-1",
            "worker-luna-2", "worker-terra-1", "worker-glm-full", "worker-sol", "worker-astra",
            "worker-terra-2")
 PROJECT_DISPATCH = ["jobcron-worker", "jobcron-reviewer", "chapt-worker", "chapt-reviewer",
                     "harness-worker", "harness-reviewer", "jss-worker", "jss-reviewer",
                     "harness-worker-2", "chapt-worker-2", "jobcron-worker-2", "jss-worker-2",
-                    "anki-worker", "anki-worker-2", "anki-reviewer"]
+                    "anki-worker", "anki-worker-2", "anki-reviewer", *GLM_IN_SERVICE]
 HARNESS = "/Users/chanbla11mit/hermes-local-harness"
 
 
@@ -85,8 +89,17 @@ class ModelPolicy(Base):
         for profile in self.roster["profiles"]:
             if profile["lifecycle"] != "retired":
                 with self.subTest(profile=profile["name"]):
+                    if profile["name"] in GLM_IN_SERVICE:
+                        self.assertEqual((profile["model"], profile["provider"]), ("glm-5.3", "zai"))
+                        continue
                     want = FABLE if "reviewer" in profile["role"] or profile["role"] == "advisor" else OPUS
                     self.assertEqual((profile["model"], profile["provider"]), (want, CLAUDE))
+
+    def test_glm_worker_on_another_model_fails(self):
+        roster = copy.deepcopy(self.roster)
+        next(p for p in roster["profiles"] if p["name"] == "chapt-worker-glm-1").update(model=OPUS, provider=CLAUDE)
+        self.assertEqual(quiet(self.verifier.check_model_policy, roster), [
+            f"roster model policy drift chapt-worker-glm-1: expected glm-5.3 on zai, declared {OPUS} on {CLAUDE}"])
 
     def test_out_of_policy_declaration_fails(self):
         roster = copy.deepcopy(self.roster)
@@ -117,7 +130,7 @@ class RetiredProfiles(Base):
     """Items 2 and 3: retired lifecycle, never dispatchable."""
 
     def test_glm_and_gpt_era_profiles_are_declared_retired(self):
-        for name in (*GLM, *GPT_ERA):
+        for name in (*GLM_RETIRED, *GPT_ERA):
             with self.subTest(profile=name):
                 entry = self.profiles[name]
                 self.assertEqual(entry["lifecycle"], "retired")
@@ -134,12 +147,30 @@ class RetiredProfiles(Base):
         glm_provider, _, glm_model, _ = switch.TARGETS["glm"]
         for name in GLM:
             self.assertEqual((self.profiles[name]["model"], self.profiles[name]["provider"]), (glm_model, glm_provider))
+        for name in GLM_RETIRED:
             self.assertEqual(self.profiles[name]["lifecycle_before_retirement"], "project-active")
-        self.assertEqual(set(self.verifier.roster_retired(self.roster)), set(GLM) | set(GPT_ERA))
+        self.assertEqual(set(self.verifier.roster_retired(self.roster)), set(GLM_RETIRED) | set(GPT_ERA))
         self.assertEqual(quiet(self.verifier.check_retired_profiles, self.roster), [])
 
+    def test_glm_workers_in_service_are_declared_dispatchable(self):
+        for name in GLM_IN_SERVICE:
+            with self.subTest(profile=name):
+                entry = self.profiles[name]
+                self.assertEqual(entry["lifecycle"], "project-active")
+                self.assertNotIn("retired_on", entry)
+                self.assertNotIn("lifecycle_before_retirement", entry)
+                self.assertTrue(entry["dispatch_eligible"])
+                self.assertTrue(entry["in_dispatch_pool"])
+        self.assertEqual(quiet(self.verifier.check_glm_worker_profiles, self.roster), [])
+        roster = copy.deepcopy(self.roster)
+        entry = next(p for p in roster["profiles"] if p["name"] == "harness-worker-glm-2")
+        entry.update(lifecycle="retired", in_dispatch_pool=False)
+        self.assertEqual(quiet(self.verifier.check_glm_worker_profiles, roster), [
+            "GLM worker lifecycle drift harness-worker-glm-2: expected project-active, declared 'retired'",
+            "GLM worker not dispatchable harness-worker-glm-2: dispatch_eligible and in_dispatch_pool must be true"])
+
     def test_no_retired_profile_in_any_pool(self):
-        retired = set(GLM) | set(GPT_ERA)
+        retired = set(GLM_RETIRED) | set(GPT_ERA)
         pool = self.roster["dispatch_pool"]
         self.assertEqual(pool, {"implementation_allowlist": [], "dispatch_allowlist": [],
                                 "reviewer_outside_budget": None})
@@ -151,9 +182,9 @@ class RetiredProfiles(Base):
 
     def test_retired_profile_marked_dispatchable_fails(self):
         roster = copy.deepcopy(self.roster)
-        next(p for p in roster["profiles"] if p["name"] == "harness-worker-glm-1")["dispatch_eligible"] = True
+        next(p for p in roster["profiles"] if p["name"] == "jss-worker-glm-1")["dispatch_eligible"] = True
         self.assertEqual(quiet(self.verifier.check_retired_profiles, roster), [
-            "retired profile dispatchable harness-worker-glm-1: dispatch_eligible and in_dispatch_pool must be false"])
+            "retired profile dispatchable jss-worker-glm-1: dispatch_eligible and in_dispatch_pool must be false"])
         roster = copy.deepcopy(self.roster)
         next(p for p in roster["profiles"] if p["name"] == "worker-astra")["in_dispatch_pool"] = True
         self.assertEqual(quiet(self.verifier.check_retired_profiles, roster), [
@@ -163,24 +194,24 @@ class RetiredProfiles(Base):
         roster = copy.deepcopy(self.roster)
         roster["project_dispatch_allowlist"].append("jss-worker-glm-2")
         roster["dispatch_pool"]["dispatch_allowlist"].append("reviewer-sol")
-        roster["project_fleets"]["harness"]["workers"].append("harness-worker-glm-1")
+        roster["project_fleets"]["harness"]["workers"].append("jss-worker-glm-1")
         errors = quiet(self.verifier.check_retired_profiles, roster)
         self.assertIn("retired profile back in project_dispatch_allowlist: jss-worker-glm-2", errors)
         self.assertIn("retired profile back in dispatch_pool.dispatch_allowlist: reviewer-sol", errors)
-        self.assertIn("retired profile back in project fleet harness: harness-worker-glm-1", errors)
+        self.assertIn("retired profile back in project fleet harness: jss-worker-glm-1", errors)
 
     def test_glm_lifecycle_cannot_be_dropped(self):
         roster = copy.deepcopy(self.roster)
-        entry = next(p for p in roster["profiles"] if p["name"] == "chapt-worker-glm-2")
+        entry = next(p for p in roster["profiles"] if p["name"] == "jss-worker-glm-2")
         entry["lifecycle"] = "project-active"
-        self.assertIn("retired profile lifecycle drift chapt-worker-glm-2: expected retired",
+        self.assertIn("retired profile lifecycle drift jss-worker-glm-2: expected retired",
                       quiet(self.verifier.check_retired_profiles, roster))
-        roster["profiles"] = [p for p in roster["profiles"] if p["name"] != "chapt-worker-glm-2"]
-        self.assertIn("retired profile lifecycle drift chapt-worker-glm-2: expected retired",
+        roster["profiles"] = [p for p in roster["profiles"] if p["name"] != "jss-worker-glm-2"]
+        self.assertIn("retired profile lifecycle drift jss-worker-glm-2: expected retired",
                       quiet(self.verifier.check_retired_profiles, roster))
 
     def test_retired_profile_back_in_observed_dispatch_fails(self):
-        for name in ("worker-astra", "harness-worker-glm-2"):
+        for name in ("worker-astra", "jss-worker-glm-2"):
             data = copy.deepcopy(self.clean)
             data["dispatch_profiles"].append(name)
             code, output = fixture_main(data)

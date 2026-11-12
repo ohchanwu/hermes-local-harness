@@ -30,6 +30,11 @@ ENABLED_NOTIF = f"enabled      git pinned@6ae2bf2d 0.2.0    {NOTIF}"
 DISABLED_NOTIF = f"disabled     git pinned@6ae2bf2d 0.2.0    {NOTIF}"
 DISABLED_PONY = "disabled     git pinned@16f29800 4.8.4    ponytail"
 ENABLED_PONY = "enabled      git pinned@16f29800 4.8.4    ponytail"
+# Observed `plugins list --plain` line of an enabled jev plugin (card t_4f7740d0). The
+# source and version columns are assumed values: no pin is declared for jev, so
+# check_plugins compares only the leading `enabled` status.
+JEV = "jev"
+ENABLED_JEV = f"enabled      user     0.1.0    {JEV}"
 
 
 def write(name, data):
@@ -57,6 +62,8 @@ def base_plugins():
                 plugins[name][NOTIF] = DISABLED_NOTIF
             if name in IMPL:
                 plugins[name]["ponytail"] = DISABLED_PONY
+        if JEV in roster_profiles[name].get("required_plugins", []):
+            plugins[name][JEV] = ENABLED_JEV
     return plugins
 
 
@@ -183,12 +190,30 @@ write("dormant-extra.yaml", delta(lambda d: d["dormant_extras"].append("unused-l
 
 
 def retired_glm_dispatch(d):
-    # A retired GLM worker stays installed and stopped, but is back on the dispatch list.
-    d["dormant_extras"].append("harness-worker-glm-1")
-    d["dispatch_profiles"].append("harness-worker-glm-1")
+    # A GLM worker that is still retired stays installed and stopped, but is back on the
+    # dispatch list.
+    d["dormant_extras"].append("jss-worker-glm-1")
+    d["dispatch_profiles"].append("jss-worker-glm-1")
 
 
 write("retired-glm-dispatch-drift.yaml", delta(retired_glm_dispatch))
+
+
+def glm_worker_dispatch_missing(d):
+    # One of the GLM workers in service (card t_4f7740d0) is missing from the dispatch list.
+    d["dispatch_profiles"].remove("chapt-worker-glm-2")
+
+
+write("glm-worker-dispatch-missing.yaml", delta(glm_worker_dispatch_missing))
+
+
+def jev_plugin_missing(d):
+    # jev is absent on one Claude profile and disabled on one GLM worker that require it.
+    del d["plugins"]["harness-reviewer"][JEV]
+    d["plugins"]["jobcron-worker-glm-1"][JEV] = "disabled     user     0.1.0    jev"
+
+
+write("jev-plugin-missing.yaml", delta(jev_plugin_missing))
 
 
 def compression_drift(d):

@@ -316,12 +316,12 @@ PROFILE_SOUL_PATHS = {
 }
 # Fleet GLM workers retired 2026-10-18 (procedures/switching-hermes-models.md).
 # The owner kept them installed (2026-10-19): roster.yaml carries each one with
-# lifecycle "retired". This constant is the floor: none of them may lose that
+# lifecycle "retired". On 2026-11-12 the owner returned the GLM workers of the
+# jobcron, cha-pt and harness boards to service for the jev plugin (card
+# t_4f7740d0); see PROJECT_GLM_WORKER_POOLS. The jss-genr GLM workers stay
+# retired. This constant is the floor: none of them may lose the retired
 # lifecycle, and none may ever be dispatchable.
 RETIRED_PROFILES = (
-    "jobcron-worker-glm-1", "jobcron-worker-glm-2",
-    "chapt-worker-glm-1", "chapt-worker-glm-2",
-    "harness-worker-glm-1", "harness-worker-glm-2",
     "jss-worker-glm-1", "jss-worker-glm-2",
 )
 RETIRED_LIFECYCLE = "retired"
@@ -338,6 +338,11 @@ MODEL_POLICY_BY_ROLE = {
     "independent reviewer": "claude-fable-5-2",
     "project independent reviewer": "claude-fable-5-2",
 }
+# The GLM workers of PROJECT_GLM_WORKER_POOLS are outside MODEL_POLICY_BY_ROLE
+# (owner decision of 2026-11-12, card t_4f7740d0): each one runs this model and provider.
+GLM_WORKER_MODEL = "glm-5.3"
+GLM_WORKER_PROVIDER = "zai"
+GLM_WORKER_LIFECYCLE = "project-active"
 
 
 def roster_retired(roster):
@@ -392,12 +397,65 @@ def check_model_policy(errors, roster):
         if not isinstance(profile, dict) or profile.get("lifecycle") == RETIRED_LIFECYCLE:
             continue
         name = profile.get("name")
-        want = MODEL_POLICY_BY_ROLE.get(profile.get("role"))
+        if name in glm_worker_profiles():
+            want, provider = GLM_WORKER_MODEL, GLM_WORKER_PROVIDER
+        else:
+            want, provider = MODEL_POLICY_BY_ROLE.get(profile.get("role")), MODEL_POLICY_PROVIDER
         if want is None:
             fail(errors, f"roster model policy drift {name}: role {profile.get('role')!r} has no model policy")
-        elif profile.get("model") != want or profile.get("provider") != MODEL_POLICY_PROVIDER:
-            fail(errors, f"roster model policy drift {name}: expected {want} on {MODEL_POLICY_PROVIDER}, "
+        elif profile.get("model") != want or profile.get("provider") != provider:
+            fail(errors, f"roster model policy drift {name}: expected {want} on {provider}, "
                          f"declared {profile.get('model')} on {profile.get('provider')}")
+
+
+def glm_worker_profiles():
+    """Names of the GLM workers in service, in PROJECT_GLM_WORKER_POOLS order."""
+    return tuple(name for pool in PROJECT_GLM_WORKER_POOLS.values() for name in pool)
+
+
+def check_glm_worker_profiles(errors, roster):
+    """Each GLM worker in service is declared with its lifecycle and dispatch flags
+    (check_model_policy checks its model and provider)."""
+    profiles = {p.get("name"): p for p in roster.get("profiles", []) if isinstance(p, dict)}
+    for name in glm_worker_profiles():
+        profile = profiles.get(name)
+        if profile is None:
+            fail(errors, f"GLM worker profile missing from roster: {name}")
+            continue
+        if profile.get("lifecycle") != GLM_WORKER_LIFECYCLE:
+            fail(errors, f"GLM worker lifecycle drift {name}: expected {GLM_WORKER_LIFECYCLE}, "
+                         f"declared {profile.get('lifecycle')!r}")
+        if profile.get("dispatch_eligible") is not True or profile.get("in_dispatch_pool") is not True:
+            fail(errors, f"GLM worker not dispatchable {name}: dispatch_eligible and in_dispatch_pool must be true")
+
+
+# The jev plugin (plugins/jev/, card t_4f7740d0) is a required enabled plugin
+# on the 21 Claude subscription profiles (the advisor and the orchestrator, reviewer and
+# two Claude workers of every project fleet) and on the GLM workers in service.
+JEV_PLUGIN = "jev"
+JEV_CLAUDE_PROFILES = ("advisor", *(f"{prefix}-{role}" for prefix in ("anki", "chapt", "harness", "jobcron", "jss")
+                                    for role in ("orchestrator", "reviewer", "worker", "worker-2")))
+
+
+def jev_required_profiles():
+    return (*JEV_CLAUDE_PROFILES, *glm_worker_profiles())
+
+
+def check_jev_plugin_declarations(errors, roster):
+    """roster.yaml lists jev in required_plugins of exactly the jev profiles, so profile
+    repair keeps the plugin and the plugin checks expect it enabled."""
+    wanted = set(jev_required_profiles())
+    profiles = {p.get("name"): p for p in roster.get("profiles", []) if isinstance(p, dict)}
+    for name in sorted(wanted - set(profiles)):
+        fail(errors, f"jev plugin profile missing from roster: {name}")
+    for name, profile in profiles.items():
+        required = profile.get("required_plugins")
+        declared = isinstance(required, list) and JEV_PLUGIN in required
+        if name in wanted and not declared:
+            fail(errors, f"jev plugin declaration drift {name}: required_plugins must name {JEV_PLUGIN}")
+        elif name not in wanted and declared:
+            fail(errors, f"jev plugin declaration drift {name}: {JEV_PLUGIN} is required only on "
+                         "the 21 Claude subscription profiles and the GLM workers in service")
 
 
 # Fallback providers (t_54fc49fb, procedures/anthropic-api-fallback.md). A roster
@@ -661,7 +719,8 @@ def check_auxiliary_models(errors, roster, read, allowed_models):
 
 
 def check_fleet_dispatch(errors, label, fleets, profiles, exact=False):
-    """Both workers of every fleet and its reviewer stay dispatchable; exact lists admit nothing else."""
+    """Both workers of every fleet, its reviewer and the GLM workers in service stay
+    dispatchable; exact lists admit nothing else."""
     if not isinstance(profiles, list) or not isinstance(fleets, dict):
         return
     wanted = [name for pool in PROJECT_WORKER_POOLS.values() for name in pool]
@@ -669,6 +728,10 @@ def check_fleet_dispatch(errors, label, fleets, profiles, exact=False):
     for name in wanted:
         if name not in profiles:
             fail(errors, f"project fleet profile missing from {label}: {name}")
+    for name in glm_worker_profiles():
+        if name not in profiles:
+            fail(errors, f"GLM worker missing from {label}: {name}")
+    wanted += list(glm_worker_profiles())
     if exact:
         for name in profiles:
             if name not in wanted:
@@ -896,8 +959,17 @@ PROJECT_WORKER_POOLS = {
     "jss-genr": ["jss-worker", "jss-worker-2"],
     "anki": ["anki-worker", "anki-worker-2"],
 }
-CHAPT_ASSIGNEES = {"chapt-worker", "chapt-worker-2", "chapt-reviewer"}
-HARNESS_ASSIGNEES = {"harness-worker", "harness-worker-2", "harness-reviewer"}
+# GLM workers in service (owner decision of 2026-11-12, card t_4f7740d0): the jev plugin
+# reassigns easy and medium implementation cards of these boards to them. They are not
+# fleet workers (project_isolation `workers` lists only PROJECT_WORKER_POOLS), but they
+# are in kanban.dispatch_profiles and may be the assignee of an implementation card.
+PROJECT_GLM_WORKER_POOLS = {
+    "jobcron": ["jobcron-worker-glm-1", "jobcron-worker-glm-2"],
+    "cha-pt": ["chapt-worker-glm-1", "chapt-worker-glm-2"],
+    "harness": ["harness-worker-glm-1", "harness-worker-glm-2"],
+}
+CHAPT_ASSIGNEES = {"chapt-worker", "chapt-worker-2", *PROJECT_GLM_WORKER_POOLS["cha-pt"], "chapt-reviewer"}
+HARNESS_ASSIGNEES = {"harness-worker", "harness-worker-2", *PROJECT_GLM_WORKER_POOLS["harness"], "harness-reviewer"}
 JSS_ASSIGNEES = {"jss-worker", "jss-worker-2", "jss-reviewer"}
 ANKI_ASSIGNEES = {"anki-worker", "anki-worker-2", "anki-reviewer"}
 # Anki add-on repository (owner decision 2026-10-22): its cards declare the add-on
@@ -2080,6 +2152,8 @@ def main():
     # mode is still verified) but never in a dispatch list or pool.
     retired = roster_retired(roster)
     check_retired_profiles(errors, roster)
+    check_glm_worker_profiles(errors, roster)
+    check_jev_plugin_declarations(errors, roster)
     check_model_policy(errors, roster)
     check_fallback_declarations(errors, roster)
     allowed_models = claude_subscription_models()

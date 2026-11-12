@@ -123,7 +123,13 @@
       "jss-worker-2",
       "anki-worker",
       "anki-worker-2",
-      "anki-reviewer"
+      "anki-reviewer",
+      "jobcron-worker-glm-1",
+      "jobcron-worker-glm-2",
+      "chapt-worker-glm-1",
+      "chapt-worker-glm-2",
+      "harness-worker-glm-1",
+      "harness-worker-glm-2"
     ]
   },
   "plugins": {

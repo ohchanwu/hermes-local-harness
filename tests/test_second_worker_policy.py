@@ -25,12 +25,17 @@ SECOND = tuple(pool[1] for pool in POOLS.values())
 # The anki fleet (t_06fc410a) was defined with both workers; it is not part of the
 # 2026-10-18 second-worker change that SECOND and the procedure text record.
 ALL_POOLS = {**POOLS, "anki": ["anki-worker", "anki-worker-2"]}
-# Live default-home kanban.dispatch_profiles order after the controller's 2026-10-18 change.
+# Owner decision of 2026-11-12 (card t_4f7740d0): the GLM workers of jobcron, cha-pt and
+# harness are back in service for the jev plugin; the jss-genr GLM workers stay retired.
+GLM_IN_SERVICE = tuple(f"{prefix}-worker-glm-{n}" for prefix in ("jobcron", "chapt", "harness") for n in (1, 2))
+GLM_RETIRED = ("jss-worker-glm-1", "jss-worker-glm-2")
+# Live default-home kanban.dispatch_profiles order after the controller's 2026-10-18 change,
+# followed by the GLM workers in service (card t_4f7740d0).
 PROJECT_DISPATCH = [
     "jobcron-worker", "jobcron-reviewer", "chapt-worker", "chapt-reviewer",
     "harness-worker", "harness-reviewer", "jss-worker", "jss-reviewer",
     "harness-worker-2", "chapt-worker-2", "jobcron-worker-2", "jss-worker-2",
-    "anki-worker", "anki-worker-2", "anki-reviewer",
+    "anki-worker", "anki-worker-2", "anki-reviewer", *GLM_IN_SERVICE,
 ]
 GLM = tuple(f"{prefix}-worker-glm-{n}" for prefix in FLEETS.values() for n in (1, 2))
 GLM_NAME = re.compile(r"\b(?:jobcron|chapt|harness|jss)-worker-glm-\d\b")
@@ -149,15 +154,20 @@ class DesiredState(unittest.TestCase):
     def test_no_glm_worker_reintroduced(self):
         for name in SECOND:
             self.assertIsNone(GLM_NAME.search(name))
-        # Owner decision 2026-10-19: the GLM workers stay declared, but only as retired.
-        for name in GLM:
+        # Owner decision 2026-10-19: the GLM workers stay declared. The jss-genr GLM workers
+        # stay retired; the other six are back in service (card t_4f7740d0) but are not
+        # fleet workers and have no tracked SOUL.
+        for name in GLM_RETIRED:
             self.assertEqual(self.profiles[name]["lifecycle"], "retired")
             self.assertFalse(self.profiles[name]["dispatch_eligible"])
             self.assertFalse(self.profiles[name]["in_dispatch_pool"])
         for listing in (self.roster["project_dispatch_allowlist"],
-                        self.snapshot["kanban"]["dispatch_profiles"], list(self.roster["profile_souls"])):
-            self.assertEqual([name for name in listing if name in GLM], [])
-        self.assertEqual(set(load_verifier().RETIRED_PROFILES), set(GLM))
+                        self.snapshot["kanban"]["dispatch_profiles"]):
+            self.assertEqual([name for name in listing if name in GLM], list(GLM_IN_SERVICE))
+        self.assertEqual([name for name in self.roster["profile_souls"] if name in GLM], [])
+        for fleet in self.roster["project_fleets"].values():
+            self.assertEqual([name for name in fleet["workers"] if name in GLM], [])
+        self.assertEqual(set(load_verifier().RETIRED_PROFILES), set(GLM_RETIRED))
 
 
 class Verifier(unittest.TestCase):
@@ -169,10 +179,11 @@ class Verifier(unittest.TestCase):
 
     def test_constants(self):
         self.assertEqual(self.verifier.PROJECT_WORKER_POOLS, ALL_POOLS)
-        for assignees, prefix in ((self.verifier.CHAPT_ASSIGNEES, "chapt"),
-                                  (self.verifier.HARNESS_ASSIGNEES, "harness"),
-                                  (self.verifier.JSS_ASSIGNEES, "jss")):
-            self.assertEqual(assignees, {f"{prefix}-worker", f"{prefix}-worker-2", f"{prefix}-reviewer"})
+        for assignees, prefix, glm in ((self.verifier.CHAPT_ASSIGNEES, "chapt", True),
+                                       (self.verifier.HARNESS_ASSIGNEES, "harness", True),
+                                       (self.verifier.JSS_ASSIGNEES, "jss", False)):
+            extra = {f"{prefix}-worker-glm-1", f"{prefix}-worker-glm-2"} if glm else set()
+            self.assertEqual(assignees, {f"{prefix}-worker", f"{prefix}-worker-2", f"{prefix}-reviewer", *extra})
         for profile in PINNED_WORKERS:
             self.assertEqual(self.verifier.PROFILE_SOUL_PATHS[f"{profile}-2"], {
                 "source": f"policies/profile-souls/{profile}-2/SOUL.md",
@@ -187,7 +198,7 @@ class Verifier(unittest.TestCase):
                 ("unknown extra worker", lambda pool: pool.append("harness-worker-3")),
                 ("renamed second worker", lambda pool: pool.__setitem__(1, "harness-worker-3")),
                 ("swapped order", lambda pool: pool.reverse()),
-                ("retired GLM worker", lambda pool: pool.__setitem__(1, "harness-worker-glm-1"))):
+                ("GLM worker", lambda pool: pool.__setitem__(1, "harness-worker-glm-1"))):
             fleets = copy.deepcopy(self.fleets)
             mutate(fleets["harness"]["workers"])
             with self.subTest(case=label):

@@ -252,7 +252,8 @@ class FleetDesiredState(unittest.TestCase):
                 self.assertEqual(profile["dispatch_eligible"], dispatchable)
                 self.assertEqual(profile["lifecycle"], "project-active")
                 self.assertIn("jss-genr", profile["modes"])
-                self.assertEqual(profile["required_plugins"], [])
+                # jev is a required plugin on every Claude project profile (card t_4f7740d0).
+                self.assertEqual(profile["required_plugins"], ["jev"])
                 self.assertIn("hermes-terminal-outcome-notification", profile["installed_disabled_plugins"])
                 self.assertIsNone(RETIRED_MODEL.search(profile["model"] + " " + profile["provider"]))
         self.assertEqual(self.roster["approval_policy"]["profiles"], list(self.profiles))

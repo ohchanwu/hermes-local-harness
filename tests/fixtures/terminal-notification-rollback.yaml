@@ -87,7 +87,9 @@
   },
   "plugins": {
     "default": {},
-    "advisor": {},
+    "advisor": {
+      "jev": "enabled      user     0.1.0    jev"
+    },
     "reviewer-sol": {},
     "worker-flash-1": {
       "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail"
@@ -119,54 +121,96 @@
     "worker-terra-2": {
       "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail"
     },
-    "jobcron-orchestrator": {},
+    "jobcron-orchestrator": {
+      "jev": "enabled      user     0.1.0    jev"
+    },
     "jobcron-worker": {
-      "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail"
+      "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail",
+      "jev": "enabled      user     0.1.0    jev"
     },
     "jobcron-worker-2": {
-      "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail"
+      "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail",
+      "jev": "enabled      user     0.1.0    jev"
     },
-    "jobcron-reviewer": {},
-    "chapt-orchestrator": {},
+    "jobcron-reviewer": {
+      "jev": "enabled      user     0.1.0    jev"
+    },
+    "chapt-orchestrator": {
+      "jev": "enabled      user     0.1.0    jev"
+    },
     "chapt-worker": {
-      "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail"
+      "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail",
+      "jev": "enabled      user     0.1.0    jev"
     },
     "chapt-worker-2": {
-      "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail"
+      "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail",
+      "jev": "enabled      user     0.1.0    jev"
     },
-    "chapt-reviewer": {},
-    "harness-orchestrator": {},
+    "chapt-reviewer": {
+      "jev": "enabled      user     0.1.0    jev"
+    },
+    "harness-orchestrator": {
+      "jev": "enabled      user     0.1.0    jev"
+    },
     "harness-worker": {
-      "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail"
+      "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail",
+      "jev": "enabled      user     0.1.0    jev"
     },
     "harness-worker-2": {
-      "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail"
+      "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail",
+      "jev": "enabled      user     0.1.0    jev"
     },
-    "harness-reviewer": {},
-    "jss-orchestrator": {},
+    "harness-reviewer": {
+      "jev": "enabled      user     0.1.0    jev"
+    },
+    "jss-orchestrator": {
+      "jev": "enabled      user     0.1.0    jev"
+    },
     "jss-worker": {
-      "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail"
+      "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail",
+      "jev": "enabled      user     0.1.0    jev"
     },
     "jss-worker-2": {
-      "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail"
+      "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail",
+      "jev": "enabled      user     0.1.0    jev"
     },
-    "jss-reviewer": {},
-    "jobcron-worker-glm-1": {},
-    "jobcron-worker-glm-2": {},
-    "chapt-worker-glm-1": {},
-    "chapt-worker-glm-2": {},
-    "harness-worker-glm-1": {},
-    "harness-worker-glm-2": {},
+    "jss-reviewer": {
+      "jev": "enabled      user     0.1.0    jev"
+    },
+    "jobcron-worker-glm-1": {
+      "jev": "enabled      user     0.1.0    jev"
+    },
+    "jobcron-worker-glm-2": {
+      "jev": "enabled      user     0.1.0    jev"
+    },
+    "chapt-worker-glm-1": {
+      "jev": "enabled      user     0.1.0    jev"
+    },
+    "chapt-worker-glm-2": {
+      "jev": "enabled      user     0.1.0    jev"
+    },
+    "harness-worker-glm-1": {
+      "jev": "enabled      user     0.1.0    jev"
+    },
+    "harness-worker-glm-2": {
+      "jev": "enabled      user     0.1.0    jev"
+    },
     "jss-worker-glm-1": {},
     "jss-worker-glm-2": {},
-    "anki-orchestrator": {},
+    "anki-orchestrator": {
+      "jev": "enabled      user     0.1.0    jev"
+    },
     "anki-worker": {
-      "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail"
+      "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail",
+      "jev": "enabled      user     0.1.0    jev"
     },
     "anki-worker-2": {
-      "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail"
+      "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail",
+      "jev": "enabled      user     0.1.0    jev"
     },
-    "anki-reviewer": {}
+    "anki-reviewer": {
+      "jev": "enabled      user     0.1.0    jev"
+    }
   },
   "dispatch_profiles": [
     "jobcron-worker",
@@ -183,7 +227,13 @@
     "jss-worker-2",
     "anki-worker",
     "anki-worker-2",
-    "anki-reviewer"
+    "anki-reviewer",
+    "jobcron-worker-glm-1",
+    "jobcron-worker-glm-2",
+    "chapt-worker-glm-1",
+    "chapt-worker-glm-2",
+    "harness-worker-glm-1",
+    "harness-worker-glm-2"
   ],
   "kanban": {
     "max_in_progress": null,
@@ -3405,6 +3455,30 @@
           ]
         }
       }
+    },
+    "jobcron-worker-glm-1": {
+      "fallback_providers": [],
+      "auxiliary": {}
+    },
+    "jobcron-worker-glm-2": {
+      "fallback_providers": [],
+      "auxiliary": {}
+    },
+    "chapt-worker-glm-1": {
+      "fallback_providers": [],
+      "auxiliary": {}
+    },
+    "chapt-worker-glm-2": {
+      "fallback_providers": [],
+      "auxiliary": {}
+    },
+    "harness-worker-glm-1": {
+      "fallback_providers": [],
+      "auxiliary": {}
+    },
+    "harness-worker-glm-2": {
+      "fallback_providers": [],
+      "auxiliary": {}
     },
     "anki-orchestrator": {
       "fallback_providers": [

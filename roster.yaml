@@ -277,7 +277,9 @@
       "in_dispatch_pool": false,
       "lifecycle": "active",
       "concurrency_limit": 1,
-      "required_plugins": [],
+      "required_plugins": [
+        "jev"
+      ],
       "modes": [],
       "toolsets": "read-only",
       "credential_required": true,
@@ -649,7 +651,9 @@
       "in_dispatch_pool": false,
       "lifecycle": "project-active",
       "concurrency_limit": 1,
-      "required_plugins": [],
+      "required_plugins": [
+        "jev"
+      ],
       "modes": [
         "project-isolated",
         "jobcron"
@@ -779,7 +783,9 @@
       "in_dispatch_pool": true,
       "lifecycle": "project-active",
       "concurrency_limit": 1,
-      "required_plugins": [],
+      "required_plugins": [
+        "jev"
+      ],
       "modes": [
         "project-isolated",
         "jobcron"
@@ -910,7 +916,9 @@
       "in_dispatch_pool": true,
       "lifecycle": "project-active",
       "concurrency_limit": 1,
-      "required_plugins": [],
+      "required_plugins": [
+        "jev"
+      ],
       "modes": [
         "project-isolated",
         "jobcron"
@@ -1041,7 +1049,9 @@
       "in_dispatch_pool": true,
       "lifecycle": "project-active",
       "concurrency_limit": 1,
-      "required_plugins": [],
+      "required_plugins": [
+        "jev"
+      ],
       "modes": [
         "project-isolated",
         "jobcron"
@@ -1171,7 +1181,9 @@
       "in_dispatch_pool": false,
       "lifecycle": "project-active",
       "concurrency_limit": 1,
-      "required_plugins": [],
+      "required_plugins": [
+        "jev"
+      ],
       "modes": [
         "project-isolated",
         "cha-pt"
@@ -1301,7 +1313,9 @@
       "in_dispatch_pool": true,
       "lifecycle": "project-active",
       "concurrency_limit": 1,
-      "required_plugins": [],
+      "required_plugins": [
+        "jev"
+      ],
       "modes": [
         "project-isolated",
         "cha-pt"
@@ -1432,7 +1446,9 @@
       "in_dispatch_pool": true,
       "lifecycle": "project-active",
       "concurrency_limit": 1,
-      "required_plugins": [],
+      "required_plugins": [
+        "jev"
+      ],
       "modes": [
         "project-isolated",
         "cha-pt"
@@ -1563,7 +1579,9 @@
       "in_dispatch_pool": true,
       "lifecycle": "project-active",
       "concurrency_limit": 1,
-      "required_plugins": [],
+      "required_plugins": [
+        "jev"
+      ],
       "modes": [
         "project-isolated",
         "cha-pt"
@@ -1693,7 +1711,9 @@
       "in_dispatch_pool": false,
       "lifecycle": "project-active",
       "concurrency_limit": 1,
-      "required_plugins": [],
+      "required_plugins": [
+        "jev"
+      ],
       "modes": [
         "project-isolated",
         "harness"
@@ -1823,7 +1843,9 @@
       "in_dispatch_pool": true,
       "lifecycle": "project-active",
       "concurrency_limit": 1,
-      "required_plugins": [],
+      "required_plugins": [
+        "jev"
+      ],
       "modes": [
         "project-isolated",
         "harness"
@@ -1954,7 +1976,9 @@
       "in_dispatch_pool": true,
       "lifecycle": "project-active",
       "concurrency_limit": 1,
-      "required_plugins": [],
+      "required_plugins": [
+        "jev"
+      ],
       "modes": [
         "project-isolated",
         "harness"
@@ -2085,7 +2109,9 @@
       "in_dispatch_pool": true,
       "lifecycle": "project-active",
       "concurrency_limit": 1,
-      "required_plugins": [],
+      "required_plugins": [
+        "jev"
+      ],
       "modes": [
         "project-isolated",
         "harness"
@@ -2215,7 +2241,9 @@
       "in_dispatch_pool": false,
       "lifecycle": "project-active",
       "concurrency_limit": 1,
-      "required_plugins": [],
+      "required_plugins": [
+        "jev"
+      ],
       "modes": [
         "project-isolated",
         "jss-genr"
@@ -2345,7 +2373,9 @@
       "in_dispatch_pool": true,
       "lifecycle": "project-active",
       "concurrency_limit": 1,
-      "required_plugins": [],
+      "required_plugins": [
+        "jev"
+      ],
       "modes": [
         "project-isolated",
         "jss-genr"
@@ -2476,7 +2506,9 @@
       "in_dispatch_pool": true,
       "lifecycle": "project-active",
       "concurrency_limit": 1,
-      "required_plugins": [],
+      "required_plugins": [
+        "jev"
+      ],
       "modes": [
         "project-isolated",
         "jss-genr"
@@ -2607,7 +2639,9 @@
       "in_dispatch_pool": true,
       "lifecycle": "project-active",
       "concurrency_limit": 1,
-      "required_plugins": [],
+      "required_plugins": [
+        "jev"
+      ],
       "modes": [
         "project-isolated",
         "jss-genr"
@@ -2733,11 +2767,9 @@
       "model": "glm-5.3",
       "provider": "zai",
       "installed": true,
-      "dispatch_eligible": false,
-      "in_dispatch_pool": false,
-      "lifecycle": "retired",
-      "lifecycle_before_retirement": "project-active",
-      "retired_on": "2026-10-18",
+      "dispatch_eligible": true,
+      "in_dispatch_pool": true,
+      "lifecycle": "project-active",
       "concurrency_limit": 1,
       "modes": [
         "project-isolated",
@@ -2746,7 +2778,9 @@
       "toolsets": "implementation",
       "credential_required": true,
       "credential_present": null,
-      "required_plugins": [],
+      "required_plugins": [
+        "jev"
+      ],
       "installed_disabled_plugins": []
     },
     {
@@ -2755,11 +2789,9 @@
       "model": "glm-5.3",
       "provider": "zai",
       "installed": true,
-      "dispatch_eligible": false,
-      "in_dispatch_pool": false,
-      "lifecycle": "retired",
-      "lifecycle_before_retirement": "project-active",
-      "retired_on": "2026-10-18",
+      "dispatch_eligible": true,
+      "in_dispatch_pool": true,
+      "lifecycle": "project-active",
       "concurrency_limit": 1,
       "modes": [
         "project-isolated",
@@ -2768,7 +2800,9 @@
       "toolsets": "implementation",
       "credential_required": true,
       "credential_present": null,
-      "required_plugins": [],
+      "required_plugins": [
+        "jev"
+      ],
       "installed_disabled_plugins": []
     },
     {
@@ -2777,11 +2811,9 @@
       "model": "glm-5.3",
       "provider": "zai",
       "installed": true,
-      "dispatch_eligible": false,
-      "in_dispatch_pool": false,
-      "lifecycle": "retired",
-      "lifecycle_before_retirement": "project-active",
-      "retired_on": "2026-10-18",
+      "dispatch_eligible": true,
+      "in_dispatch_pool": true,
+      "lifecycle": "project-active",
       "concurrency_limit": 1,
       "modes": [
         "project-isolated",
@@ -2790,7 +2822,9 @@
       "toolsets": "implementation",
       "credential_required": true,
       "credential_present": null,
-      "required_plugins": [],
+      "required_plugins": [
+        "jev"
+      ],
       "installed_disabled_plugins": []
     },
     {
@@ -2799,11 +2833,9 @@
       "model": "glm-5.3",
       "provider": "zai",
       "installed": true,
-      "dispatch_eligible": false,
-      "in_dispatch_pool": false,
-      "lifecycle": "retired",
-      "lifecycle_before_retirement": "project-active",
-      "retired_on": "2026-10-18",
+      "dispatch_eligible": true,
+      "in_dispatch_pool": true,
+      "lifecycle": "project-active",
       "concurrency_limit": 1,
       "modes": [
         "project-isolated",
@@ -2812,7 +2844,9 @@
       "toolsets": "implementation",
       "credential_required": true,
       "credential_present": null,
-      "required_plugins": [],
+      "required_plugins": [
+        "jev"
+      ],
       "installed_disabled_plugins": []
     },
     {
@@ -2821,11 +2855,9 @@
       "model": "glm-5.3",
       "provider": "zai",
       "installed": true,
-      "dispatch_eligible": false,
-      "in_dispatch_pool": false,
-      "lifecycle": "retired",
-      "lifecycle_before_retirement": "project-active",
-      "retired_on": "2026-10-18",
+      "dispatch_eligible": true,
+      "in_dispatch_pool": true,
+      "lifecycle": "project-active",
       "concurrency_limit": 1,
       "modes": [
         "project-isolated",
@@ -2834,7 +2866,9 @@
       "toolsets": "implementation",
       "credential_required": true,
       "credential_present": null,
-      "required_plugins": [],
+      "required_plugins": [
+        "jev"
+      ],
       "installed_disabled_plugins": []
     },
     {
@@ -2843,11 +2877,9 @@
       "model": "glm-5.3",
       "provider": "zai",
       "installed": true,
-      "dispatch_eligible": false,
-      "in_dispatch_pool": false,
-      "lifecycle": "retired",
-      "lifecycle_before_retirement": "project-active",
-      "retired_on": "2026-10-18",
+      "dispatch_eligible": true,
+      "in_dispatch_pool": true,
+      "lifecycle": "project-active",
       "concurrency_limit": 1,
       "modes": [
         "project-isolated",
@@ -2856,7 +2888,9 @@
       "toolsets": "implementation",
       "credential_required": true,
       "credential_present": null,
-      "required_plugins": [],
+      "required_plugins": [
+        "jev"
+      ],
       "installed_disabled_plugins": []
     },
     {
@@ -2913,7 +2947,9 @@
       "in_dispatch_pool": false,
       "lifecycle": "project-active",
       "concurrency_limit": 1,
-      "required_plugins": [],
+      "required_plugins": [
+        "jev"
+      ],
       "modes": [
         "project-isolated",
         "anki"
@@ -3043,7 +3079,9 @@
       "in_dispatch_pool": true,
       "lifecycle": "project-active",
       "concurrency_limit": 1,
-      "required_plugins": [],
+      "required_plugins": [
+        "jev"
+      ],
       "modes": [
         "project-isolated",
         "anki"
@@ -3174,7 +3212,9 @@
       "in_dispatch_pool": true,
       "lifecycle": "project-active",
       "concurrency_limit": 1,
-      "required_plugins": [],
+      "required_plugins": [
+        "jev"
+      ],
       "modes": [
         "project-isolated",
         "anki"
@@ -3305,7 +3345,9 @@
       "in_dispatch_pool": true,
       "lifecycle": "project-active",
       "concurrency_limit": 1,
-      "required_plugins": [],
+      "required_plugins": [
+        "jev"
+      ],
       "modes": [
         "project-isolated",
         "anki"
@@ -3611,6 +3653,12 @@
     "jss-worker-2",
     "anki-worker",
     "anki-worker-2",
-    "anki-reviewer"
+    "anki-reviewer",
+    "jobcron-worker-glm-1",
+    "jobcron-worker-glm-2",
+    "chapt-worker-glm-1",
+    "chapt-worker-glm-2",
+    "harness-worker-glm-1",
+    "harness-worker-glm-2"
   ]
 }

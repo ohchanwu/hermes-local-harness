@@ -89,7 +89,9 @@
     "default": {
       "hermes-terminal-outcome-notification": "enabled      git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification"
     },
-    "advisor": {},
+    "advisor": {
+      "jev": "enabled      user     0.1.0    jev"
+    },
     "reviewer-sol": {
       "hermes-terminal-outcome-notification": "enabled      git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification"
     },
@@ -133,82 +135,114 @@
       "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail"
     },
     "jobcron-orchestrator": {
-      "hermes-terminal-outcome-notification": "disabled     git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification"
+      "hermes-terminal-outcome-notification": "disabled     git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification",
+      "jev": "enabled      user     0.1.0    jev"
     },
     "jobcron-worker": {
       "hermes-terminal-outcome-notification": "disabled     git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification",
-      "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail"
+      "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail",
+      "jev": "enabled      user     0.1.0    jev"
     },
     "jobcron-worker-2": {
       "hermes-terminal-outcome-notification": "disabled     git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification",
-      "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail"
+      "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail",
+      "jev": "enabled      user     0.1.0    jev"
     },
     "jobcron-reviewer": {
-      "hermes-terminal-outcome-notification": "disabled     git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification"
+      "hermes-terminal-outcome-notification": "disabled     git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification",
+      "jev": "enabled      user     0.1.0    jev"
     },
     "chapt-orchestrator": {
-      "hermes-terminal-outcome-notification": "disabled     git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification"
+      "hermes-terminal-outcome-notification": "disabled     git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification",
+      "jev": "enabled      user     0.1.0    jev"
     },
     "chapt-worker": {
       "hermes-terminal-outcome-notification": "disabled     git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification",
-      "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail"
+      "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail",
+      "jev": "enabled      user     0.1.0    jev"
     },
     "chapt-worker-2": {
       "hermes-terminal-outcome-notification": "disabled     git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification",
-      "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail"
+      "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail",
+      "jev": "enabled      user     0.1.0    jev"
     },
     "chapt-reviewer": {
-      "hermes-terminal-outcome-notification": "disabled     git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification"
+      "hermes-terminal-outcome-notification": "disabled     git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification",
+      "jev": "enabled      user     0.1.0    jev"
     },
     "harness-orchestrator": {
-      "hermes-terminal-outcome-notification": "disabled     git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification"
+      "hermes-terminal-outcome-notification": "disabled     git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification",
+      "jev": "enabled      user     0.1.0    jev"
     },
     "harness-worker": {
       "hermes-terminal-outcome-notification": "disabled     git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification",
-      "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail"
+      "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail",
+      "jev": "enabled      user     0.1.0    jev"
     },
     "harness-worker-2": {
       "hermes-terminal-outcome-notification": "disabled     git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification",
-      "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail"
+      "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail",
+      "jev": "enabled      user     0.1.0    jev"
     },
     "harness-reviewer": {
-      "hermes-terminal-outcome-notification": "disabled     git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification"
+      "hermes-terminal-outcome-notification": "disabled     git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification",
+      "jev": "enabled      user     0.1.0    jev"
     },
     "jss-orchestrator": {
-      "hermes-terminal-outcome-notification": "disabled     git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification"
+      "hermes-terminal-outcome-notification": "disabled     git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification",
+      "jev": "enabled      user     0.1.0    jev"
     },
     "jss-worker": {
       "hermes-terminal-outcome-notification": "disabled     git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification",
-      "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail"
+      "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail",
+      "jev": "enabled      user     0.1.0    jev"
     },
     "jss-worker-2": {
       "hermes-terminal-outcome-notification": "disabled     git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification",
-      "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail"
+      "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail",
+      "jev": "enabled      user     0.1.0    jev"
     },
     "jss-reviewer": {
-      "hermes-terminal-outcome-notification": "disabled     git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification"
+      "hermes-terminal-outcome-notification": "disabled     git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification",
+      "jev": "enabled      user     0.1.0    jev"
     },
-    "jobcron-worker-glm-1": {},
-    "jobcron-worker-glm-2": {},
-    "chapt-worker-glm-1": {},
-    "chapt-worker-glm-2": {},
-    "harness-worker-glm-1": {},
-    "harness-worker-glm-2": {},
+    "jobcron-worker-glm-1": {
+      "jev": "enabled      user     0.1.0    jev"
+    },
+    "jobcron-worker-glm-2": {
+      "jev": "enabled      user     0.1.0    jev"
+    },
+    "chapt-worker-glm-1": {
+      "jev": "enabled      user     0.1.0    jev"
+    },
+    "chapt-worker-glm-2": {
+      "jev": "enabled      user     0.1.0    jev"
+    },
+    "harness-worker-glm-1": {
+      "jev": "enabled      user     0.1.0    jev"
+    },
+    "harness-worker-glm-2": {
+      "jev": "enabled      user     0.1.0    jev"
+    },
     "jss-worker-glm-1": {},
     "jss-worker-glm-2": {},
     "anki-orchestrator": {
-      "hermes-terminal-outcome-notification": "disabled     git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification"
+      "hermes-terminal-outcome-notification": "disabled     git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification",
+      "jev": "enabled      user     0.1.0    jev"
     },
     "anki-worker": {
       "hermes-terminal-outcome-notification": "disabled     git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification",
-      "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail"
+      "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail",
+      "jev": "enabled      user     0.1.0    jev"
     },
     "anki-worker-2": {
       "hermes-terminal-outcome-notification": "disabled     git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification",
-      "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail"
+      "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail",
+      "jev": "enabled      user     0.1.0    jev"
     },
     "anki-reviewer": {
-      "hermes-terminal-outcome-notification": "disabled     git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification"
+      "hermes-terminal-outcome-notification": "disabled     git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification",
+      "jev": "enabled      user     0.1.0    jev"
     }
   },
   "dispatch_profiles": [
@@ -226,7 +260,13 @@
     "jss-worker-2",
     "anki-worker",
     "anki-worker-2",
-    "anki-reviewer"
+    "anki-reviewer",
+    "jobcron-worker-glm-1",
+    "jobcron-worker-glm-2",
+    "chapt-worker-glm-1",
+    "chapt-worker-glm-2",
+    "harness-worker-glm-1",
+    "harness-worker-glm-2"
   ],
   "kanban": {
     "max_in_progress": null,
@@ -3448,6 +3488,30 @@
           ]
         }
       }
+    },
+    "jobcron-worker-glm-1": {
+      "fallback_providers": [],
+      "auxiliary": {}
+    },
+    "jobcron-worker-glm-2": {
+      "fallback_providers": [],
+      "auxiliary": {}
+    },
+    "chapt-worker-glm-1": {
+      "fallback_providers": [],
+      "auxiliary": {}
+    },
+    "chapt-worker-glm-2": {
+      "fallback_providers": [],
+      "auxiliary": {}
+    },
+    "harness-worker-glm-1": {
+      "fallback_providers": [],
+      "auxiliary": {}
+    },
+    "harness-worker-glm-2": {
+      "fallback_providers": [],
+      "auxiliary": {}
     },
     "anki-orchestrator": {
       "fallback_providers": [
