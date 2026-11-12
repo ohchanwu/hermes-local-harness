@@ -1,0 +1,407 @@
+#!/usr/bin/env python3
+"""Read-only report on the jev plugin logs (Part D of the jev plugin).
+
+Usage:
+  scripts/jev-report [--log-dir DIR] [--since DAYS]
+                     [--kanban-db PATH ...] [--state-db PATH ...]
+
+Inputs (nothing is written; every database is opened with SQLite's read-only
+mode, mode=ro):
+  --log-dir     directory with decisions.jsonl, tool_results.jsonl and
+                auxiliary.jsonl. Default: the environment variable
+                HERMES_JEV_LOG_DIR, else /Users/chanbla11mit/.hermes/jev/logs.
+  --since       only log records whose `ts` is within this many days (default 30).
+  --kanban-db   board database (tables tasks, task_runs); may be repeated.
+                Default: /Users/chanbla11mit/.hermes/kanban.db (board `default`)
+                and /Users/chanbla11mit/.hermes/kanban/boards/<board>/kanban.db.
+  --state-db    worker session database (tables sessions,
+                session_model_usage); may be repeated. Default:
+                /Users/chanbla11mit/.hermes/state.db and
+                /Users/chanbla11mit/.hermes/profiles/<profile>/state.db.
+
+A worker session belongs to a card run when the session has source `kanban`,
+started between 60 seconds before the run started and the end of the run (or
+now, for a running run), its profile_name is empty or equal to the run profile,
+and its cwd is empty, equal to the card's workspace_path, or below it.
+
+Sections:
+  1. Card model routing: per route, number of cards, tokens per card from the
+     worker sessions, and the share of cards with at least one run whose
+     outcome is changes_requested, crashed or blocked.
+  2. Peak-hours holds: hold, release and toggle records.
+  3. Tool result filter: results per tool and action, characters removed per
+     tool and per profile, and the share of saved files read later.
+  4. Auxiliary model calls: calls and tokens per aux_task and model.
+  5. Jev usage: total Jev input tokens and cost at 0.042 US dollars per million
+     input tokens.
+A section whose log or database is empty or missing prints "no records".
+
+The output holds only identifiers, counts, token numbers and costs: never card
+titles, card bodies, run summaries, tool output or message text.
+"""
+import argparse
+import datetime
+import glob
+import json
+import os
+import sqlite3
+import sys
+import time
+import urllib.parse
+from collections import defaultdict
+
+HERMES_ROOT = "/Users/chanbla11mit/.hermes"
+DEFAULT_LOG_DIR = HERMES_ROOT + "/jev/logs"
+COST_PER_MILLION_INPUT = 0.042
+RUN_OUTCOMES = ("changes_requested", "crashed", "blocked")
+SESSION_START_SLACK_SECONDS = 60
+NO_RECORDS = "  no records"
+
+
+def default_kanban_dbs():
+    paths = [HERMES_ROOT + "/kanban.db"]
+    paths += sorted(glob.glob(HERMES_ROOT + "/kanban/boards/*/kanban.db"))
+    return [p for p in paths if os.path.isfile(p)]
+
+
+def default_state_dbs():
+    paths = [HERMES_ROOT + "/state.db"]
+    paths += sorted(glob.glob(HERMES_ROOT + "/profiles/*/state.db"))
+    return [p for p in paths if os.path.isfile(p)]
+
+
+def parse_ts(value):
+    if not isinstance(value, str):
+        return None
+    try:
+        parsed = datetime.datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return None
+    return parsed.timestamp()
+
+
+def read_log(log_dir, stream, cutoff):
+    """Records of <log_dir>/<stream>.jsonl with a valid ts at or after cutoff."""
+    path = os.path.join(log_dir, f"{stream}.jsonl")
+    records = []
+    try:
+        with open(path, encoding="utf-8") as handle:
+            for line in handle:
+                try:
+                    record = json.loads(line)
+                except ValueError:
+                    continue
+                if not isinstance(record, dict):
+                    continue
+                ts = parse_ts(record.get("ts"))
+                if ts is not None and ts >= cutoff:
+                    records.append(record)
+    except OSError:
+        return []
+    return records
+
+
+def connect_ro(path):
+    uri = "file:" + urllib.parse.quote(os.path.abspath(path)) + "?mode=ro"
+    return sqlite3.connect(uri, uri=True)
+
+
+def columns(conn, table):
+    return {row[1] for row in conn.execute(f"PRAGMA table_info({table})")}
+
+
+def load_runs(kanban_dbs, task_ids):
+    """{task_id: {"workspace_path": str|None, "runs": [(profile, started, ended, outcome)]}}"""
+    cards = {}
+    if not task_ids:
+        return cards
+    wanted = sorted(task_ids)
+    for path in kanban_dbs:
+        try:
+            conn = connect_ro(path)
+        except sqlite3.Error:
+            continue
+        try:
+            run_cols = columns(conn, "task_runs")
+            if not {"task_id", "started_at", "outcome"} <= run_cols:
+                continue
+            task_cols = columns(conn, "tasks")
+            for start in range(0, len(wanted), 500):
+                batch = wanted[start:start + 500]
+                marks = ",".join("?" * len(batch))
+                if "workspace_path" in task_cols:
+                    for task_id, workspace in conn.execute(
+                            f"SELECT id, workspace_path FROM tasks WHERE id IN ({marks})", batch):
+                        cards.setdefault(task_id, {"workspace_path": None, "runs": []})
+                        cards[task_id]["workspace_path"] = workspace
+                profile_col = "profile" if "profile" in run_cols else "NULL"
+                ended_col = "ended_at" if "ended_at" in run_cols else "NULL"
+                for task_id, profile, started, ended, outcome in conn.execute(
+                        f"SELECT task_id, {profile_col}, started_at, {ended_col}, outcome "
+                        f"FROM task_runs WHERE task_id IN ({marks})", batch):
+                    cards.setdefault(task_id, {"workspace_path": None, "runs": []})
+                    cards[task_id]["runs"].append((profile, started, ended, outcome))
+        except sqlite3.Error:
+            continue
+        finally:
+            conn.close()
+    return cards
+
+
+def load_sessions(state_dbs):
+    """[(key, started_at, profile_name, cwd, tokens dict)] for kanban worker sessions."""
+    sessions = []
+    for path in state_dbs:
+        try:
+            conn = connect_ro(path)
+        except sqlite3.Error:
+            continue
+        try:
+            session_cols = columns(conn, "sessions")
+            if not {"id", "source", "started_at"} <= session_cols:
+                continue
+            profile_col = "profile_name" if "profile_name" in session_cols else "NULL"
+            cwd_col = "cwd" if "cwd" in session_cols else "NULL"
+            rows = conn.execute(
+                f"SELECT id, started_at, {profile_col}, {cwd_col} FROM sessions "
+                "WHERE source = 'kanban'").fetchall()
+            usage = {}
+            usage_cols = columns(conn, "session_model_usage")
+            token_cols = ("input_tokens", "output_tokens", "cache_read_tokens", "cache_write_tokens")
+            if {"session_id", *token_cols} <= usage_cols:
+                for row in conn.execute(
+                        "SELECT session_id, SUM(input_tokens), SUM(output_tokens), "
+                        "SUM(cache_read_tokens), SUM(cache_write_tokens) "
+                        "FROM session_model_usage GROUP BY session_id"):
+                    usage[row[0]] = dict(zip(token_cols, (int(v or 0) for v in row[1:])))
+            elif set(token_cols) <= session_cols:
+                for row in conn.execute(
+                        "SELECT id, input_tokens, output_tokens, cache_read_tokens, "
+                        "cache_write_tokens FROM sessions WHERE source = 'kanban'"):
+                    usage[row[0]] = dict(zip(token_cols, (int(v or 0) for v in row[1:])))
+            for session_id, started, profile, cwd in rows:
+                tokens = usage.get(session_id, dict.fromkeys(token_cols, 0))
+                sessions.append((f"{path}:{session_id}", started, profile, cwd, tokens))
+        except sqlite3.Error:
+            continue
+        finally:
+            conn.close()
+    return sessions
+
+
+def under(cwd, workspace):
+    if not cwd or not workspace:
+        return True
+    cwd, workspace = cwd.rstrip("/"), workspace.rstrip("/")
+    return cwd == workspace or cwd.startswith(workspace + "/")
+
+
+def card_tokens(card, sessions, now):
+    """Token totals of the sessions that belong to the card's runs, or None if none match."""
+    matched = {}
+    for profile, started, ended, _outcome in card["runs"]:
+        if started is None:
+            continue
+        end = ended if ended is not None else now
+        for key, s_started, s_profile, s_cwd, tokens in sessions:
+            if s_started is None or not started - SESSION_START_SLACK_SECONDS <= s_started <= end:
+                continue
+            if s_profile and profile and s_profile != profile:
+                continue
+            if not under(s_cwd, card["workspace_path"]):
+                continue
+            matched[key] = tokens
+    if not matched:
+        return None
+    total = defaultdict(int)
+    for tokens in matched.values():
+        for name, value in tokens.items():
+            total[name] += value
+    return total
+
+
+def pct(part, whole):
+    return f"{part} of {whole} ({100.0 * part / whole:.1f}%)" if whole else f"{part} of 0"
+
+
+def number(value):
+    return value if isinstance(value, (int, float)) and not isinstance(value, bool) else 0
+
+
+def section_routing(out, decisions, kanban_dbs, state_dbs, now):
+    out.append("== Card model routing (decisions.jsonl event route) ==")
+    routes = [r for r in decisions if r.get("event") == "route"]
+    if not routes:
+        out.append(NO_RECORDS)
+        return
+    groups = defaultdict(set)
+    without_task = 0
+    for record in routes:
+        task_id = record.get("task_id")
+        if not isinstance(task_id, str) or not task_id:
+            without_task += 1
+            continue
+        label = f"{record.get('route') or 'none'} applied={'yes' if record.get('applied') else 'no'}"
+        groups[label].add(task_id)
+    out.append(f"  route records: {len(routes)}; without task_id: {without_task}")
+    all_ids = set().union(*groups.values()) if groups else set()
+    cards = load_runs(kanban_dbs, all_ids)
+    sessions = load_sessions(state_dbs) if cards else []
+    if not cards:
+        out.append("  task_runs: no records")
+    if cards and not sessions:
+        out.append("  worker sessions: no records")
+    for label in sorted(groups):
+        ids = sorted(groups[label])
+        out.append(f"  route {label}: cards {len(ids)}")
+        with_runs = [cards[t] for t in ids if t in cards and cards[t]["runs"]]
+        if with_runs:
+            for outcome in RUN_OUTCOMES:
+                hit = sum(1 for c in with_runs if any(r[3] == outcome for r in c["runs"]))
+                out.append(f"    cards with a {outcome} run: {pct(hit, len(with_runs))}")
+        else:
+            out.append("    task_runs: no records")
+        totals = [card_tokens(c, sessions, now) for c in with_runs]
+        totals = [t for t in totals if t is not None]
+        if totals:
+            keys = ("input_tokens", "output_tokens", "cache_read_tokens", "cache_write_tokens")
+            averages = {k: sum(t[k] for t in totals) / len(totals) for k in keys}
+            all_tokens = sum(averages.values())
+            out.append(f"    tokens per card (average over {len(totals)} cards with sessions): "
+                       f"total {all_tokens:.0f}, input {averages['input_tokens']:.0f}, "
+                       f"output {averages['output_tokens']:.0f}, "
+                       f"cache read {averages['cache_read_tokens']:.0f}, "
+                       f"cache write {averages['cache_write_tokens']:.0f}")
+        else:
+            out.append("    tokens per card: no records")
+
+
+def section_peak_hold(out, decisions):
+    out.append("== Peak-hours holds (decisions.jsonl events hold, release, toggle) ==")
+    records = [r for r in decisions if r.get("event") in ("hold", "release", "toggle")]
+    if not records:
+        out.append(NO_RECORDS)
+        return
+    counts = defaultdict(int)
+    boards = defaultdict(lambda: defaultdict(int))
+    held_cards = set()
+    for record in records:
+        counts[record["event"]] += 1
+        if record["event"] != "toggle":
+            boards[record.get("board") or "unknown"][record["event"]] += 1
+        if record["event"] == "hold" and isinstance(record.get("task_id"), str):
+            held_cards.add(record["task_id"])
+    out.append(f"  holds {counts['hold']}, releases {counts['release']}, toggles {counts['toggle']}, "
+               f"distinct held cards {len(held_cards)}")
+    for board in sorted(boards):
+        c = boards[board]
+        out.append(f"  board {board}: holds {c['hold']}, releases {c['release']}")
+
+
+def section_tool_results(out, tool_results):
+    out.append("== Tool result filter (tool_results.jsonl) ==")
+    if not tool_results:
+        out.append(NO_RECORDS)
+        return
+    filters = [r for r in tool_results if r.get("event") == "filter"]
+    reads = [r for r in tool_results if r.get("event") == "saved_read"]
+    per_tool = defaultdict(lambda: defaultdict(int))
+    removed_tool = defaultdict(int)
+    removed_profile = defaultdict(int)
+    reasons = defaultdict(int)
+    errors = defaultdict(int)
+    saved = set()
+    for record in filters:
+        tool = record.get("tool") or "unknown"
+        action = record.get("action") or "unknown"
+        per_tool[tool][action] += 1
+        if action != "filtered" and record.get("reason"):
+            reasons[f"{action} {record['reason']}"] += 1
+        if record.get("error_class"):
+            errors[record["error_class"]] += 1
+        if action == "filtered":
+            removed = number(record.get("chars_before")) - number(record.get("chars_after"))
+            removed_tool[tool] += removed
+            removed_profile[record.get("profile") or "unknown"] += removed
+            if isinstance(record.get("saved_file"), str):
+                saved.add(record["saved_file"])
+    if not filters:
+        out.append("  filter records: no records")
+    for tool in sorted(per_tool):
+        c = per_tool[tool]
+        out.append(f"  tool {tool}: results {sum(c.values())}, filtered {c['filtered']}, "
+                   f"unchanged {c['unchanged']}, skipped {c['skipped']}, "
+                   f"characters removed {removed_tool[tool]}")
+    for profile in sorted(removed_profile):
+        out.append(f"  profile {profile}: characters removed {removed_profile[profile]}")
+    for reason in sorted(reasons):
+        out.append(f"  reason {reason}: {reasons[reason]}")
+    for error_class in sorted(errors):
+        out.append(f"  error_class {error_class}: {errors[error_class]}")
+    read_files = {r.get("saved_file") for r in reads if isinstance(r.get("saved_file"), str)}
+    out.append(f"  saved_read records: {len(reads)}")
+    out.append(f"  saved files read later: {pct(len(read_files & saved), len(saved))}")
+
+
+def section_auxiliary(out, auxiliary):
+    out.append("== Auxiliary model calls (auxiliary.jsonl) ==")
+    if not auxiliary:
+        out.append(NO_RECORDS)
+        return
+    groups = defaultdict(lambda: [0, 0, 0])
+    for record in auxiliary:
+        key = (record.get("aux_task") or "unknown", record.get("model") or "unknown")
+        groups[key][0] += 1
+        groups[key][1] += number(record.get("input_tokens"))
+        groups[key][2] += number(record.get("output_tokens"))
+    for (aux_task, model), (calls, tokens_in, tokens_out) in sorted(
+            groups.items(), key=lambda item: (-(item[1][1] + item[1][2]), item[0])):
+        out.append(f"  aux_task {aux_task} model {model}: calls {calls}, "
+                   f"input tokens {tokens_in}, output tokens {tokens_out}")
+
+
+def section_jev(out, decisions, tool_results):
+    out.append("== Jev usage ==")
+    calls = [r for r in decisions + tool_results if r.get("jev_input_tokens") is not None]
+    if not calls:
+        out.append(NO_RECORDS)
+        return
+    tokens = sum(number(r.get("jev_input_tokens")) for r in calls)
+    cost = tokens * COST_PER_MILLION_INPUT / 1_000_000
+    out.append(f"  records with Jev input tokens: {len(calls)}")
+    out.append(f"  Jev input tokens: {tokens}")
+    out.append(f"  Jev cost: {cost:.6f} US dollars (0.042 US dollars per million input tokens)")
+
+
+def build_report(log_dir, since_days, kanban_dbs, state_dbs, now=None):
+    now = time.time() if now is None else now
+    cutoff = now - since_days * 86400
+    decisions = read_log(log_dir, "decisions", cutoff)
+    tool_results = read_log(log_dir, "tool_results", cutoff)
+    auxiliary = read_log(log_dir, "auxiliary", cutoff)
+    out = [f"jev report: log directory {log_dir}, last {since_days} days"]
+    section_routing(out, decisions, kanban_dbs, state_dbs, now)
+    section_peak_hold(out, decisions)
+    section_tool_results(out, tool_results)
+    section_auxiliary(out, auxiliary)
+    section_jev(out, decisions, tool_results)
+    return "\n".join(out) + "\n"
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description="Read-only report on the jev plugin logs.")
+    parser.add_argument("--log-dir", default=os.environ.get("HERMES_JEV_LOG_DIR") or DEFAULT_LOG_DIR)
+    parser.add_argument("--since", type=float, default=30, metavar="DAYS")
+    parser.add_argument("--kanban-db", action="append", metavar="PATH")
+    parser.add_argument("--state-db", action="append", metavar="PATH")
+    args = parser.parse_args(argv)
+    kanban_dbs = args.kanban_db if args.kanban_db is not None else default_kanban_dbs()
+    state_dbs = args.state_db if args.state_db is not None else default_state_dbs()
+    sys.stdout.write(build_report(args.log_dir, args.since, kanban_dbs, state_dbs))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
