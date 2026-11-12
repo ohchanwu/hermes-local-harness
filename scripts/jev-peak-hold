@@ -18,7 +18,10 @@ Commands:
 A hold is `hermes kanban --board <board> schedule <id> "jev-peak-hold until <time>"`;
 a release is `hermes kanban --board <board> unblock <id>`. Only cards in the
 scheduled status whose latest scheduled reason carries the marker are released.
-Python standard library only.
+A board database that cannot be read is reported ("failed read <board>
+error_class=<class>") and the other boards are still processed. Exit status 1
+when a board could not be read or a hold or release failed, else 0.
+Python standard library only; runs under /usr/bin/python3 and python3.
 """
 from __future__ import annotations
 
@@ -89,6 +92,20 @@ def _print_results(results: list) -> int:
     return 1 if failures else 0
 
 
+def _print_read_errors(errors: list, log: bool = False) -> int:
+    """Print one line per board that could not be read; 1 when there is any.
+
+    With ``log`` (``--apply``, ``off``) each error also writes one decisions
+    record ``event: read_error`` so a scheduled run leaves a durable trace.
+    """
+    for item in errors:
+        print(f"failed read {item['board']} error_class={item['error_class']}")
+        if log:
+            jev_log.write("decisions", {"event": "read_error", "board": item["board"], "applied": False,
+                                        "error_class": item["error_class"]})
+    return 1 if errors else 0
+
+
 def _changed_by(args: argparse.Namespace) -> str:
     if args.by:
         return args.by
@@ -119,11 +136,12 @@ def _toggle(config: dict, args: argparse.Namespace, enabled: bool) -> int:
     if enabled:
         return 0
     boards = _boards(config, args)
-    actions, _ = peak_hold.plan(config, now, boards, force_release=True)
+    actions, _, errors = peak_hold.plan(config, now, boards, force_release=True)
+    read_status = _print_read_errors(errors, log=not args.dry_run)
     if args.dry_run:
         _print_actions(actions, "planned ")
-        return 0
-    return _print_results(peak_hold.apply(config, actions, args.hermes))
+        return read_status
+    return max(_print_results(peak_hold.apply(config, actions, args.hermes)), read_status)
 
 
 def _status(config: dict, args: argparse.Namespace) -> int:
@@ -138,26 +156,28 @@ def _status(config: dict, args: argparse.Namespace) -> int:
     print(f"changed_by: {content.get('changed_by') or '-'}")
     print(f"config peak_hold.enabled: {str(bool(cfg.get('enabled', False))).lower()}")
     print(f"inside window now: {str(peak_hold.in_window(now, cfg)).lower()}")
-    print(f"held cards: {peak_hold.count_held(config, _boards(config, args))}")
-    return 0
+    held, errors = peak_hold.count_held(config, _boards(config, args))
+    print(f"held cards: {held}" + (" (boards that could not be read are not counted)" if errors else ""))
+    return _print_read_errors(errors)
 
 
 def _run(config: dict, args: argparse.Namespace) -> int:
     now = _parse_now(args.now)
-    actions, switch_error = peak_hold.plan(config, now, _boards(config, args))
+    actions, switch_error, errors = peak_hold.plan(config, now, _boards(config, args))
     if switch_error:
         print(f"switch file error: {switch_error} (treated as on)")
         if args.apply:
             peak_hold.log_switch_error(switch_error)
+    read_status = _print_read_errors(errors, log=args.apply)
     if not args.apply:
         _print_actions(actions, "planned ")
         if not actions:
             print("nothing to hold or release")
-        return 0
+        return read_status
     if not actions:
         print("nothing to hold or release")
-        return 0
-    return _print_results(peak_hold.apply(config, actions, args.hermes))
+        return read_status
+    return max(_print_results(peak_hold.apply(config, actions, args.hermes)), read_status)
 
 
 def main(argv: list[str] | None = None) -> int:

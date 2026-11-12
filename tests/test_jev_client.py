@@ -175,10 +175,13 @@ def fake_hermes_calls(log_path: Path) -> list:
 def build_board_db(path: Path, tasks) -> None:
     """Synthetic board database with the columns the jev plugin reads.
 
+    Like Hermes board databases it uses ``journal_mode=wal``.
     ``tasks``: iterable of (id, status, assignee) or (id, status, assignee, scheduled_reason).
     """
     import sqlite3
+    path.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(path)
+    conn.execute("PRAGMA journal_mode=wal")
     conn.execute("CREATE TABLE tasks (id TEXT PRIMARY KEY, title TEXT, status TEXT, assignee TEXT,"
                  " model_override TEXT, provider_override TEXT)")
     conn.execute("CREATE TABLE task_events (id INTEGER PRIMARY KEY AUTOINCREMENT, task_id TEXT, run_id INTEGER,"
@@ -448,6 +451,19 @@ class PluginFrameTests(unittest.TestCase):
         self.assertEqual(out, "result")
         self.assertEqual(calls, [None])
         self.assertEqual(read_records(self.log_dir, "decisions"), [])
+
+    def test_middleware_routes_the_three_kanban_tools(self):
+        def next_call(payload=None):
+            return "result"
+
+        for tool, handler in (("kanban_create", "handle_create"), ("kanban_unblock", "handle_unblock"),
+                              ("kanban_request_review", "handle_request_review")):
+            with self.subTest(tool=tool), mock.patch.object(self.plugin.routing, handler,
+                                                            return_value="handled") as called:
+                out = self.plugin._tool_execution(tool_name=tool, args={"task_id": "t_0a1b2c3d"},
+                                                  next_call=next_call)
+                self.assertEqual(out, "handled")
+                called.assert_called_once()
 
 
 if __name__ == "__main__":

@@ -13,13 +13,15 @@ the shared switch file allows it (absent file means on), and the time is
 inside the window.
 
 Changes to cards go through ``hermes kanban --board <board> ...`` commands only.
-Reads use a read-only SQLite connection to the board database.
+Reads use a SQLite connection to the board database with ``PRAGMA query_only``
+(see ``connect_readonly``).
 """
 from __future__ import annotations
 
 import json
 import os
 import shlex
+import shutil
 import sqlite3
 import subprocess
 from datetime import datetime, time as dtime
@@ -192,9 +194,42 @@ def kanban_db_path(config: Mapping[str, Any], board: str) -> Path:
 # --- board reads ------------------------------------------------------------
 
 def connect_readonly(path: Path) -> sqlite3.Connection:
-    conn = sqlite3.connect(f"file:{path}?mode=ro", uri=True, timeout=10)
+    """Open a board database for reading only.
+
+    Hermes board databases use ``journal_mode=wal``. When the last writer closes,
+    SQLite removes the ``-wal`` and ``-shm`` files, and older SQLite versions
+    (for example the one in /usr/bin/python3 on macOS) then refuse a
+    ``mode=ro`` URI connection with "unable to open database file". A normal
+    connection with ``PRAGMA query_only=ON`` reads that state with every SQLite
+    version and refuses every write statement. The existence check keeps the
+    normal connection from creating an empty database file.
+    """
+    if not Path(path).is_file():
+        raise FileNotFoundError(str(path))
+    conn = sqlite3.connect(str(path), timeout=10)
+    try:
+        conn.execute("PRAGMA query_only = ON")
+    except Exception:
+        conn.close()
+        raise
     conn.row_factory = sqlite3.Row
     return conn
+
+
+def card_hold_state(conn: sqlite3.Connection, task_id: str, mark: str) -> Optional[Tuple[str, Optional[str], bool]]:
+    """``(status, assignee, carries_marker)`` of one card, or None when it does not exist.
+
+    ``carries_marker`` is true only for a ``scheduled`` card whose latest
+    ``scheduled`` event reason carries the marker.
+    """
+    row = conn.execute("SELECT status, assignee FROM tasks WHERE id = ?", (task_id,)).fetchone()
+    if row is None:
+        return None
+    status = str(row["status"])
+    held = False
+    if status == "scheduled":
+        held = any(card_id == task_id for card_id, _assignee, _reason in held_cards(conn, mark, only=task_id))
+    return status, row["assignee"], held
 
 
 def holdable_cards(conn: sqlite3.Connection, workers: Iterable[str]) -> List[Tuple[str, str]]:
@@ -209,11 +244,17 @@ def holdable_cards(conn: sqlite3.Connection, workers: Iterable[str]) -> List[Tup
     return [(str(r["id"]), str(r["assignee"])) for r in rows]
 
 
-def held_cards(conn: sqlite3.Connection, mark: str) -> List[Tuple[str, Optional[str], str]]:
+def held_cards(conn: sqlite3.Connection, mark: str, *, only: Optional[str] = None) -> List[Tuple[str, Optional[str], str]]:
     """``(task_id, assignee, reason)`` for ``scheduled`` cards whose latest ``scheduled``
-    event reason carries the marker. Other scheduled or blocked cards are never returned."""
+    event reason carries the marker. Other scheduled or blocked cards are never returned.
+    ``only`` limits the query to one card."""
     out = []
-    for row in conn.execute("SELECT id, assignee FROM tasks WHERE status = 'scheduled' ORDER BY id").fetchall():
+    query = "SELECT id, assignee FROM tasks WHERE status = 'scheduled'"
+    params: Tuple[Any, ...] = ()
+    if only is not None:
+        query += " AND id = ?"
+        params = (only,)
+    for row in conn.execute(query + " ORDER BY id", params).fetchall():
         event = conn.execute(
             "SELECT payload FROM task_events WHERE task_id = ? AND kind = 'scheduled' "
             "ORDER BY id DESC LIMIT 1", (row["id"],)).fetchone()
@@ -230,6 +271,35 @@ def held_cards(conn: sqlite3.Connection, mark: str) -> List[Tuple[str, Optional[
 
 # --- board changes ------------------------------------------------------------
 
+def hermes_argv(config: Mapping[str, Any], command: Optional[str] = None) -> List[str]:
+    kanban_cfg = config.get("kanban") or {}
+    return shlex.split(command or str(kanban_cfg.get("hermes_command") or "hermes"))
+
+
+def command_resolves(config: Mapping[str, Any], command: Optional[str] = None) -> bool:
+    """True when the ``hermes`` command names an executable file (a path or a ``PATH`` entry)."""
+    try:
+        base = hermes_argv(config, command)
+    except ValueError:
+        return False
+    if not base:
+        return False
+    program = base[0]
+    if os.sep in program:
+        return os.path.isfile(program) and os.access(program, os.X_OK)
+    return shutil.which(program) is not None
+
+
+def worker_session() -> bool:
+    """True inside a dispatcher-started worker session.
+
+    There ``hermes kanban schedule`` and ``hermes kanban unblock`` refuse every
+    card other than the worker's own (Hermes ``hermes_cli/kanban.py``
+    ``_worker_run_id_for`` and the ``unblock`` command).
+    """
+    return bool(os.environ.get("HERMES_KANBAN_TASK", "").strip())
+
+
 def run_kanban(config: Mapping[str, Any], board: Optional[str], args: List[str],
                command: Optional[str] = None) -> Tuple[bool, Optional[str]]:
     """Run ``<hermes> kanban [--board <board>] <args>``; ``(ok, error_class)``.
@@ -237,7 +307,7 @@ def run_kanban(config: Mapping[str, Any], board: Optional[str], args: List[str],
     The command's output is not returned or logged because it can repeat card text.
     """
     kanban_cfg = config.get("kanban") or {}
-    base = shlex.split(command or str(kanban_cfg.get("hermes_command") or "hermes"))
+    base = hermes_argv(config, command)
     argv = base + ["kanban"] + (["--board", board] if board else []) + list(args)
     try:
         timeout = float(kanban_cfg.get("command_timeout_seconds") or 30)
@@ -287,14 +357,37 @@ def log_release(board: str, task_id: str, assignee: Optional[str], until: Option
 
 # --- one pass over the boards (used by scripts/jev-peak-hold) ---------------
 
+def _plan_board(conn: sqlite3.Connection, board: str, workers: List[str], mark: str, active: bool,
+                until: str) -> List[Dict[str, Any]]:
+    actions: List[Dict[str, Any]] = []
+    held = held_cards(conn, mark)
+    if active:
+        for task_id, assignee in holdable_cards(conn, workers):
+            actions.append({"action": "hold", "board": board, "task_id": task_id,
+                            "assignee": assignee, "held_until": until})
+        for task_id, assignee, reason in held:
+            if assignee not in workers:
+                actions.append({"action": "release", "board": board, "task_id": task_id,
+                                "assignee": assignee, "held_until": until_from_reason(reason, mark)})
+    else:
+        for task_id, assignee, reason in held:
+            actions.append({"action": "release", "board": board, "task_id": task_id,
+                            "assignee": assignee, "held_until": until_from_reason(reason, mark)})
+    return actions
+
+
 def plan(config: Mapping[str, Any], now: datetime, boards: Mapping[str, Path],
-         *, force_release: bool = False) -> Tuple[List[Dict[str, Any]], Optional[str]]:
+         *, force_release: bool = False
+         ) -> Tuple[List[Dict[str, Any]], Optional[str], List[Dict[str, Any]]]:
     """Planned holds and releases for ``boards`` (board name to database path).
 
-    When the hold is active, ready and todo cards of the board's GLM workers
-    are held, and marker-held cards that are no longer assigned to a GLM worker
-    are released. When it is not active (outside the window, switch off or
-    ``peak_hold.enabled`` false), every marker-held card is released.
+    Returns ``(actions, switch_error_class, read_errors)``. When the hold is
+    active, ready and todo cards of the board's GLM workers are held, and cards
+    held with the marker that are no longer assigned to a GLM worker are
+    released. When it is not active (outside the window, switch off or
+    ``peak_hold.enabled`` false), every card held with the marker is released.
+    A board whose database cannot be read adds ``{"board", "error_class"}`` to
+    ``read_errors`` and does not stop the other boards.
     """
     active, switch_error = hold_active(config, now)
     if force_release:
@@ -304,26 +397,17 @@ def plan(config: Mapping[str, Any], now: datetime, boards: Mapping[str, Path],
     workers_by_board = glm_workers_by_board(config)
     until = held_until(now, cfg)
     actions: List[Dict[str, Any]] = []
+    errors: List[Dict[str, Any]] = []
     for board, path in boards.items():
-        workers = workers_by_board.get(board, [])
-        conn = connect_readonly(path)
         try:
-            held = held_cards(conn, mark)
-            if active:
-                for task_id, assignee in holdable_cards(conn, workers):
-                    actions.append({"action": "hold", "board": board, "task_id": task_id,
-                                    "assignee": assignee, "held_until": until})
-                for task_id, assignee, reason in held:
-                    if assignee not in workers:
-                        actions.append({"action": "release", "board": board, "task_id": task_id,
-                                        "assignee": assignee, "held_until": until_from_reason(reason, mark)})
-            else:
-                for task_id, assignee, reason in held:
-                    actions.append({"action": "release", "board": board, "task_id": task_id,
-                                    "assignee": assignee, "held_until": until_from_reason(reason, mark)})
-        finally:
-            conn.close()
-    return actions, switch_error
+            conn = connect_readonly(path)
+            try:
+                actions.extend(_plan_board(conn, board, workers_by_board.get(board, []), mark, active, until))
+            finally:
+                conn.close()
+        except Exception as exc:
+            errors.append({"board": board, "error_class": type(exc).__name__})
+    return actions, switch_error, errors
 
 
 def apply(config: Mapping[str, Any], actions: List[Dict[str, Any]],
@@ -341,13 +425,18 @@ def apply(config: Mapping[str, Any], actions: List[Dict[str, Any]],
     return results
 
 
-def count_held(config: Mapping[str, Any], boards: Mapping[str, Path]) -> int:
+def count_held(config: Mapping[str, Any], boards: Mapping[str, Path]) -> Tuple[int, List[Dict[str, Any]]]:
+    """``(number of cards held with the marker, read_errors)`` over ``boards``."""
     mark = marker(config)
     total = 0
-    for _board, path in boards.items():
-        conn = connect_readonly(path)
+    errors: List[Dict[str, Any]] = []
+    for board, path in boards.items():
         try:
-            total += len(held_cards(conn, mark))
-        finally:
-            conn.close()
-    return total
+            conn = connect_readonly(path)
+            try:
+                total += len(held_cards(conn, mark))
+            finally:
+                conn.close()
+        except Exception as exc:
+            errors.append({"board": board, "error_class": type(exc).__name__})
+    return total, errors

@@ -49,7 +49,11 @@ CARDS = [
     ("t_other_blocked", "blocked", "harness-worker-glm-1"),
     ("t_other_sched", "scheduled", "harness-worker-glm-2", "waiting for the owner's release window"),
     ("t_lookalike", "scheduled", "harness-worker-glm-2", "not jev-peak-hold"),
+    # Hermes-form IDs for the kanban_unblock middleware, which uses only such IDs.
+    ("t_0b10c4ed", "blocked", "harness-worker-glm-2"),
+    ("t_c1a0de00", "blocked", "harness-worker"),
 ]
+USR_BIN_PYTHON3 = "/usr/bin/python3"
 
 
 class WindowTests(unittest.TestCase):
@@ -84,12 +88,13 @@ class _BoardCase(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
         self.dir = Path(self.tmp.name)
-        self.db = self.dir / "kanban.db"
+        self.env = isolated_env(self.dir)
+        # The Hermes board layout under the test Kanban home: <home>/kanban/boards/<board>/kanban.db
+        self.db = Path(self.env["HERMES_KANBAN_HOME"]) / "kanban" / "boards" / "harness" / "kanban.db"
         build_board_db(self.db, CARDS)
         self.hermes = write_fake_hermes(self.dir)
         self.calls_log = self.dir / "hermes-calls.jsonl"
         self.log_dir = self.dir / "logs"
-        self.env = isolated_env(self.dir)
         self.env.update({"FAKE_HERMES_LOG": str(self.calls_log), "FAKE_KANBAN_DB": str(self.db)})
         patcher = mock.patch.dict(os.environ, self.env)
         patcher.start()
@@ -101,12 +106,17 @@ class _BoardCase(unittest.TestCase):
     def save_config(self):
         self.config_path.write_text(json.dumps(self.config), encoding="utf-8")
 
-    def script(self, *args, now=WEDNESDAY_16, extra_env=None):
+    def script(self, *args, now=WEDNESDAY_16, extra_env=None, python=None, returncode=0, boards=("harness",),
+               kanban_db=True):
         env = {**os.environ, **(extra_env or {})}
-        argv = [sys.executable, str(SCRIPT), *args, "--board", "harness", "--kanban-db", str(self.db),
-                "--config", str(self.config_path), "--hermes", self.hermes, "--now", now]
+        argv = [python or sys.executable, str(SCRIPT), *args]
+        for board in boards:
+            argv += ["--board", board]
+        if kanban_db:
+            argv += ["--kanban-db", str(self.db)]
+        argv += ["--config", str(self.config_path), "--hermes", self.hermes, "--now", now]
         proc = subprocess.run(argv, capture_output=True, text=True, env=env, timeout=120)
-        self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
+        self.assertEqual(proc.returncode, returncode, proc.stdout + proc.stderr)
         return proc.stdout
 
     def statuses(self):
@@ -198,6 +208,75 @@ class PeakHoldScriptTests(_BoardCase):
         self.assertEqual(self.statuses()["t_glm_ready"], "ready")
         self.assertFalse(self.decisions("hold")[0]["applied"])
 
+    def prepare_wal_without_side_files(self):
+        """Put the board database in the state the reviewer found on the live board:
+        WAL mode, and no -wal and -shm files.
+
+        Some SQLite builds remove the two files when the last connection closes;
+        the macOS system SQLite keeps the -wal file (persistent WAL). After a
+        TRUNCATE checkpoint and close, the -wal file holds no data, so removing
+        the two files gives the same state with every SQLite build.
+        """
+        conn = sqlite3.connect(self.db)
+        try:
+            conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+        finally:
+            conn.close()
+        for suffix in ("-wal", "-shm"):
+            side = Path(str(self.db) + suffix)
+            if side.exists():
+                side.unlink()
+        # File header bytes 18 and 19 are 2 in WAL mode; reading them opens no connection.
+        header = self.db.read_bytes()[:20]
+        self.assertEqual((header[18], header[19]), (2, 2))
+        for suffix in ("-wal", "-shm"):
+            self.assertFalse(Path(str(self.db) + suffix).exists(), suffix)
+
+    def test_wal_database_without_wal_and_shm_files(self):
+        # Hermes board databases are in WAL mode, and the -wal and -shm files can be
+        # absent when no connection is open. /usr/bin/python3 (older SQLite)
+        # refused a mode=ro connection in that state.
+        self.prepare_wal_without_side_files()
+        self.script("--apply")
+        self.assertEqual(self.statuses()["t_glm_ready"], "scheduled")
+        self.prepare_wal_without_side_files()
+        self.script("--apply", now=WEDNESDAY_19)
+        self.assertEqual(self.statuses()["t_glm_ready"], "ready")
+
+    @unittest.skipUnless(os.path.exists(USR_BIN_PYTHON3), "no /usr/bin/python3")
+    def test_wal_database_under_usr_bin_python3(self):
+        self.prepare_wal_without_side_files()
+        self.assertIn("held cards: 0", self.script("status", python=USR_BIN_PYTHON3))
+        self.prepare_wal_without_side_files()
+        self.script("--apply", python=USR_BIN_PYTHON3)
+        self.assertEqual(self.statuses()["t_glm_ready"], "scheduled")
+        self.prepare_wal_without_side_files()
+        self.script("--apply", now=WEDNESDAY_19, python=USR_BIN_PYTHON3)
+        self.assertEqual(self.statuses()["t_glm_ready"], "ready")
+
+    def test_unreadable_board_does_not_stop_other_boards(self):
+        broken = self.db.parent.parent / "jobcron" / "kanban.db"
+        broken.parent.mkdir(parents=True)
+        broken.write_bytes(b"this file is not a SQLite database" * 200)
+        out = self.script("--apply", boards=("jobcron", "harness"), kanban_db=False, returncode=1)
+        self.assertIn("failed read jobcron error_class=DatabaseError", out)
+        self.assertEqual(self.statuses()["t_glm_ready"], "scheduled")
+        errors = self.decisions("read_error")
+        self.assertEqual([(r["board"], r["error_class"]) for r in errors], [("jobcron", "DatabaseError")])
+        status = self.script("status", boards=("jobcron", "harness"), kanban_db=False, returncode=1)
+        self.assertIn("held cards: 2 (boards that could not be read are not counted)", status)
+
+    def test_read_is_query_only(self):
+        conn = peak_hold.connect_readonly(self.db)
+        try:
+            with self.assertRaises(sqlite3.OperationalError):
+                conn.execute("UPDATE tasks SET status='done'")
+        finally:
+            conn.close()
+        with self.assertRaises(FileNotFoundError):
+            peak_hold.connect_readonly(self.dir / "missing.db")
+        self.assertFalse((self.dir / "missing.db").exists())
+
 
 class OwnerSwitchTests(_BoardCase):
     def switch_file(self):
@@ -287,30 +366,38 @@ class CreationHoldTests(_BoardCase):
         self.config["kanban"]["hermes_command"] = self.hermes
         self.counter = 0
 
-    def next_call_factory(self):
+    def next_call_factory(self, existing=None):
+        """Stands in for the Hermes tool. With ``existing`` it behaves like a
+        repeated create with a known idempotency key: it returns that card."""
         calls = []
 
         def next_call(payload=None):
             calls.append(payload)
-            self.counter += 1
-            task_id = f"t_new{self.counter}"
-            args = payload or {}
-            status = "blocked" if args.get("initial_status") == "blocked" else "ready"
             conn = sqlite3.connect(self.db)
-            conn.execute("INSERT INTO tasks (id, title, status, assignee) VALUES (?, ?, ?, ?)",
-                         (task_id, "synthetic", status, args.get("assignee") or "harness-worker"))
-            conn.commit()
-            conn.close()
-            return json.dumps({"ok": True, "task_id": task_id})
+            try:
+                if existing is not None:
+                    task_id = existing
+                else:
+                    self.counter += 1
+                    task_id = f"t_new{self.counter}"
+                    args = payload or {}
+                    status = "blocked" if args.get("initial_status") == "blocked" else "ready"
+                    conn.execute("INSERT INTO tasks (id, title, status, assignee) VALUES (?, ?, ?, ?)",
+                                 (task_id, "synthetic", status, args.get("assignee") or "harness-worker"))
+                    conn.commit()
+                landed = conn.execute("SELECT status FROM tasks WHERE id = ?", (task_id,)).fetchone()[0]
+            finally:
+                conn.close()
+            return json.dumps({"ok": True, "task_id": task_id, "status": landed})
 
         return next_call, calls
 
-    def create(self, route, now, assignee="harness-worker"):
+    def create(self, route, now, assignee="harness-worker", existing=None, **extra):
         self.fake.choice(route, {"easy": 0.0, "medium": 0.0, "hard": 0.0, route: 0.9})
-        next_call, calls = self.next_call_factory()
+        next_call, calls = self.next_call_factory(existing)
         ask = functools.partial(jev_client.ask, settings=self.config["jev"])
-        routing.handle_create({"title": "t", "body": "b", "assignee": assignee, "board": "harness"}, next_call,
-                              config=self.config, ask=ask, now=datetime.fromisoformat(now))
+        args = {"title": "t", "body": "b", "assignee": assignee, "board": "harness", **extra}
+        routing.handle_create(args, next_call, config=self.config, ask=ask, now=datetime.fromisoformat(now))
         return calls[0]
 
     def test_glm_card_held_at_creation_inside_window(self):
@@ -348,6 +435,140 @@ class CreationHoldTests(_BoardCase):
         self.assertEqual(self.statuses()["t_new1"], "ready")
         hold = self.decisions("hold")[-1]
         self.assertEqual((hold["applied"], hold["error_class"]), (False, "CommandFailed"))
+
+    # --- the creation-time hold acts only on a card this call created blocked ----------
+
+    def set_existing(self, task_id, status, assignee):
+        conn = sqlite3.connect(self.db)
+        conn.execute("INSERT INTO tasks (id, title, status, assignee) VALUES (?, ?, ?, ?)",
+                     (task_id, "synthetic", status, assignee))
+        conn.commit()
+        conn.close()
+
+    def test_known_idempotency_key_never_schedules_an_existing_card(self):
+        # Hermes returns the existing card for a known key. A card blocked for an
+        # owner decision and a running GLM card must keep their status.
+        self.set_existing("t_0dec1de0", "blocked", "harness-worker")
+        self.set_existing("t_0a11ce00", "running", "harness-worker-glm-1")
+        for existing, status in (("t_0dec1de0", "blocked"), ("t_0a11ce00", "running")):
+            with self.subTest(existing=existing):
+                sent = self.create("easy", WEDNESDAY_16, existing=existing, idempotency_key="key-1")
+                self.assertNotIn("initial_status", sent)
+                self.assertEqual(self.statuses()[existing], status)
+        self.assertEqual(fake_hermes_calls(self.calls_log), [])
+        self.assertEqual(self.decisions("hold"), [])
+        self.script("--apply", now=WEDNESDAY_19)
+        self.assertEqual(self.statuses()["t_0dec1de0"], "blocked")
+
+    def test_new_card_with_idempotency_key_is_left_to_the_script(self):
+        sent = self.create("easy", WEDNESDAY_16, idempotency_key="key-2")
+        self.assertNotIn("initial_status", sent)
+        self.assertEqual(self.statuses()["t_new1"], "ready")
+        self.script("--apply")
+        self.assertEqual(self.statuses()["t_new1"], "scheduled")
+
+    def test_result_status_other_than_blocked_is_not_scheduled(self):
+        # The plugin set initial_status, but Hermes reports another status
+        # (for example an existing card): nothing is scheduled.
+        self.set_existing("t_0a11ce01", "running", "harness-worker-glm-2")
+        sent = self.create("easy", WEDNESDAY_16, existing="t_0a11ce01")
+        self.assertEqual(sent["initial_status"], "blocked")
+        self.assertEqual(self.statuses()["t_0a11ce01"], "running")
+        self.assertEqual(fake_hermes_calls(self.calls_log), [])
+
+    def test_worker_session_card_is_created_as_requested_and_held_by_the_script(self):
+        # In a dispatcher-started worker session hermes kanban schedule and unblock
+        # refuse other cards, so the plugin does not create the card blocked.
+        with mock.patch.dict(os.environ, {"HERMES_KANBAN_TASK": "t_feedc0de"}):
+            sent = self.create("easy", WEDNESDAY_16)
+        self.assertNotIn("initial_status", sent)
+        self.assertEqual(sent["assignee"], "harness-worker-glm-1")
+        self.assertEqual(self.statuses()["t_new1"], "ready")
+        self.assertEqual(fake_hermes_calls(self.calls_log), [])
+        self.script("--apply")
+        self.assertEqual(self.statuses()["t_new1"], "scheduled")
+
+    def test_unresolvable_command_card_is_created_as_requested(self):
+        self.config["kanban"]["hermes_command"] = str(self.dir / "no-such-hermes")
+        sent = self.create("easy", WEDNESDAY_16)
+        self.assertNotIn("initial_status", sent)
+        self.assertEqual(self.statuses()["t_new1"], "ready")
+
+    def test_card_created_blocked_by_the_caller_is_not_scheduled_at_creation(self):
+        sent = self.create("easy", WEDNESDAY_16, initial_status="blocked")
+        self.assertEqual(sent["initial_status"], "blocked")
+        self.assertEqual(self.statuses()["t_new1"], "blocked")
+        self.assertEqual(fake_hermes_calls(self.calls_log), [])
+
+
+class UnblockHoldTests(_BoardCase):
+    """``kanban_unblock`` inside the window moves a blocked GLM card directly to
+    ``scheduled`` with the marker (orchestrator Card Setup step 5)."""
+
+    def setUp(self):
+        super().setUp()
+        self.config["kanban"]["hermes_command"] = self.hermes
+
+    def unblock(self, task_id, now=WEDNESDAY_16, board="harness"):
+        calls = []
+
+        def next_call(payload=None):
+            calls.append(payload)
+            return json.dumps({"ok": True, "task_id": task_id, "status": "ready"})
+
+        result = routing.handle_unblock({"task_id": task_id, "board": board}, next_call, config=self.config,
+                                        now=datetime.fromisoformat(now))
+        return calls, json.loads(result)
+
+    def test_glm_card_goes_from_blocked_to_scheduled_inside_window(self):
+        calls, result = self.unblock("t_0b10c4ed")
+        self.assertEqual(calls, [])
+        self.assertEqual((result["status"], result["held_until"]), ("scheduled", "2026-11-11T19:00:00+09:00"))
+        self.assertEqual(self.statuses()["t_0b10c4ed"], "scheduled")
+        self.assertEqual(fake_hermes_calls(self.calls_log),
+                         [["kanban", "--board", "harness", "schedule", "t_0b10c4ed", MARK]])
+        hold = self.decisions("hold")[-1]
+        self.assertEqual((hold["task_id"], hold["applied"]), ("t_0b10c4ed", True))
+        self.script("--apply", now=WEDNESDAY_19)
+        self.assertEqual(self.statuses()["t_0b10c4ed"], "ready")
+
+    def test_card_held_with_the_marker_stays_held(self):
+        self.unblock("t_0b10c4ed")
+        calls, result = self.unblock("t_0b10c4ed")
+        self.assertEqual(calls, [])
+        self.assertEqual(result["status"], "scheduled")
+        self.assertEqual(len(fake_hermes_calls(self.calls_log)), 1)
+
+    def test_unblock_runs_unchanged_otherwise(self):
+        cases = [("outside window", "t_0b10c4ed", WEDNESDAY_19, "harness", {}),
+                 ("weekend", "t_0b10c4ed", SATURDAY_16, "harness", {}),
+                 ("claude card", "t_c1a0de00", WEDNESDAY_16, "harness", {}),
+                 ("unknown board", "t_0b10c4ed", WEDNESDAY_16, "other-board", {}),
+                 ("worker session", "t_0b10c4ed", WEDNESDAY_16, "harness", {"HERMES_KANBAN_TASK": "t_feedc0de"})]
+        for name, task_id, now, board, env in cases:
+            with self.subTest(name=name), mock.patch.dict(os.environ, env):
+                calls, result = self.unblock(task_id, now=now, board=board)
+                self.assertEqual(calls, [None])
+                self.assertEqual(result["status"], "ready")
+        self.assertEqual(fake_hermes_calls(self.calls_log), [])
+
+    def test_switch_off_unblocks_unchanged(self):
+        peak_hold.write_switch(False, "owner")
+        calls, _ = self.unblock("t_0b10c4ed")
+        self.assertEqual(calls, [None])
+
+    def test_failed_schedule_unblocks_unchanged(self):
+        with mock.patch.dict(os.environ, {"FAKE_HERMES_EXIT": "2"}):
+            calls, result = self.unblock("t_0b10c4ed")
+        self.assertEqual(calls, [None])
+        hold = self.decisions("hold")[-1]
+        self.assertEqual((hold["applied"], hold["error_class"]), (False, "CommandFailed"))
+
+    def test_unreadable_board_unblocks_unchanged(self):
+        self.db.write_bytes(b"this file is not a SQLite database" * 200)
+        calls, _ = self.unblock("t_0b10c4ed")
+        self.assertEqual(calls, [None])
+        self.assertEqual(self.decisions("hold")[-1]["error_class"], "DatabaseError")
 
 
 if __name__ == "__main__":

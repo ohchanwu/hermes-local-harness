@@ -16,6 +16,8 @@
     "state_max_chars": 60000,
     "question_instructions": "Which route fits the work this Kanban card asks for?",
     "clear_override_at_review": true,
+    "known_models": ["claude-opus-5-5", "claude-haiku-5-5", "claude-fable-5-2", "gpt-6.1-sol", "gpt-6-astra",
+                     "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna", "glm-5.3", "glm-5.3-flash"],
     "boards": {
       "jobcron": {
         "implementation_workers": ["jobcron-worker", "jobcron-worker-2"],

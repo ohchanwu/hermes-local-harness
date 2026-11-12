@@ -153,6 +153,11 @@ class RoutingTests(unittest.TestCase):
         self.assertEqual(record["orchestrator_model"], "claude-opus-5-5")
         self.assertEqual(record["route"], "easy")  # Jev's choice is still logged
 
+    def test_model_not_in_configuration_is_logged_as_unrecognized(self):
+        self.fake.choice("easy", probs(easy=0.99))
+        create, _ = self.create(self.card(model="some-other-model-1"))
+        self.assertEqual(self.assert_unchanged(create, "model_set")["orchestrator_model"], "unrecognized")
+
     def test_not_applied_when_assignee_not_listed(self):
         self.fake.choice("easy", probs(easy=0.99))
         create, _ = self.create(self.card(assignee="harness-reviewer"))
@@ -274,8 +279,37 @@ class RoutingTests(unittest.TestCase):
         self.fake.choice("easy", probs(easy=0.9))
         self.create(self.card(**text_args, assignee=SENTINEL))
         self.create(self.card(**text_args, board=SENTINEL))
+        # model and provider arguments.
+        self.create(self.card(**text_args, model=SENTINEL, provider=SENTINEL))
+        self.create(self.card(**text_args, model=f"claude-{SENTINEL}", provider="zai"))
+        self.assertEqual([r["orchestrator_model"] for r in read_records(self.log_dir, "decisions")[-2:]],
+                         ["unrecognized", "unrecognized"])
+        # kanban_request_review in a GLM worker session and kanban_unblock: every argument.
+        hermes = write_fake_hermes(self.dir)
+        calls_log = self.dir / "hermes-calls.jsonl"
+        review_args = [
+            {"task_id": SENTINEL, "board": "harness", "summary": SENTINEL, "metadata": {"x": SENTINEL},
+             "reviewer": SENTINEL, "artifacts": [SENTINEL]},
+            {"task_id": "t_feedc0de", "board": SENTINEL, "summary": SENTINEL},
+            {"summary": SENTINEL, "board": f"harness {SENTINEL}"},
+        ]
+        with mock.patch.dict(os.environ, {"HERMES_PROFILE": "harness-worker-glm-1", "FAKE_HERMES_LOG": str(calls_log),
+                                          "HERMES_KANBAN_TASK": "t_feedc0de"}):
+            for args in review_args:
+                routing.handle_request_review(args, lambda payload=None: '{"ok": true}', config=self.config,
+                                              command=hermes)
+        unblock_now = datetime(2026, 11, 11, 16, 0, tzinfo=KST)  # inside the window
+        for args in ({"task_id": SENTINEL, "board": "harness"}, {"task_id": "t_0b10c4ed", "board": SENTINEL}):
+            routing.handle_unblock(args, lambda payload=None: '{"ok": true}', config=self.config, now=unblock_now,
+                                   command=hermes)
+        records = read_records(self.log_dir, "decisions")
+        reviews = [r for r in records if r["event"] == "clear_override"]
+        self.assertEqual([(r["task_id"], r["board"], r["not_applied_reason"]) for r in reviews],
+                         [(None, "harness", "task_id_not_recognized"), ("t_feedc0de", None, "board_not_configured"),
+                          ("t_feedc0de", None, "board_not_configured")])
+        self.assertEqual(fake_hermes_calls(calls_log), [])  # no command with an argument that was not recognized
         logged = all_text_under(self.log_dir)
-        self.assertEqual(len(read_records(self.log_dir, "decisions")), 5)
+        self.assertEqual(len([r for r in records if r["event"] == "route"]), 7)
         self.assertNotIn(SENTINEL, logged)
         self.assertNotIn(TEST_KEY, logged)
         # Jev did receive the card text (it is the state).
@@ -319,6 +353,17 @@ class ReviewHandoffTests(unittest.TestCase):
     def test_claude_worker_does_not_clear(self):
         self.assertEqual(self.review("harness-worker"), [None])
         self.assertEqual(fake_hermes_calls(self.calls_log), [])
+
+    def test_board_not_configured_is_not_used_or_logged(self):
+        calls = []
+        with mock.patch.dict(os.environ, {"HERMES_PROFILE": "harness-worker-glm-1"}):
+            routing.handle_request_review({"board": "not-a-configured-board"}, lambda p=None: calls.append(p),
+                                          config=self.config, command=self.hermes)
+        self.assertEqual(calls, [None])
+        self.assertEqual(fake_hermes_calls(self.calls_log), [])
+        record = read_records(self.dir / "logs", "decisions")[-1]
+        self.assertEqual((record["board"], record["applied"], record["not_applied_reason"]),
+                         (None, False, "board_not_configured"))
 
     def test_failed_clear_still_requests_review(self):
         with mock.patch.dict(os.environ, {"FAKE_HERMES_EXIT": "3"}):

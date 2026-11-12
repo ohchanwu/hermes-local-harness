@@ -14,10 +14,16 @@
    line that starts with ``Assigned worker EXACT ``. ``hard`` changes nothing.
 3. Inside the peak-hours window it creates a card assigned to a GLM worker
    as ``blocked`` and then moves it to ``scheduled`` with the
-   ``jev-peak-hold`` marker (see ``peak_hold``).
+   ``jev-peak-hold`` marker (see ``peak_hold``), but only where both Kanban
+   commands can work and only for a card this call creates (see
+   ``_creation_hold_blocker``).
 4. It writes one ``decisions`` record for every call.
 
 Any exception before ``next_call`` leaves the arguments unchanged.
+
+``handle_unblock`` runs for ``kanban_unblock`` and, inside the window, moves a
+blocked card of a GLM worker to ``scheduled`` with the marker instead of
+making it ``ready``.
 
 ``handle_request_review`` runs for ``kanban_request_review`` in a GLM worker
 session and clears the card's model override before the review handoff,
@@ -44,7 +50,8 @@ except ImportError:  # loaded directly by the tests
 
 QUESTION_ID = "route"
 ASSIGNED_WORKER_LINE = re.compile(r"^(Assigned worker EXACT )([A-Za-z0-9][A-Za-z0-9_-]*)", re.MULTILINE)
-_MODEL_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/@-]{0,99}$")
+# Hermes task IDs are "t_" plus hexadecimal digits (hermes_cli/kanban_db.py _new_task_id).
+_HERMES_TASK_ID = re.compile(r"t_[0-9a-f]{4,32}")
 STATE_FILE_NAME = "routing-state.json"
 
 
@@ -149,21 +156,49 @@ def _parse_answer(answers: Mapping[str, Any], names: List[str]) -> Tuple[str, Di
     return str(answer["choice"]), probabilities, confidence
 
 
-def _task_id_from_result(result: Any) -> Optional[str]:
+def _create_result(result: Any) -> Tuple[Optional[str], Optional[str]]:
+    """``(task_id, status)`` from a ``kanban_create`` result (Hermes reports both)."""
     try:
         parsed = json.loads(result) if isinstance(result, str) else result
     except Exception:
-        return None
-    if isinstance(parsed, dict) and isinstance(parsed.get("task_id"), str):
-        task_id = parsed["task_id"]
-        return task_id if re.fullmatch(r"[A-Za-z0-9_-]{1,64}", task_id) else None
-    return None
+        return None, None
+    if not isinstance(parsed, dict):
+        return None, None
+    task_id = parsed.get("task_id")
+    if not isinstance(task_id, str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", task_id):
+        return None, None
+    status = parsed.get("status")
+    return task_id, status if isinstance(status, str) else None
 
 
-def _safe_model(value: Any) -> Optional[str]:
+def known_models(config: Mapping[str, Any]) -> set:
+    """``routing.known_models`` plus every model a configured route sets."""
+    routing = config.get("routing") or {}
+    models = {str(m) for m in routing.get("known_models") or [] if isinstance(m, str)}
+    for entry in (routing.get("boards") or {}).values():
+        for route in (entry or {}).get("routes") or []:
+            if isinstance(route, dict) and isinstance(route.get("model"), str):
+                models.add(route["model"])
+    return models
+
+
+def _safe_model(value: Any, config: Mapping[str, Any]) -> Optional[str]:
+    """The ``model`` argument for the log: a configured model ID as given,
+    ``unrecognized`` for any other text, None when empty."""
     if not isinstance(value, str) or not value:
         return None
-    return value if _MODEL_ID.match(value) else "unrecognized"
+    return value if value in known_models(config) else "unrecognized"
+
+
+def _configured_board(board: Any, config: Mapping[str, Any]) -> Optional[str]:
+    """``board`` when it is a board in ``routing.boards``, otherwise None."""
+    boards = (config.get("routing") or {}).get("boards") or {}
+    return board if isinstance(board, str) and board in boards else None
+
+
+def _arg_task_id(value: Any) -> Optional[str]:
+    """A task ID taken from tool arguments, only when it has the Hermes form ``t_<hex>``."""
+    return value if isinstance(value, str) and _HERMES_TASK_ID.fullmatch(value) else None
 
 
 # --- decision ---------------------------------------------------------------
@@ -178,7 +213,7 @@ def decide(args: Mapping[str, Any], config: Mapping[str, Any], ask: Callable[...
     assignee = args.get("assignee")
     record: Dict[str, Any] = {
         "event": "route", "board": board if board_cfg is not None else None, "task_id": None,
-        "original_assignee": None, "new_assignee": None, "orchestrator_model": _safe_model(args.get("model")),
+        "original_assignee": None, "new_assignee": None, "orchestrator_model": _safe_model(args.get("model"), config),
         "route": None, "probabilities": None, "confidence": None, "applied": False,
         "not_applied_reason": None, "jev_latency_ms": None, "jev_input_tokens": None, "error_class": None,
     }
@@ -255,6 +290,31 @@ def decide(args: Mapping[str, Any], config: Mapping[str, Any], ask: Callable[...
 
 # --- middleware entry points ---------------------------------------------------
 
+def _creation_hold_blocker(effective: Mapping[str, Any], config: Mapping[str, Any],
+                           command: Optional[str]) -> Optional[str]:
+    """Why the creation-time hold cannot be used for this call, or None when it can.
+
+    The hold creates the card ``blocked`` and then runs ``hermes kanban
+    schedule``; if that fails, ``hermes kanban unblock``. It is used only where
+    both commands can work and only for a card this call creates:
+    - ``idempotency_key``: Hermes returns an existing card for a known key
+      (``hermes_cli/kanban_db.py`` ``create_task``), and that card must not be
+      scheduled.
+    - a dispatcher-started worker session (``HERMES_KANBAN_TASK`` set): both
+      commands refuse every card other than the worker's own.
+    - the ``hermes`` command does not resolve to an executable.
+    In each of these cases the card is created as requested and
+    ``scripts/jev-peak-hold`` holds it on its next run.
+    """
+    if effective.get("idempotency_key"):
+        return "idempotency_key"
+    if peak_hold.worker_session():
+        return "worker_session"
+    if not peak_hold.command_resolves(config, command):
+        return "command_not_found"
+    return None
+
+
 def handle_create(args: Mapping[str, Any], next_call: Callable[..., Any], *, config: Mapping[str, Any],
                   ask: Callable[..., Any], now: Optional[datetime] = None, command: Optional[str] = None,
                   state_dir: Optional[Path] = None) -> Any:
@@ -271,9 +331,12 @@ def handle_create(args: Mapping[str, Any], next_call: Callable[..., Any], *, con
         active, switch_error = peak_hold.hold_active(config, moment)
         peak_hold.log_switch_error(switch_error)
         glm_here = peak_hold.glm_workers_by_board(config).get(board, [])
+        # A card the caller creates blocked (orchestrator Card Setup) or in triage
+        # is not dispatchable; its later kanban_unblock goes through handle_unblock.
         already_parked = (str(effective.get("initial_status") or "running") == "blocked"
                           or bool(effective.get("triage")))
-        if active and effective.get("assignee") in glm_here and not already_parked:
+        if (active and effective.get("assignee") in glm_here and not already_parked
+                and _creation_hold_blocker(effective, config, command) is None):
             effective = dict(effective)
             effective["initial_status"] = "blocked"
             new_args = effective
@@ -286,16 +349,18 @@ def handle_create(args: Mapping[str, Any], next_call: Callable[..., Any], *, con
     result = next_call(new_args) if new_args is not None else next_call()
 
     try:
-        task_id = _task_id_from_result(result)
+        task_id, status = _create_result(result)
         record["task_id"] = task_id
         if task_id is None and record.get("applied"):
             record["not_applied_reason"] = "create_failed"
         jev_log.write("decisions", record)
-        if hold_until is not None and task_id is not None and board is not None:
+        # Schedule only a card that this call created blocked because the plugin
+        # set initial_status (Hermes reports the stored status in the result).
+        if hold_until is not None and task_id is not None and board is not None and status == "blocked":
             assignee = (new_args or {}).get("assignee")
             ok, error_class = peak_hold.hold_card(config, board, task_id, hold_until, command)
             if not ok:
-                # Never leave a card blocked without the marker: return it to the dispatcher.
+                # Return the card to the dispatcher; scripts/jev-peak-hold holds it on its next run.
                 released, release_error = peak_hold.release_card(config, board, task_id, command)
                 error_class = error_class if released else f"{error_class}+{release_error}"
             peak_hold.log_hold(board, task_id, assignee, hold_until, ok, error_class)
@@ -304,26 +369,102 @@ def handle_create(args: Mapping[str, Any], next_call: Callable[..., Any], *, con
     return result
 
 
+def handle_unblock(args: Mapping[str, Any], next_call: Callable[..., Any], *, config: Mapping[str, Any],
+                   now: Optional[datetime] = None, command: Optional[str] = None) -> Any:
+    """``tool_execution`` middleware body for ``kanban_unblock``.
+
+    Orchestrator Card Setup creates every card ``blocked`` and unblocks it when
+    setup is complete. Inside the peak-hours window, unblocking a card assigned
+    to a GLM worker of that board would make it ``ready`` for the next
+    dispatcher tick. Instead this moves the card from ``blocked`` directly to
+    ``scheduled`` with the marker (``hermes kanban schedule`` accepts a blocked
+    card), so the card is never ``ready`` inside the window, and returns a
+    result that states this. A card that is already held with the marker stays
+    held. If the schedule command fails, the unblock runs unchanged and
+    ``scripts/jev-peak-hold`` holds the card on its next run.
+
+    ``kanban_unblock`` is an orchestrator tool: Hermes refuses it when
+    ``HERMES_KANBAN_TASK`` is set (``tools/kanban_tools.py``
+    ``_require_orchestrator_tool``), so the session can run ``hermes kanban schedule``.
+    """
+    action: Optional[str] = None
+    board: Optional[str] = None
+    task_id: Optional[str] = None
+    assignee: Optional[str] = None
+    until: Optional[str] = None
+    try:
+        moment = now or datetime.now().astimezone()
+        active, switch_error = peak_hold.hold_active(config, moment)
+        peak_hold.log_switch_error(switch_error)
+        if active and not peak_hold.worker_session():
+            task_id = _arg_task_id(args.get("task_id"))
+            board = _configured_board(resolve_board(args, config), config)
+            glm_here = peak_hold.glm_workers_by_board(config).get(board or "", [])
+            if task_id and board and glm_here:
+                conn = peak_hold.connect_readonly(peak_hold.kanban_db_path(config, board))
+                try:
+                    state = peak_hold.card_hold_state(conn, task_id, peak_hold.marker(config))
+                finally:
+                    conn.close()
+                if state is not None and state[1] in glm_here:
+                    assignee = state[1]
+                    until = peak_hold.held_until(moment, config.get("peak_hold") or {})
+                    if state[0] == "blocked":
+                        action = "hold"
+                    elif state[2]:
+                        action = "keep"
+    except Exception as exc:
+        action = None
+        jev_log.write("decisions", {"event": "hold", "board": board, "task_id": task_id, "applied": False,
+                                    "not_applied_reason": "plugin_error", "error_class": type(exc).__name__})
+
+    if action == "hold":
+        try:
+            ok, error_class = peak_hold.hold_card(config, board, task_id, until, command)
+            peak_hold.log_hold(board, task_id, assignee, until, ok, error_class)
+        except Exception:
+            ok = False
+        if not ok:
+            return next_call()
+    elif action != "keep":
+        return next_call()
+    return json.dumps({
+        "ok": True, "task_id": task_id, "status": "scheduled", "held_by": peak_hold.marker(config),
+        "held_until": until,
+        "note": ("Not unblocked: the jev plugin GLM peak-hours hold keeps this card in the scheduled "
+                 "status until held_until. scripts/jev-peak-hold releases it then, or at once with "
+                 "scripts/jev-peak-hold off."),
+    })
+
+
 def handle_request_review(args: Mapping[str, Any], next_call: Callable[..., Any], *,
                           config: Mapping[str, Any], command: Optional[str] = None) -> Any:
     """``tool_execution`` middleware body for ``kanban_request_review``.
 
     In a GLM worker session, clear the card's model override first so that the
     reviewer run does not start with the GLM model and the ``zai`` provider.
+    Only a task ID of the Hermes form and a board in ``routing.boards`` are
+    used and logged; other argument values are never written to a log.
     """
     try:
         routing = config.get("routing") or {}
         profile = jev_log.profile_name()
         if (routing.get("enabled", False) and routing.get("clear_override_at_review", True)
                 and profile in peak_hold.all_glm_workers(config)):
-            task_id = args.get("task_id") or os.environ.get("HERMES_KANBAN_TASK", "").strip() or None
-            board = args.get("board") or os.environ.get("HERMES_KANBAN_BOARD", "").strip() or None
-            if isinstance(task_id, str) and re.fullmatch(r"[A-Za-z0-9_-]{1,64}", task_id):
+            raw_task = args.get("task_id") or os.environ.get("HERMES_KANBAN_TASK", "").strip() or None
+            raw_board = args.get("board") or os.environ.get("HERMES_KANBAN_BOARD", "").strip() or None
+            task_id = _arg_task_id(raw_task)
+            board = _configured_board(raw_board, config)
+            record: Dict[str, Any] = {"event": "clear_override", "board": board, "task_id": task_id,
+                                      "original_assignee": profile, "applied": False}
+            if task_id is None:
+                record["not_applied_reason"] = "task_id_not_recognized"
+            elif raw_board is not None and board is None:
+                record["not_applied_reason"] = "board_not_configured"
+            else:
                 ok, error_class = peak_hold.run_kanban(config, board, ["set-model", task_id, "none"], command)
-                jev_log.write("decisions", {
-                    "event": "clear_override", "board": board, "task_id": task_id,
-                    "original_assignee": profile, "applied": ok, "error_class": error_class,
-                })
+                record.update(applied=ok, error_class=error_class)
+            jev_log.write("decisions", record)
     except Exception:
         pass
     return next_call()
