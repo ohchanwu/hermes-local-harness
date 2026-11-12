@@ -526,8 +526,29 @@ class JevPolicySources(unittest.TestCase):
                        "model `glm-5.3`, provider `zai`, base URL `https://api.z.ai/api/coding/paas/v4`",
                        "/Users/chanbla11mit/hermes-local-harness/policies/profile-souls/<profile>/SOUL.md",
                        "because a cloned profile has no `auth.json`", "hermes -p <profile> auth add zai",
-                       "`hermes -p jss-worker-glm-1 auth add zai`", "`hermes -p jss-worker-glm-2 auth add zai`"):
+                       "`hermes -p jss-worker-glm-1 auth add zai`", "`hermes -p jss-worker-glm-2 auth add zai`",
+                       # The clone copies the Anthropic API fallback, the key, the memory files and two plugins.
+                       "`fallback_providers` `[{\"provider\": \"anthropic\", \"model\": \"claude-opus-5-5\"}]`",
+                       "`.env`, which contains `ANTHROPIC_API_KEY`",
+                       "`memories/MEMORY.md` and `memories/USER.md`",
+                       "The owner removes the copied Anthropic API key",
+                       "hermes -p <profile> config unset ANTHROPIC_API_KEY",
+                       "must list no entry with source `env:ANTHROPIC_API_KEY`",
+                       "hermes -p <profile> plugins remove ponytail",
+                       "hermes -p <profile> plugins remove hermes-terminal-outcome-notification",
+                       "`WARN: dormant unexpected plugin <profile>: ponytail`",
+                       "`hermes -p <profile> config get --json fallback_providers` must print `[]`"):
             self.assertIn(marker, section)
+        switch = ("python3 /Users/chanbla11mit/hermes-local-harness/scripts/switch-profile-model "
+                  "--profile <profile> --to glm --dispatch add --clear-fallbacks")
+        self.assertIn(switch, section)
+        # Every switch command in the section clears the copied fallback values.
+        commands = re.findall(r"scripts/switch-profile-model [^\n`]*", section)
+        self.assertTrue(commands)
+        for command in commands:
+            self.assertIn("--clear-fallbacks", command)
+        # The key is removed before the profile is switched into the dispatch list.
+        self.assertLess(section.index("config unset ANTHROPIC_API_KEY"), section.index(switch))
         self.assertNotIn("~/", install + section)
         self.assertNotIn("$HOME", install + section)
 

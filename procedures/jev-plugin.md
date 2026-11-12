@@ -30,23 +30,45 @@ Gateway-served sessions load the plugin after the owner runs `hermes gateway res
 
 Card `t_71b4ef4a` added `anki-worker-glm-1` and `anki-worker-glm-2` to `roster.yaml`, `plugins/jev/config.json` and the policy sources only. The deployment card creates the two profiles with the owner's authorization. Until then `scripts/verify-state` reports both profiles as missing. For each `<profile>` of `anki-worker-glm-1` and `anki-worker-glm-2`:
 
-1. Clone the Anki Claude worker, which copies its `config.yaml`, `.env`, `SOUL.md` and skills, but no `auth.json`:
+1. Clone the Anki Claude worker:
 
         hermes profile create <profile> --clone-from anki-worker
 
-2. Set the model and provider: model `glm-5.3`, provider `zai`, base URL `https://api.z.ai/api/coding/paas/v4`, the helper tasks on the same target, and the profile in `kanban.dispatch_profiles`. The switch script does all of this after it backs up the profile's `config.yaml` (preview first with `--dry-run`):
+   The clone copies these files and directories of `anki-worker` (Hermes source `hermes_cli/profiles.py`, `_CLONE_CONFIG_FILES`, `_CLONE_SUBDIR_FILES` and `_clone_plugins`, called from `_bootstrap_profile_dir`):
+   - `config.yaml`, including the Anthropic API fallback of `anki-worker`: `fallback_providers` `[{"provider": "anthropic", "model": "claude-opus-5-5"}]` and a `fallback_chain` on all sixteen helper tasks;
+   - `.env`, which contains `ANTHROPIC_API_KEY` (written to `anki-worker` by `procedures/anthropic-api-fallback.md`, section 8);
+   - `SOUL.md` and the installed skills;
+   - `memories/MEMORY.md` and `memories/USER.md`;
+   - the `plugins/` directory, with `ponytail` and `hermes-terminal-outcome-notification` (both installed and disabled on `anki-worker`), and `jev` if it is installed on `anki-worker` at that time.
 
-        python3 /Users/chanbla11mit/hermes-local-harness/scripts/switch-profile-model --profile <profile> --to glm --dispatch add
+   The clone copies no `auth.json`. The GLM worker profiles have no Anthropic API fallback (`procedures/anthropic-api-fallback.md`, section 1, limits it to the four Jobcron profiles and the claude-subscription profiles listed in section 8), so steps 2 to 4 remove the copied key, the copied memory files, the two copied plugins and the copied fallback values.
+2. The owner removes the copied Anthropic API key from the profile's `.env`, before any other step:
 
-3. Replace the cloned SOUL with the tracked source `/Users/chanbla11mit/hermes-local-harness/policies/profile-souls/<profile>/SOUL.md`, copied to `/Users/chanbla11mit/.hermes/profiles/<profile>/SOUL.md`.
-4. Install and enable the `jev` plugin on the profile as described in "Install on a profile".
-5. The owner adds the Z.ai login, because a cloned profile has no `auth.json`:
+        hermes -p <profile> config unset ANTHROPIC_API_KEY
+
+   The command prints `✓ Unset ANTHROPIC_API_KEY from <path of the profile .env>` and no key value (`procedures/anthropic-api-fallback.md`, section 7, step 3). Then `hermes -p <profile> auth list anthropic` must list no entry with source `env:ANTHROPIC_API_KEY`. Nobody else opens or changes the profile's `.env`.
+3. Delete the two copied memory files, as `procedures/manual-apply.md` requires for a cloned profile, and remove the two copied plugins, because the roster entry declares `installed_disabled_plugins` `[]`:
+
+        rm /Users/chanbla11mit/.hermes/profiles/<profile>/memories/MEMORY.md /Users/chanbla11mit/.hermes/profiles/<profile>/memories/USER.md
+        hermes -p <profile> plugins remove ponytail
+        hermes -p <profile> plugins remove hermes-terminal-outcome-notification
+
+   Without the plugin removal, `scripts/verify-state` prints `WARN: dormant unexpected plugin <profile>: ponytail` and the same line for `hermes-terminal-outcome-notification`.
+4. Set the model and provider and clear the copied fallback values: model `glm-5.3`, provider `zai`, base URL `https://api.z.ai/api/coding/paas/v4`, the helper tasks on the same target, `fallback_providers` and every `auxiliary.<task>.fallback_chain` set to `[]`, and the profile in `kanban.dispatch_profiles`. The switch script does all of this in one command after it backs up the profile's `config.yaml` (preview first with `--dry-run`):
+
+        python3 /Users/chanbla11mit/hermes-local-harness/scripts/switch-profile-model --profile <profile> --to glm --dispatch add --clear-fallbacks
+
+   Without `--clear-fallbacks` the switch script writes no fallback key: the profile keeps the Anthropic API fallback of `anki-worker`, and `scripts/verify-state` reports 17 `fallback drift` lines for the profile. Then `hermes -p <profile> config get --json fallback_providers` must print `[]`.
+5. Replace the cloned SOUL with the tracked source `/Users/chanbla11mit/hermes-local-harness/policies/profile-souls/<profile>/SOUL.md`, copied to `/Users/chanbla11mit/.hermes/profiles/<profile>/SOUL.md`.
+6. Install and enable the `jev` plugin on the profile as described in "Install on a profile". If the clone already carries `jev`, check with `hermes -p <profile> plugins list --plain --no-bundled` that it is enabled and installed from the reviewed commit instead of installing it again.
+7. The owner adds the Z.ai login, because a cloned profile has no `auth.json`:
 
         hermes -p <profile> auth add zai
 
    Nobody else runs this command or handles the key.
+8. Run `python3 /Users/chanbla11mit/hermes-local-harness/scripts/verify-state`. The expected result is no `missing profile`, `fallback drift` or `dormant unexpected plugin` line for the profile.
 
-`jss-worker-glm-1` and `jss-worker-glm-2` exist, run `glm-5.3` on provider `zai` and have no `auth.json` either. They need the same owner step 5 (`hermes -p jss-worker-glm-1 auth add zai` and `hermes -p jss-worker-glm-2 auth add zai`), their SOULs from `/Users/chanbla11mit/hermes-local-harness/policies/profile-souls/jss-worker-glm-1/SOUL.md` and `/Users/chanbla11mit/hermes-local-harness/policies/profile-souls/jss-worker-glm-2/SOUL.md`, the `jev` plugin, and an entry in `kanban.dispatch_profiles`. A GLM worker without a Z.ai login fails its run when the dispatcher starts it, so add the login before the board's routes take effect.
+`jss-worker-glm-1` and `jss-worker-glm-2` exist, run `glm-5.3` on provider `zai` and have no `auth.json` either. They need the same owner step 7 (`hermes -p jss-worker-glm-1 auth add zai` and `hermes -p jss-worker-glm-2 auth add zai`), their SOULs from `/Users/chanbla11mit/hermes-local-harness/policies/profile-souls/jss-worker-glm-1/SOUL.md` and `/Users/chanbla11mit/hermes-local-harness/policies/profile-souls/jss-worker-glm-2/SOUL.md`, the `jev` plugin, and an entry in `kanban.dispatch_profiles`. A GLM worker without a Z.ai login fails its run when the dispatcher starts it, so add the login before the board's routes take effect.
 
 ## TypeSafe API key
 
