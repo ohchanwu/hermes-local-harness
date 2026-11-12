@@ -1,0 +1,106 @@
+{
+  "jev": {
+    "endpoint": "https://api.typesafe.ai/v1/systemone",
+    "model": "jev-1.14.0",
+    "timeout_seconds": 5,
+    "api_key_env": "TYPESAFE_API_KEY"
+  },
+  "kanban": {
+    "home": "/Users/chanbla11mit/.hermes",
+    "hermes_command": "hermes",
+    "command_timeout_seconds": 30
+  },
+  "routing": {
+    "enabled": true,
+    "threshold": 0.6,
+    "state_max_chars": 60000,
+    "question_instructions": "Which route fits the work this Kanban card asks for?",
+    "clear_override_at_review": true,
+    "known_models": ["claude-opus-5-5", "claude-haiku-5-5", "claude-fable-5-2", "gpt-6.1-sol", "gpt-6-astra",
+                     "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna", "glm-5.3", "glm-5.3-flash"],
+    "boards": {
+      "jobcron": {
+        "implementation_workers": ["jobcron-worker", "jobcron-worker-2"],
+        "glm_workers": ["jobcron-worker-glm-1", "jobcron-worker-glm-2"],
+        "routes": [
+          {"name": "easy", "enabled": true, "assignee_from": "glm_workers", "model": "glm-5.3-flash", "provider": "zai",
+           "criterion": "Very easy to easy work: a small, well-specified change in one or two files, a documentation or wording edit, or a mechanical change with an exact test."},
+          {"name": "medium", "enabled": true, "assignee_from": "glm_workers", "model": "glm-5.3", "provider": "zai",
+           "criterion": "A well-specified change across several files, or a change that needs reading surrounding code but no design decision."},
+          {"name": "hard", "enabled": true,
+           "criterion": "Everything else, including design decisions, debugging without a known cause, security, payment, migration or deployment work."}
+        ]
+      },
+      "cha-pt": {
+        "implementation_workers": ["chapt-worker", "chapt-worker-2"],
+        "glm_workers": ["chapt-worker-glm-1", "chapt-worker-glm-2"],
+        "routes": [
+          {"name": "easy", "enabled": true, "assignee_from": "glm_workers", "model": "glm-5.3-flash", "provider": "zai",
+           "criterion": "Very easy to easy work: a small, well-specified change in one or two files, a documentation or wording edit, or a mechanical change with an exact test."},
+          {"name": "medium", "enabled": true, "assignee_from": "glm_workers", "model": "glm-5.3", "provider": "zai",
+           "criterion": "A well-specified change across several files, or a change that needs reading surrounding code but no design decision."},
+          {"name": "hard", "enabled": true,
+           "criterion": "Everything else, including design decisions, debugging without a known cause, security, payment, migration or deployment work."}
+        ]
+      },
+      "harness": {
+        "implementation_workers": ["harness-worker", "harness-worker-2"],
+        "glm_workers": ["harness-worker-glm-1", "harness-worker-glm-2"],
+        "routes": [
+          {"name": "easy", "enabled": true, "assignee_from": "glm_workers", "model": "glm-5.3-flash", "provider": "zai",
+           "criterion": "Very easy to easy work: a small, well-specified change in one or two files, a documentation or wording edit, or a mechanical change with an exact test."},
+          {"name": "medium", "enabled": true, "assignee_from": "glm_workers", "model": "glm-5.3", "provider": "zai",
+           "criterion": "A well-specified change across several files, or a change that needs reading surrounding code but no design decision."},
+          {"name": "hard", "enabled": true,
+           "criterion": "Everything else, including design decisions, debugging without a known cause, security, payment, migration or deployment work."}
+        ]
+      },
+      "jss-genr": {
+        "implementation_workers": ["jss-worker", "jss-worker-2"],
+        "glm_workers": [],
+        "routes": [
+          {"name": "easy", "enabled": false, "assignee_from": "glm_workers", "model": "glm-5.3-flash", "provider": "zai",
+           "criterion": "Very easy to easy work: a small, well-specified change in one or two files, a documentation or wording edit, or a mechanical change with an exact test."},
+          {"name": "medium", "enabled": false, "assignee_from": "glm_workers", "model": "glm-5.3", "provider": "zai",
+           "criterion": "A well-specified change across several files, or a change that needs reading surrounding code but no design decision."},
+          {"name": "hard", "enabled": true,
+           "criterion": "Everything else, including design decisions, debugging without a known cause, security, payment, migration or deployment work."}
+        ]
+      },
+      "anki": {
+        "implementation_workers": ["anki-worker", "anki-worker-2"],
+        "glm_workers": [],
+        "routes": [
+          {"name": "easy", "enabled": false, "assignee_from": "glm_workers", "model": "glm-5.3-flash", "provider": "zai",
+           "criterion": "Very easy to easy work: a small, well-specified change in one or two files, a documentation or wording edit, or a mechanical change with an exact test."},
+          {"name": "medium", "enabled": false, "assignee_from": "glm_workers", "model": "glm-5.3", "provider": "zai",
+           "criterion": "A well-specified change across several files, or a change that needs reading surrounding code but no design decision."},
+          {"name": "hard", "enabled": true,
+           "criterion": "Everything else, including design decisions, debugging without a known cause, security, payment, migration or deployment work."}
+        ]
+      }
+    }
+  },
+  "peak_hold": {
+    "enabled": true,
+    "timezone": "Asia/Seoul",
+    "weekdays": [0, 1, 2, 3, 4],
+    "start": "15:00",
+    "end": "19:00",
+    "marker": "jev-peak-hold"
+  },
+  "tool_results": {
+    "enabled": true,
+    "tools": ["terminal", "execute_code", "search_files", "browser_exec"],
+    "min_chars": 8000,
+    "max_chars": 100000,
+    "chunk_lines": 40,
+    "chunk_chars": 2000,
+    "args_chars": 2000,
+    "keep_threshold": 0.3,
+    "max_kept_ratio": 0.8
+  },
+  "auxiliary_log": {
+    "enabled": true
+  }
+}
