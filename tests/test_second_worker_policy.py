@@ -18,6 +18,7 @@ import unittest
 from unittest.mock import patch
 
 from incident_recovery_verify_fixture import LocalReads, ROOT, load_verifier, resolved_fixture
+from test_jev_policy_sources import reverse_jev_policy_edits
 
 FLEETS = {"jobcron": "jobcron", "cha-pt": "chapt", "harness": "harness", "jss-genr": "jss"}
 POOLS = {project: [f"{prefix}-worker", f"{prefix}-worker-2"] for project, prefix in FLEETS.items()}
@@ -54,9 +55,9 @@ JOBCRON_PRODUCTION_DEPLOYMENT = ("devops/production-deployment/SKILL.md",
                                  "devops/production-deployment/references/release-ci-portability.md")
 SHARED_SKILL = ROOT / "skills/multi-agent-coding-orchestrator/SKILL.md"
 VERSIONS = {
-    PROFILE_SKILLS["jobcron"]: "0.6.9-jobcron.8",  # raised by t_b7455361
-    PROFILE_SKILLS["chapt"]: "0.6.7-chapt.7",
-    PROFILE_SKILLS["harness"]: "0.6.7-harness.6",
+    PROFILE_SKILLS["jobcron"]: "0.6.9-jobcron.9",  # raised by t_b7455361 and t_b722c617
+    PROFILE_SKILLS["chapt"]: "0.6.7-chapt.8",  # raised by t_b722c617
+    PROFILE_SKILLS["harness"]: "0.6.7-harness.7",  # raised by t_b722c617
     PROFILE_SKILLS["jss"]: "0.6.7-jss.8",
     # The shared skill's version is recorded in the snapshot; read it rather than copy it.
     SHARED_SKILL: next(entry["version"] for entry in json.loads(
@@ -295,7 +296,10 @@ class PolicyText(unittest.TestCase):
                 text = soul(f"{prefix}-{role}").read_text()
                 with self.subTest(profile=f"{prefix}-{role}"):
                     self.assertIn(f"`{prefix}-worker` or `{prefix}-worker-2`", text)
-                    self.assertIsNone(GLM_NAME.search(text))
+                    # The jev plugin policy text (t_b722c617, pinned by tests/test_jev_policy_sources.py)
+                    # names the board's GLM workers; no other text does.
+                    relative = soul(f"{prefix}-{role}").relative_to(ROOT).as_posix()
+                    self.assertIsNone(GLM_NAME.search(reverse_jev_policy_edits(relative, text)))
 
     def test_skills_name_both_workers_and_the_spread_rule_once(self):
         for path, version in VERSIONS.items():
@@ -305,7 +309,8 @@ class PolicyText(unittest.TestCase):
                 self.assertEqual(" ".join(text.split()).count(RULE), 1)
                 self.assertNotIn("one implementation worker", text)
                 self.assertNotIn("The sole implementation worker", text)
-                self.assertIsNone(GLM_NAME.search(text))
+                # The jev plugin policy text (t_b722c617) names the board's GLM workers; no other text does.
+                self.assertIsNone(GLM_NAME.search(reverse_jev_policy_edits(path.relative_to(ROOT).as_posix(), text)))
         for prefix in ("harness", "jss"):
             text = PROFILE_SKILLS[prefix].read_text()
             self.assertIn(f"- The implementation workers are `{prefix}-worker` and `{prefix}-worker-2`.\n", text)

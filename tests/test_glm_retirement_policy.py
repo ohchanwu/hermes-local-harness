@@ -24,6 +24,7 @@ from unittest.mock import patch
 from incident_recovery_verify_fixture import LocalReads, ROOT, load_verifier, resolved_fixture
 from rule_text import assert_rule
 from test_jobcron_app_only_deploy_authorization import reverse_app_only_deploy_edits
+from test_jev_policy_sources import reverse_jev_policy_edits
 
 FLEETS = {"jobcron": "jobcron", "cha-pt": "chapt", "harness": "harness", "jss-genr": "jss"}
 GLM = tuple(f"{prefix}-worker-glm-{n}" for prefix in FLEETS.values() for n in (1, 2))
@@ -53,9 +54,9 @@ JOBCRON_PRODUCTION_DEPLOYMENT = ("devops/production-deployment/SKILL.md",
                                  "devops/production-deployment/references/release-ci-portability.md")
 SHARED_SKILL = ROOT / "skills/multi-agent-coding-orchestrator/SKILL.md"
 VERSIONS = {
-    PROFILE_SKILLS["jobcron-orchestrator"]: "0.6.9-jobcron.8",  # raised by t_b7455361
-    PROFILE_SKILLS["chapt-orchestrator"]: "0.6.7-chapt.7",
-    PROFILE_SKILLS["harness-orchestrator"]: "0.6.7-harness.6",
+    PROFILE_SKILLS["jobcron-orchestrator"]: "0.6.9-jobcron.9",  # raised by t_b7455361 and t_b722c617
+    PROFILE_SKILLS["chapt-orchestrator"]: "0.6.7-chapt.8",  # raised by t_b722c617
+    PROFILE_SKILLS["harness-orchestrator"]: "0.6.7-harness.7",  # raised by t_b722c617
     PROFILE_SKILLS["jss-orchestrator"]: "0.6.7-jss.8",
     SHARED_SKILL: "0.6.13",
 }
@@ -85,6 +86,17 @@ CURRENT_STATE_DOCS = (
 
 def sha(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def without_jev_text(path):
+    """Text of path with the jev plugin policy text (t_b722c617) reversed.
+
+    That card names the board's own GLM workers in the reviewer, orchestrator and
+    GLM worker SOULs and the orchestrator skills of jobcron, cha-pt and harness,
+    in the exact sentences that tests/test_jev_policy_sources.py pins. Every other
+    text of these files still names no GLM worker and no GLM lane.
+    """
+    return reverse_jev_policy_edits(path.relative_to(ROOT).as_posix(), path.read_text())
 
 
 def sha_bytes(content):
@@ -286,7 +298,7 @@ class PolicyText(unittest.TestCase):
     def test_active_souls_name_no_glm_worker(self):
         souls = load(ROOT / "roster.yaml")["profile_souls"]
         for profile, entry in souls.items():
-            text = (ROOT / entry["source"]).read_text()
+            text = without_jev_text(ROOT / entry["source"])
             with self.subTest(profile=profile):
                 self.assertIsNone(GLM_NAME.search(text))
                 self.assertIsNone(GLM_LANE.search(text))
@@ -303,15 +315,17 @@ class PolicyText(unittest.TestCase):
         souls = sorted((ROOT / "policies/profile-souls").glob("*/SOUL.md"))
         self.assertIn(JOBCRON_SOUL, souls)
         for path in souls:
-            text = path.read_text()
+            text = without_jev_text(path)
             with self.subTest(soul=path.parent.name):
                 self.assertIsNone(GLM_NAME.search(text))
                 self.assertIsNone(LEGACY_GLM_NAME.search(text))
 
     def test_jobcron_orchestrator_soul_routes_only_to_its_worker(self):
         # The later owner-requested application-only production deploy exception
-        # (t_b7455361) appended a sentence to line 7; reverse it first.
-        text = reverse_app_only_deploy_edits(JOBCRON_SOUL.relative_to(ROOT).as_posix(), JOBCRON_SOUL.read_bytes())
+        # (t_b7455361) appended a sentence to line 7; reverse it first, after the latest
+        # change, the jev plugin policy change (t_b722c617).
+        relative = JOBCRON_SOUL.relative_to(ROOT).as_posix()
+        text = reverse_app_only_deploy_edits(relative, reverse_jev_policy_edits(relative, JOBCRON_SOUL.read_bytes()))
         self.assertEqual(text.count(JOBCRON_SOUL_EDIT[0]), 1)
         self.assertNotIn(b"glm", text.lower())
         self.assertIn(b"assign same-card review only to `jobcron-reviewer`", text)
@@ -326,7 +340,7 @@ class PolicyText(unittest.TestCase):
         for path in PROFILE_SKILLS.values():
             text = path.read_text()
             with self.subTest(path=str(path.relative_to(ROOT))):
-                self.assertIsNone(GLM_NAME.search(text))
+                self.assertIsNone(GLM_NAME.search(without_jev_text(path)))
                 self.assertIsNone(LEGACY_GLM_NAME.search(text))
                 self.assertIsNone(LEGACY_LANE_LIST.search(text))
         for profile in ("jobcron-orchestrator", "chapt-orchestrator"):
@@ -346,7 +360,7 @@ class PolicyText(unittest.TestCase):
             text = path.read_text()
             with self.subTest(path=str(path.relative_to(ROOT))):
                 self.assertRegex(text, rf"(?m)^version: {re.escape(version)}$")
-                self.assertIsNone(GLM_NAME.search(text))
+                self.assertIsNone(GLM_NAME.search(without_jev_text(path)))
                 self.assertIsNone(GLM_LANE.search(text))
         for prefix in ("harness", "jss"):
             text = PROFILE_SKILLS[f"{prefix}-orchestrator"].read_text()

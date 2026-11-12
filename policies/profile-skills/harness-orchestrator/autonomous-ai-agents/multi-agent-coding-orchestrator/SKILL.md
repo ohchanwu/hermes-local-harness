@@ -1,7 +1,7 @@
 ---
 name: multi-agent-coding-orchestrator
 description: "Use when orchestrating Harness repository work."
-version: 0.6.7-harness.6
+version: 0.6.7-harness.7
 author: chanbla11mit, Hermes Agent
 license: MIT
 platforms: [macos]
@@ -23,6 +23,7 @@ Coordinate specification-driven work for board `harness` and repository `/Users/
 - Never access or route to another project, board, repository, profile fleet, or worktree.
 - The orchestrator is interactive and non-dispatchable. Launch it with `scripts/run-harness-orchestrator`.
 - The implementation workers are `harness-worker` and `harness-worker-2`.
+- The `jev` plugin can move a new card to the GLM workers `harness-worker-glm-1` and `harness-worker-glm-2` (see Worker Selection).
 - The sole independent reviewer is `harness-reviewer`.
 - Files under `docs/bugs/` are evidence and triage input, not implementation authorization.
 - Repository work is local-only unless the human separately authorizes an external action.
@@ -64,10 +65,10 @@ Use `kanban_create(..., board: harness)` only after validating the complete cont
 Set up a card without a setup-only hold:
 
 1. Create it with the kanban_create tool: `kanban_create(..., board: harness, initial_status: blocked)`. The card is created blocked, so it cannot be dispatched before setup is complete, and its notification subscription exists from creation. Create cards only with the kanban_create tool, never with `hermes kanban --board harness create`. The tool auto-subscribes this session to the card with delivery_mode notify+wake, the owner's user ID, and this profile as notifier_profile, so completion, review-request, and block events wake this orchestrator and ping the owner. The CLI create command does not subscribe, and a manual notify-subscribe without flags defaults to notify with no user ID, which wakes nobody. This caused the 2026-10-20 stalls of the JSS and Jobcron orchestrators.
-2. Read the new ID and write the exact ID, worktree path, and branch into the body.
+2. Read the stored card with `kanban_show(..., board: harness)` first. Then write the exact ID, worktree path, and branch into the body, and keep the stored assignee, model and provider and the stored `Assigned worker EXACT` line: the `jev` plugin may have changed them inside `kanban_create`, and the full body you write must not put the Claude worker name back.
 3. Pin `refs/harness/baselines/<ID>` to the baseline.
 4. Confirm the kanban_create result reports subscribed: true. Only if it does not, repair the subscription with: hermes kanban --board harness notify-subscribe <id> --platform telegram --chat-id <owner chat> --user-id <owner user> --chat-type dm --notifier-profile harness-orchestrator --delivery-mode notify+wake. Re-running notify-subscribe updates an existing row, so this command also upgrades a wrongly subscribed card.
-5. Unblock the card so it becomes `ready`.
+5. Unblock the card so it becomes `ready`. From Monday to Friday, 15:00 to 19:00 Asia/Seoul, the `jev` plugin moves a card that is assigned to `harness-worker-glm-1` or `harness-worker-glm-2` to `scheduled` instead of unblocking it, with a reason that starts with the marker `jev-peak-hold` (the tool result has `status` `scheduled` and `held_until`), and the script `/Users/chanbla11mit/hermes-local-harness/scripts/jev-peak-hold` holds such a card the same way when it becomes `ready` by another path. This is expected: the card is released at 19:00 to `ready`, or to `todo` while a parent is open. It is not a blocker and not an owner question; do not unblock it again and do not reassign it to a Claude worker to start it earlier. The owner turns the hold off and on and reads its state with `python3 /Users/chanbla11mit/hermes-local-harness/scripts/jev-peak-hold off`, `python3 /Users/chanbla11mit/hermes-local-harness/scripts/jev-peak-hold on` and `python3 /Users/chanbla11mit/hermes-local-harness/scripts/jev-peak-hold status`.
 
 Never claim a card and `kanban_block` it as a setup hold. The worker's first action verifies `$HERMES_KANBAN_TASK`, worktree path, branch, and baseline, and it blocks only on a real mismatch.
 
@@ -76,6 +77,7 @@ At creation Hermes records `workspace_path` as the repository root; the dispatch
 ## Worker Selection
 
 - Assign implementation to `harness-worker` or `harness-worker-2`. Spread independent ready cards across the two workers; keep cards that touch the same files serialized or dependency-linked.
+- The `jev` plugin can change the assignee of a card that `kanban_create` creates for `harness-worker` or `harness-worker-2` to `harness-worker-glm-1` or `harness-worker-glm-2`, alternating between the two, and set the card's `model` and `provider` (`glm-5.3-flash` or `glm-5.3` on provider `zai`) for work that the plugin classifies as `easy` or `medium`. Accept that change: it is not an assignee mismatch, the reviewer stays `harness-reviewer`, and same-card review, local integration and every prohibition are unchanged. The `kanban_create` result does not show the change; `kanban_show(..., board: harness)` does. Still create every implementation card for `harness-worker` or `harness-worker-2`; assign a GLM worker yourself only when the owner asks for it.
 - Never route implementation to the orchestrator or reviewer.
 - Never route review to an implementation worker.
 
@@ -89,7 +91,7 @@ Before dispatch:
 2. Create the card first so its ID is known.
 3. Require the task worktree path to end in that exact ID.
 4. Confirm the worktree belongs to the Harness repository and starts from the recorded baseline.
-5. Confirm the worker profile and reviewer match the fixed roster.
+5. Confirm the worker profile and reviewer match the fixed roster; a GLM worker that the `jev` plugin set is a match.
 6. Confirm the Tests section has executable commands appropriate to the changed surfaces.
 
 A shared checkout, foreign path, missing baseline, prose-only test plan, or mismatched assignee is a hard block.

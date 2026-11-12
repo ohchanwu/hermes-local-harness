@@ -25,6 +25,7 @@ from pathlib import Path
 
 from test_anki_apply_tool_card_contracts_reference import reverse_apply_tool_reference_edits
 from test_fable_5_2_declared_model import reverse_fable_5_2_edits
+from test_jev_policy_sources import reverse_jev_policy_edits
 from test_jobcron_app_only_deploy_authorization import reverse_app_only_deploy_edits
 from test_jss_fleet_policy import reverse_read_only_exception_edits
 from test_orchestrator_skill_changes_policy import reverse_skill_changes_edits
@@ -287,8 +288,9 @@ class OwnerShellCommandPaths(unittest.TestCase):
         # The live skill predates the later declared Fable model change (t_a6bbe808), the
         # owner-requested application-only production deploy exception (t_b7455361), the
         # Skill Changes section (t_0a8674fe) and the repair_history candidate rule change
-        # (t_6436ac1c), so reverse those changes first.
-        data = reverse_fable_5_2_edits(JOBCRON, self.read(JOBCRON).decode())
+        # (t_6436ac1c), so reverse those changes first. The jev plugin policy change
+        # (t_b722c617) is the latest and is reversed before them.
+        data = reverse_fable_5_2_edits(JOBCRON, reverse_jev_policy_edits(JOBCRON, self.read(JOBCRON).decode()))
         data = reverse_app_only_deploy_edits(JOBCRON, data)
         data = reverse_skill_changes_edits(JOBCRON, data)
         data = reverse_candidate_rule_edits(JOBCRON, data)
@@ -323,7 +325,7 @@ class OwnerShellCommandPaths(unittest.TestCase):
                 # application-only production deploy exception (t_b7455361), the
                 # apply-tool-card-contracts pointer (t_c9d4d5c8), the Skill Changes section
                 # (t_0a8674fe) and repair_history candidate rule change (t_6436ac1c) first.
-                current = reverse_read_only_exception_edits(path, self.read(path))
+                current = reverse_read_only_exception_edits(path, reverse_jev_policy_edits(path, self.read(path)))
                 current = reverse_fable_5_2_edits(path, current)
                 current = reverse_app_only_deploy_edits(path, current)
                 current = reverse_apply_tool_reference_edits(path, current)

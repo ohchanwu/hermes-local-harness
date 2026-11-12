@@ -16,6 +16,7 @@ from pathlib import Path
 import unittest
 
 from test_fable_5_2_declared_model import reverse_fable_5_2_edits
+from test_jev_policy_sources import reverse_jev_policy_edits
 from test_jobcron_app_only_deploy_authorization import reverse_app_only_deploy_edits
 from test_jss_fleet_policy import reverse_read_only_exception_edits
 from test_card_contract_line_start_policy import reverse_owner_path_edits
@@ -221,7 +222,7 @@ class OrchestratorSkillTerminologyTests(unittest.TestCase):
                 # section (t_0a8674fe), the repair_history candidate rule change (t_6436ac1c), the
                 # owner shell command path change (t_bd860536) and the repair_history format change
                 # (t_a4dccec1) first.
-                current = reverse_read_only_exception_edits(path, (ROOT / path).read_bytes())
+                current = reverse_read_only_exception_edits(path, reverse_jev_policy_edits(path, (ROOT / path).read_bytes()))
                 current = reverse_fable_5_2_edits(path, current)
                 current = reverse_app_only_deploy_edits(path, current)
                 current = reverse_skill_changes_edits(path, current)
@@ -238,7 +239,8 @@ class OrchestratorSkillTerminologyTests(unittest.TestCase):
         for path, want in ((HARNESS, "c1e78607948f4d0c890ef86afb2fe63f3898efe35d8c413ec225147c99d8f17c"),
                            (JSS, "589ca4a53186e13726d4f77a6a647a36559fa8795dbc7682000007114211b5e6")):
             with self.subTest(path=path):
-                current = reverse_skill_changes_edits(path, reverse_read_only_exception_edits(path, (ROOT / path).read_bytes()))
+                current = reverse_skill_changes_edits(path, reverse_read_only_exception_edits(
+                    path, reverse_jev_policy_edits(path, (ROOT / path).read_bytes())))
                 current = reverse_candidate_rule_edits(path, current)
                 current = reverse_owner_path_edits(path, current)
                 original = reverse_repair_format_edits(path, current)

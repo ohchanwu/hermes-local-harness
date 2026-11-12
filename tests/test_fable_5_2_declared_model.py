@@ -9,7 +9,8 @@ model policy declare the same Fable model, claude-fable-5-2.
 FABLE_5_2_EDITS lists the exact (new, old) text this card changed in each
 orchestrator skill copy, so tests that pin older bytes of these files can
 reverse the change byte for byte with reverse_fable_5_2_edits(). This module
-imports no other test module, so any test module can import it.
+imports only test_jev_policy_sources, which imports no other test module, so
+any test module can import it.
 """
 import hashlib
 import importlib.machinery
@@ -17,6 +18,8 @@ import importlib.util
 import json
 from pathlib import Path
 import unittest
+
+from test_jev_policy_sources import reverse_jev_policy_edits
 
 ROOT = Path(__file__).resolve().parents[1]
 OLD_MODEL, NEW_MODEL = "claude-fable-5-1", "claude-fable-5-2"
@@ -77,7 +80,8 @@ class FableDeclaredModel(unittest.TestCase):
     def test_reversing_the_edits_recovers_the_baseline_bytes(self):
         for path, want in BASELINE_SHA256.items():
             with self.subTest(path=path):
-                original = reverse_fable_5_2_edits(path, (ROOT / path).read_bytes())
+                # The later jev plugin policy change (t_b722c617) is reversed first.
+                original = reverse_fable_5_2_edits(path, reverse_jev_policy_edits(path, (ROOT / path).read_bytes()))
                 self.assertEqual(hashlib.sha256(original).hexdigest(), want)
 
     def test_skill_copies_name_only_the_new_model(self):

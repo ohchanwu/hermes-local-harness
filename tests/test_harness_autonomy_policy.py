@@ -42,7 +42,8 @@ class HarnessAutonomyPolicy(unittest.TestCase):
         cls.text = flat(cls.raw)
 
     def test_version_and_bounded_growth(self):
-        self.assertRegex(self.raw, r"(?m)^version: 0\.6\.7-harness\.6$")
+        # Raised by the jev plugin policy change (t_b722c617).
+        self.assertRegex(self.raw, r"(?m)^version: 0\.6\.7-harness\.7$")
         # Plus the 9 lines of repair_history candidate rules and example (t_6436ac1c)
         # and the 6 lines of the Skill Changes section (t_0a8674fe).
         self.assertLessEqual(len(self.raw.splitlines()), BASELINE_SKILL_LINES + 70 + 9 + 6)

@@ -21,6 +21,7 @@ from test_chapt_policy_reconciliation import CARD_CREATION_EDITS
 from test_orchestrator_skill_terminology import TERMINOLOGY_EDITS, reverse_terminology_edits
 from test_card_contract_line_start_policy import reverse_owner_path_edits
 from test_fable_5_2_declared_model import reverse_fable_5_2_edits
+from test_jev_policy_sources import reverse_jev_policy_edits
 from test_repair_history_candidate_rules_policy import reverse_candidate_rule_edits
 from test_repair_history_format_policy import reverse_repair_format_edits
 
@@ -519,7 +520,9 @@ class PolicyText(unittest.TestCase):
             relative = str(path.relative_to(ROOT))
             # Reverse the later declared Fable model change (t_a6bbe808), the repair_history
             # candidate rule change (t_6436ac1c), the owner shell command path change
-            # (t_bd860536) and the repair_history format and repository line change (t_a4dccec1).
+            # (t_bd860536) and the repair_history format and repository line change (t_a4dccec1),
+            # after the latest change, the jev plugin policy change (t_b722c617).
+            current = reverse_jev_policy_edits(relative, current)
             current = reverse_fable_5_2_edits(relative, current)
             current = reverse_candidate_rule_edits(relative, current)
             current = reverse_owner_path_edits(relative, current)

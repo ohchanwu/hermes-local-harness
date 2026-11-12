@@ -29,6 +29,7 @@ from test_card_contract_line_start_policy import reverse_owner_path_edits
 from test_jobcron_app_only_deploy_authorization import reverse_app_only_deploy_edits
 from test_jss_fleet_policy import reverse_read_only_exception_edits
 from test_fable_5_2_declared_model import reverse_fable_5_2_edits
+from test_jev_policy_sources import reverse_jev_policy_edits
 from test_orchestrator_skill_changes_policy import reverse_skill_changes_edits
 from test_repair_history_candidate_rules_policy import reverse_candidate_rule_edits
 
@@ -429,9 +430,9 @@ class InstructionTextTests(unittest.TestCase):
         # tests/test_repair_history_candidate_rules_policy.py checks that change, and it is
         # reversed here so these checks keep reading the text this card wrote. The later
         # owner-requested application-only production deploy exception (t_b7455361) is
-        # reversed before it.
+        # reversed before it, and the jev plugin policy change (t_b722c617) before that.
         self.text = {path: reverse_candidate_rule_edits(
-                         path, reverse_app_only_deploy_edits(path, (ROOT / path).read_text()))
+                         path, reverse_app_only_deploy_edits(path, reverse_jev_policy_edits(path, (ROOT / path).read_text())))
                      for path in SKILL_FILES + POLICY_FILES}
 
     def example_lines(self, path):
@@ -488,7 +489,7 @@ class InstructionTextTests(unittest.TestCase):
                 # apply-tool-card-contracts pointer (t_c9d4d5c8), the Skill Changes section
                 # (t_0a8674fe), the repair_history candidate rule change (t_6436ac1c) and the
                 # owner shell command path change (t_bd860536) first.
-                current = reverse_read_only_exception_edits(path, (ROOT / path).read_bytes())
+                current = reverse_read_only_exception_edits(path, reverse_jev_policy_edits(path, (ROOT / path).read_bytes()))
                 current = reverse_fable_5_2_edits(path, current)
                 current = reverse_app_only_deploy_edits(path, current)
                 current = reverse_apply_tool_reference_edits(path, current)

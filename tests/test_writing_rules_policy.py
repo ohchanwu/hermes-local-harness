@@ -22,6 +22,7 @@ from incident_recovery_verify_fixture import ROOT
 from test_verify_state_derived_expectations import TempTree, TreeReads, load, redeployed, tree_verifier
 from test_jobcron_app_only_deploy_authorization import reverse_app_only_deploy_edits
 from test_jss_fleet_policy import reverse_read_only_exception_edits
+from test_jev_policy_sources import reverse_jev_policy_edits
 
 BASELINE = "b7093717054754283c6f9ac671a227f695fec9b5"
 POLICY = "policies/writing-rules.md"
@@ -87,7 +88,10 @@ class TrackedText(unittest.TestCase):
                 want += b"\n" + block
                 # The later owner-requested application-only production deploy exception
                 # (t_b7455361) changed line 7 of the jobcron-orchestrator SOUL; reverse it first.
-                text = reverse_app_only_deploy_edits(path.relative_to(ROOT).as_posix(), reverse_read_only_exception_edits(path.relative_to(ROOT).as_posix(), path.read_bytes()))
+                # The jev plugin policy change (t_b722c617) is the latest change; reverse it first.
+                relative = path.relative_to(ROOT).as_posix()
+                text = reverse_jev_policy_edits(relative, path.read_bytes())
+                text = reverse_app_only_deploy_edits(relative, reverse_read_only_exception_edits(relative, text))
                 self.assertEqual(text, want)
                 self.assertTrue(text.endswith(block))
                 self.assertEqual(text.count(REVIEWER_SENTENCE), 1 if profile in REVIEWERS else 0)

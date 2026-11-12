@@ -18,8 +18,9 @@ lists its (new, old) text, and reverse_deploy_campaign_edits() must be applied
 to the deployment skill before reverse_app_only_deploy_edits(). The checks in
 this module read the current section; tests/test_jobcron_deploy_campaign.py
 checks the deploy campaign rules in detail. This module imports only
-test_fable_5_2_declared_model, which imports no other test module, so any test
-module can import it.
+test_fable_5_2_declared_model and test_jev_policy_sources;
+test_fable_5_2_declared_model imports only test_jev_policy_sources, which
+imports no other test module, so any test module can import it.
 """
 import hashlib
 import importlib.machinery
@@ -31,6 +32,7 @@ from pathlib import Path
 import unittest
 
 from test_fable_5_2_declared_model import reverse_fable_5_2_edits
+from test_jev_policy_sources import reverse_jev_policy_edits
 
 ROOT = Path(__file__).resolve().parents[1]
 PROFILE = "jobcron-orchestrator"
@@ -311,8 +313,10 @@ class AppOnlyDeployAuthorization(unittest.TestCase):
         for path, want in BASELINE_SHA256.items():
             with self.subTest(path=path):
                 # Reverse the later deploy campaign change (t_90a548ad) and the later declared
-                # Fable model change (t_a6bbe808) first.
-                current = reverse_deploy_campaign_edits(path, (ROOT / path).read_bytes())
+                # Fable model change (t_a6bbe808) first, after the latest change, the jev plugin
+                # policy change (t_b722c617).
+                current = reverse_jev_policy_edits(path, (ROOT / path).read_bytes())
+                current = reverse_deploy_campaign_edits(path, current)
                 current = reverse_fable_5_2_edits(path, current)
                 original = reverse_app_only_deploy_edits(path, current)
                 self.assertEqual(hashlib.sha256(original).hexdigest(), want)
@@ -424,7 +428,10 @@ class AppOnlyDeployAuthorization(unittest.TestCase):
                       "check result and the rollback result", reporting)
 
     def test_versions_are_raised(self):
-        self.assertEqual(re.findall(r"(?m)^version: (.+)$", self.text[ORCHESTRATOR_SKILL]), ["0.6.9-jobcron.8"])
+        # The later jev plugin policy change (t_b722c617) raised the version to 0.6.9-jobcron.9;
+        # reverse it to read the version this card set.
+        orchestrator = reverse_jev_policy_edits(ORCHESTRATOR_SKILL, self.text[ORCHESTRATOR_SKILL])
+        self.assertEqual(re.findall(r"(?m)^version: (.+)$", orchestrator), ["0.6.9-jobcron.8"])
         self.assertEqual(re.findall(r"(?m)^version: (.+)$", self.text[DEPLOYMENT_SKILL]), ["0.2.5-jobcron.3"])
 
     def test_snapshot_pins_match_the_file_hashes(self):

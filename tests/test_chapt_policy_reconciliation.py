@@ -13,6 +13,7 @@ import test_orchestrator_skill_terminology as terminology
 from test_orchestrator_skill_terminology import CHAPT, reverse_terminology_edits
 from test_card_contract_line_start_policy import reverse_owner_path_edits
 from test_fable_5_2_declared_model import reverse_fable_5_2_edits
+from test_jev_policy_sources import reverse_jev_policy_edits
 from test_orchestrator_skill_changes_policy import reverse_skill_changes_edits
 from test_repair_history_candidate_rules_policy import reverse_candidate_rule_edits
 from test_repair_history_format_policy import reverse_repair_format_edits
@@ -153,7 +154,8 @@ def digest(content):
 
 class ChaptPolicyReconciliationTests(unittest.TestCase):
     def setUp(self):
-        self.source = SOURCE.read_bytes()
+        # The jev plugin policy change (t_b722c617) is the latest change; reverse it here.
+        self.source = reverse_jev_policy_edits(CHAPT, SOURCE.read_bytes())
         # Reverse the later declared Fable model change (t_a6bbe808), the Skill Changes
         # section (t_0a8674fe), the repair_history candidate rule change (t_6436ac1c) and the
         # owner shell command path change (t_bd860536) first.

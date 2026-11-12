@@ -1,7 +1,7 @@
 ---
 name: multi-agent-coding-orchestrator
 description: "Use when orchestrating multi-agent coding with Hermes."
-version: 0.6.9-jobcron.8
+version: 0.6.9-jobcron.9
 author: chanbla11mit, Hermes Agent
 license: MIT
 platforms: [macos]
@@ -35,6 +35,8 @@ Each project profile has an independent Hermes home, memory, sessions, and fixed
 Project orchestrators are interactive control-plane sessions, not dispatcher-spawned task workers. Hermes intentionally hides `kanban_list` and `kanban_unblock` whenever `HERMES_KANBAN_TASK` is set, so assigning a card to an orchestrator removes the board-routing tools it needs. Launch each controller through the tracked board-pinning wrapper (`scripts/run-jobcron-orchestrator` or `scripts/run-chapt-orchestrator`). Keep only project workers and reviewers in `kanban.dispatch_profiles`.
 
 Each project has two implementation workers. Assign implementation only to them, never to a foreign-project or legacy worker. Spread independent ready cards across the two workers; keep cards that touch the same files serialized or dependency-linked. Review revision stays on the same assignee.
+
+The `jev` plugin can change the assignee of a card that `kanban_create` creates for `jobcron-worker` or `jobcron-worker-2` to `jobcron-worker-glm-1` or `jobcron-worker-glm-2`, alternating between the two, and set the card's `model` and `provider` (`glm-5.3-flash` or `glm-5.3` on provider `zai`) for work that the plugin classifies as `easy` or `medium`. Accept that change: it is not an assignee mismatch, the reviewer stays `jobcron-reviewer`, and same-card review, local integration and every prohibition are unchanged. The `kanban_create` result does not show the change; `kanban_show(..., board: jobcron)` does. Still create every implementation card for `jobcron-worker` or `jobcron-worker-2`; assign a GLM worker yourself only when the owner asks for it.
 
 ### Autonomous project repair budget
 
@@ -341,12 +343,12 @@ For broad-test child commands, explicitly remove the project's inspected optiona
 Set up a card without a setup-only hold:
 
 1. Create it with the kanban_create tool: `kanban_create(..., board: jobcron, initial_status: blocked)`. The card is created blocked, so it cannot be dispatched before setup is complete, and its notification subscription exists from creation. Create cards only with the kanban_create tool, never with `hermes kanban --board jobcron create`. The tool auto-subscribes this session to the card with delivery_mode notify+wake, the owner's user ID, and this profile as notifier_profile, so completion, review-request, and block events wake this orchestrator and ping the owner. The CLI create command does not subscribe, and a manual notify-subscribe without flags defaults to notify with no user ID, which wakes nobody. This caused the 2026-10-20 stalls of the JSS and Jobcron orchestrators.
-2. Read the new ID and write the exact ID, worktree path, and branch into the body.
+2. Read the stored card with `kanban_show(..., board: jobcron)` first. Then write the exact ID, worktree path, and branch into the body, and keep the stored assignee, model and provider and the stored `Assigned worker EXACT` line: the `jev` plugin may have changed them inside `kanban_create`, and the full body you write must not put the Claude worker name back.
 3. Pin the approved baseline commit for that exact card before dispatch.
 Protected instruction files (AGENTS.md, CLAUDE.md, SOUL.md, .cursorrules, project .hermes/): every write needs a human approval each time, and dispatched workers cannot get one, because the dispatcher starts them as `hermes chat -q` with stdin set to /dev/null; the prompt times out after 300 s. Do not offer the owner "approve the prompt when the worker reaches it". Before dispatching a card that edits such a file, either have the owner make that edit, or make that one edit from the orchestrator's Telegram session (the approval prompt is delivered to the owner there) with the owner's agreement, then dispatch the worker for the rest.
 
 4. Confirm the kanban_create result reports subscribed: true. Only if it does not, repair the subscription with: hermes kanban --board jobcron notify-subscribe <id> --platform telegram --chat-id <owner chat> --user-id <owner user> --chat-type dm --notifier-profile jobcron-orchestrator --delivery-mode notify+wake. Re-running notify-subscribe updates an existing row, so this command also upgrades a wrongly subscribed card.
-5. Unblock the card so it becomes `ready`.
+5. Unblock the card so it becomes `ready`. From Monday to Friday, 15:00 to 19:00 Asia/Seoul, the `jev` plugin moves a card that is assigned to `jobcron-worker-glm-1` or `jobcron-worker-glm-2` to `scheduled` instead of unblocking it, with a reason that starts with the marker `jev-peak-hold` (the tool result has `status` `scheduled` and `held_until`), and the script `/Users/chanbla11mit/hermes-local-harness/scripts/jev-peak-hold` holds such a card the same way when it becomes `ready` by another path. This is expected: the card is released at 19:00 to `ready`, or to `todo` while a parent is open. It is not a blocker and not an owner question; do not unblock it again and do not reassign it to a Claude worker to start it earlier. The owner turns the hold off and on and reads its state with `python3 /Users/chanbla11mit/hermes-local-harness/scripts/jev-peak-hold off`, `python3 /Users/chanbla11mit/hermes-local-harness/scripts/jev-peak-hold on` and `python3 /Users/chanbla11mit/hermes-local-harness/scripts/jev-peak-hold status`.
 
 Never claim a card and `kanban_block` it as a setup hold. The worker's first action verifies `$HERMES_KANBAN_TASK`, worktree path, branch, and baseline, and it blocks only on a real mismatch.
 

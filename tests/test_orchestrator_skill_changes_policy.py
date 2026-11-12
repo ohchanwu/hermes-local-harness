@@ -26,6 +26,7 @@ from test_anki_apply_tool_card_contracts_reference import reverse_apply_tool_ref
 from test_jobcron_app_only_deploy_authorization import reverse_app_only_deploy_edits
 from test_jss_fleet_policy import reverse_read_only_exception_edits
 from test_fable_5_2_declared_model import reverse_fable_5_2_edits
+from test_jev_policy_sources import reverse_jev_policy_edits
 
 ROOT = Path(__file__).resolve().parents[1]
 RELATIVE = "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md"
@@ -40,11 +41,12 @@ PROFILES = {HARNESS: "harness-orchestrator", JOBCRON: "jobcron-orchestrator", CH
 
 # Version lines stay unchanged: tests outside this card pin them, and an increment
 # is optional on this card. The later owner-requested application-only production
-# deploy exception (t_b7455361) raised the Jobcron version.
+# deploy exception (t_b7455361) raised the Jobcron version, and the jev plugin
+# policy change (t_b722c617) raised the Harness, Jobcron and Cha PT versions.
 VERSIONS = {
-    HARNESS: "0.6.7-harness.6",
-    JOBCRON: "0.6.9-jobcron.8",
-    CHAPT: "0.6.7-chapt.7",
+    HARNESS: "0.6.7-harness.7",
+    JOBCRON: "0.6.9-jobcron.9",
+    CHAPT: "0.6.7-chapt.8",
     JSS: "0.6.7-jss.8",
     ANKI: "0.6.10-anki.4",
 }
@@ -160,7 +162,7 @@ class SkillChangesSection(unittest.TestCase):
                 # Reverse the later declared Fable model change (t_a6bbe808), the owner-requested
                 # application-only production deploy exception (t_b7455361) and
                 # apply-tool-card-contracts pointer (t_c9d4d5c8) first.
-                current = reverse_read_only_exception_edits(path, (ROOT / path).read_bytes())
+                current = reverse_read_only_exception_edits(path, reverse_jev_policy_edits(path, (ROOT / path).read_bytes()))
                 current = reverse_fable_5_2_edits(path, current)
                 current = reverse_app_only_deploy_edits(path, current)
                 current = reverse_apply_tool_reference_edits(path, current)

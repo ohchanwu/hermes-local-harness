@@ -14,6 +14,7 @@ import unittest
 from rule_text import assert_rule, raw_section
 
 from incident_recovery_verify_fixture import resolved_fixture
+from test_jev_policy_sources import HOLD_SCRIPT
 
 ROOT = Path(__file__).resolve().parents[1]
 RELATIVE = "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md"
@@ -23,7 +24,8 @@ SKILLS = {
 }
 # The jobcron version was raised by the owner-requested application-only production
 # deploy exception (t_b7455361).
-VERSIONS = {"jobcron": "0.6.9-jobcron.8", "cha-pt": "0.6.7-chapt.7"}
+# Raised by the jev plugin policy change (t_b722c617).
+VERSIONS = {"jobcron": "0.6.9-jobcron.9", "cha-pt": "0.6.7-chapt.8"}
 BASELINE_SKILL_LINES = {"jobcron": 429, "cha-pt": 434}
 # Live-only Jobcron rules reconciled verbatim from the installed
 # jobcron-orchestrator skill (0.6.5-jobcron.1) into the repository copy.
@@ -211,10 +213,14 @@ class FleetAutonomyPolicy(unittest.TestCase):
     def test_rule8_no_harness_board_routing(self):
         for board in SKILLS:
             with self.subTest(board=board):
+                # Card Setup step 5 names the owner's switch commands of the jev peak-hours
+                # hold with the full path of the script in the harness repository
+                # (t_b722c617); that path routes no work to the harness board.
+                text = self.raw[board].replace(HOLD_SCRIPT, "")
                 for forbidden in ("board: harness", "--board harness", "board `harness`",
                                   "harness-orchestrator", "harness-reviewer", "harness-worker",
                                   "hermes-local-harness"):
-                    self.assertNotIn(forbidden, self.raw[board])
+                    self.assertNotIn(forbidden, text)
 
     def test_jobcron_live_only_rules_reconciled_verbatim(self):
         text = self.raw["jobcron"]
