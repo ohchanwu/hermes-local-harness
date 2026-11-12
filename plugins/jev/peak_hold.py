@@ -39,6 +39,8 @@ STATE_DIR_ENV = "HERMES_JEV_STATE_DIR"
 SWITCH_FILE_NAME = "peak-hold.json"
 DEFAULT_MARKER = "jev-peak-hold"
 DEFAULT_KANBAN_HOME = "/Users/chanbla11mit/.hermes"
+READ_ERROR_STATE_FILE_NAME = "read-error-state.json"
+READ_ERROR_LOG_INTERVAL_SECONDS = 3600
 
 
 # --- window ---------------------------------------------------------------
@@ -423,6 +425,77 @@ def apply(config: Mapping[str, Any], actions: List[Dict[str, Any]],
             log_release(item["board"], item["task_id"], item["assignee"], item["held_until"], ok, error_class)
         results.append({**item, "applied": ok, "error_class": error_class})
     return results
+
+
+def read_error_state_path() -> Path:
+    return jev_log.log_dir() / READ_ERROR_STATE_FILE_NAME
+
+
+def _read_error_state() -> Dict[str, str]:
+    """Board name to the ISO 8601 time of its last ``read_error`` record; empty when unreadable."""
+    try:
+        content = json.loads(read_error_state_path().read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+    if not isinstance(content, dict):
+        return {}
+    return {str(board): stamp for board, stamp in content.items() if isinstance(stamp, str)}
+
+
+def _write_read_error_state(state: Mapping[str, str]) -> None:
+    """Write the state file atomically with mode 0600; failures are ignored."""
+    path = read_error_state_path()
+    try:
+        jev_log.ensure_private_dir(path.parent)
+        tmp = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+        fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        try:
+            os.write(fd, (json.dumps(dict(state), sort_keys=True) + "\n").encode("utf-8"))
+        finally:
+            os.close(fd)
+        os.chmod(tmp, 0o600)
+        os.replace(tmp, path)
+    except Exception:
+        pass
+
+
+def log_read_errors(errors: Iterable[Mapping[str, Any]], now: datetime) -> int:
+    """Write one ``decisions`` record ``event: read_error`` per board in ``errors``,
+    at most once per board per hour; return the number of records written.
+
+    A board database that stays unreadable would otherwise write one record per
+    script run (8,640 per day with the 10-second schedule). The time of the
+    last record per board is kept in ``<log dir>/read-error-state.json``, which
+    holds only board names and timestamps. A record is written when the board
+    has no earlier time, when an hour or more has passed, or when the earlier
+    time is later than ``now`` (a clock that moved back). The caller still
+    reports every error and exits non-zero.
+    """
+    errors = list(errors)
+    if not errors:
+        return 0
+    if now.tzinfo is None:
+        now = now.astimezone()
+    state = _read_error_state()
+    written = 0
+    for item in errors:
+        board = str(item.get("board"))
+        try:
+            last = datetime.fromisoformat(state[board])
+            if last.tzinfo is None:
+                last = last.astimezone()
+            elapsed = (now - last).total_seconds()
+        except Exception:
+            elapsed = None
+        if elapsed is not None and 0 <= elapsed < READ_ERROR_LOG_INTERVAL_SECONDS:
+            continue
+        jev_log.write("decisions", {"event": "read_error", "board": item.get("board"), "applied": False,
+                                    "error_class": item.get("error_class")})
+        state[board] = now.isoformat(timespec="seconds")
+        written += 1
+    if written:
+        _write_read_error_state(state)
+    return written
 
 
 def count_held(config: Mapping[str, Any], boards: Mapping[str, Path]) -> Tuple[int, List[Dict[str, Any]]]:

@@ -92,17 +92,17 @@ def _print_results(results: list) -> int:
     return 1 if failures else 0
 
 
-def _print_read_errors(errors: list, log: bool = False) -> int:
+def _print_read_errors(errors: list, log: bool = False, now: datetime | None = None) -> int:
     """Print one line per board that could not be read; 1 when there is any.
 
-    With ``log`` (``--apply``, ``off``) each error also writes one decisions
-    record ``event: read_error`` so a scheduled run leaves a durable trace.
+    With ``log`` (``--apply``, ``off``) the errors also write decisions records
+    ``event: read_error`` so a scheduled run leaves a durable trace, at most one
+    per board per hour (``peak_hold.log_read_errors``).
     """
     for item in errors:
         print(f"failed read {item['board']} error_class={item['error_class']}")
-        if log:
-            jev_log.write("decisions", {"event": "read_error", "board": item["board"], "applied": False,
-                                        "error_class": item["error_class"]})
+    if log:
+        peak_hold.log_read_errors(errors, now or datetime.now().astimezone())
     return 1 if errors else 0
 
 
@@ -137,7 +137,7 @@ def _toggle(config: dict, args: argparse.Namespace, enabled: bool) -> int:
         return 0
     boards = _boards(config, args)
     actions, _, errors = peak_hold.plan(config, now, boards, force_release=True)
-    read_status = _print_read_errors(errors, log=not args.dry_run)
+    read_status = _print_read_errors(errors, log=not args.dry_run, now=now)
     if args.dry_run:
         _print_actions(actions, "planned ")
         return read_status
@@ -168,7 +168,7 @@ def _run(config: dict, args: argparse.Namespace) -> int:
         print(f"switch file error: {switch_error} (treated as on)")
         if args.apply:
             peak_hold.log_switch_error(switch_error)
-    read_status = _print_read_errors(errors, log=args.apply)
+    read_status = _print_read_errors(errors, log=args.apply, now=now)
     if not args.apply:
         _print_actions(actions, "planned ")
         if not actions:

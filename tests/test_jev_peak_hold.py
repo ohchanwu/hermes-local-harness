@@ -49,7 +49,7 @@ CARDS = [
     ("t_other_blocked", "blocked", "harness-worker-glm-1"),
     ("t_other_sched", "scheduled", "harness-worker-glm-2", "waiting for the owner's release window"),
     ("t_lookalike", "scheduled", "harness-worker-glm-2", "not jev-peak-hold"),
-    # Hermes-form IDs for the kanban_unblock middleware, which uses only such IDs.
+    # IDs of the Hermes form `t_<hexadecimal digits>` for the kanban_unblock middleware, which uses only such IDs.
     ("t_0b10c4ed", "blocked", "harness-worker-glm-2"),
     ("t_c1a0de00", "blocked", "harness-worker"),
 ]
@@ -165,7 +165,7 @@ class PeakHoldScriptTests(_BoardCase):
                 self.assertEqual(self.statuses()["t_glm_ready"], "ready")
         self.assertEqual(self.decisions("hold"), [])
 
-    def test_release_only_marker_held_cards(self):
+    def test_release_only_cards_held_with_the_marker(self):
         self.script("--apply")
         self.script("--apply", now=WEDNESDAY_19)
         statuses = self.statuses()
@@ -265,6 +265,52 @@ class PeakHoldScriptTests(_BoardCase):
         self.assertEqual([(r["board"], r["error_class"]) for r in errors], [("jobcron", "DatabaseError")])
         status = self.script("status", boards=("jobcron", "harness"), kanban_db=False, returncode=1)
         self.assertIn("held cards: 2 (boards that could not be read are not counted)", status)
+
+    def test_unreadable_board_writes_one_read_error_record_per_hour(self):
+        broken = self.db.parent.parent / "jobcron" / "kanban.db"
+        broken.parent.mkdir(parents=True)
+        broken.write_bytes(b"this file is not a SQLite database" * 200)
+        runs = ("2026-11-11T16:00:00+09:00", "2026-11-11T16:00:10+09:00", "2026-11-11T16:59:59+09:00",
+                "2026-11-11T17:00:00+09:00", "2026-11-11T17:30:00+09:00")
+        for now in runs:
+            with self.subTest(now=now):
+                out = self.script("--apply", boards=("jobcron", "harness"), kanban_db=False, returncode=1, now=now)
+                self.assertIn("failed read jobcron error_class=DatabaseError", out)
+        errors = self.decisions("read_error")
+        self.assertEqual([(r["board"], r["error_class"]) for r in errors],
+                         [("jobcron", "DatabaseError"), ("jobcron", "DatabaseError")])
+        state_file = self.log_dir / "read-error-state.json"
+        self.assertEqual(json.loads(state_file.read_text(encoding="utf-8")),
+                         {"jobcron": "2026-11-11T17:00:00+09:00"})
+        self.assertEqual(stat.S_IMODE(state_file.stat().st_mode), 0o600)
+        # A dry run prints the error and exits 1 but writes no record and no state.
+        self.script(boards=("jobcron", "harness"), kanban_db=False, returncode=1, now="2026-11-11T18:30:00+09:00")
+        self.assertEqual(len(self.decisions("read_error")), 2)
+        # off logs read errors under the same limit.
+        self.script("off", boards=("jobcron", "harness"), kanban_db=False, returncode=1,
+                    now="2026-11-11T17:10:00+09:00")
+        self.assertEqual(len(self.decisions("read_error")), 2)
+
+    def test_read_error_limit_is_per_board(self):
+        now = datetime.fromisoformat(WEDNESDAY_16)
+        with mock.patch.dict(os.environ, {"HERMES_JEV_LOG_DIR": str(self.log_dir)}):
+            self.assertEqual(peak_hold.log_read_errors([{"board": "jobcron", "error_class": "DatabaseError"}], now), 1)
+            self.assertEqual(peak_hold.log_read_errors([
+                {"board": "jobcron", "error_class": "DatabaseError"},
+                {"board": "cha-pt", "error_class": "OperationalError"},
+            ], now), 1)
+            # An earlier time that is later than now (a clock that moved back) does not suppress the record.
+            earlier = datetime.fromisoformat("2026-11-11T15:00:00+09:00")
+            self.assertEqual(peak_hold.log_read_errors([{"board": "jobcron", "error_class": "DatabaseError"}],
+                                                       earlier), 1)
+            # An unreadable state file means no earlier time.
+            (self.log_dir / "read-error-state.json").write_text("not json", encoding="utf-8")
+            self.assertEqual(peak_hold.log_read_errors([{"board": "jobcron", "error_class": "DatabaseError"}], now), 1)
+            self.assertEqual(peak_hold.log_read_errors([], now), 0)
+        records = self.decisions("read_error")
+        self.assertEqual([r["board"] for r in records], ["jobcron", "cha-pt", "jobcron", "jobcron"])
+        state = json.loads((self.log_dir / "read-error-state.json").read_text(encoding="utf-8"))
+        self.assertEqual(state, {"jobcron": "2026-11-11T16:00:00+09:00"})
 
     def test_read_is_query_only(self):
         conn = peak_hold.connect_readonly(self.db)
