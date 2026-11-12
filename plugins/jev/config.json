@@ -57,11 +57,11 @@
       },
       "jss-genr": {
         "implementation_workers": ["jss-worker", "jss-worker-2"],
-        "glm_workers": [],
+        "glm_workers": ["jss-worker-glm-1", "jss-worker-glm-2"],
         "routes": [
-          {"name": "easy", "enabled": false, "assignee_from": "glm_workers", "model": "glm-5.3-flash", "provider": "zai",
+          {"name": "easy", "enabled": true, "assignee_from": "glm_workers", "model": "glm-5.3-flash", "provider": "zai",
            "criterion": "Very easy to easy work: a small, well-specified change in one or two files, a documentation or wording edit, or a mechanical change with an exact test."},
-          {"name": "medium", "enabled": false, "assignee_from": "glm_workers", "model": "glm-5.3", "provider": "zai",
+          {"name": "medium", "enabled": true, "assignee_from": "glm_workers", "model": "glm-5.3", "provider": "zai",
            "criterion": "A well-specified change across several files, or a change that needs reading surrounding code but no design decision."},
           {"name": "hard", "enabled": true,
            "criterion": "Everything else, including design decisions, debugging without a known cause, security, payment, migration or deployment work."}
@@ -69,11 +69,11 @@
       },
       "anki": {
         "implementation_workers": ["anki-worker", "anki-worker-2"],
-        "glm_workers": [],
+        "glm_workers": ["anki-worker-glm-1", "anki-worker-glm-2"],
         "routes": [
-          {"name": "easy", "enabled": false, "assignee_from": "glm_workers", "model": "glm-5.3-flash", "provider": "zai",
+          {"name": "easy", "enabled": true, "assignee_from": "glm_workers", "model": "glm-5.3-flash", "provider": "zai",
            "criterion": "Very easy to easy work: a small, well-specified change in one or two files, a documentation or wording edit, or a mechanical change with an exact test."},
-          {"name": "medium", "enabled": false, "assignee_from": "glm_workers", "model": "glm-5.3", "provider": "zai",
+          {"name": "medium", "enabled": true, "assignee_from": "glm_workers", "model": "glm-5.3", "provider": "zai",
            "criterion": "A well-specified change across several files, or a change that needs reading surrounding code but no design decision."},
           {"name": "hard", "enabled": true,
            "criterion": "Everything else, including design decisions, debugging without a known cause, security, payment, migration or deployment work."}

@@ -19,13 +19,15 @@ from unittest.mock import patch
 
 from incident_recovery_verify_fixture import LocalReads, ROOT, load_verifier, resolved_fixture
 from rule_text import assert_rule
+from test_jev_policy_sources import reverse_jev_policy_edits
 
 REPO = "/Users/chanbla11mit/projects/jss-genr"
 ORCH, WORKER, WORKER2, REVIEWER = (
     "jss-orchestrator", "jss-worker", "jss-worker-2", "jss-reviewer")
 JSS = (ORCH, WORKER, WORKER2, REVIEWER)
 WORKERS = (WORKER, WORKER2)
-# Retired from dispatch but still deployed; their SOULs are tracked sources too.
+# Back in service for the jev plugin since 2026-11-12 (card t_71b4ef4a); their SOULs are
+# tracked sources too.
 GLM_WORKERS = ("jss-worker-glm-1", "jss-worker-glm-2")
 NON_ORCH_SOULS = (WORKER, WORKER2, REVIEWER, *GLM_WORKERS)
 SITE = "/Users/chanbla11mit/mystuff/projects/ohchanwu.dev"
@@ -89,9 +91,11 @@ EXCEPTION_PRIVACY = (
     "the jss-genr repository")
 EXCEPTION_RULES = (EXCEPTION_REPOSITORIES, EXCEPTION_PERMITTED, EXCEPTION_PROHIBITED,
                    EXCEPTION_MERGED_NOT_DEPLOYED, EXCEPTION_SHA_AND_DATE, EXCEPTION_PRIVACY)
+# The jev plugin policy change (t_71b4ef4a) names the four jss-genr implementation profiles.
 REVIEWER_FIRST_LINE = (
     "You are the independent jss-genr reviewer. Accept review only for a card on board `jss-genr`, "
-    "implemented by `jss-worker` or `jss-worker-2`, and pinned to repository `/Users/chanbla11mit/projects/jss-genr`.")
+    "implemented by one of the four jss-genr implementation profiles `jss-worker`, `jss-worker-2`, "
+    "`jss-worker-glm-1` or `jss-worker-glm-2`, and pinned to repository `/Users/chanbla11mit/projects/jss-genr`.")
 # Sentences that limit access to other repositories name the exception instead of contradicting it.
 ACCESS_LIMIT = re.compile(r"(?i)never access|or access jobcron|may not probe|operate only on|use only `")
 EXCEPTION_REFERENCE = "the reads that the read-only repository exception"
@@ -260,9 +264,22 @@ class FleetDesiredState(unittest.TestCase):
         self.assertEqual(self.snapshot["approvals"], self.roster["approval_policy"])
         self.assertEqual(self.snapshot["profiles"], list(self.profiles))
         for listing in (self.roster["project_dispatch_allowlist"], self.snapshot["kanban"]["dispatch_profiles"]):
-            # The second worker was appended after the reviewer in the live dispatch order.
-            self.assertEqual([name for name in listing if name.startswith("jss-")], [WORKER, REVIEWER, WORKER2])
+            # The second worker was appended after the reviewer in the live dispatch order; the
+            # GLM workers were appended for the jev plugin (card t_71b4ef4a).
+            self.assertEqual([name for name in listing if name.startswith("jss-")],
+                             [WORKER, REVIEWER, WORKER2, *GLM_WORKERS])
             self.assertNotIn(ORCH, listing)
+        for name in GLM_WORKERS:
+            with self.subTest(glm_worker=name):
+                profile = self.profiles[name]
+                self.assertEqual((profile["model"], profile["provider"], profile["toolsets"]),
+                                 ("glm-5.3", "zai", "implementation"))
+                self.assertEqual(profile["lifecycle"], "project-active")
+                self.assertTrue(profile["dispatch_eligible"])
+                self.assertTrue(profile["in_dispatch_pool"])
+                self.assertEqual(profile["modes"], ["project-isolated", "jss-genr"])
+                self.assertEqual(profile["required_plugins"], ["jev"])
+                self.assertNotIn("retired_on", profile)
 
     def test_skill_deployment_matrix(self):
         shared = {entry["name"]: entry for entry in self.snapshot["skill"]["shared_skills"]}
@@ -454,12 +471,14 @@ class RoleContracts(unittest.TestCase):
         self.assertLessEqual(len(paragraph), 1000)
 
     def test_skill_version_size_and_sections(self):
-        self.assertRegex(self.skill_raw, r"(?m)^version: 0\.6\.7-jss\.8$")
+        # Raised by the jev plugin policy change (t_71b4ef4a).
+        self.assertRegex(self.skill_raw, r"(?m)^version: 0\.6\.7-jss\.9$")
         # 260 lines plus the 4-line Pitfalls section (t_bd860536), the 9 lines of
         # repair_history candidate rules and example (t_6436ac1c), the 6-line
         # Skill Changes section (t_0a8674fe) and the one-line Hard Scope read-only
-        # repository exception (t_3af6293c), which fits inside the same cap.
-        self.assertLessEqual(len(self.skill_raw.splitlines()), 279)
+        # repository exception (t_3af6293c), which fits inside the same cap, plus the
+        # jev plugin lines in Hard Scope and Worker Selection (t_71b4ef4a).
+        self.assertLessEqual(len(self.skill_raw.splitlines()), 281)
         self.assertEqual(re.findall(r"^## (.+)$", self.skill_raw, re.M), [
             "Hard Scope", "Privacy Gate", "Card Kinds", "Role Separation", "Card Contract",
             "Card Setup", "Worker Selection", "Worktree and Baseline Gate", "Skills", "Skill Changes",
@@ -893,7 +912,9 @@ class ReadOnlyRepositoryException(unittest.TestCase):
     def test_reversing_the_edits_recovers_the_baseline_bytes(self):
         for path in self.raw:
             with self.subTest(path=path):
-                original = reverse_read_only_exception_edits(path, (ROOT / path).read_bytes())
+                # The later jev plugin policy change (t_71b4ef4a) is reversed first.
+                current = reverse_jev_policy_edits(path, (ROOT / path).read_bytes())
+                original = reverse_read_only_exception_edits(path, current)
                 self.assertEqual(hashlib.sha256(original).hexdigest(), BASELINE_SHA256[path])
 
     def test_worker_souls_are_unchanged_and_carry_no_exception(self):
@@ -901,7 +922,9 @@ class ReadOnlyRepositoryException(unittest.TestCase):
             relative = f"policies/profile-souls/{profile}/SOUL.md"
             text = soul_path(profile).read_text()
             with self.subTest(profile=profile):
-                self.assertEqual(sha(soul_path(profile)), BASELINE_SHA256[relative])
+                # The jev plugin policy change (t_71b4ef4a) changed the GLM worker SOULs only.
+                current = reverse_jev_policy_edits(relative, soul_path(profile).read_bytes())
+                self.assertEqual(hashlib.sha256(current).hexdigest(), BASELINE_SHA256[relative])
                 self.assertNotIn(EXCEPTION_LEAD, text)
                 self.assertNotIn("read-only repository exception", text)
                 for repo in FOREIGN_REPOS:

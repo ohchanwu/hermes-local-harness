@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Policy sources of the jobcron, cha-pt and harness boards follow the jev plugin (t_b722c617).
+"""Policy sources of the jobcron, cha-pt, harness, jss-genr and anki boards follow the jev
+plugin (t_b722c617 for jobcron, cha-pt and harness; t_71b4ef4a for jss-genr and anki).
 
 Offline checks of tracked repository files only: no live /Users/chanbla11mit/.hermes
 reads, board access, network or model calls.
@@ -8,20 +9,22 @@ The jev plugin (procedures/jev-plugin.md) can change the assignee of a new
 implementation card from one of the board's two Claude workers to one of the
 board's two GLM workers and set the card's model and provider, and it holds
 cards of GLM workers on Monday to Friday from 15:00 to 19:00 Asia/Seoul. The
-reviewer, orchestrator and GLM worker policy sources of the three boards state
+reviewer, orchestrator and GLM worker policy sources of the five boards state
 this:
 - each reviewer SOUL accepts the four implementation profiles of its board and
   does not reject a card because a model or provider override is still set;
 - each orchestrator SOUL and orchestrator skill accepts the plugin's change of
   assignee, model and provider, keeps them in Card Setup step 2, and treats a
   `jev-peak-hold` hold at Card Setup step 5 as expected;
-- each GLM worker SOUL of harness and cha-pt states the model override and the
-  review request call with the board.
+- each GLM worker SOUL states the model override and the review request call
+  with the board.
 
-JEV_POLICY_EDITS lists the exact (new, old) text this card changed in each
-file, so tests that pin older bytes of these files can reverse the change byte
-for byte with reverse_jev_policy_edits(). This module imports no other test
-module, so any test module can import it.
+JEV_POLICY_EDITS lists the exact (new, old) text that the two cards changed in
+each existing file, so tests that pin older bytes of these files can reverse the
+change byte for byte with reverse_jev_policy_edits(). The anki GLM worker SOULs
+are new files (t_71b4ef4a): ANKI_GLM_SOUL_EDITS derives each one from the anki
+worker SOUL. This module imports no other test module, so any test module can
+import it.
 """
 import hashlib
 import re
@@ -40,6 +43,10 @@ BOARDS = {
               ("chapt-worker-glm-1", "chapt-worker-glm-2"), "chapt-reviewer"),
     "jobcron": ("jobcron", "jobcron", ("jobcron-worker", "jobcron-worker-2"),
                 ("jobcron-worker-glm-1", "jobcron-worker-glm-2"), "jobcron-reviewer"),
+    "jss": ("jss-genr", "jss", ("jss-worker", "jss-worker-2"),
+            ("jss-worker-glm-1", "jss-worker-glm-2"), "jss-reviewer"),
+    "anki": ("anki", "anki", ("anki-worker", "anki-worker-2"),
+             ("anki-worker-glm-1", "anki-worker-glm-2"), "anki-reviewer"),
 }
 
 
@@ -164,6 +171,91 @@ def _chapt_glm_edits(number):
     )
 
 
+def _glm_first_sentences(identity):
+    return (f"{identity} The profile model is `glm-5.3` on provider `zai`; a card that the `jev` plugin routed "
+            "to this profile sets the model override `glm-5.3-flash` or `glm-5.3`, and the run uses that model. ")
+
+
+def _glm_review_clause(board, reviewer):
+    return (f"request same-card independent review only from `{reviewer}`, with "
+            f"`kanban_request_review(..., reviewer: {reviewer}, board: {board})`. The `jev` plugin clears the "
+            "card's model override when this profile requests review, so the reviewer runs on its own model; "
+            "rework after a change request runs on this profile's own model `glm-5.3`.")
+
+
+# The jss-genr GLM worker SOULs (t_71b4ef4a): the harness GLM worker rules for the model
+# override and the review request; the lane sentence names the jev routes instead of the
+# lane of the retired GLM workers; the writing-round sentence is the one of `jss-worker`
+# and `jss-worker-2`, which also permits declared new files under `profile/`.
+JSS_GLM_WRITING_ROUND = (
+    "write only the card's declared new files under `profile/` or one `companies/<slug>/` (normally the "
+    "numbered `ko-vN.md` and `notes-vN.md` in `companies/<slug>/drafts/` per `CLAUDE.md`)",
+    "write only the card's declared new numbered files in `companies/<slug>/drafts/` (`ko-vN.md`, "
+    "`notes-vN.md` per `CLAUDE.md`)",
+)
+
+
+def _jss_glm_edits(number):
+    return (
+        (_glm_first_sentences(f"You are jss-genr GLM implementation worker {number}."),
+         f"You are jss-genr parallel implementation worker {number}. "),
+        (_glm_review_clause("jss-genr", "jss-reviewer") + "\n",
+         "request same-card independent review only from `jss-reviewer`.\n"),
+        ("Cards reach this profile when the `jev` plugin routes an `easy` or `medium` jss-genr card to it, or "
+         "when the owner asks for it.\n",
+         "Use this lane for large-context, repository-wide, long-horizon, broadly specified, multimodal or "
+         "visual (such as rendered-PDF inspection), or independent parallel jss-genr work.\n"),
+        JSS_GLM_WRITING_ROUND,
+    )
+
+
+# The anki GLM worker SOULs are new (t_71b4ef4a). Each one is the anki worker SOUL with
+# these (new, old) edits applied, in the way the cha-pt GLM worker SOULs follow the
+# cha-pt worker SOUL.
+def anki_glm_soul_edits(number):
+    return (
+        (_glm_first_sentences(f"You are anki GLM implementation worker {number}."),
+         "You are the anki implementation worker. "),
+        (_glm_review_clause("anki", "anki-reviewer") + "\n",
+         "request same-card independent review only from `anki-reviewer`.\n"),
+    )
+
+
+def anki_glm_soul(number):
+    """Expected text of policies/profile-souls/anki-worker-glm-<number>/SOUL.md."""
+    text = (ROOT / soul("anki-worker")).read_text()
+    for new, old in anki_glm_soul_edits(number):
+        if text.count(old) != 1:
+            raise AssertionError(f"anki-worker SOUL: expected one occurrence of {old[:60]!r}")
+        text = text.replace(old, new, 1)
+    return text
+
+
+JSS_SKILL_GATE = (
+    "5. Confirm the card kind, write targets, worker profile, and reviewer match this policy; a GLM worker "
+    "that the `jev` plugin set is a match.\n",
+    "5. Confirm the card kind, write targets, worker profile, and reviewer match this policy.\n",
+)
+ANKI_SKILL_GATE = (
+    "5. Confirm the add-on project line and project match the repository, and that the worker profile and "
+    "reviewer match this policy; a GLM worker that the `jev` plugin set is a match.\n",
+    "5. Confirm the add-on project line and project match the repository, and that the worker profile and "
+    "reviewer match this policy.\n",
+)
+JSS_WORKER_SELECTION = ("- Assign work to `jss-worker` or `jss-worker-2`. Spread independent ready cards across "
+                        "the two workers; keep cards that touch the same files serialized or dependency-linked.\n")
+ANKI_WORKER_SELECTION = ("- Assign work to `anki-worker` or `anki-worker-2`. Spread independent ready cards "
+                         "across the two workers; keep cards that touch the same files serialized or "
+                         "dependency-linked. Review revision stays on the same assignee.\n")
+
+
+def _hard_scope_line(prefix):
+    return (f"- The implementation workers are `{prefix}-worker` and `{prefix}-worker-2`.\n- The `jev` plugin can "
+            f"move a new card to the GLM workers `{prefix}-worker-glm-1` and `{prefix}-worker-glm-2` (see Worker "
+            "Selection).\n",
+            f"- The implementation workers are `{prefix}-worker` and `{prefix}-worker-2`.\n")
+
+
 # File -> ((new text, old text), ...). Each new text occurs exactly once.
 JEV_POLICY_EDITS = {
     soul("harness-reviewer"): (
@@ -231,6 +323,48 @@ JEV_POLICY_EDITS = {
         (setup_step_two("jobcron"), OLD_STEP_TWO),
         (setup_step_five("jobcron"), OLD_STEP_FIVE),
     ),
+    # Card t_71b4ef4a: boards jss-genr and anki.
+    soul("jss-reviewer"): (
+        ("implemented by one of the four jss-genr implementation profiles `jss-worker`, `jss-worker-2`, "
+         "`jss-worker-glm-1` or `jss-worker-glm-2`, and pinned to repository "
+         "`/Users/chanbla11mit/projects/jss-genr`.\n\n" + reviewer_paragraph("jss"),
+         "implemented by `jss-worker` or `jss-worker-2`, and pinned to repository "
+         "`/Users/chanbla11mit/projects/jss-genr`.\n\n"),
+    ),
+    soul("anki-reviewer"): (
+        ("implemented by one of the four anki implementation profiles `anki-worker`, `anki-worker-2`, "
+         "`anki-worker-glm-1` or `anki-worker-glm-2`, and pinned to exactly one of the repositories "
+         "`/Users/chanbla11mit/projects/anki` or `/Users/chanbla11mit/projects/anki-addons`.\n\n"
+         + reviewer_paragraph("anki"),
+         "implemented by `anki-worker` or `anki-worker-2`, and pinned to exactly one of the repositories "
+         "`/Users/chanbla11mit/projects/anki` or `/Users/chanbla11mit/projects/anki-addons`.\n\n"),
+    ),
+    soul("jss-orchestrator"): (
+        ("same-card independent review only to `jss-reviewer`." + orchestrator_soul_sentences("jss"),
+         "same-card independent review only to `jss-reviewer`."),
+    ),
+    soul("anki-orchestrator"): (
+        ("same-card independent review only to `anki-reviewer`." + orchestrator_soul_sentences("anki"),
+         "same-card independent review only to `anki-reviewer`."),
+    ),
+    soul("jss-worker-glm-1"): _jss_glm_edits(1),
+    soul("jss-worker-glm-2"): _jss_glm_edits(2),
+    skill("jss"): (
+        _version("0.6.7-jss.8", "0.6.7-jss.9"),
+        _hard_scope_line("jss"),
+        (setup_step_two("jss"), OLD_STEP_TWO),
+        (setup_step_five("jss"), OLD_STEP_FIVE),
+        (JSS_WORKER_SELECTION + "- " + worker_selection_text("jss") + "\n", JSS_WORKER_SELECTION),
+        JSS_SKILL_GATE,
+    ),
+    skill("anki"): (
+        _version("0.6.10-anki.4", "0.6.10-anki.5"),
+        _hard_scope_line("anki"),
+        (setup_step_two("anki"), OLD_STEP_TWO),
+        (setup_step_five("anki"), OLD_STEP_FIVE),
+        (ANKI_WORKER_SELECTION + "- " + worker_selection_text("anki") + "\n", ANKI_WORKER_SELECTION),
+        ANKI_SKILL_GATE,
+    ),
 }
 
 # Bytes of each file at baseline 7880b992ad4bba794add815bdd55e6087b66b1a4.
@@ -248,9 +382,21 @@ BASELINE_SHA256 = {
     skill("harness"): "2104c3a371b9f3d7077c15c90ea9a6ea18d864d4f99786236b57e7f3990ac445",
     skill("chapt"): "fe6a85efe9c7ea587584f22e0077cb1f8ed11da8abe5cb6d3a8cadceac8fc085",
     skill("jobcron"): "8a754651b5e50fe468a0cb8eae2483a0f33940910156485aab4cf8c7fbf8caf2",
+    # Bytes at baseline c59bf96d022354238ada5661bcdf6fb58d91a23a (card t_71b4ef4a).
+    soul("jss-reviewer"): "af55e59789abe72d5636411954538fc205d2a2fe5c38216e71d9b588eb8cdd4e",
+    soul("anki-reviewer"): "08fef55d34cd59262f38f87d8ece25e00ee219cb290b4fb47a65d93db4d3b01e",
+    soul("jss-orchestrator"): "b699314136c665481339959f5792e06658b133775c267aa0451eb2540a41c573",
+    soul("anki-orchestrator"): "c31415a522767e0e3d197e2adbc0458a890ca60b69c0153f8b91b8c395c1728a",
+    soul("jss-worker-glm-1"): "28d6f9b3459494330b76d18480123d54e0a082c857b29bb207473a4c2bbb9eb2",
+    soul("jss-worker-glm-2"): "4c51476e5a709c1aa3bc6cf1fac9e1e2e8801930311c91d4aab799c783440be6",
+    skill("jss"): "bd9fdea67d1ce063d4e99dd2ce29591c58f664c2da6d9a4282a141f344be6c21",
+    skill("anki"): "c9c682d4c3333f23237de50f3a44d0f3eacd3c42b24039663a8ba1e1104baefd",
 }
 VERSIONS = {skill("harness"): "0.6.7-harness.7", skill("chapt"): "0.6.7-chapt.8",
-            skill("jobcron"): "0.6.9-jobcron.9"}
+            skill("jobcron"): "0.6.9-jobcron.9", skill("jss"): "0.6.7-jss.9", skill("anki"): "0.6.10-anki.5"}
+# The GLM worker SOULs in this repository (the jobcron GLM workers have none).
+GLM_WORKER_SOUL_BOARDS = ("harness", "chapt", "jss", "anki")
+ANKI_GLM_SOULS = (soul("anki-worker-glm-1"), soul("anki-worker-glm-2"))
 
 
 def reverse_jev_policy_edits(relative_path, text):
@@ -272,7 +418,32 @@ def implementation_profiles(text, prefix):
 
 class JevPolicySources(unittest.TestCase):
     def setUp(self):
-        self.text = {path: (ROOT / path).read_text() for path in JEV_POLICY_EDITS}
+        self.text = {path: (ROOT / path).read_text() for path in (*JEV_POLICY_EDITS, *ANKI_GLM_SOULS)}
+
+    def test_every_board_is_covered(self):
+        self.assertEqual(sorted(board for board, *_ in BOARDS.values()),
+                         ["anki", "cha-pt", "harness", "jobcron", "jss-genr"])
+        self.assertEqual(set(BASELINE_SHA256), set(JEV_POLICY_EDITS))
+        for key, (_board, prefix, _claude, glm, reviewer) in BOARDS.items():
+            with self.subTest(key=key):
+                self.assertIn(soul(reviewer), JEV_POLICY_EDITS)
+                self.assertIn(soul(f"{prefix}-orchestrator"), JEV_POLICY_EDITS)
+                self.assertIn(skill(prefix), JEV_POLICY_EDITS)
+                if key in GLM_WORKER_SOUL_BOARDS:
+                    for profile in glm:
+                        self.assertTrue((ROOT / soul(profile)).is_file(), profile)
+
+    def test_anki_glm_worker_souls_follow_the_anki_worker_soul(self):
+        for number, path in enumerate(ANKI_GLM_SOULS, start=1):
+            with self.subTest(path=path):
+                self.assertEqual(self.text[path], anki_glm_soul(number))
+                worker = (ROOT / soul("anki-worker")).read_text()
+                # The terminology rule of the anki SOULs is kept unchanged.
+                terminology = worker[worker.index("Terminology and wording\n"):]
+                self.assertTrue(self.text[path].endswith(terminology))
+                self.assertIn("board `anki`", self.text[path])
+                self.assertIn("`/Users/chanbla11mit/projects/anki`", self.text[path])
+                self.assertIn("`/Users/chanbla11mit/projects/anki-addons`", self.text[path])
 
     def test_reversing_the_edits_recovers_the_baseline_bytes(self):
         for path, want in BASELINE_SHA256.items():
@@ -295,7 +466,8 @@ class JevPolicySources(unittest.TestCase):
             text = self.text[soul(f"{prefix}-orchestrator")]
             with self.subTest(key=key):
                 self.assertEqual(text.count(orchestrator_soul_sentences(key)), 1)
-                self.assertIn(f"Assign implementation only to {_names(claude)}", text)
+                # jss-genr and anki assign "work" (cards of every kind) to the same two workers.
+                self.assertRegex(text, rf"Assign (?:implementation|work) only to {re.escape(_names(claude))}")
                 self.assertIn("Assign a GLM worker yourself only when the owner asks for it.", text)
 
     def test_orchestrator_skills_card_setup_and_worker_selection(self):
@@ -320,7 +492,7 @@ class JevPolicySources(unittest.TestCase):
                 self.assertIn(f"`{BOARDS[key][4]}`", worker_selection_text(key))
 
     def test_glm_worker_souls_state_the_model_override_and_the_review_call(self):
-        for key in ("harness", "chapt"):
+        for key in GLM_WORKER_SOUL_BOARDS:
             board, prefix, _claude, glm, reviewer = BOARDS[key]
             for profile in glm:
                 text = self.text[soul(profile)]
@@ -332,6 +504,32 @@ class JevPolicySources(unittest.TestCase):
                     self.assertNotRegex(text.lower(), r"retire")
                     self.assertNotIn("GLM Full", text)
                     self.assertNotIn("multimodal", text)
+
+    def test_procedure_lists_31_profiles_and_glm_routing_on_every_board(self):
+        text = (ROOT / "procedures/jev-plugin.md").read_text()
+        install = text.split("## Install on a profile\n", 1)[1].split("\n## ", 1)[0]
+        self.assertIn("Profiles (31 in total;", install)
+        claude = {"advisor"} | {f"{prefix}-{role}" for _b, prefix, *_rest in BOARDS.values()
+                                for role in ("orchestrator", "reviewer", "worker", "worker-2")}
+        glm = {name for *_head, glm_workers, _reviewer in BOARDS.values() for name in glm_workers}
+        self.assertEqual((len(claude), len(glm)), (21, 10))
+        named = set(re.findall(r"`([a-z0-9-]+)`", install))
+        self.assertLessEqual(claude | glm, named)
+        for key, (board, _prefix, claude_workers, glm_workers, _reviewer) in BOARDS.items():
+            with self.subTest(board=board):
+                row = (f"| `{board}` | `{claude_workers[0]}`, `{claude_workers[1]}` | "
+                       f"`{glm_workers[0]}`, `{glm_workers[1]}` | `easy`, `medium`, `hard` |")
+                self.assertEqual(text.count(row), 1)
+        self.assertNotIn("have no GLM worker profile", text)
+        section = text.split("## Creating the Anki GLM worker profiles\n", 1)[1].split("\n## ", 1)[0]
+        for marker in ("hermes profile create <profile> --clone-from anki-worker",
+                       "model `glm-5.3`, provider `zai`, base URL `https://api.z.ai/api/coding/paas/v4`",
+                       "/Users/chanbla11mit/hermes-local-harness/policies/profile-souls/<profile>/SOUL.md",
+                       "because a cloned profile has no `auth.json`", "hermes -p <profile> auth add zai",
+                       "`hermes -p jss-worker-glm-1 auth add zai`", "`hermes -p jss-worker-glm-2 auth add zai`"):
+            self.assertIn(marker, section)
+        self.assertNotIn("~/", install + section)
+        self.assertNotIn("$HOME", install + section)
 
     def test_jev_named_only_as_a_plugin(self):
         for path, text in self.text.items():

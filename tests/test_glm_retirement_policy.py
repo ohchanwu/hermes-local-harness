@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Offline source contract for the 2026-10-18 GLM worker retirement and for the
 2026-11-12 return of the jobcron, cha-pt and harness GLM workers to service for
-the jev plugin (card t_4f7740d0).
+the jev plugin (card t_4f7740d0), joined the same day by the GLM workers of
+jss-genr and anki (card t_71b4ef4a).
 
 Checks tracked repository text, desired state, pins and fixture-mode
 verification only; no live profile, board, or model observation.
@@ -26,16 +27,19 @@ from rule_text import assert_rule
 from test_jobcron_app_only_deploy_authorization import reverse_app_only_deploy_edits
 from test_jev_policy_sources import reverse_jev_policy_edits
 
-FLEETS = {"jobcron": "jobcron", "cha-pt": "chapt", "harness": "harness", "jss-genr": "jss"}
+FLEETS = {"jobcron": "jobcron", "cha-pt": "chapt", "harness": "harness", "jss-genr": "jss", "anki": "anki"}
 GLM = tuple(f"{prefix}-worker-glm-{n}" for prefix in FLEETS.values() for n in (1, 2))
-# Owner decision of 2026-11-12 (card t_4f7740d0): back in service, in dispatch order.
+# Owner decisions of 2026-11-12, in dispatch order: back in service (card t_4f7740d0), and
+# the GLM workers of jss-genr and anki (card t_71b4ef4a).
 GLM_IN_SERVICE = ("jobcron-worker-glm-1", "jobcron-worker-glm-2", "chapt-worker-glm-1", "chapt-worker-glm-2",
-                  "harness-worker-glm-1", "harness-worker-glm-2")
-GLM_RETIRED = ("jss-worker-glm-1", "jss-worker-glm-2")
+                  "harness-worker-glm-1", "harness-worker-glm-2", "jss-worker-glm-1", "jss-worker-glm-2",
+                  "anki-worker-glm-1", "anki-worker-glm-2")
+# The generic GLM profiles stay retired: the RETIRED_PROFILES floor of verify-state.
+GLM_RETIRED = ("worker-flash-1", "worker-flash-2", "worker-flash-3", "worker-glm-full")
 # The 21 Claude subscription profiles that require the jev plugin.
 JEV_CLAUDE = ("advisor", *(f"{prefix}-{role}" for prefix in ("anki", "chapt", "harness", "jobcron", "jss")
                            for role in ("orchestrator", "reviewer", "worker", "worker-2")))
-GLM_NAME = re.compile(r"\b(?:jobcron|chapt|harness|jss)-worker-glm-\d\b")
+GLM_NAME = re.compile(r"\b(?:jobcron|chapt|harness|jss|anki)-worker-glm-\d\b")
 GLM_LANE = re.compile(r"(?i)GLM Full workers?|idle GLM worker|both GLM workers|GLM workers may|three-(?:worker|profile) pool")
 # Legacy/default-board GLM lanes archived 2026-10-18 (t_56d81c3a).
 LEGACY_GLM_NAME = re.compile(r"\bworker-flash-\d\b|\bworker-glm-full\b")
@@ -57,7 +61,7 @@ VERSIONS = {
     PROFILE_SKILLS["jobcron-orchestrator"]: "0.6.9-jobcron.9",  # raised by t_b7455361 and t_b722c617
     PROFILE_SKILLS["chapt-orchestrator"]: "0.6.7-chapt.8",  # raised by t_b722c617
     PROFILE_SKILLS["harness-orchestrator"]: "0.6.7-harness.7",  # raised by t_b722c617
-    PROFILE_SKILLS["jss-orchestrator"]: "0.6.7-jss.8",
+    PROFILE_SKILLS["jss-orchestrator"]: "0.6.7-jss.9",  # raised by t_71b4ef4a
     SHARED_SKILL: "0.6.13",
 }
 PROCEDURE = ROOT / "procedures/switching-hermes-models.md"
@@ -123,10 +127,11 @@ class DesiredState(unittest.TestCase):
 
     def test_no_glm_worker_in_any_roster_list(self):
         # Owner decision 2026-10-19: keep the GLM workers and mark them retired.
-        # The jss-genr GLM workers are still declared roster profiles (and so in the
+        # The generic GLM profiles are still declared roster profiles (and so in the
         # approval list) with the retired lifecycle, and appear in no dispatch list,
-        # pool or fleet. The other six are back in service (owner decision 2026-11-12):
-        # in the project dispatch allowlist only, never in a fleet or a SOUL.
+        # pool or fleet. The ten project fleet GLM workers are in service (owner
+        # decisions 2026-11-12): in the project dispatch allowlist only, never in a fleet
+        # or a profile_souls entry.
         profiles = {profile["name"]: profile for profile in self.roster["profiles"]}
         for name in GLM_RETIRED:
             with self.subTest(retired=name):
@@ -197,17 +202,21 @@ class DesiredState(unittest.TestCase):
         self.assertEqual(self.verifier.PROJECT_GLM_WORKER_POOLS, {
             "jobcron": ["jobcron-worker-glm-1", "jobcron-worker-glm-2"],
             "cha-pt": ["chapt-worker-glm-1", "chapt-worker-glm-2"],
-            "harness": ["harness-worker-glm-1", "harness-worker-glm-2"]})
+            "harness": ["harness-worker-glm-1", "harness-worker-glm-2"],
+            "jss-genr": ["jss-worker-glm-1", "jss-worker-glm-2"],
+            "anki": ["anki-worker-glm-1", "anki-worker-glm-2"]})
         self.assertEqual(self.verifier.glm_worker_profiles(), GLM_IN_SERVICE)
+        assignees = {"cha-pt": self.verifier.CHAPT_ASSIGNEES, "harness": self.verifier.HARNESS_ASSIGNEES,
+                     "jss-genr": self.verifier.JSS_ASSIGNEES, "anki": self.verifier.ANKI_ASSIGNEES}
+        for board, prefix in FLEETS.items():
+            if board not in assignees:  # jobcron has no card contract check in verify-state
+                continue
+            with self.subTest(board=board):
+                self.assertEqual(assignees[board], {f"{prefix}-worker", f"{prefix}-worker-2", f"{prefix}-reviewer",
+                                                    f"{prefix}-worker-glm-1", f"{prefix}-worker-glm-2"})
         for name in GLM:
             with self.subTest(profile=name):
                 self.assertNotIn(name, self.verifier.PROFILE_SOUL_PATHS)
-                self.assertNotIn(name, self.verifier.JSS_ASSIGNEES)
-        self.assertEqual(self.verifier.HARNESS_ASSIGNEES, {"harness-worker", "harness-worker-2", "harness-reviewer",
-                                                           "harness-worker-glm-1", "harness-worker-glm-2"})
-        self.assertEqual(self.verifier.CHAPT_ASSIGNEES, {"chapt-worker", "chapt-worker-2", "chapt-reviewer",
-                                                         "chapt-worker-glm-1", "chapt-worker-glm-2"})
-        self.assertEqual(self.verifier.JSS_ASSIGNEES, {"jss-worker", "jss-worker-2", "jss-reviewer"})
         self.assertEqual(set(self.verifier.jev_required_profiles()), set(JEV_CLAUDE) | set(GLM_IN_SERVICE))
         self.assertEqual(len(set(JEV_CLAUDE)), 21)
 
@@ -220,11 +229,14 @@ class DesiredState(unittest.TestCase):
         roster = copy.deepcopy(self.roster)
         entries = {p["name"]: p for p in roster["profiles"]}
         entries["harness-worker-glm-1"]["required_plugins"].remove("jev")
-        entries["jss-worker-glm-1"]["required_plugins"].append("jev")
+        entries["worker-glm-full"]["required_plugins"].append("jev")
+        # Errors follow the roster order, where worker-glm-full comes first.
         self.assertEqual(quiet(self.verifier.check_jev_plugin_declarations, roster), [
-            "jev plugin declaration drift harness-worker-glm-1: required_plugins must name jev",
-            "jev plugin declaration drift jss-worker-glm-1: jev is required only on the 21 Claude "
-            "subscription profiles and the GLM workers in service"])
+            "jev plugin declaration drift worker-glm-full: jev is required only on the 21 Claude "
+            "subscription profiles and the GLM workers in service",
+            "jev plugin declaration drift harness-worker-glm-1: required_plugins must name jev"])
+        # 31 profiles: the 21 Claude subscription profiles and the 10 GLM workers (t_71b4ef4a).
+        self.assertEqual(len(set(self.verifier.jev_required_profiles())), 31)
 
     def test_verifier_requires_each_glm_worker_in_dispatch(self):
         fleets = self.snapshot["project_isolation"]
@@ -238,8 +250,8 @@ class DesiredState(unittest.TestCase):
                 listing = [entry for entry in dispatch if entry != name]
                 self.assertEqual(quiet(check, "kanban.dispatch_profiles", fleets, listing),
                                  [f"GLM worker missing from kanban.dispatch_profiles: {name}"])
-        self.assertEqual(quiet(check, "project_dispatch_allowlist", fleets, [*dispatch, "jss-worker-glm-1"], True),
-                         ["unexpected profile in project_dispatch_allowlist: jss-worker-glm-1"])
+        self.assertEqual(quiet(check, "project_dispatch_allowlist", fleets, [*dispatch, "worker-glm-full"], True),
+                         ["unexpected profile in project_dispatch_allowlist: worker-glm-full"])
 
     def test_verifier_rejects_glm_reentry(self):
         fleets = copy.deepcopy(self.roster["project_fleets"])
@@ -248,7 +260,7 @@ class DesiredState(unittest.TestCase):
                       quiet(self.verifier.check_project_isolation, fleets))
         self.assertEqual(quiet(self.verifier.check_project_isolation, self.roster["project_fleets"]), [])
         for label in ("kanban.dispatch_profiles", "project_dispatch_allowlist"):
-            for name in (*GLM_RETIRED, "worker-flash-1", "worker-glm-full"):
+            for name in GLM_RETIRED:
                 with self.subTest(label=label, retired=name):
                     self.assertEqual(
                         quiet(self.verifier.check_retired_dispatch, label, ["harness-worker", name],
@@ -292,6 +304,38 @@ class DesiredState(unittest.TestCase):
             with self.subTest(chapt_other_board=assignee):
                 self.assertEqual(quiet(self.verifier.check_chapt_card_contract, [chapt_card(assignee)]),
                                  ["Cha PT card contract drift t_c: independent review contract missing"])
+
+        # jss-genr and anki (card t_71b4ef4a).
+        def jss_card(assignee, reviewer="jss-reviewer"):
+            body = ("Repository /Users/chanbla11mit/projects/jss-genr ONLY.\n"
+                    f"Baseline EXACT {'d' * 40}.\nCard kind EXACT repository.\nAssigned worker EXACT {assignee}.\n"
+                    f"Reviewer EXACT {reviewer}.\n## Tests\n- `make -C resume qa`\n")
+            return {"id": "t_j", "board": "jss-genr", "body": body, "assignee": assignee,
+                    "workspace_kind": "worktree", "workspace_path": "/Users/chanbla11mit/projects/jss-genr/.worktrees/t_j"}
+
+        def anki_card(assignee, reviewer="anki-reviewer"):
+            body = ("Repository /Users/chanbla11mit/projects/anki ONLY.\n"
+                    f"Baseline EXACT {'e' * 40}.\nAssigned worker EXACT {assignee}.\n"
+                    f"Reviewer EXACT {reviewer}.\n## Tests\n- `python3 -m pytest`\n")
+            return {"id": "t_a", "board": "anki", "body": body, "assignee": assignee,
+                    "workspace_kind": "worktree", "workspace_path": "/Users/chanbla11mit/projects/anki/.worktrees/t_a"}
+
+        for label, check, make, prefix in (
+                ("jss-genr", self.verifier.check_jss_card_contract, jss_card, "jss"),
+                ("anki", self.verifier.check_anki_card_contract, anki_card, "anki")):
+            task_id = make("x")["id"]
+            for assignee in (f"{prefix}-worker", f"{prefix}-worker-2", f"{prefix}-worker-glm-1",
+                             f"{prefix}-worker-glm-2"):
+                with self.subTest(board=label, assignee=assignee):
+                    self.assertEqual(quiet(check, [make(assignee)]), [])
+            for assignee in ("harness-worker-glm-1", "chapt-worker-glm-2", f"{prefix}-worker-glm-3"):
+                with self.subTest(board=label, other_board=assignee):
+                    self.assertEqual(quiet(check, [make(assignee)]),
+                                     [f"{label} card contract drift {task_id}: {label} worker assignment invalid"])
+            # The reviewer rule is unchanged: a GLM worker is never the declared reviewer.
+            with self.subTest(board=label, reviewer="GLM worker"):
+                self.assertEqual(quiet(check, [make(f"{prefix}-worker-glm-1", f"{prefix}-worker-glm-2")]),
+                                 [f"{label} card contract drift {task_id}: independent review contract missing"])
 
 
 class PolicyText(unittest.TestCase):
@@ -488,7 +532,7 @@ class Pins(unittest.TestCase):
                 dispatch = [name for name in data["dispatch_profiles"] if name in GLM]
                 want = list(GLM_IN_SERVICE)
                 if fixture.name == RETIREMENT_FIXTURE:
-                    want.append("jss-worker-glm-1")
+                    self.assertEqual(data["dispatch_profiles"][-1], "worker-glm-full")
                 if fixture.name == GLM_MISSING_FIXTURE:
                     want.remove("chapt-worker-glm-2")
                 self.assertEqual(dispatch, want)
@@ -513,9 +557,9 @@ class FixtureMode(unittest.TestCase):
     def test_retired_glm_back_in_dispatch_is_red(self):
         code, output = fixture_main(ROOT / "tests/fixtures" / RETIREMENT_FIXTURE)
         self.assertEqual(code, 1, output)
-        self.assertIn("FAIL: retired profile back in dispatch_profiles: jss-worker-glm-1", output)
+        self.assertIn("FAIL: retired profile back in dispatch_profiles: worker-glm-full", output)
         self.assertIn("FAIL: dispatch drift", output)
-        self.assertIn("WARN: dormant unexpected profile: jss-worker-glm-1", output)
+        self.assertIn("WARN: dormant unexpected profile: worker-glm-full", output)
 
     def test_glm_worker_missing_from_dispatch_is_red(self):
         code, output = fixture_main(ROOT / "tests/fixtures" / GLM_MISSING_FIXTURE)

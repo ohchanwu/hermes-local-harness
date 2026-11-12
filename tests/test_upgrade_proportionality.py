@@ -30,7 +30,7 @@ FIXTURE_RESULTS = {
     "clean.yaml": (0, "OK: desired state matches observed state"),
     "astra-local-override.yaml": (0, "OK: desired state matches observed state"),
     "dormant-extra.yaml": (0, "WARN: dormant"),
-    "retired-glm-dispatch-drift.yaml": (1, "retired profile back in dispatch_profiles: jss-worker-glm-1"),
+    "retired-glm-dispatch-drift.yaml": (1, "retired profile back in dispatch_profiles: worker-glm-full"),
     "glm-worker-dispatch-missing.yaml": (1, "GLM worker missing from dispatch_profiles: chapt-worker-glm-2"),
     "jev-plugin-missing.yaml": (1, "plugin drift harness-reviewer: required jev not enabled"),
     "behavior-changing-model-drift.yaml": (1, "model drift"),

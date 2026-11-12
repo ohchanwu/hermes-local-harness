@@ -40,7 +40,9 @@
     "anki-orchestrator": "claude-opus-5-5",
     "anki-worker": "claude-opus-5-5",
     "anki-worker-2": "claude-opus-5-5",
-    "anki-reviewer": "claude-fable-5-2"
+    "anki-reviewer": "claude-fable-5-2",
+    "anki-worker-glm-1": "glm-5.3",
+    "anki-worker-glm-2": "glm-5.3"
   },
   "profile_providers": {
     "default": "claude-subscription",
@@ -83,7 +85,9 @@
     "anki-orchestrator": "claude-subscription",
     "anki-worker": "claude-subscription",
     "anki-worker-2": "claude-subscription",
-    "anki-reviewer": "claude-subscription"
+    "anki-reviewer": "claude-subscription",
+    "anki-worker-glm-1": "zai",
+    "anki-worker-glm-2": "zai"
   },
   "plugins": {
     "default": {
@@ -225,8 +229,12 @@
     "harness-worker-glm-2": {
       "jev": "enabled      user     0.1.0    jev"
     },
-    "jss-worker-glm-1": {},
-    "jss-worker-glm-2": {},
+    "jss-worker-glm-1": {
+      "jev": "enabled      user     0.1.0    jev"
+    },
+    "jss-worker-glm-2": {
+      "jev": "enabled      user     0.1.0    jev"
+    },
     "anki-orchestrator": {
       "hermes-terminal-outcome-notification": "disabled     git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification",
       "jev": "enabled      user     0.1.0    jev"
@@ -243,6 +251,12 @@
     },
     "anki-reviewer": {
       "hermes-terminal-outcome-notification": "disabled     git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification",
+      "jev": "enabled      user     0.1.0    jev"
+    },
+    "anki-worker-glm-1": {
+      "jev": "enabled      user     0.1.0    jev"
+    },
+    "anki-worker-glm-2": {
       "jev": "enabled      user     0.1.0    jev"
     }
   },
@@ -267,7 +281,11 @@
     "chapt-worker-glm-1",
     "chapt-worker-glm-2",
     "harness-worker-glm-1",
-    "harness-worker-glm-2"
+    "harness-worker-glm-2",
+    "jss-worker-glm-1",
+    "jss-worker-glm-2",
+    "anki-worker-glm-1",
+    "anki-worker-glm-2"
   ],
   "kanban": {
     "max_in_progress": null,
@@ -890,7 +908,9 @@
     "anki-orchestrator": "off",
     "anki-worker": "off",
     "anki-worker-2": "off",
-    "anki-reviewer": "off"
+    "anki-reviewer": "off",
+    "anki-worker-glm-1": "off",
+    "anki-worker-glm-2": "off"
   },
   "profile_soul_hashes": {
     "chapt-orchestrator": "tracked-source",
@@ -3514,6 +3534,14 @@
       "fallback_providers": [],
       "auxiliary": {}
     },
+    "jss-worker-glm-1": {
+      "fallback_providers": [],
+      "auxiliary": {}
+    },
+    "jss-worker-glm-2": {
+      "fallback_providers": [],
+      "auxiliary": {}
+    },
     "anki-orchestrator": {
       "fallback_providers": [
         {
@@ -4065,6 +4093,14 @@
           ]
         }
       }
+    },
+    "anki-worker-glm-1": {
+      "fallback_providers": [],
+      "auxiliary": {}
+    },
+    "anki-worker-glm-2": {
+      "fallback_providers": [],
+      "auxiliary": {}
     }
   },
   "profile_auxiliary_settings": {

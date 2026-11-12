@@ -190,10 +190,11 @@ write("dormant-extra.yaml", delta(lambda d: d["dormant_extras"].append("unused-l
 
 
 def retired_glm_dispatch(d):
-    # A GLM worker that is still retired stays installed and stopped, but is back on the
-    # dispatch list.
-    d["dormant_extras"].append("jss-worker-glm-1")
-    d["dispatch_profiles"].append("jss-worker-glm-1")
+    # A GLM profile that is still retired stays installed and stopped, but is back on the
+    # dispatch list (card t_71b4ef4a returned every project fleet GLM worker to service;
+    # the generic profile worker-glm-full stays retired).
+    d["dormant_extras"].append("worker-glm-full")
+    d["dispatch_profiles"].append("worker-glm-full")
 
 
 write("retired-glm-dispatch-drift.yaml", delta(retired_glm_dispatch))

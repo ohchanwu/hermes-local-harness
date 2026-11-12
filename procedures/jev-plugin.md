@@ -19,12 +19,34 @@ The live installation, the gateway restart and the LaunchAgent belong to the dep
 
 Plugins load only when they are listed in the profile's `plugins.enabled` (Hermes source `hermes_cli/plugins.py` line 1481), which `--enable` does.
 
-Profiles:
+Profiles (31 in total; `roster.yaml` lists `jev` in `required_plugins` of exactly these, and `scripts/verify-state` checks that list):
 
-- Every Claude subscription profile (orchestrators, workers, reviewers, `advisor`, the `chapt-*` roles). Routing and the `kanban_unblock` part of the peak-hours hold have an effect only in profiles that call `kanban_create` and `kanban_unblock` (the orchestrators); the auxiliary log and the tool result filter apply in every profile.
-- The six GLM worker profiles that the routes use (`jobcron-worker-glm-1`, `jobcron-worker-glm-2`, `chapt-worker-glm-1`, `chapt-worker-glm-2`, `harness-worker-glm-1`, `harness-worker-glm-2`). The plugin must run in these profiles so that the card's model override is cleared at the review handoff (see "Model override at the review handoff").
+- The 21 Claude subscription profiles: `advisor`, and the orchestrator, reviewer and two Claude workers of each of the five boards (`jobcron-orchestrator`, `jobcron-reviewer`, `jobcron-worker`, `jobcron-worker-2`, `chapt-orchestrator`, `chapt-reviewer`, `chapt-worker`, `chapt-worker-2`, `harness-orchestrator`, `harness-reviewer`, `harness-worker`, `harness-worker-2`, `jss-orchestrator`, `jss-reviewer`, `jss-worker`, `jss-worker-2`, `anki-orchestrator`, `anki-reviewer`, `anki-worker`, `anki-worker-2`). Routing and the `kanban_unblock` part of the peak-hours hold have an effect only in profiles that call `kanban_create` and `kanban_unblock` (the orchestrators); the auxiliary log and the tool result filter apply in every profile.
+- The ten GLM worker profiles that the routes use, two for each board: `jobcron-worker-glm-1`, `jobcron-worker-glm-2`, `chapt-worker-glm-1`, `chapt-worker-glm-2`, `harness-worker-glm-1`, `harness-worker-glm-2`, `jss-worker-glm-1`, `jss-worker-glm-2`, `anki-worker-glm-1`, `anki-worker-glm-2`. The plugin must run in these profiles so that the card's model override is cleared at the review handoff (see "Model override at the review handoff"). `anki-worker-glm-1` and `anki-worker-glm-2` do not exist yet; create them first (see "Creating the Anki GLM worker profiles").
 
 Gateway-served sessions load the plugin after the owner runs `hermes gateway restart` from a separate shell. Workers started by the dispatcher load it when they start (`hermes -p <profile> --cli ... chat -q`).
+
+## Creating the Anki GLM worker profiles
+
+Card `t_71b4ef4a` added `anki-worker-glm-1` and `anki-worker-glm-2` to `roster.yaml`, `plugins/jev/config.json` and the policy sources only. The deployment card creates the two profiles with the owner's authorization. Until then `scripts/verify-state` reports both profiles as missing. For each `<profile>` of `anki-worker-glm-1` and `anki-worker-glm-2`:
+
+1. Clone the Anki Claude worker, which copies its `config.yaml`, `.env`, `SOUL.md` and skills, but no `auth.json`:
+
+        hermes profile create <profile> --clone-from anki-worker
+
+2. Set the model and provider: model `glm-5.3`, provider `zai`, base URL `https://api.z.ai/api/coding/paas/v4`, the helper tasks on the same target, and the profile in `kanban.dispatch_profiles`. The switch script does all of this after it backs up the profile's `config.yaml` (preview first with `--dry-run`):
+
+        python3 /Users/chanbla11mit/hermes-local-harness/scripts/switch-profile-model --profile <profile> --to glm --dispatch add
+
+3. Replace the cloned SOUL with the tracked source `/Users/chanbla11mit/hermes-local-harness/policies/profile-souls/<profile>/SOUL.md`, copied to `/Users/chanbla11mit/.hermes/profiles/<profile>/SOUL.md`.
+4. Install and enable the `jev` plugin on the profile as described in "Install on a profile".
+5. The owner adds the Z.ai login, because a cloned profile has no `auth.json`:
+
+        hermes -p <profile> auth add zai
+
+   Nobody else runs this command or handles the key.
+
+`jss-worker-glm-1` and `jss-worker-glm-2` exist, run `glm-5.3` on provider `zai` and have no `auth.json` either. They need the same owner step 5 (`hermes -p jss-worker-glm-1 auth add zai` and `hermes -p jss-worker-glm-2 auth add zai`), their SOULs from `/Users/chanbla11mit/hermes-local-harness/policies/profile-souls/jss-worker-glm-1/SOUL.md` and `/Users/chanbla11mit/hermes-local-harness/policies/profile-souls/jss-worker-glm-2/SOUL.md`, the `jev` plugin, and an entry in `kanban.dispatch_profiles`. A GLM worker without a Z.ai login fails its run when the dispatcher starts it, so add the login before the board's routes take effect.
 
 ## TypeSafe API key
 
@@ -83,10 +105,10 @@ A repeated `kanban_create` with an `idempotency_key` that Hermes already knows r
 | `jobcron` | `jobcron-worker`, `jobcron-worker-2` | `jobcron-worker-glm-1`, `jobcron-worker-glm-2` | `easy`, `medium`, `hard` |
 | `cha-pt` | `chapt-worker`, `chapt-worker-2` | `chapt-worker-glm-1`, `chapt-worker-glm-2` | `easy`, `medium`, `hard` |
 | `harness` | `harness-worker`, `harness-worker-2` | `harness-worker-glm-1`, `harness-worker-glm-2` | `easy`, `medium`, `hard` |
-| `jss-genr` | `jss-worker`, `jss-worker-2` | none | `hard` only (`easy`, `medium` present with `enabled: false`) |
-| `anki` | `anki-worker`, `anki-worker-2` | none | `hard` only (`easy`, `medium` present with `enabled: false`) |
+| `jss-genr` | `jss-worker`, `jss-worker-2` | `jss-worker-glm-1`, `jss-worker-glm-2` | `easy`, `medium`, `hard` |
+| `anki` | `anki-worker`, `anki-worker-2` | `anki-worker-glm-1`, `anki-worker-glm-2` | `easy`, `medium`, `hard` |
 
-`jss-genr` and `anki` have no GLM worker profile. Their cards stay on Claude, and no Jev call is made for them, until GLM worker profiles exist and the two routes are enabled.
+Every board has GLM routing (card `t_71b4ef4a` added `jss-genr` and `anki`). Every board uses the same three routes with the same models, providers and criteria. A board whose `easy` and `medium` routes are both disabled in `config.json` gets no Jev call, and its cards stay on Claude.
 
 ### Model override at the review handoff
 

@@ -12,7 +12,8 @@ writes its observation into a TemporaryDirectory.
 APPLY_TOOL_REFERENCE_EDITS lists the exact (new, old) text this card changed in
 the anki skill file, so tests that pin older bytes of that file can reverse the
 change byte for byte with reverse_apply_tool_reference_edits(). This module
-imports no other test module, so any test module can import it.
+imports only tests/test_jev_policy_sources.py, which imports no other test module,
+so any test module can import it.
 """
 import hashlib
 import json
@@ -23,6 +24,8 @@ import subprocess
 import sys
 import tempfile
 import unittest
+
+from test_jev_policy_sources import reverse_jev_policy_edits
 
 ROOT = Path(__file__).resolve().parents[1]
 PROFILE = "anki-orchestrator"
@@ -124,7 +127,9 @@ class CardContractPointer(unittest.TestCase):
     def test_reversing_the_edits_recovers_the_baseline_bytes(self):
         for path, want in PRE_APPLY_TOOL_REFERENCE_SHA256.items():
             with self.subTest(path=path):
-                original = reverse_apply_tool_reference_edits(path, (ROOT / path).read_bytes())
+                # The later jev plugin policy change (t_71b4ef4a) is reversed first.
+                current = reverse_jev_policy_edits(path, (ROOT / path).read_bytes())
+                original = reverse_apply_tool_reference_edits(path, current)
                 self.assertEqual(hashlib.sha256(original).hexdigest(), want)
 
     def test_new_text_is_ascii_and_uses_no_coined_compound(self):

@@ -175,12 +175,41 @@ class RoutingTests(unittest.TestCase):
         self.assert_unchanged(create, "routing_disabled")
         self.assertEqual(self.fake.requests, [])
 
-    def test_boards_without_glm_workers_only_hard_route(self):
-        for board in ("jss-genr", "anki"):
-            entry = self.config["routing"]["boards"][board]
-            self.assertEqual(entry["glm_workers"], [])
-            self.assertEqual({r["name"]: r["enabled"] for r in entry["routes"]},
-                             {"easy": False, "medium": False, "hard": True})
+    def test_every_board_has_glm_routing(self):
+        # Card t_71b4ef4a: jss-genr and anki have GLM workers and the easy and medium
+        # routes like the other three boards.
+        boards = self.config["routing"]["boards"]
+        self.assertEqual(sorted(boards), ["anki", "cha-pt", "harness", "jobcron", "jss-genr"])
+        glm_workers = {"jobcron": ["jobcron-worker-glm-1", "jobcron-worker-glm-2"],
+                       "cha-pt": ["chapt-worker-glm-1", "chapt-worker-glm-2"],
+                       "harness": ["harness-worker-glm-1", "harness-worker-glm-2"],
+                       "jss-genr": ["jss-worker-glm-1", "jss-worker-glm-2"],
+                       "anki": ["anki-worker-glm-1", "anki-worker-glm-2"]}
+        reference = boards["harness"]["routes"]
+        for board, entry in boards.items():
+            with self.subTest(board=board):
+                self.assertEqual(entry["glm_workers"], glm_workers[board])
+                self.assertEqual(entry["routes"], reference)
+                self.assertEqual({r["name"]: r["enabled"] for r in entry["routes"]},
+                                 {"easy": True, "medium": True, "hard": True})
+
+    def test_jss_and_anki_routes_applied(self):
+        cases = (("jss-genr", "jss-worker", "easy", "jss-worker-glm-1", "glm-5.3-flash"),
+                 ("anki", "anki-worker-2", "medium", "anki-worker-glm-1", "glm-5.3"))
+        for board, assignee, route, glm_worker, model in cases:
+            with self.subTest(board=board):
+                self.fake.choice(route, probs(**{route: 0.9, "hard": 0.1}))
+                create, _ = self.create(self.card(board=board, assignee=assignee))
+                sent = create.calls[0]
+                self.assertEqual(sent["assignee"], glm_worker)
+                self.assertEqual((sent["model"], sent["provider"]), (model, "zai"))
+                record = self.last_decision()
+                self.assertEqual((record["board"], record["route"], record["applied"]), (board, route, True))
+
+    def test_board_with_only_the_hard_route_is_not_asked(self):
+        for route in self.config["routing"]["boards"]["jss-genr"]["routes"]:
+            if route["name"] != "hard":
+                route["enabled"] = False
         create, _ = self.create(self.card(board="jss-genr", assignee="jss-worker"))
         self.assert_unchanged(create, "single_route")
         self.assertEqual(self.fake.requests, [])

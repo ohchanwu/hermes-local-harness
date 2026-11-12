@@ -24,11 +24,13 @@ _POLICY = load_verifier()
 OPUS = _POLICY.MODEL_POLICY_BY_ROLE["implementation"]
 FABLE = _POLICY.MODEL_POLICY_BY_ROLE["independent reviewer"]
 CLAUDE = _POLICY.MODEL_POLICY_PROVIDER
-GLM = tuple(f"{prefix}-worker-glm-{n}" for prefix in ("jobcron", "chapt", "harness", "jss") for n in (1, 2))
-# Owner decision of 2026-11-12 (card t_4f7740d0): the GLM workers of jobcron, cha-pt and
-# harness are back in service for the jev plugin; the jss-genr GLM workers stay retired.
-GLM_IN_SERVICE = tuple(f"{prefix}-worker-glm-{n}" for prefix in ("jobcron", "chapt", "harness") for n in (1, 2))
-GLM_RETIRED = ("jss-worker-glm-1", "jss-worker-glm-2")
+GLM = tuple(f"{prefix}-worker-glm-{n}" for prefix in ("jobcron", "chapt", "harness", "jss", "anki") for n in (1, 2))
+# Owner decisions of 2026-11-12: the GLM workers of jobcron, cha-pt and harness are back in
+# service for the jev plugin (card t_4f7740d0); the GLM workers of jss-genr and anki joined
+# them (card t_71b4ef4a). Every project fleet GLM worker is in service.
+GLM_IN_SERVICE = GLM
+# The generic GLM profiles stay retired; they are the RETIRED_PROFILES floor of verify-state.
+GLM_RETIRED = ("worker-flash-1", "worker-flash-2", "worker-flash-3", "worker-glm-full")
 GPT_ERA = ("reviewer-sol", "worker-flash-1", "worker-flash-2", "worker-flash-3", "worker-luna-1",
            "worker-luna-2", "worker-terra-1", "worker-glm-full", "worker-sol", "worker-astra",
            "worker-terra-2")
@@ -148,7 +150,8 @@ class RetiredProfiles(Base):
         for name in GLM:
             self.assertEqual((self.profiles[name]["model"], self.profiles[name]["provider"]), (glm_model, glm_provider))
         for name in GLM_RETIRED:
-            self.assertEqual(self.profiles[name]["lifecycle_before_retirement"], "project-active")
+            self.assertEqual(self.profiles[name]["lifecycle_before_retirement"], "active")
+        self.assertEqual(set(self.verifier.RETIRED_PROFILES), set(GLM_RETIRED))
         self.assertEqual(set(self.verifier.roster_retired(self.roster)), set(GLM_RETIRED) | set(GPT_ERA))
         self.assertEqual(quiet(self.verifier.check_retired_profiles, self.roster), [])
 
@@ -182,9 +185,9 @@ class RetiredProfiles(Base):
 
     def test_retired_profile_marked_dispatchable_fails(self):
         roster = copy.deepcopy(self.roster)
-        next(p for p in roster["profiles"] if p["name"] == "jss-worker-glm-1")["dispatch_eligible"] = True
+        next(p for p in roster["profiles"] if p["name"] == "worker-glm-full")["dispatch_eligible"] = True
         self.assertEqual(quiet(self.verifier.check_retired_profiles, roster), [
-            "retired profile dispatchable jss-worker-glm-1: dispatch_eligible and in_dispatch_pool must be false"])
+            "retired profile dispatchable worker-glm-full: dispatch_eligible and in_dispatch_pool must be false"])
         roster = copy.deepcopy(self.roster)
         next(p for p in roster["profiles"] if p["name"] == "worker-astra")["in_dispatch_pool"] = True
         self.assertEqual(quiet(self.verifier.check_retired_profiles, roster), [
@@ -192,26 +195,26 @@ class RetiredProfiles(Base):
 
     def test_retired_profile_in_a_pool_fails(self):
         roster = copy.deepcopy(self.roster)
-        roster["project_dispatch_allowlist"].append("jss-worker-glm-2")
+        roster["project_dispatch_allowlist"].append("worker-glm-full")
         roster["dispatch_pool"]["dispatch_allowlist"].append("reviewer-sol")
-        roster["project_fleets"]["harness"]["workers"].append("jss-worker-glm-1")
+        roster["project_fleets"]["harness"]["workers"].append("worker-flash-1")
         errors = quiet(self.verifier.check_retired_profiles, roster)
-        self.assertIn("retired profile back in project_dispatch_allowlist: jss-worker-glm-2", errors)
+        self.assertIn("retired profile back in project_dispatch_allowlist: worker-glm-full", errors)
         self.assertIn("retired profile back in dispatch_pool.dispatch_allowlist: reviewer-sol", errors)
-        self.assertIn("retired profile back in project fleet harness: jss-worker-glm-1", errors)
+        self.assertIn("retired profile back in project fleet harness: worker-flash-1", errors)
 
     def test_glm_lifecycle_cannot_be_dropped(self):
         roster = copy.deepcopy(self.roster)
-        entry = next(p for p in roster["profiles"] if p["name"] == "jss-worker-glm-2")
-        entry["lifecycle"] = "project-active"
-        self.assertIn("retired profile lifecycle drift jss-worker-glm-2: expected retired",
+        entry = next(p for p in roster["profiles"] if p["name"] == "worker-glm-full")
+        entry["lifecycle"] = "active"
+        self.assertIn("retired profile lifecycle drift worker-glm-full: expected retired",
                       quiet(self.verifier.check_retired_profiles, roster))
-        roster["profiles"] = [p for p in roster["profiles"] if p["name"] != "jss-worker-glm-2"]
-        self.assertIn("retired profile lifecycle drift jss-worker-glm-2: expected retired",
+        roster["profiles"] = [p for p in roster["profiles"] if p["name"] != "worker-glm-full"]
+        self.assertIn("retired profile lifecycle drift worker-glm-full: expected retired",
                       quiet(self.verifier.check_retired_profiles, roster))
 
     def test_retired_profile_back_in_observed_dispatch_fails(self):
-        for name in ("worker-astra", "jss-worker-glm-2"):
+        for name in ("worker-astra", "worker-glm-full"):
             data = copy.deepcopy(self.clean)
             data["dispatch_profiles"].append(name)
             code, output = fixture_main(data)

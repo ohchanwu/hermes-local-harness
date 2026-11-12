@@ -318,11 +318,13 @@ PROFILE_SOUL_PATHS = {
 # The owner kept them installed (2026-10-19): roster.yaml carries each one with
 # lifecycle "retired". On 2026-11-12 the owner returned the GLM workers of the
 # jobcron, cha-pt and harness boards to service for the jev plugin (card
-# t_4f7740d0); see PROJECT_GLM_WORKER_POOLS. The jss-genr GLM workers stay
-# retired. This constant is the floor: none of them may lose the retired
+# t_4f7740d0), and the same day the GLM workers of the jss-genr board (card
+# t_71b4ef4a); see PROJECT_GLM_WORKER_POOLS. No GLM worker of a project fleet is
+# retired now. The generic GLM profiles worker-flash-1 to -3 and worker-glm-full
+# stay retired. This constant is the floor: none of them may lose the retired
 # lifecycle, and none may ever be dispatchable.
 RETIRED_PROFILES = (
-    "jss-worker-glm-1", "jss-worker-glm-2",
+    "worker-flash-1", "worker-flash-2", "worker-flash-3", "worker-glm-full",
 )
 RETIRED_LIFECYCLE = "retired"
 # Owner model policy (2026-10-19) for every non-retired roster profile: one
@@ -963,15 +965,19 @@ PROJECT_WORKER_POOLS = {
 # reassigns easy and medium implementation cards of these boards to them. They are not
 # fleet workers (project_isolation `workers` lists only PROJECT_WORKER_POOLS), but they
 # are in kanban.dispatch_profiles and may be the assignee of an implementation card.
+# Card t_71b4ef4a (owner approval of 2026-11-12 for every board) added the GLM workers
+# of the jss-genr and anki boards.
 PROJECT_GLM_WORKER_POOLS = {
     "jobcron": ["jobcron-worker-glm-1", "jobcron-worker-glm-2"],
     "cha-pt": ["chapt-worker-glm-1", "chapt-worker-glm-2"],
     "harness": ["harness-worker-glm-1", "harness-worker-glm-2"],
+    "jss-genr": ["jss-worker-glm-1", "jss-worker-glm-2"],
+    "anki": ["anki-worker-glm-1", "anki-worker-glm-2"],
 }
 CHAPT_ASSIGNEES = {"chapt-worker", "chapt-worker-2", *PROJECT_GLM_WORKER_POOLS["cha-pt"], "chapt-reviewer"}
 HARNESS_ASSIGNEES = {"harness-worker", "harness-worker-2", *PROJECT_GLM_WORKER_POOLS["harness"], "harness-reviewer"}
-JSS_ASSIGNEES = {"jss-worker", "jss-worker-2", "jss-reviewer"}
-ANKI_ASSIGNEES = {"anki-worker", "anki-worker-2", "anki-reviewer"}
+JSS_ASSIGNEES = {"jss-worker", "jss-worker-2", *PROJECT_GLM_WORKER_POOLS["jss-genr"], "jss-reviewer"}
+ANKI_ASSIGNEES = {"anki-worker", "anki-worker-2", *PROJECT_GLM_WORKER_POOLS["anki"], "anki-reviewer"}
 # Anki add-on repository (owner decision 2026-10-22): its cards declare the add-on
 # project line; cards for the primary Anki repository never carry it.
 ANKI_REPOSITORY = "/Users/chanbla11mit/projects/anki"

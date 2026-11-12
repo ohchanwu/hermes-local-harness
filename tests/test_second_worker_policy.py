@@ -26,20 +26,22 @@ SECOND = tuple(pool[1] for pool in POOLS.values())
 # The anki fleet (t_06fc410a) was defined with both workers; it is not part of the
 # 2026-10-18 second-worker change that SECOND and the procedure text record.
 ALL_POOLS = {**POOLS, "anki": ["anki-worker", "anki-worker-2"]}
-# Owner decision of 2026-11-12 (card t_4f7740d0): the GLM workers of jobcron, cha-pt and
-# harness are back in service for the jev plugin; the jss-genr GLM workers stay retired.
-GLM_IN_SERVICE = tuple(f"{prefix}-worker-glm-{n}" for prefix in ("jobcron", "chapt", "harness") for n in (1, 2))
-GLM_RETIRED = ("jss-worker-glm-1", "jss-worker-glm-2")
+# Owner decisions of 2026-11-12: the GLM workers of jobcron, cha-pt and harness are back in
+# service for the jev plugin (card t_4f7740d0), and the GLM workers of jss-genr and anki
+# joined them (card t_71b4ef4a). The generic GLM profiles stay retired.
+GLM_IN_SERVICE = tuple(f"{prefix}-worker-glm-{n}" for prefix in ("jobcron", "chapt", "harness", "jss", "anki")
+                       for n in (1, 2))
+GLM_RETIRED = ("worker-flash-1", "worker-flash-2", "worker-flash-3", "worker-glm-full")
 # Live default-home kanban.dispatch_profiles order after the controller's 2026-10-18 change,
-# followed by the GLM workers in service (card t_4f7740d0).
+# followed by the GLM workers in service (cards t_4f7740d0 and t_71b4ef4a).
 PROJECT_DISPATCH = [
     "jobcron-worker", "jobcron-reviewer", "chapt-worker", "chapt-reviewer",
     "harness-worker", "harness-reviewer", "jss-worker", "jss-reviewer",
     "harness-worker-2", "chapt-worker-2", "jobcron-worker-2", "jss-worker-2",
     "anki-worker", "anki-worker-2", "anki-reviewer", *GLM_IN_SERVICE,
 ]
-GLM = tuple(f"{prefix}-worker-glm-{n}" for prefix in FLEETS.values() for n in (1, 2))
-GLM_NAME = re.compile(r"\b(?:jobcron|chapt|harness|jss)-worker-glm-\d\b")
+GLM = tuple(f"{prefix}-worker-glm-{n}" for prefix in (*FLEETS.values(), "anki") for n in (1, 2))
+GLM_NAME = re.compile(r"\b(?:jobcron|chapt|harness|jss|anki)-worker-glm-\d\b")
 RULE = ("Spread independent ready cards across the two workers; keep cards that touch the same files "
         "serialized or dependency-linked.")
 RELATIVE = "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md"
@@ -58,7 +60,7 @@ VERSIONS = {
     PROFILE_SKILLS["jobcron"]: "0.6.9-jobcron.9",  # raised by t_b7455361 and t_b722c617
     PROFILE_SKILLS["chapt"]: "0.6.7-chapt.8",  # raised by t_b722c617
     PROFILE_SKILLS["harness"]: "0.6.7-harness.7",  # raised by t_b722c617
-    PROFILE_SKILLS["jss"]: "0.6.7-jss.8",
+    PROFILE_SKILLS["jss"]: "0.6.7-jss.9",  # raised by t_71b4ef4a
     # The shared skill's version is recorded in the snapshot; read it rather than copy it.
     SHARED_SKILL: next(entry["version"] for entry in json.loads(
         (ROOT / "snapshots/sanitized-current-state.yaml").read_text())["skill"]["shared_skills"]
@@ -155,9 +157,9 @@ class DesiredState(unittest.TestCase):
     def test_no_glm_worker_reintroduced(self):
         for name in SECOND:
             self.assertIsNone(GLM_NAME.search(name))
-        # Owner decision 2026-10-19: the GLM workers stay declared. The jss-genr GLM workers
-        # stay retired; the other six are back in service (card t_4f7740d0) but are not
-        # fleet workers and have no tracked SOUL.
+        # Owner decision 2026-10-19: the GLM workers stay declared. The generic GLM profiles
+        # stay retired; the ten GLM workers of the five boards are in service (cards
+        # t_4f7740d0 and t_71b4ef4a) but are not fleet workers and have no profile_souls entry.
         for name in GLM_RETIRED:
             self.assertEqual(self.profiles[name]["lifecycle"], "retired")
             self.assertFalse(self.profiles[name]["dispatch_eligible"])
@@ -180,10 +182,11 @@ class Verifier(unittest.TestCase):
 
     def test_constants(self):
         self.assertEqual(self.verifier.PROJECT_WORKER_POOLS, ALL_POOLS)
-        for assignees, prefix, glm in ((self.verifier.CHAPT_ASSIGNEES, "chapt", True),
-                                       (self.verifier.HARNESS_ASSIGNEES, "harness", True),
-                                       (self.verifier.JSS_ASSIGNEES, "jss", False)):
-            extra = {f"{prefix}-worker-glm-1", f"{prefix}-worker-glm-2"} if glm else set()
+        for assignees, prefix in ((self.verifier.CHAPT_ASSIGNEES, "chapt"),
+                                  (self.verifier.HARNESS_ASSIGNEES, "harness"),
+                                  (self.verifier.JSS_ASSIGNEES, "jss"),
+                                  (self.verifier.ANKI_ASSIGNEES, "anki")):
+            extra = {f"{prefix}-worker-glm-1", f"{prefix}-worker-glm-2"}
             self.assertEqual(assignees, {f"{prefix}-worker", f"{prefix}-worker-2", f"{prefix}-reviewer", *extra})
         for profile in PINNED_WORKERS:
             self.assertEqual(self.verifier.PROFILE_SOUL_PATHS[f"{profile}-2"], {
@@ -283,10 +286,10 @@ class FixtureMode(unittest.TestCase):
 
     def test_retired_glm_dispatch_stays_red(self):
         fixture = copy.deepcopy(self.clean)
-        fixture["dispatch_profiles"].append("jss-worker-glm-1")
+        fixture["dispatch_profiles"].append("worker-glm-full")
         code, output = fixture_main(fixture)
         self.assertEqual(code, 1, output)
-        self.assertIn("FAIL: retired profile back in dispatch_profiles: jss-worker-glm-1", output)
+        self.assertIn("FAIL: retired profile back in dispatch_profiles: worker-glm-full", output)
 
 
 class PolicyText(unittest.TestCase):

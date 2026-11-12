@@ -27,6 +27,9 @@ ADDONS = "/Users/chanbla11mit/projects/anki-addons"
 ORCH, WORKER, WORKER2, REVIEWER = "anki-orchestrator", "anki-worker", "anki-worker-2", "anki-reviewer"
 ANKI = (ORCH, WORKER, WORKER2, REVIEWER)
 WORKERS = (WORKER, WORKER2)
+# GLM workers added for the jev plugin (card t_71b4ef4a). They are not fleet workers: the
+# fleet `workers` list and the shared skill deployment lists do not name them.
+GLM_WORKERS = ("anki-worker-glm-1", "anki-worker-glm-2")
 FLEETS = {"jobcron", "cha-pt", "harness", "jss-genr", "anki"}
 BASELINE = "00453fee8fdd4438c185eb97c1279255c7170132"
 RELATIVE = "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md"
@@ -118,7 +121,8 @@ class FleetDesiredState(unittest.TestCase):
         self.assertEqual(self.verifier.PROJECT_WORKER_POOLS["anki"], list(WORKERS))
         self.assertEqual(self.verifier.PROJECT_LAUNCHERS["anki"], "run-anki-orchestrator")
         self.assertEqual(self.verifier.ADOPTION_REPOS["anki"], "adoption/anki.md")
-        self.assertEqual(self.verifier.ANKI_ASSIGNEES, {WORKER, WORKER2, REVIEWER})
+        self.assertEqual(self.verifier.ANKI_ASSIGNEES, {WORKER, WORKER2, *GLM_WORKERS, REVIEWER})
+        self.assertEqual(self.verifier.PROJECT_GLM_WORKER_POOLS["anki"], list(GLM_WORKERS))
         self.assertIn("anki", self.verifier.PROJECTS_WITHOUT_PREVIEW_PORT)
         for mutate, expected in (
                 (lambda f: f["anki"].__setitem__("preview_port", 19192),
@@ -169,8 +173,20 @@ class FleetDesiredState(unittest.TestCase):
         self.assertEqual(self.snapshot["approvals"], self.roster["approval_policy"])
         self.assertEqual(self.snapshot["profiles"], list(self.profiles))
         for listing in (self.roster["project_dispatch_allowlist"], self.snapshot["kanban"]["dispatch_profiles"]):
-            self.assertEqual([name for name in listing if name.startswith("anki-")], [WORKER, WORKER2, REVIEWER])
+            self.assertEqual([name for name in listing if name.startswith("anki-")],
+                             [WORKER, WORKER2, REVIEWER, *GLM_WORKERS])
             self.assertNotIn(ORCH, listing)
+        for name in GLM_WORKERS:
+            with self.subTest(glm_worker=name):
+                profile = self.profiles[name]
+                self.assertEqual((profile["model"], profile["provider"], profile["role"], profile["toolsets"]),
+                                 ("glm-5.3", "zai", "project implementation", "implementation"))
+                self.assertEqual(profile["lifecycle"], "project-active")
+                self.assertTrue(profile["dispatch_eligible"])
+                self.assertTrue(profile["in_dispatch_pool"])
+                self.assertTrue(profile["installed"])
+                self.assertEqual(profile["modes"], ["project-isolated", "anki"])
+                self.assertEqual(profile["required_plugins"], ["jev"])
         self.assertEqual(self.roster["dispatch_pool"]["dispatch_allowlist"], [])
 
     def test_skill_deployment_matrix_and_provenance(self):
@@ -358,7 +374,8 @@ class RoleContracts(unittest.TestCase):
         self.assertLessEqual(len(paragraph), 1000)
 
     def test_skill_version_scope_and_board_pinning(self):
-        self.assertRegex(self.skill_raw, r"(?m)^version: 0\.6\.10-anki\.4$")
+        # Raised by the jev plugin policy change (t_71b4ef4a).
+        self.assertRegex(self.skill_raw, r"(?m)^version: 0\.6\.10-anki\.5$")
         history = "This caused the 2026-10-20 stalls of the JSS and Jobcron orchestrators."
         self.assertEqual(self.skill_raw.count(history), 1)
         rest = self.skill_raw.replace(history, "")
@@ -375,8 +392,11 @@ class RoleContracts(unittest.TestCase):
         for call in calls:
             self.assertIn("board: anki", call)
         harness_paths = set(re.findall(r"/Users/chanbla11mit/hermes-local-harness/[^\s`'(),;]+", self.skill_raw))
+        # Card Setup step 5 names the owner's switch commands of the jev peak-hours hold with
+        # the full path of the script (t_71b4ef4a); the owner runs them, the fleet does not.
         self.assertEqual(harness_paths, {CHECKLIST_ABS,
-                                         "/Users/chanbla11mit/hermes-local-harness/scripts/check-forced-skills"})
+                                         "/Users/chanbla11mit/hermes-local-harness/scripts/check-forced-skills",
+                                         "/Users/chanbla11mit/hermes-local-harness/scripts/jev-peak-hold"})
 
     def test_skill_card_types_collection_access_and_apply_rules(self):
         actions = ", ".join(f"`{action}`" for action in READ_ACTIONS)

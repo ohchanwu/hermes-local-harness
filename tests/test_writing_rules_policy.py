@@ -28,7 +28,8 @@ BASELINE = "b7093717054754283c6f9ac671a227f695fec9b5"
 POLICY = "policies/writing-rules.md"
 POLICY_SHA256 = "36609ae76520b9eef3aa4d8cf795f7844aebc91fb8e0ee072b0843d232d2044c"
 REVIEWERS = ("chapt-reviewer", "harness-reviewer", "jobcron-reviewer", "jss-reviewer")
-LATER_SOULS = ("anki-orchestrator", "anki-worker", "anki-worker-2", "anki-reviewer")
+LATER_SOULS = ("anki-orchestrator", "anki-worker", "anki-worker-2", "anki-reviewer",
+               "anki-worker-glm-1", "anki-worker-glm-2")
 REVIEWER_SENTENCE = (b"Reject a card, document, or commit that introduces a coined compound term or a "
                      b"'(project term)' that is not defined in the repository glossary.\n")
 OK = "OK: desired state matches observed state"
@@ -64,8 +65,9 @@ class TrackedText(unittest.TestCase):
     def test_every_soul_is_its_baseline_bytes_plus_the_exact_append(self):
         block = (ROOT / POLICY).read_bytes()
         all_souls = sorted((ROOT / "policies/profile-souls").glob("*/SOUL.md"))
-        # SOULs added after BASELINE (the anki fleet, t_06fc410a) have no baseline bytes;
-        # they were written with the block already at their end.
+        # SOULs added after BASELINE (the anki fleet, t_06fc410a; the anki GLM workers,
+        # t_71b4ef4a) have no baseline bytes; they were written with the block already at
+        # their end.
         later = {path for path in all_souls if path.parent.name in LATER_SOULS}
         self.assertEqual({path.parent.name for path in later}, set(LATER_SOULS))
         for path in sorted(later):
@@ -88,7 +90,8 @@ class TrackedText(unittest.TestCase):
                 want += b"\n" + block
                 # The later owner-requested application-only production deploy exception
                 # (t_b7455361) changed line 7 of the jobcron-orchestrator SOUL; reverse it first.
-                # The jev plugin policy change (t_b722c617) is the latest change; reverse it first.
+                # The jev plugin policy change (t_b722c617, and t_71b4ef4a for jss-genr) is the
+                # latest change; reverse it first.
                 relative = path.relative_to(ROOT).as_posix()
                 text = reverse_jev_policy_edits(relative, path.read_bytes())
                 text = reverse_app_only_deploy_edits(relative, reverse_read_only_exception_edits(relative, text))
