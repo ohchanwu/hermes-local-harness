@@ -11,11 +11,22 @@ The plugin uses only the Hermes plugin interface (`register_middleware`, `regist
 
 ## Install on a profile
 
-The live installation, the gateway restart and the LaunchAgent belong to the deployment card and need the owner's authorization. Install the plugin the same way as `hermes-terminal-outcome-notification` (see `procedures/hermes-terminal-outcome-notifications.md`), from the reviewed commit:
+The live installation, the gateway restart and the LaunchAgent belong to the deployment card and need the owner's authorization. Install the plugin the same way as `hermes-terminal-outcome-notification` (see `procedures/hermes-terminal-outcome-notifications.md`), from the reviewed commit. The source depends on whether the reviewed commit is pushed:
 
-    hermes -p <profile> plugins install https://github.com/ohchanwu/hermes-local-harness.git#plugins/jev --ref <reviewed commit> --enable
+- While the reviewed commit exists only in the local repository (not pushed), install from the local repository. Hermes (`hermes_cli/plugins_cmd.py`, `_resolve_git_url`) accepts a `file://` URL with a `#plugins/jev` fragment and prints only a warning about the local URL scheme:
+
+        hermes -p <profile> plugins install file:///Users/chanbla11mit/hermes-local-harness#plugins/jev --ref <reviewed commit> --enable
+
+- After the reviewed commit is pushed, install from GitHub:
+
+        hermes -p <profile> plugins install https://github.com/ohchanwu/hermes-local-harness.git#plugins/jev --ref <reviewed commit> --enable
+
+Then, for either source:
+
     hermes -p <profile> plugins list --plain --no-bundled
     hermes plugins validate /Users/chanbla11mit/hermes-local-harness/plugins/jev
+
+`plugins list` prints `enabled      git pinned@<first 8 characters of the commit> 0.1.0    jev`, and `plugins/.install-metadata.json` in the profile records the source URL and the full commit. Card `t_f9262e33` installed commit `921f85b2d8987e0631b958a0026b30fa4609b40e` from the local `file://` source on all 31 profiles. Each install also makes the running gateway reload its plugins (the command prints `Gateway reloaded plugins`); this is not a gateway restart.
 
 Plugins load only when they are listed in the profile's `plugins.enabled` (Hermes source `hermes_cli/plugins.py` line 1481), which `--enable` does.
 
