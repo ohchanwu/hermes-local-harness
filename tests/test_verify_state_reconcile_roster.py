@@ -24,10 +24,12 @@ _POLICY = load_verifier()
 OPUS = _POLICY.MODEL_POLICY_BY_ROLE["implementation"]
 FABLE = _POLICY.MODEL_POLICY_BY_ROLE["advisor"]
 CLAUDE = _POLICY.MODEL_POLICY_PROVIDER
-GLM = tuple(f"{prefix}-worker-glm-{n}" for prefix in ("jobcron", "chapt", "harness", "jss", "anki") for n in (1, 2))
+GLM = tuple(f"{prefix}-worker-glm-{n}" for prefix in ("jobcron", "chapt", "harness", "jss", "anki")
+            for n in (1, 2, 3))
 # Owner decisions of 2026-11-12: the GLM workers of jobcron, cha-pt and harness are back in
 # service for the jev plugin (card t_4f7740d0); the GLM workers of jss-genr and anki joined
-# them (card t_71b4ef4a). Every project fleet GLM worker is in service.
+# them (card t_71b4ef4a); every board has a third GLM worker (owner request of 2026-11-14,
+# card t_f4ce916d). Every project fleet GLM worker is in service.
 GLM_IN_SERVICE = GLM
 # The generic GLM profiles stay retired; they are the RETIRED_PROFILES floor of verify-state.
 GLM_RETIRED = ("worker-flash-1", "worker-flash-2", "worker-flash-3", "worker-glm-full")

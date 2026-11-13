@@ -11,8 +11,9 @@ board's two GLM workers and set the card's model and provider, and it holds
 cards of GLM workers on Monday to Friday from 15:00 to 19:00 Asia/Seoul. The
 reviewer, orchestrator and GLM worker policy sources of the five boards state
 this:
-- each reviewer SOUL accepts the four implementation profiles of its board and
-  does not reject a card because a model or provider override is still set;
+- each reviewer SOUL accepts the implementation profiles of its board (four at
+  first, five since card t_f4ce916d added a third GLM worker) and does not
+  reject a card because a model or provider override is still set;
 - each orchestrator SOUL and orchestrator skill accepts the plugin's change of
   assignee, model and provider, keeps them in Card Setup step 2, and treats a
   `jev-peak-hold` hold at Card Setup step 5 as expected;
@@ -27,9 +28,12 @@ worker SOUL.
 
 Card t_ac454595 (policy text of the GLM routing request of 2026-11-13) changed
 the same files later; reverse_jev_policy_edits() reverses that change first
-(tests/test_jev_routing_policy_text.py). This module imports only
-test_jev_routing_policy_text, which imports no other test module, so any test
-module can import it.
+(tests/test_jev_routing_policy_text.py). Card t_f4ce916d (owner request of
+2026-11-14) added a third GLM worker to every board; the sentences of this card
+name it after that card (with_third_glm_worker() of
+tests/test_third_glm_worker_policy.py), and reverse_stale_test_rule_edits()
+reverses that change first. This module imports only test modules that import
+no module that imports it back, so any test module can import it.
 """
 import hashlib
 import re
@@ -39,6 +43,7 @@ import unittest
 from jss_download_install_edits import reverse_download_install_edits
 from test_jev_routing_policy_text import reverse_jev_routing_policy_edits
 from test_stale_test_rule_policy import reverse_stale_test_rule_edits
+from test_third_glm_worker_policy import with_third_glm_worker
 
 ROOT = Path(__file__).resolve().parents[1]
 RELATIVE = "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md"
@@ -401,9 +406,9 @@ BASELINE_SHA256 = {
     skill("jss"): "bd9fdea67d1ce063d4e99dd2ce29591c58f664c2da6d9a4282a141f344be6c21",
     skill("anki"): "c9c682d4c3333f23237de50f3a44d0f3eacd3c42b24039663a8ba1e1104baefd",
 }
-# Raised again by cards t_ac454595 and t_46b5e63e, and for jss by t_89838618.
-VERSIONS = {skill("harness"): "0.6.7-harness.9", skill("chapt"): "0.6.7-chapt.10",
-            skill("jobcron"): "0.6.9-jobcron.11", skill("jss"): "0.6.7-jss.12", skill("anki"): "0.6.10-anki.7"}
+# Raised again by cards t_ac454595, t_46b5e63e and t_f4ce916d, and for jss by t_89838618.
+VERSIONS = {skill("harness"): "0.6.7-harness.10", skill("chapt"): "0.6.7-chapt.11",
+            skill("jobcron"): "0.6.9-jobcron.12", skill("jss"): "0.6.7-jss.13", skill("anki"): "0.6.10-anki.8"}
 # The GLM worker SOULs in this repository (the jobcron GLM workers have none).
 GLM_WORKER_SOUL_BOARDS = ("harness", "chapt", "jss", "anki")
 ANKI_GLM_SOULS = (soul("anki-worker-glm-1"), soul("anki-worker-glm-2"))
@@ -470,13 +475,16 @@ class JevPolicySources(unittest.TestCase):
                 original = reverse_jev_policy_edits(path, reverse_role_model_edits(path, current))
                 self.assertEqual(hashlib.sha256(original).hexdigest(), want)
 
-    def test_each_reviewer_names_exactly_the_four_implementation_profiles_of_its_board(self):
+    def test_each_reviewer_names_exactly_the_five_implementation_profiles_of_its_board(self):
         for key, (_board, prefix, claude, glm, reviewer) in BOARDS.items():
             text = self.text[soul(reviewer)]
+            # Card t_f4ce916d added the third GLM worker of the board.
+            want = set(claude) | set(glm) | {f"{prefix}-worker-glm-3"}
             with self.subTest(reviewer=reviewer):
-                self.assertEqual(implementation_profiles(text, prefix), set(claude) | set(glm))
+                self.assertEqual(implementation_profiles(text, prefix), want)
                 first = text.split("\n\n", 1)[0]
-                self.assertEqual(implementation_profiles(first, prefix), set(claude) | set(glm))
+                self.assertEqual(implementation_profiles(first, prefix), want)
+                self.assertEqual(text.count(with_third_glm_worker(reviewer_paragraph(key))), 1)
                 self.assertIn("A model or provider override that is still set on the card at review is not a "
                               "reason to reject the card.", text)
 
@@ -484,7 +492,9 @@ class JevPolicySources(unittest.TestCase):
         for key, (_board, prefix, claude, glm, _reviewer) in BOARDS.items():
             text = self.text[soul(f"{prefix}-orchestrator")]
             with self.subTest(key=key):
-                self.assertEqual(text.count(orchestrator_soul_sentences(key)), 1)
+                self.assertEqual(text.count(with_third_glm_worker(orchestrator_soul_sentences(key))), 1)
+                self.assertIn(f"to `{prefix}-worker-glm-1`, `{prefix}-worker-glm-2` or `{prefix}-worker-glm-3`, "
+                              "and set the card's model and provider, inside `kanban_create`", text)
                 # jss-genr and anki assign "work" (cards of every kind) to the same two workers.
                 self.assertRegex(text, rf"Assign (?:implementation|work) only to {re.escape(_names(claude))}")
                 self.assertIn("Assign a GLM worker yourself only when the owner asks for it.", text)
@@ -494,11 +504,13 @@ class JevPolicySources(unittest.TestCase):
             text = self.text[skill(prefix)]
             with self.subTest(key=key):
                 self.assertRegex(text, rf"(?m)^version: {re.escape(VERSIONS[skill(prefix)])}$")
-                self.assertEqual(text.count(worker_selection_text(key)), 1)
+                self.assertEqual(text.count(with_third_glm_worker(worker_selection_text(key))), 1)
+                self.assertIn(f"to `{prefix}-worker-glm-1`, `{prefix}-worker-glm-2` or `{prefix}-worker-glm-3`, "
+                              "taking the three in turn, and set the card's `model` and `provider`", text)
                 setup = text.split("## Card Setup\n", 1)[1].split("\n## ", 1)[0]
                 steps = {line[:2]: line for line in setup.splitlines() if re.match(r"^[1-5]\. ", line)}
                 self.assertEqual(steps["2."] + "\n", setup_step_two(key))
-                self.assertEqual(steps["5."] + "\n", setup_step_five(key))
+                self.assertEqual(steps["5."] + "\n", with_third_glm_worker(setup_step_five(key)))
                 self.assertNotIn(OLD_STEP_TWO, text)
                 for command in ("off", "on", "status"):
                     self.assertIn(f"`python3 {HOLD_SCRIPT} {command}`", steps["5."])
@@ -513,8 +525,9 @@ class JevPolicySources(unittest.TestCase):
     def test_glm_worker_souls_state_the_model_override_and_the_review_call(self):
         for key in GLM_WORKER_SOUL_BOARDS:
             board, prefix, _claude, glm, reviewer = BOARDS[key]
-            for profile in glm:
-                text = self.text[soul(profile)]
+            # The third GLM worker (card t_f4ce916d) follows the same rules.
+            for profile in (*glm, f"{prefix}-worker-glm-3"):
+                text = (ROOT / soul(profile)).read_text()
                 with self.subTest(profile=profile):
                     self.assertIn("`glm-5.3-flash`", text)
                     self.assertIn("`glm-5.3`", text)
@@ -524,20 +537,22 @@ class JevPolicySources(unittest.TestCase):
                     self.assertNotIn("GLM Full", text)
                     self.assertNotIn("multimodal", text)
 
-    def test_procedure_lists_31_profiles_and_glm_routing_on_every_board(self):
+    def test_procedure_lists_36_profiles_and_glm_routing_on_every_board(self):
         text = (ROOT / "procedures/jev-plugin.md").read_text()
         install = text.split("## Install on a profile\n", 1)[1].split("\n## ", 1)[0]
-        self.assertIn("Profiles (31 in total;", install)
+        # Card t_f4ce916d added the third GLM worker of every board: 36 profiles.
+        self.assertIn("Profiles (36 in total;", install)
         claude = {"advisor"} | {f"{prefix}-{role}" for _b, prefix, *_rest in BOARDS.values()
                                 for role in ("orchestrator", "reviewer", "worker", "worker-2")}
-        glm = {name for *_head, glm_workers, _reviewer in BOARDS.values() for name in glm_workers}
-        self.assertEqual((len(claude), len(glm)), (21, 10))
+        glm = {name for _b, prefix, _c, glm_workers, _reviewer in BOARDS.values()
+               for name in (*glm_workers, f"{prefix}-worker-glm-3")}
+        self.assertEqual((len(claude), len(glm)), (21, 15))
         named = set(re.findall(r"`([a-z0-9-]+)`", install))
         self.assertLessEqual(claude | glm, named)
-        for key, (board, _prefix, claude_workers, glm_workers, _reviewer) in BOARDS.items():
+        for key, (board, prefix, claude_workers, glm_workers, _reviewer) in BOARDS.items():
             with self.subTest(board=board):
                 row = (f"| `{board}` | `{claude_workers[0]}`, `{claude_workers[1]}` | "
-                       f"`{glm_workers[0]}`, `{glm_workers[1]}` | `easy`, `medium`, `hard` |")
+                       f"`{glm_workers[0]}`, `{glm_workers[1]}`, `{prefix}-worker-glm-3` | `easy`, `medium`, `hard` |")
                 self.assertEqual(text.count(row), 1)
         self.assertNotIn("have no GLM worker profile", text)
         section = text.split("## Creating the Anki GLM worker profiles\n", 1)[1].split("\n## ", 1)[0]

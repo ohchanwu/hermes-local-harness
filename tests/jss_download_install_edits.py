@@ -4,9 +4,12 @@
 The owner removed the rule that a download needs explicit owner approval, and permitted
 installs from a reputable source, in six jss-genr sources. Tests that compare one of those
 sources with an earlier reviewed version call reverse_download_install_edits() first, before
-the reversal functions of earlier cards. This module imports no test module, so any test
-module can import it without a circular import.
+the reversal functions of earlier cards. For these six sources it first reverses the later
+edits of card t_f4ce916d (test_third_glm_worker_policy.reverse_third_glm_worker_edits). This
+module imports only test_third_glm_worker_policy, which imports no other test module, so any
+test module can import it without a circular import.
 """
+from test_third_glm_worker_policy import reverse_third_glm_worker_edits
 
 _DECISION = (
     "Owner decision, 2026-11-13: downloading a file that the work needs (for example icon SVG files, "
@@ -64,6 +67,8 @@ DOWNLOAD_INSTALL_EDITS = {
 def reverse_download_install_edits(relative_path, text):
     """Return text with the t_89838618 edits reversed; text may be str or bytes. The text of a
     path that is not one of the six changed sources is returned unchanged."""
+    if relative_path in DOWNLOAD_INSTALL_EDITS:
+        text = reverse_third_glm_worker_edits(relative_path, text)
     as_bytes = isinstance(text, bytes)
     if as_bytes:
         text = text.decode()

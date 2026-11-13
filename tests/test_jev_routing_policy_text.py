@@ -23,9 +23,13 @@ The card states in the policy sources of the five boards:
 ROUTING_POLICY_EDITS lists the exact (new, old) text this card changed in each
 file under policies/, so tests that pin older bytes of these files can reverse
 the change byte for byte with reverse_jev_routing_policy_edits().
-test_jev_policy_sources.reverse_jev_policy_edits() calls it first. This module
-imports only test_stale_test_rule_policy, which imports no other test module at load
-time, so any test module can import it.
+test_jev_policy_sources.reverse_jev_policy_edits() calls it first. Card t_f4ce916d
+(owner request of 2026-11-14) added a third GLM worker to every board; the sentences
+of this card name it after that card (with_third_glm_worker() of
+tests/test_third_glm_worker_policy.py). This module imports only
+jss_download_install_edits, test_stale_test_rule_policy and
+test_third_glm_worker_policy, which import no module that imports this one, so any
+test module can import it.
 """
 import hashlib
 import json
@@ -35,6 +39,7 @@ import unittest
 
 from jss_download_install_edits import reverse_download_install_edits
 from test_stale_test_rule_policy import reverse_stale_test_rule_edits
+from test_third_glm_worker_policy import with_third_glm_worker
 
 ROOT = Path(__file__).resolve().parents[1]
 RELATIVE = "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md"
@@ -332,12 +337,17 @@ class RoutingPolicyText(unittest.TestCase):
             text = self.text[skill(prefix)]
             with self.subTest(board=board):
                 # Card t_46b5e63e raised each version by one step after this card; card t_89838618 raised
-                # the jss version by one more step.
-                current = {"harness": "0.6.7-harness.9", "chapt": "0.6.7-chapt.10", "jobcron": "0.6.9-jobcron.11",
-                           "jss": "0.6.7-jss.12", "anki": "0.6.10-anki.7"}[prefix]
+                # the jss version by one more step, and card t_f4ce916d each version by one more step.
+                current = {"harness": "0.6.7-harness.10", "chapt": "0.6.7-chapt.11", "jobcron": "0.6.9-jobcron.12",
+                           "jss": "0.6.7-jss.13", "anki": "0.6.10-anki.8"}[prefix]
                 self.assertRegex(text, rf"(?m)^version: {re.escape(current)}$")
                 self.assertEqual(text.count(SPLIT_RULE), 1)
-                self.assertEqual(text.count(escalation_skill_text(key)), 1)
+                # Card t_f4ce916d: the sentence names the three GLM workers of the board.
+                escalation = with_third_glm_worker(escalation_skill_text(key))
+                self.assertEqual(text.count(escalation), 1)
+                self.assertTrue(escalation.startswith(
+                    f"After the fifth change request on a card that `{prefix}-worker-glm-1`, `{prefix}-worker-glm-2` "
+                    f"or `{prefix}-worker-glm-3` implements, the `jev` plugin clears"))
                 self.assertEqual(text.count(ROUTE_DISABLING_RULE), 1)
                 self.assertEqual(text.count(route_disabling_text(key)), 1)
                 # Only the Harness copy names the profile that turns off a route after the owner's statement.
@@ -350,8 +360,8 @@ class RoutingPolicyText(unittest.TestCase):
                 # The rules follow the jev worker selection text and precede the next section.
                 selection = text.index(GLM_LINE_END)
                 self.assertLess(selection, text.index(route_reference(key)))
-                self.assertLess(text.index(route_reference(key)), text.index(escalation_skill_text(key)))
-                self.assertLess(text.index(escalation_skill_text(key)), text.index(ROUTE_DISABLING_RULE))
+                self.assertLess(text.index(route_reference(key)), text.index(escalation))
+                self.assertLess(text.index(escalation), text.index(ROUTE_DISABLING_RULE))
 
     def test_jobcron_and_chapt_passages_no_longer_discourage_splitting(self):
         for prefix in ("jobcron", "chapt"):
@@ -378,7 +388,12 @@ class RoutingPolicyText(unittest.TestCase):
         for key, (board, prefix, _claude, _glm) in BOARDS.items():
             text = self.text[soul(f"{prefix}-reviewer")]
             with self.subTest(board=board):
-                self.assertEqual(text.count(escalation_reviewer_text(key)), 1)
+                # Card t_f4ce916d: the sentence names the three GLM workers of the board.
+                escalation = with_third_glm_worker(escalation_reviewer_text(key))
+                self.assertEqual(text.count(escalation), 1)
+                self.assertTrue(escalation.startswith(
+                    f"After the fifth change request on a card that `{prefix}-worker-glm-1`, `{prefix}-worker-glm-2` "
+                    f"or `{prefix}-worker-glm-3` implements, the `jev` plugin clears"))
                 self.assertTrue(text.endswith(block))
 
     def test_every_glm_worker_soul_has_the_attachment_procedure(self):
@@ -387,8 +402,9 @@ class RoutingPolicyText(unittest.TestCase):
         block += "\n" + (ROOT / "policies/stale-test-rule.md").read_text()
         for key in GLM_SOUL_KEYS:
             board = BOARDS[key][0]
-            for profile in BOARDS[key][3]:
-                text = self.text[soul(profile)]
+            # The third GLM worker (card t_f4ce916d) has the same procedure with its own name.
+            for profile in (*BOARDS[key][3], f"{BOARDS[key][1]}-worker-glm-3"):
+                text = (ROOT / soul(profile)).read_text()
                 with self.subTest(profile=profile):
                     self.assertEqual(text.count(attachment_procedure(board, profile)), 1)
                     self.assertEqual(text.count(attach_example(board)), 1)
@@ -410,9 +426,12 @@ class RoutingPolicyText(unittest.TestCase):
                 self.assertEqual(section.count(attachment_procedure("jobcron", profile)), 1)
                 self.assertFalse((ROOT / soul(profile)).exists())
         for key in GLM_SOUL_KEYS:
-            for profile in BOARDS[key][3]:
+            for profile in (*BOARDS[key][3], f"{BOARDS[key][1]}-worker-glm-3"):
                 self.assertIn(f"`/Users/chanbla11mit/hermes-local-harness/policies/profile-souls/{profile}/SOUL.md`",
                               section)
+        # The Jobcron GLM worker SOULs, also the third one (card t_f4ce916d), have no repository source.
+        self.assertFalse((ROOT / soul("jobcron-worker-glm-3")).exists())
+        self.assertIn("`jobcron-worker-glm-3` has no SOUL source in this repository either.", section)
 
     def test_procedure_report_section_and_route_rule(self):
         self.assertEqual(self.procedure.count(REPORT_HEADING), 1)

@@ -29,12 +29,15 @@ from test_jobcron_app_only_deploy_authorization import reverse_app_only_deploy_e
 from test_jev_policy_sources import reverse_jev_policy_edits
 
 FLEETS = {"jobcron": "jobcron", "cha-pt": "chapt", "harness": "harness", "jss-genr": "jss", "anki": "anki"}
-GLM = tuple(f"{prefix}-worker-glm-{n}" for prefix in FLEETS.values() for n in (1, 2))
+GLM = tuple(f"{prefix}-worker-glm-{n}" for prefix in FLEETS.values() for n in (1, 2, 3))
 # Owner decisions of 2026-11-12, in dispatch order: back in service (card t_4f7740d0), and
-# the GLM workers of jss-genr and anki (card t_71b4ef4a).
-GLM_IN_SERVICE = ("jobcron-worker-glm-1", "jobcron-worker-glm-2", "chapt-worker-glm-1", "chapt-worker-glm-2",
-                  "harness-worker-glm-1", "harness-worker-glm-2", "jss-worker-glm-1", "jss-worker-glm-2",
-                  "anki-worker-glm-1", "anki-worker-glm-2")
+# the GLM workers of jss-genr and anki (card t_71b4ef4a); the third GLM worker of every board
+# (owner request of 2026-11-14, card t_f4ce916d).
+GLM_IN_SERVICE = ("jobcron-worker-glm-1", "jobcron-worker-glm-2", "jobcron-worker-glm-3",
+                  "chapt-worker-glm-1", "chapt-worker-glm-2", "chapt-worker-glm-3",
+                  "harness-worker-glm-1", "harness-worker-glm-2", "harness-worker-glm-3",
+                  "jss-worker-glm-1", "jss-worker-glm-2", "jss-worker-glm-3",
+                  "anki-worker-glm-1", "anki-worker-glm-2", "anki-worker-glm-3")
 # The generic GLM profiles stay retired: the RETIRED_PROFILES floor of verify-state.
 GLM_RETIRED = ("worker-flash-1", "worker-flash-2", "worker-flash-3", "worker-glm-full")
 # The 21 Claude subscription profiles that require the jev plugin.
@@ -59,10 +62,10 @@ JOBCRON_PRODUCTION_DEPLOYMENT = ("devops/production-deployment/SKILL.md",
                                  "devops/production-deployment/references/release-ci-portability.md")
 SHARED_SKILL = ROOT / "skills/multi-agent-coding-orchestrator/SKILL.md"
 VERSIONS = {
-    PROFILE_SKILLS["jobcron-orchestrator"]: "0.6.9-jobcron.11",  # raised by t_b7455361, t_b722c617, t_ac454595 and t_46b5e63e
-    PROFILE_SKILLS["chapt-orchestrator"]: "0.6.7-chapt.10",  # raised by t_b722c617, t_ac454595 and t_46b5e63e
-    PROFILE_SKILLS["harness-orchestrator"]: "0.6.7-harness.9",  # raised by t_b722c617, t_ac454595 and t_46b5e63e
-    PROFILE_SKILLS["jss-orchestrator"]: "0.6.7-jss.12",  # raised by t_71b4ef4a, t_ac454595, t_46b5e63e and t_89838618
+    PROFILE_SKILLS["jobcron-orchestrator"]: "0.6.9-jobcron.12",  # raised by t_b7455361, t_b722c617, t_ac454595, t_46b5e63e and t_f4ce916d
+    PROFILE_SKILLS["chapt-orchestrator"]: "0.6.7-chapt.11",  # raised by t_b722c617, t_ac454595, t_46b5e63e and t_f4ce916d
+    PROFILE_SKILLS["harness-orchestrator"]: "0.6.7-harness.10",  # raised by t_b722c617, t_ac454595, t_46b5e63e and t_f4ce916d
+    PROFILE_SKILLS["jss-orchestrator"]: "0.6.7-jss.13",  # raised by t_71b4ef4a, t_ac454595, t_46b5e63e, t_89838618 and t_f4ce916d
     SHARED_SKILL: "0.6.14",  # raised by t_46b5e63e
 }
 PROCEDURE = ROOT / "procedures/switching-hermes-models.md"
@@ -132,8 +135,8 @@ class DesiredState(unittest.TestCase):
         # Owner decision 2026-10-19: keep the GLM workers and mark them retired.
         # The generic GLM profiles are still declared roster profiles (and so in the
         # approval list) with the retired lifecycle, and appear in no dispatch list,
-        # pool or fleet. The ten project fleet GLM workers are in service (owner
-        # decisions 2026-11-12): in the project dispatch allowlist only, never in a fleet
+        # pool or fleet. The fifteen project fleet GLM workers are in service (owner
+        # decisions 2026-11-12, owner request 2026-11-14): in the project dispatch allowlist only, never in a fleet
         # or a profile_souls entry.
         profiles = {profile["name"]: profile for profile in self.roster["profiles"]}
         for name in GLM_RETIRED:
@@ -214,11 +217,11 @@ class DesiredState(unittest.TestCase):
     def test_verifier_constants(self):
         self.assertEqual(set(self.verifier.RETIRED_PROFILES), set(GLM_RETIRED))
         self.assertEqual(self.verifier.PROJECT_GLM_WORKER_POOLS, {
-            "jobcron": ["jobcron-worker-glm-1", "jobcron-worker-glm-2"],
-            "cha-pt": ["chapt-worker-glm-1", "chapt-worker-glm-2"],
-            "harness": ["harness-worker-glm-1", "harness-worker-glm-2"],
-            "jss-genr": ["jss-worker-glm-1", "jss-worker-glm-2"],
-            "anki": ["anki-worker-glm-1", "anki-worker-glm-2"]})
+            "jobcron": ["jobcron-worker-glm-1", "jobcron-worker-glm-2", "jobcron-worker-glm-3"],
+            "cha-pt": ["chapt-worker-glm-1", "chapt-worker-glm-2", "chapt-worker-glm-3"],
+            "harness": ["harness-worker-glm-1", "harness-worker-glm-2", "harness-worker-glm-3"],
+            "jss-genr": ["jss-worker-glm-1", "jss-worker-glm-2", "jss-worker-glm-3"],
+            "anki": ["anki-worker-glm-1", "anki-worker-glm-2", "anki-worker-glm-3"]})
         self.assertEqual(self.verifier.glm_worker_profiles(), GLM_IN_SERVICE)
         assignees = {"cha-pt": self.verifier.CHAPT_ASSIGNEES, "harness": self.verifier.HARNESS_ASSIGNEES,
                      "jss-genr": self.verifier.JSS_ASSIGNEES, "anki": self.verifier.ANKI_ASSIGNEES}
@@ -227,7 +230,8 @@ class DesiredState(unittest.TestCase):
                 continue
             with self.subTest(board=board):
                 self.assertEqual(assignees[board], {f"{prefix}-worker", f"{prefix}-worker-2", f"{prefix}-reviewer",
-                                                    f"{prefix}-worker-glm-1", f"{prefix}-worker-glm-2"})
+                                                    f"{prefix}-worker-glm-1", f"{prefix}-worker-glm-2",
+                                                    f"{prefix}-worker-glm-3"})
         for name in GLM:
             with self.subTest(profile=name):
                 self.assertNotIn(name, self.verifier.PROFILE_SOUL_PATHS)
@@ -249,8 +253,8 @@ class DesiredState(unittest.TestCase):
             "jev plugin declaration drift worker-glm-full: jev is required only on the 21 Claude "
             "subscription profiles and the GLM workers in service",
             "jev plugin declaration drift harness-worker-glm-1: required_plugins must name jev"])
-        # 31 profiles: the 21 Claude subscription profiles and the 10 GLM workers (t_71b4ef4a).
-        self.assertEqual(len(set(self.verifier.jev_required_profiles())), 31)
+        # 36 profiles: the 21 Claude subscription profiles and the 15 GLM workers (t_f4ce916d).
+        self.assertEqual(len(set(self.verifier.jev_required_profiles())), 36)
 
     def test_verifier_requires_each_glm_worker_in_dispatch(self):
         fleets = self.snapshot["project_isolation"]
@@ -292,10 +296,12 @@ class DesiredState(unittest.TestCase):
                     "workspace_kind": "worktree",
                     "workspace_path": "/Users/chanbla11mit/hermes-local-harness/.worktrees/t_glm"}
         invalid = "Harness card contract drift t_glm: Harness worker assignment invalid"
-        for assignee in ("harness-worker", "harness-worker-2", "harness-worker-glm-1", "harness-worker-glm-2"):
+        for assignee in ("harness-worker", "harness-worker-2", "harness-worker-glm-1", "harness-worker-glm-2",
+                         "harness-worker-glm-3"):
             with self.subTest(assignee=assignee):
                 self.assertEqual(quiet(self.verifier.check_harness_card_contract, [harness_card(assignee)]), [])
-        for assignee in ("chapt-worker-glm-1", "jobcron-worker-glm-2", "jss-worker-glm-1", "harness-worker-glm-3"):
+        # A fourth GLM worker name is not a profile of any board (card t_f4ce916d added the third).
+        for assignee in ("chapt-worker-glm-1", "jobcron-worker-glm-2", "jss-worker-glm-1", "harness-worker-glm-4"):
             with self.subTest(other_board=assignee):
                 self.assertEqual(quiet(self.verifier.check_harness_card_contract, [harness_card(assignee)]),
                                  [invalid])
@@ -311,7 +317,8 @@ class DesiredState(unittest.TestCase):
                     "Reviewer EXACT chapt-reviewer.\n## Tests\n- `go test ./...`\n")
             return {"id": "t_c", "body": body, "assignee": assignee, "workspace_kind": "worktree",
                     "workspace_path": "/Users/chanbla11mit/projects/cha-pt/.worktrees/t_c"}
-        for assignee in ("chapt-worker", "chapt-worker-2", "chapt-worker-glm-1", "chapt-worker-glm-2"):
+        for assignee in ("chapt-worker", "chapt-worker-2", "chapt-worker-glm-1", "chapt-worker-glm-2",
+                         "chapt-worker-glm-3"):
             with self.subTest(chapt=assignee):
                 self.assertEqual(quiet(self.verifier.check_chapt_card_contract, [chapt_card(assignee)]), [])
         for assignee in ("harness-worker-glm-1", "jss-worker-glm-2"):
@@ -339,10 +346,10 @@ class DesiredState(unittest.TestCase):
                 ("anki", self.verifier.check_anki_card_contract, anki_card, "anki")):
             task_id = make("x")["id"]
             for assignee in (f"{prefix}-worker", f"{prefix}-worker-2", f"{prefix}-worker-glm-1",
-                             f"{prefix}-worker-glm-2"):
+                             f"{prefix}-worker-glm-2", f"{prefix}-worker-glm-3"):
                 with self.subTest(board=label, assignee=assignee):
                     self.assertEqual(quiet(check, [make(assignee)]), [])
-            for assignee in ("harness-worker-glm-1", "chapt-worker-glm-2", f"{prefix}-worker-glm-3"):
+            for assignee in ("harness-worker-glm-1", "chapt-worker-glm-2", f"{prefix}-worker-glm-4"):
                 with self.subTest(board=label, other_board=assignee):
                     self.assertEqual(quiet(check, [make(assignee)]),
                                      [f"{label} card contract drift {task_id}: {label} worker assignment invalid"])
@@ -373,8 +380,19 @@ class PolicyText(unittest.TestCase):
         souls = sorted((ROOT / "policies/profile-souls").glob("*/SOUL.md"))
         self.assertIn(JOBCRON_SOUL, souls)
         for path in souls:
-            text = without_jev_text(path)
-            with self.subTest(soul=path.parent.name):
+            name = path.parent.name
+            if name.endswith("-worker-glm-3"):
+                # The SOUL of a third GLM worker (card t_f4ce916d) is the SOUL of the first GLM worker
+                # with the profile name and the worker number replaced (tests/test_third_glm_worker_policy.py),
+                # so it is checked as that SOUL.
+                first = name[:-1] + "1"
+                raw = path.read_text().replace(name, first).replace("GLM implementation worker 3",
+                                                                   "GLM implementation worker 1", 1)
+                relative = f"policies/profile-souls/{first}/SOUL.md"
+                text = reverse_jev_policy_edits(relative, reverse_download_install_edits(relative, raw))
+            else:
+                text = without_jev_text(path)
+            with self.subTest(soul=name):
                 self.assertIsNone(GLM_NAME.search(text))
                 self.assertIsNone(LEGACY_GLM_NAME.search(text))
 
@@ -555,6 +573,7 @@ class Pins(unittest.TestCase):
                     self.assertEqual(data["dispatch_profiles"][-1], "worker-glm-full")
                 if fixture.name == GLM_MISSING_FIXTURE:
                     want.remove("chapt-worker-glm-2")
+                    want.remove("anki-worker-glm-3")
                 self.assertEqual(dispatch, want)
 
 
@@ -585,6 +604,8 @@ class FixtureMode(unittest.TestCase):
         code, output = fixture_main(ROOT / "tests/fixtures" / GLM_MISSING_FIXTURE)
         self.assertEqual(code, 1, output)
         self.assertIn("FAIL: GLM worker missing from dispatch_profiles: chapt-worker-glm-2", output)
+        # A third GLM worker (card t_f4ce916d) missing from the dispatch list fails the same way.
+        self.assertIn("FAIL: GLM worker missing from dispatch_profiles: anki-worker-glm-3", output)
         self.assertIn("FAIL: dispatch drift", output)
         self.assertNotIn("retired profile", output)
 

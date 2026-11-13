@@ -455,6 +455,9 @@ class PushHelper(GitSandbox):
 SOULS = {name: ROOT / f"policies/profile-souls/{name}/SOUL.md" for name in (
     "chapt-orchestrator", "chapt-worker", "chapt-worker-2", "chapt-worker-glm-1", "chapt-worker-glm-2",
     "chapt-reviewer")}
+# The SOUL of the third Cha PT GLM worker (card t_f4ce916d) is a copy of the first one and states the same
+# rules; it has no bytes at this card's baseline, so the check against the baseline leaves it out.
+CURRENT_SOULS = {**SOULS, "chapt-worker-glm-3": ROOT / "policies/profile-souls/chapt-worker-glm-3/SOUL.md"}
 SKILLS = (ROOT / "skills/multi-agent-coding-orchestrator/SKILL.md",
           ROOT / "policies/profile-skills/chapt-orchestrator/autonomous-ai-agents/"
                  "multi-agent-coding-orchestrator/SKILL.md")
@@ -470,7 +473,7 @@ class PolicyText(unittest.TestCase):
                               check=True, text=True, stdout=subprocess.PIPE).stdout
 
     def test_three_repository_allowlist_and_declaration(self):
-        for path in (*SOULS.values(), *SKILLS):
+        for path in (*CURRENT_SOULS.values(), *SKILLS):
             text = self.text(path)
             with self.subTest(path=path.relative_to(ROOT)):
                 for repo in (BACKEND, FRONTEND, SCRAPER):
@@ -484,7 +487,7 @@ class PolicyText(unittest.TestCase):
         self.assertIn("exactly three repositories", self.text(SOULS["chapt-orchestrator"]))
 
     def test_workers_and_reviewer_local_only(self):
-        for name, path in SOULS.items():
+        for name, path in CURRENT_SOULS.items():
             if name == "chapt-orchestrator":
                 continue
             text = self.text(path)

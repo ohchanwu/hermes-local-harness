@@ -201,8 +201,10 @@ write("retired-glm-dispatch-drift.yaml", delta(retired_glm_dispatch))
 
 
 def glm_worker_dispatch_missing(d):
-    # One of the GLM workers in service (card t_4f7740d0) is missing from the dispatch list.
+    # Two of the GLM workers in service are missing from the dispatch list: one of card
+    # t_4f7740d0 and one third GLM worker of card t_f4ce916d.
     d["dispatch_profiles"].remove("chapt-worker-glm-2")
+    d["dispatch_profiles"].remove("anki-worker-glm-3")
 
 
 write("glm-worker-dispatch-missing.yaml", delta(glm_worker_dispatch_missing))
