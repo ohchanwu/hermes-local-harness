@@ -57,10 +57,10 @@ JOBCRON_PRODUCTION_DEPLOYMENT = ("devops/production-deployment/SKILL.md",
                                  "devops/production-deployment/references/release-ci-portability.md")
 SHARED_SKILL = ROOT / "skills/multi-agent-coding-orchestrator/SKILL.md"
 VERSIONS = {
-    PROFILE_SKILLS["jobcron"]: "0.6.9-jobcron.9",  # raised by t_b7455361 and t_b722c617
-    PROFILE_SKILLS["chapt"]: "0.6.7-chapt.8",  # raised by t_b722c617
-    PROFILE_SKILLS["harness"]: "0.6.7-harness.7",  # raised by t_b722c617
-    PROFILE_SKILLS["jss"]: "0.6.7-jss.9",  # raised by t_71b4ef4a
+    PROFILE_SKILLS["jobcron"]: "0.6.9-jobcron.10",  # raised by t_b7455361, t_b722c617 and t_ac454595
+    PROFILE_SKILLS["chapt"]: "0.6.7-chapt.9",  # raised by t_b722c617 and t_ac454595
+    PROFILE_SKILLS["harness"]: "0.6.7-harness.8",  # raised by t_b722c617 and t_ac454595
+    PROFILE_SKILLS["jss"]: "0.6.7-jss.10",  # raised by t_71b4ef4a and t_ac454595
     # The shared skill's version is recorded in the snapshot; read it rather than copy it.
     SHARED_SKILL: next(entry["version"] for entry in json.loads(
         (ROOT / "snapshots/sanitized-current-state.yaml").read_text())["skill"]["shared_skills"]

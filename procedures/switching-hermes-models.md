@@ -24,8 +24,8 @@ The owner retired the GLM workers on 2026-10-18. The same day the owner added a 
 ```sh
 scripts/switch-profile-model --profile harness-worker --to glm                       # GLM 5.3 everywhere
 scripts/switch-profile-model --profile harness-worker --to gpt --model gpt-6.1-sol   # back to GPT
-scripts/switch-profile-model --profile harness-reviewer --to claude-fable            # Fable main, Haiku and Opus helpers
-scripts/switch-profile-model --profile default --to claude-opus                      # the main ~/.hermes home
+scripts/switch-profile-model --profile harness-reviewer --to claude-opus             # Opus main, Haiku and Opus helpers
+scripts/switch-profile-model --profile default --to claude-fable                     # Fable main; the main /Users/chanbla11mit/.hermes home
 scripts/switch-profile-model --profile worker-sol --to gpt --dispatch add            # put a GPT worker back on Kanban
 ```
 

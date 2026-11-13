@@ -472,13 +472,14 @@ class RoleContracts(unittest.TestCase):
 
     def test_skill_version_size_and_sections(self):
         # Raised by the jev plugin policy change (t_71b4ef4a).
-        self.assertRegex(self.skill_raw, r"(?m)^version: 0\.6\.7-jss\.9$")
+        self.assertRegex(self.skill_raw, r"(?m)^version: 0\.6\.7-jss\.10$")  # raised by t_ac454595
         # 260 lines plus the 4-line Pitfalls section (t_bd860536), the 9 lines of
         # repair_history candidate rules and example (t_6436ac1c), the 6-line
         # Skill Changes section (t_0a8674fe) and the one-line Hard Scope read-only
         # repository exception (t_3af6293c), which fits inside the same cap, plus the
-        # jev plugin lines in Hard Scope and Worker Selection (t_71b4ef4a).
-        self.assertLessEqual(len(self.skill_raw.splitlines()), 281)
+        # jev plugin lines in Hard Scope and Worker Selection (t_71b4ef4a), plus the 5 lines of the card
+        # splitting rule (with its blank line) and the 3 jev routing bullets in Worker Selection (t_ac454595).
+        self.assertLessEqual(len(self.skill_raw.splitlines()), 281 + 5)
         self.assertEqual(re.findall(r"^## (.+)$", self.skill_raw, re.M), [
             "Hard Scope", "Privacy Gate", "Card Kinds", "Role Separation", "Card Contract",
             "Card Setup", "Worker Selection", "Worktree and Baseline Gate", "Skills", "Skill Changes",

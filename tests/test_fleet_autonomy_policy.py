@@ -25,7 +25,7 @@ SKILLS = {
 # The jobcron version was raised by the owner-requested application-only production
 # deploy exception (t_b7455361).
 # Raised by the jev plugin policy change (t_b722c617).
-VERSIONS = {"jobcron": "0.6.9-jobcron.9", "cha-pt": "0.6.7-chapt.8"}
+VERSIONS = {"jobcron": "0.6.9-jobcron.10", "cha-pt": "0.6.7-chapt.9"}  # raised by t_ac454595
 BASELINE_SKILL_LINES = {"jobcron": 429, "cha-pt": 434}
 # Live-only Jobcron rules reconciled verbatim from the installed
 # jobcron-orchestrator skill (0.6.5-jobcron.1) into the repository copy.
@@ -90,9 +90,10 @@ class FleetAutonomyPolicy(unittest.TestCase):
                     port_lines += match.group(1).count("\n")
                 self.assertLessEqual(port_lines, 65)
                 # Plus the 9 lines of repair_history candidate rules and example (t_6436ac1c)
-                # and the 6 lines of the Skill Changes section (t_0a8674fe).
+                # and the 6 lines of the Skill Changes section (t_0a8674fe), and the 3 paragraphs and
+                # 3 blank lines of the jev routing rules after the worker selection paragraph (t_ac454595).
                 self.assertLessEqual(len(self.raw[board].splitlines()),
-                                     BASELINE_SKILL_LINES[board] + 90 + 9 + 6)
+                                     BASELINE_SKILL_LINES[board] + 90 + 9 + 6 + 6)
 
     def test_rule1_card_setup_without_setup_hold(self):
         for board in SKILLS:

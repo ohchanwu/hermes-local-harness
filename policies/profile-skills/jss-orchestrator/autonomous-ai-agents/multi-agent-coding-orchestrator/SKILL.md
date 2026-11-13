@@ -1,7 +1,7 @@
 ---
 name: multi-agent-coding-orchestrator
 description: "Use when orchestrating jss-genr repository and writing-round work."
-version: 0.6.7-jss.9
+version: 0.6.7-jss.10
 author: chanbla11mit, Hermes Agent
 license: MIT
 platforms: [macos]
@@ -98,6 +98,8 @@ Every card must contain:
 
 Item 1 writes the repository line in exactly the form `Repository <exact repository path> ONLY.` `scripts/verify-state` accepts no other repository wording; a repository line that uses `EXACT` instead of `ONLY` fails the card contract check.
 
+When a card needs a design decision, split off every part that has its own acceptance check and needs no design decision into a separate card that depends on the design card. Name the exact files and the exact check command in that card.
+
 `scripts/verify-state` fails closed on items 1–5 and 8–10 for every open card. Use `kanban_create(..., board: jss-genr)` only after validating the complete contract, then read the card with `kanban_show(..., board: jss-genr)` and verify the stored fields before dispatch.
 
 ## Card Setup
@@ -116,6 +118,9 @@ Never claim a card and `kanban_block` it as a setup hold. The worker's first act
 
 - Assign work to `jss-worker` or `jss-worker-2`. Spread independent ready cards across the two workers; keep cards that touch the same files serialized or dependency-linked.
 - The `jev` plugin can change the assignee of a card that `kanban_create` creates for `jss-worker` or `jss-worker-2` to `jss-worker-glm-1` or `jss-worker-glm-2`, alternating between the two, and set the card's `model` and `provider` (`glm-5.3-flash` or `glm-5.3` on provider `zai`) for work that the plugin classifies as `easy` or `medium`. Accept that change: it is not an assignee mismatch, the reviewer stays `jss-reviewer`, and same-card review, local integration and every prohibition are unchanged. The `kanban_create` result does not show the change; `kanban_show(..., board: jss-genr)` does. Still create every implementation card for `jss-worker` or `jss-worker-2`; assign a GLM worker yourself only when the owner asks for it.
+- The `jev` plugin chooses the route `easy`, `medium` or `hard` of a card with the criterion texts in `routing.boards.jss-genr.routes` of its configuration file `config.json`; this skill does not restate them.
+- After the fifth change request on a card that `jss-worker-glm-1` or `jss-worker-glm-2` implements, the `jev` plugin clears the card's model override, reassigns the card to a Claude worker of the board, `jss-worker` or `jss-worker-2` (the worker named when the card was created; otherwise the two alternate), and writes that worker's name on the card's `Assigned worker EXACT` line. Accept that reassignment: do not reverse it, do not assign the card back to a GLM worker, and do not treat it as an assignee mismatch. The script `/Users/chanbla11mit/hermes-local-harness/scripts/jev-peak-hold` does not hold a card that is assigned to a Claude worker. If the plugin could not rewrite the `Assigned worker EXACT` line and the Claude worker blocks the card because the line names the GLM worker, change the name on that line to the Claude worker with `hermes kanban --board jss-genr edit <task id> --body=<body>` and unblock the card. The setting is `routing.max_glm_change_requests` in the same `config.json`.
+- Route disabling needs the owner's permission. No profile, script, scheduled job or plugin code turns off a route (a route's `enabled` set to false, a route removed, or a board's `glm_workers` emptied) unless the owner has first been notified with the figures and has stated permission for that route. This also applies to a rollback that turns off a route, and to `routing.enabled` set to false, which turns off every route of every board. A weekly scheduled job notifies the owner with the figures. After an owner statement that names the route, that route's `enabled` is set to false in the repository source of the `jev` plugin, the plugin is installed by the normal procedure, and the owner receives a report of the change; this orchestrator does not change the plugin or its configuration. Without such a statement nothing changes.
 - Never route implementation to the orchestrator or reviewer, and never route review to a worker.
 
 Before assignment, verify the exact profile with `hermes profile list`. To inspect queue state use `hermes kanban --board jss-genr list --json`. Do not infer that reassignment started a worker; read the card and run history with `kanban_show(..., board: jss-genr)` after the next normal dispatcher ticks.

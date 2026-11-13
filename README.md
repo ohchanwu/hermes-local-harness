@@ -10,8 +10,8 @@ Every active profile currently runs on the [Claude subscription provider](plugin
 scripts/switch-profile-model --profile harness-worker --to glm --dry-run            # preview only
 scripts/switch-profile-model --profile harness-worker --to glm                       # GLM 5.3 (z.ai)
 scripts/switch-profile-model --profile harness-worker --to gpt --model gpt-6.1-sol   # back to GPT
-scripts/switch-profile-model --profile harness-reviewer --to claude-fable            # Fable main, Haiku and Opus helpers
-scripts/switch-profile-model --profile default --to claude-opus                      # the main ~/.hermes home
+scripts/switch-profile-model --profile harness-reviewer --to claude-opus             # Opus main, Haiku and Opus helpers
+scripts/switch-profile-model --profile default --to claude-fable                     # Fable main; the main /Users/chanbla11mit/.hermes home
 scripts/switch-profile-model --profile worker-sol --to gpt --dispatch add            # put a GPT worker back on Kanban
 ```
 

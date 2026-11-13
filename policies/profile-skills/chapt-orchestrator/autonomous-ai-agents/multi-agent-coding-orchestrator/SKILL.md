@@ -1,7 +1,7 @@
 ---
 name: multi-agent-coding-orchestrator
 description: "Use when orchestrating multi-agent coding with Hermes."
-version: 0.6.7-chapt.8
+version: 0.6.7-chapt.9
 author: chanbla11mit, Hermes Agent
 license: MIT
 platforms: [macos]
@@ -49,6 +49,12 @@ Project orchestrators are interactive control-plane sessions, not dispatcher-spa
 Each project has two implementation workers. Assign implementation only to them, never to a foreign-project or legacy worker. Spread independent ready cards across the two workers; keep cards that touch the same files serialized or dependency-linked. Review revision stays on the same assignee.
 
 The `jev` plugin can change the assignee of a card that `kanban_create` creates for `chapt-worker` or `chapt-worker-2` to `chapt-worker-glm-1` or `chapt-worker-glm-2`, alternating between the two, and set the card's `model` and `provider` (`glm-5.3-flash` or `glm-5.3` on provider `zai`) for work that the plugin classifies as `easy` or `medium`. Accept that change: it is not an assignee mismatch, the reviewer stays `chapt-reviewer`, and same-card review, local integration and every prohibition are unchanged. The `kanban_create` result does not show the change; `kanban_show(..., board: cha-pt)` does. Still create every implementation card for `chapt-worker` or `chapt-worker-2`; assign a GLM worker yourself only when the owner asks for it.
+
+The `jev` plugin chooses the route `easy`, `medium` or `hard` of a card with the criterion texts in `routing.boards.cha-pt.routes` of its configuration file `config.json`; this skill does not restate them.
+
+After the fifth change request on a card that `chapt-worker-glm-1` or `chapt-worker-glm-2` implements, the `jev` plugin clears the card's model override, reassigns the card to a Claude worker of the board, `chapt-worker` or `chapt-worker-2` (the worker named when the card was created; otherwise the two alternate), and writes that worker's name on the card's `Assigned worker EXACT` line. Accept that reassignment: do not reverse it, do not assign the card back to a GLM worker, and do not treat it as an assignee mismatch. The script `/Users/chanbla11mit/hermes-local-harness/scripts/jev-peak-hold` does not hold a card that is assigned to a Claude worker. If the plugin could not rewrite the `Assigned worker EXACT` line and the Claude worker blocks the card because the line names the GLM worker, change the name on that line to the Claude worker with `hermes kanban --board cha-pt edit <task id> --body=<body>` and unblock the card. The setting is `routing.max_glm_change_requests` in the same `config.json`.
+
+Route disabling needs the owner's permission. No profile, script, scheduled job or plugin code turns off a route (a route's `enabled` set to false, a route removed, or a board's `glm_workers` emptied) unless the owner has first been notified with the figures and has stated permission for that route. This also applies to a rollback that turns off a route, and to `routing.enabled` set to false, which turns off every route of every board. A weekly scheduled job notifies the owner with the figures. After an owner statement that names the route, that route's `enabled` is set to false in the repository source of the `jev` plugin, the plugin is installed by the normal procedure, and the owner receives a report of the change; this orchestrator does not change the plugin or its configuration. Without such a statement nothing changes.
 
 ### Autonomous project repair budget
 
@@ -381,7 +387,7 @@ Write the repository line on the card body in exactly the form `Repository <exac
 
 - Cha PT, exactly one per card: `Repository /Users/chanbla11mit/projects/cha-pt ONLY.`, `Repository /Users/chanbla11mit/projects/cha-pt-frontend ONLY.`, or `Repository /Users/chanbla11mit/projects/cha-webpt-website-sync ONLY.`
 
-Use parent-child links for real dependencies. Keep independent slices parallel. Do not decompose merely to keep every lane busy.
+Use parent-child links for real dependencies. Keep independent slices parallel. When a card needs a design decision, split off every part that has its own acceptance check and needs no design decision into a separate card that depends on the design card. Name the exact files and the exact check command in that card. Do not split a card only to keep every lane busy.
 
 ### Runtime budgeting
 
@@ -390,7 +396,7 @@ Estimate the whole worker attempt, not just editing time: repository discovery, 
 - Keep the one-hour default only when the complete attempt is reasonably expected to finish within it.
 - If the orchestrator suspects the attempt may exceed one hour, set `max_runtime_seconds` explicitly when creating the card. Use at least two to three hours for substantial implementation, security, infrastructure, migration, large-context, or broad-verification work, and use a longer evidence-based cap when the test matrix or prior measurements justify it.
 - If any prior attempt timed out, increase the cap before the next attempt. Choose a value comfortably above the observed elapsed time and remaining work; do not merely add a few minutes.
-- Prefer a larger bounded cap over splitting work solely to evade the timer. Split into dependent cards only when the stages have real independent acceptance criteria or handoffs.
+- Prefer a larger bounded cap over splitting work solely to evade the timer. Split into dependent cards when the stages have their own acceptance criteria or handoffs, including the parts that Task Construction requires to be split off a card that needs a design decision.
 - Preserve committed progress and timeout evidence. If the installed Hermes version cannot update an existing card's cap through a supported interface, do not edit the Kanban database directly; create an explicitly linked continuation card with the higher cap and durable handoff, then retire or block the superseded card without losing its audit trail.
 
 ## Autonomy
@@ -488,7 +494,7 @@ Send only milestone completions, genuine blockers, and approval requests. Do not
 - Do not manually force `hermes kanban dispatch` while the gateway-embedded dispatcher is already active merely to accelerate a handoff. Let the next gateway tick claim it; overlapping immediate ticks can produce a short-lived duplicate/protocol-violation retry even though the board lock preserves correctness.
 - Pause the owned supervisor before taking interactive integration/release ownership, then re-read exact Git/card/events: pausing future fires does not cancel an already-in-flight wake. Reuse its valid approved integration, evidence and existing dependent cards; supersede ownership durably and do not create duplicates, repeat completed gates or reset artifacts. If a newer hold causes a worker to stop, classify it as intentional controller steering, not semantic or infrastructure failure; resume through one exact release and verify a new run receipt.
 - Treat a native `crashed` / PID-not-alive receipt as claim history, not proof that the old worker exited. Before a retry shares its worktree or SQL/fault resource, verify the original PID, exact profile/task command, cwd and descendants directly. Capture recorded and fresh process fingerprints before termination when safely available; otherwise a later strict-comparison or clock-drift explanation remains a hypothesis, not a proved cause. Fence and terminate only a proven stale owned process tree, verify non-execution/exit, and leave the genuine current owner, committed artifacts and evidence untouched; otherwise a falsely reclaimed worker can resume alongside its replacement. If the actual card is already blocked/gave_up, respect that state instead of a notification promising retry, pause the owned supervisor, and preserve unfinished independent RED probes as well as passing broad-suite evidence; no final semantic verdict means no approval or integration.
-- Do not enable automatic decomposition until observed use shows manual decomposition is the bottleneck.
+- Do not enable automatic decomposition until observed use shows manual decomposition is the bottleneck. This does not limit the manual split that Task Construction requires for a card that needs a design decision.
 
 ## Completion Gate
 

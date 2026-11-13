@@ -23,13 +23,20 @@ JEV_POLICY_EDITS lists the exact (new, old) text that the two cards changed in
 each existing file, so tests that pin older bytes of these files can reverse the
 change byte for byte with reverse_jev_policy_edits(). The anki GLM worker SOULs
 are new files (t_71b4ef4a): ANKI_GLM_SOUL_EDITS derives each one from the anki
-worker SOUL. This module imports no other test module, so any test module can
-import it.
+worker SOUL.
+
+Card t_ac454595 (policy text of the GLM routing request of 2026-11-13) changed
+the same files later; reverse_jev_policy_edits() reverses that change first
+(tests/test_jev_routing_policy_text.py). This module imports only
+test_jev_routing_policy_text, which imports no other test module, so any test
+module can import it.
 """
 import hashlib
 import re
 from pathlib import Path
 import unittest
+
+from test_jev_routing_policy_text import reverse_jev_routing_policy_edits
 
 ROOT = Path(__file__).resolve().parents[1]
 RELATIVE = "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md"
@@ -392,15 +399,18 @@ BASELINE_SHA256 = {
     skill("jss"): "bd9fdea67d1ce063d4e99dd2ce29591c58f664c2da6d9a4282a141f344be6c21",
     skill("anki"): "c9c682d4c3333f23237de50f3a44d0f3eacd3c42b24039663a8ba1e1104baefd",
 }
-VERSIONS = {skill("harness"): "0.6.7-harness.7", skill("chapt"): "0.6.7-chapt.8",
-            skill("jobcron"): "0.6.9-jobcron.9", skill("jss"): "0.6.7-jss.9", skill("anki"): "0.6.10-anki.5"}
+# Raised again by card t_ac454595.
+VERSIONS = {skill("harness"): "0.6.7-harness.8", skill("chapt"): "0.6.7-chapt.9",
+            skill("jobcron"): "0.6.9-jobcron.10", skill("jss"): "0.6.7-jss.10", skill("anki"): "0.6.10-anki.6"}
 # The GLM worker SOULs in this repository (the jobcron GLM workers have none).
 GLM_WORKER_SOUL_BOARDS = ("harness", "chapt", "jss", "anki")
 ANKI_GLM_SOULS = (soul("anki-worker-glm-1"), soul("anki-worker-glm-2"))
 
 
 def reverse_jev_policy_edits(relative_path, text):
-    """Return text with this card's edits reversed; text may be str or bytes."""
+    """Return text with the later t_ac454595 edits and then this card's edits reversed; text may be
+    str or bytes."""
+    text = reverse_jev_routing_policy_edits(relative_path, text)
     as_bytes = isinstance(text, bytes)
     if as_bytes:
         text = text.decode()
@@ -436,7 +446,8 @@ class JevPolicySources(unittest.TestCase):
     def test_anki_glm_worker_souls_follow_the_anki_worker_soul(self):
         for number, path in enumerate(ANKI_GLM_SOULS, start=1):
             with self.subTest(path=path):
-                self.assertEqual(self.text[path], anki_glm_soul(number))
+                # The attachment procedure of card t_ac454595 is reversed first.
+                self.assertEqual(reverse_jev_routing_policy_edits(path, self.text[path]), anki_glm_soul(number))
                 worker = (ROOT / soul("anki-worker")).read_text()
                 # The terminology rule of the anki SOULs is kept unchanged.
                 terminology = worker[worker.index("Terminology and wording\n"):]
