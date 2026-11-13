@@ -372,8 +372,14 @@ class Procedures(unittest.TestCase):
                 "hermes -p <profile> auth add zai", "Nobody else runs this command or handles the key.",
                 "on the five orchestrator profiles only after all five new profiles have their login",
                 "a GLM worker without a Z.ai login fails its run",
-                "`FAIL: missing profile: <profile>`", "`FAIL: GLM worker missing from dispatch_profiles: <profile>`",
-                "`FAIL: plugin drift <profile>: required jev not enabled (actual ...)`"):
+                # The live labels of scripts/verify-state (fixture mode prints `dispatch_profiles` instead).
+                "`FAIL: missing profile: <profile>`", "`FAIL: provider drift <profile>: expected zai`",
+                "`FAIL: unable to read plugin list <profile>`",
+                "`FAIL: GLM worker missing from kanban.dispatch_profiles: <profile>`",
+                "`FAIL: concurrency/dispatch drift kanban.dispatch_profiles: expected [...], actual [...]`",
+                "`FAIL: deployed skill copy missing: <skill> <profile>/<file>`",
+                "`FAIL: plugin drift <profile>: required jev not enabled (actual ...)`",
+                "`FAIL: profile SOUL drift <profile>`"):
             with self.subTest(marker=marker[:50]):
                 self.assertIn(marker, self.section)
         # The owner's login comes after the dispatch entry, and the orchestrator install after the login.

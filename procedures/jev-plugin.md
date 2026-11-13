@@ -141,16 +141,20 @@ For each `<profile>` with its `<source>` from the table:
         hermes -p <profile> auth add zai
 
    Nobody else runs this command or handles the key. Install the `jev` plugin with the three-worker `config.json` on the five orchestrator profiles only after all five new profiles have their login: from that install on, the orchestrators route cards to the new profiles, and a GLM worker without a Z.ai login fails its run when the dispatcher starts it.
-7. Run `python3 /Users/chanbla11mit/hermes-local-harness/scripts/verify-state`. Afterwards none of these lines may be printed for the profile:
+7. Run `python3 /Users/chanbla11mit/hermes-local-harness/scripts/verify-state`. Afterwards none of these lines may be printed for the profile. The live run of card `t_f4ce916d` on 2026-11-14 printed the first nine kinds for each of the five missing profiles:
    - `FAIL: missing profile: <profile>`
-   - `FAIL: GLM worker missing from dispatch_profiles: <profile>`
-   - `FAIL: dispatch drift: expected [...], actual [...]` (one line for the whole list; it is absent when the list holds every expected profile)
+   - `FAIL: provider drift <profile>: expected zai`
+   - `FAIL: approval mode drift <profile>: expected off, actual '<unreadable>'`
+   - `FAIL: unable to read plugin list <profile>`
+   - `FAIL: fallback drift <profile> fallback_providers: expected [], actual <unreadable>`
+   - `FAIL: fallback drift <profile> auxiliary: expected a readable auxiliary mapping, actual <unreadable>`
+   - `FAIL: GLM worker missing from kanban.dispatch_profiles: <profile>`
+   - `FAIL: concurrency/dispatch drift kanban.dispatch_profiles: expected [...], actual [...]` (one line for the whole list; it is absent when the list holds every expected profile)
+   - `FAIL: deployed skill copy missing: <skill> <profile>/<file>`, for each file of each shared skill whose `deploy_profiles` in `/Users/chanbla11mit/hermes-local-harness/snapshots/sanitized-current-state.yaml` names the profile (the copy of step 1 brings these skills)
    - `FAIL: plugin drift <profile>: required jev not enabled (actual ...)`
-   - `FAIL: deployed skill copy missing: <skill> <profile>`, for each shared skill whose `deploy_profiles` in `/Users/chanbla11mit/hermes-local-harness/snapshots/sanitized-current-state.yaml` names the profile (the copy of step 1 brings these skills)
-   - `FAIL: fallback drift <profile> ...`
    - `WARN: dormant unexpected plugin <profile>: <plugin>`
 
-   The SOULs of the five reviewers and the five orchestrators and the five orchestrator skills that card `t_f4ce916d` changed are deployed by the same deployment card; after that deployment `FAIL: profile SOUL drift <profile>` and the drift lines of the orchestrator skill (`FAIL: profile-local skill override drift: <orchestrator profile>/autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md`) must be absent for those profiles as well.
+   The SOULs of the five reviewers and the five orchestrators and the five orchestrator skills that card `t_f4ce916d` changed are deployed by the same deployment card. Until then the live run prints `FAIL: profile SOUL drift <profile>` for the nine of these SOULs that `scripts/verify-state` checks (`PROFILE_SOUL_PATHS` has no entry for `jobcron-reviewer`) and `FAIL: profile-local skill override drift: <orchestrator profile>/autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md` for the five orchestrators; after that deployment these lines must be absent as well.
 
 ## Attachment and diff procedure of the GLM workers
 
