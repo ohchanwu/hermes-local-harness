@@ -35,6 +35,7 @@ This index is the entry point for durable harness documentation tracked in Git. 
 - [Autonomous Astra terminal-retry harness plan](plans/260929-autonomous-astra-terminal-retry.md)
 - [Hermes terminal outcome notification specification](specs/260921-hermes-terminal-outcome-notification.md)
 - [Completed local Hermes harness tracking plan](archive/260920-hermes-local-harness-tracking-plan.md)
+- [Decision: reviewers on Claude Opus 5.5, orchestrators on Claude Fable 5.2](decisions/261113-reviewers-on-opus-orchestrators-on-fable.md) — the measured token use of both roles from 2026-11-11 to 2026-11-13 and the owner's reasons.
 
 ## Bugs
 
