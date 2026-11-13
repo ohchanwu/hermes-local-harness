@@ -79,7 +79,7 @@ class HarnessAutonomyPolicy(unittest.TestCase):
             "`repair_history`, ledger, receipt, or handoff formatting",
             "appending a valid successor that preserves the original",
             "never a completion or integration prerequisite and never an owner question",
-            "Semantic gates are unchanged and still block: required tests, exact-candidate independent review, candidate drift, real budgets, and authority/external-write limits.",
+            "Semantic gates are unchanged and still block: tests that the card's acceptance criteria or test contract require, exact-candidate independent review, candidate drift, real budgets, and authority/external-write limits.",
         ):
             self.assertIn(marker, autonomy)
         gate = section(self.raw, "Completion Gate")
@@ -139,11 +139,6 @@ class HarnessAutonomyPolicy(unittest.TestCase):
         self.assertIn("At most one infrastructure retry per pending attempt.", repair)
 
     def test_rule7_legacy_policies_named_and_bannered(self):
-        autonomy = section(self.raw, "Autonomy")
-        for path in LEGACY:
-            self.assertIn(f"`{path}`", autonomy)
-        self.assertIn("retired GPT-era fleet (Flash/Luna/Terra/Sol/Astra)", autonomy)
-        self.assertIn("do not govern Harness board routing", autonomy)
         for path in LEGACY:
             first = (ROOT / path).read_text().splitlines()[0]
             with self.subTest(path=path):

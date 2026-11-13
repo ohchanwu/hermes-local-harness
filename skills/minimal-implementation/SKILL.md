@@ -1,7 +1,7 @@
 ---
 name: minimal-implementation
 description: "Use when implementing a Kanban card: produce minimal code that meets exact requirements, without ever weakening verification."
-version: 1.0.0
+version: 1.0.1
 author: chanbla11mit, Hermes Agent
 license: MIT
 platforms: [macos, linux, windows]
@@ -27,9 +27,9 @@ Produce the smallest change that fully satisfies the card's requirements. Simpli
 2. Prefer the standard library, native platform features, and already-installed dependencies. Add a new dependency only when the need is real and nothing already present can cover it.
 3. No speculative structure: no interface with one implementation, no factory with one product, no configuration for a value that never changes, no scaffolding for a later that can scaffold itself.
 
-## Minimality never limits verification
+## Verification
 
-Minimality never limits acceptance-critical, regression, security, migration, data-loss, concurrency, compliance, or user-path verification. Exact requirements and risk-proportional verification outrank simplification, always. When a minimalism rule would skip a required test, check, migration guard, or edge case, the rule is wrong for that case: run the verification.
+Do not skip a test, check or migration guard that the card's acceptance criteria or test contract require.
 
 ## Boundaries
 

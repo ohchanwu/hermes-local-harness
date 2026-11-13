@@ -1,7 +1,7 @@
 ---
 name: multi-agent-coding-orchestrator
 description: "Use when orchestrating Harness repository work."
-version: 0.6.7-harness.8
+version: 0.6.7-harness.9
 author: chanbla11mit, Hermes Agent
 license: MIT
 platforms: [macos]
@@ -54,7 +54,7 @@ Every implementation card must contain:
 9. A per-run runtime cap with rationale.
 10. Required local commit and structured handoff.
 11. Explicit prohibitions on push, PR creation, deployment, live policy changes, credentials, production/cloud mutations, and other external writes without separate human authorization.
-12. Skill-policy metadata stating whether `minimal-implementation` is enabled and that requirements and risk outrank simplification.
+12. Skill-policy metadata stating whether `minimal-implementation` is enabled.
 
 Item 1 writes the repository line in exactly the form `Repository <exact repository path> ONLY.` `scripts/verify-state` accepts no other repository wording; a repository line that uses `EXACT` instead of `ONLY` fails the card contract check.
 
@@ -105,7 +105,7 @@ A shared checkout, foreign path, missing baseline, prose-only test plan, or mism
 
 Attach `minimal-implementation` only for native-alternative questions, dependency choice, open-ended UI/component work, suspected overengineering, refactoring, simplification, shared-function repair, or diagnostic design where simplification does not weaken required evidence.
 
-Leave it off for acceptance-heavy security, trust-boundary, migration, data-loss, concurrency, infrastructure, production, or compliance-sensitive work. Verification and safety always outrank minimalism. Record the decision and reason on the card.
+Leave it off for acceptance-heavy security, trust-boundary, migration, data-loss, concurrency, infrastructure, production, or compliance-sensitive work. Record the decision and reason on the card.
 
 Before forcing a skill, run:
 
@@ -160,7 +160,7 @@ User stop, product decisions, credentials or MFA, prohibited writes, unsafe stat
 
 ## Autonomy
 
-Bookkeeping never gates. Fix malformed `repair_history`, ledger, receipt, or handoff formatting by appending a valid successor that preserves the original. Such a correction is never a completion or integration prerequisite and never an owner question. Semantic gates are unchanged and still block: required tests, exact-candidate independent review, candidate drift, real budgets, and authority/external-write limits.
+Bookkeeping never gates. Fix malformed `repair_history`, ledger, receipt, or handoff formatting by appending a valid successor that preserves the original. Such a correction is never a completion or integration prerequisite and never an owner question. Semantic gates are unchanged and still block: tests that the card's acceptance criteria or test contract require, exact-candidate independent review, candidate drift, real budgets, and authority/external-write limits.
 
 Never ask the owner about:
 
@@ -192,8 +192,6 @@ Proportional handoff checks:
 - Batch independent checks in one response; serialize only when a call depends on an earlier result.
 
 No numeric caps on harmless actions: local reads, local tests, and anonymous public reads already in scope. Keep caps only where a real cost, rate, mutation, or ambiguity risk exists (for example, live model calls and the repair budgets above).
-
-Legacy policies: `policies/concurrency.md`, `policies/escalation-ladder.md`, and `procedures/hermes-terminal-outcome-notifications.md` describe the retired GPT-era fleet (Flash/Luna/Terra/Sol/Astra). They do not govern Harness board routing.
 
 ## Incident recovery
 

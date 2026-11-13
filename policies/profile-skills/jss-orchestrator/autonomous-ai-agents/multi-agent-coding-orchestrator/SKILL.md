@@ -1,7 +1,7 @@
 ---
 name: multi-agent-coding-orchestrator
 description: "Use when orchestrating jss-genr repository and writing-round work."
-version: 0.6.7-jss.10
+version: 0.6.7-jss.11
 author: chanbla11mit, Hermes Agent
 license: MIT
 platforms: [macos]
@@ -94,7 +94,7 @@ Every card must contain:
 11. A per-run runtime cap with rationale.
 12. The required handoff: the local commit for repository cards; for writing rounds, the new file names with SHA-256 and the drafts listing taken before writing.
 13. The privacy gate and explicit prohibitions on push, PR, deployment, application submission, job-site login, installs, live policy changes, credentials, and other external writes without separate owner authorization.
-14. Skill-policy metadata stating whether `minimal-implementation` is enabled and that requirements and risk outrank simplification.
+14. Skill-policy metadata stating whether `minimal-implementation` is enabled.
 
 Item 1 writes the repository line in exactly the form `Repository <exact repository path> ONLY.` `scripts/verify-state` accepts no other repository wording; a repository line that uses `EXACT` instead of `ONLY` fails the card contract check.
 
@@ -140,7 +140,7 @@ A shared checkout, foreign path, missing baseline or kind, existing write target
 
 ## Skills
 
-Attach `minimal-implementation` only to repository cards for dependency choice, suspected overengineering, refactoring, simplification, or shared-function repair where simplification does not weaken required evidence. Never attach it to writing rounds: fidelity to the owner's draft and the hard rules outrank brevity. Verification, privacy, and safety always outrank minimalism. Record the decision and reason on the card.
+Attach `minimal-implementation` only to repository cards for dependency choice, suspected overengineering, refactoring, simplification, or shared-function repair where simplification does not weaken required evidence. Never attach it to writing rounds: fidelity to the owner's draft and the hard rules outrank brevity. Record the decision and reason on the card.
 
 Before forcing a skill, run:
 
@@ -195,7 +195,7 @@ User stop, product decisions, credentials or MFA, prohibited writes, unsafe stat
 
 ## Autonomy
 
-Bookkeeping never gates. Fix malformed `repair_history`, ledger, receipt, or handoff formatting by appending a valid successor that preserves the original. Such a correction is never a completion or integration prerequisite and never an owner question. Semantic gates are unchanged and still block: required tests, exact-candidate independent review, candidate drift, the privacy gate, the no-overwrite rule, real budgets, and authority/external-write limits.
+Bookkeeping never gates. Fix malformed `repair_history`, ledger, receipt, or handoff formatting by appending a valid successor that preserves the original. Such a correction is never a completion or integration prerequisite and never an owner question. Semantic gates are unchanged and still block: tests that the card's acceptance criteria or test contract require, exact-candidate independent review, candidate drift, the privacy gate, the no-overwrite rule, real budgets, and authority/external-write limits.
 
 Never ask the owner about:
 

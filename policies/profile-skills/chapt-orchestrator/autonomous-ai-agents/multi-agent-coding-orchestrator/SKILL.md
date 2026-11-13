@@ -101,12 +101,12 @@ Ponytail never runs as a plugin on Hermes profiles. Implementation profiles keep
 `minimal-implementation` is the task-triggered minimalism skill. The orchestrator attaches it per card (via `skills: ["minimal-implementation"]` on the card) using this policy:
 
 - Attach for: native/platform-alternative questions, dependency or library choice, open-ended UI/component work, suspected overengineering, refactoring or simplification, and shared-function or root-cause repair.
-- Attach for diagnostic design, including infrastructure diagnostics; separate any production/mutation implementation slice. Verification and safety requirements still take precedence.
+- Attach for diagnostic design, including infrastructure diagnostics; separate any production/mutation implementation slice.
 - Leave off for ordinary implementation of acceptance-heavy, security or trust-boundary, migration or data-loss, concurrency or distributed-systems, infrastructure or production, and compliance-sensitive tasks.
-- Override: even for an attach-category task, the orchestrator may leave the skill off whenever verification or safety requirements outrank simplification. That is the direction of the override — verification and safety outrank minimalism, never the reverse.
+- Override: the orchestrator may leave the skill off for any attach-category task.
 - `simplification-review` is a separate, optional post-implementation review skill; it recommends reductions only and never edits or weakens tests. It is never a substitute for required verification.
 
-Record the decision in card metadata: `skill_policy_version`, `minimal_implementation: enabled|disabled`, the reason, and that verification precedence applies (`verification_precedence: requirements-and-risk-outrank-simplification`). Reviewer and advisor lanes never load the implementation skill.
+Record the decision in card metadata: `skill_policy_version`, `minimal_implementation: enabled|disabled`, the reason. Reviewer and advisor lanes never load the implementation skill.
 
 ## Skill Changes
 
@@ -285,7 +285,7 @@ Estimate the whole worker attempt, not just editing time: repository discovery, 
 
 ## Autonomy
 
-Bookkeeping never gates. Fix malformed `repair_history`, ledger, receipt, or handoff formatting by appending a valid successor that preserves the original. Such a correction is never a completion or integration prerequisite and never an owner question. Semantic gates are unchanged and still block: required tests, exact-candidate independent review, candidate drift, real budgets, and authority/external-write limits.
+Bookkeeping never gates. Fix malformed `repair_history`, ledger, receipt, or handoff formatting by appending a valid successor that preserves the original. Such a correction is never a completion or integration prerequisite and never an owner question. Semantic gates are unchanged and still block: tests that the card's acceptance criteria or test contract require, exact-candidate independent review, candidate drift, real budgets, and authority/external-write limits.
 
 Never ask the owner about:
 

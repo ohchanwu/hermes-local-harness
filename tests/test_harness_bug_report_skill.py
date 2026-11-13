@@ -78,7 +78,7 @@ HEADER_LINES = [
     "Assigned worker EXACT harness-worker.",
     "Reviewer EXACT harness-reviewer.",
     "Runtime cap 3600s per run.",
-    "Skill policy: minimal-implementation disabled; requirements and risk outrank simplification.",
+    "Skill policy: minimal-implementation disabled.",
 ]
 HEADINGS = ["## Evidence", "## Suspected location", "## Proposed change", "## Tests", "## Deployment",
             "## Prohibited without separate human authorization"]

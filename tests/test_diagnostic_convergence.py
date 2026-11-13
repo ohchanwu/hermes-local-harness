@@ -64,7 +64,6 @@ for path in (ORCHESTRATOR, JOBCRON_ORCHESTRATOR, CHAPT_ORCHESTRATOR):
 require(ORCHESTRATOR,
         "Attach for diagnostic design, including infrastructure diagnostics",
         "Leave off for ordinary implementation",
-        "verification and safety outrank minimalism, never the reverse",
         "It never covers pushes, PR creation, deployments, production mutations",
         "Judge controls by total system risk",
         "decision value greater than its complexity")

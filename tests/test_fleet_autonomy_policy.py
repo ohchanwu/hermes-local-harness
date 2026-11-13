@@ -129,7 +129,7 @@ class FleetAutonomyPolicy(unittest.TestCase):
                     "`repair_history`, ledger, receipt, or handoff formatting",
                     "appending a valid successor that preserves the original",
                     "never a completion or integration prerequisite and never an owner question",
-                    "Semantic gates are unchanged and still block: required tests, exact-candidate independent review, candidate drift, real budgets, and authority/external-write limits.",
+                    "Semantic gates are unchanged and still block: tests that the card's acceptance criteria or test contract require, exact-candidate independent review, candidate drift, real budgets, and authority/external-write limits.",
                 ):
                     self.assertIn(marker, autonomy)
                 gate = section(self.raw[board], "Completion Gate")

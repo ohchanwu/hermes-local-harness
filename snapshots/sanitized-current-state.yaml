@@ -229,7 +229,6 @@
     "policy_version": "scoped-ponytail-separation-v1",
     "implementation_skill": "minimal-implementation",
     "review_skill": "simplification-review",
-    "verification_precedence": "requirements-and-risk-outrank-simplification",
     "shared_skills": [
       {
         "name": "multi-agent-coding-orchestrator",
@@ -285,7 +284,7 @@
           "anki-worker-glm-1",
           "anki-worker-glm-2"
         ],
-        "version": "1.0.0",
+        "version": "1.0.1",
         "files": [
           "SKILL.md"
         ]
@@ -419,7 +418,7 @@
           "anki-orchestrator",
           "advisor"
         ],
-        "version": "1.2.0",
+        "version": "1.2.1",
         "files": [
           "SKILL.md"
         ]
