@@ -148,6 +148,17 @@ if code == 0 and db and argv[:1] == ["kanban"]:
                          (task_id, "unblocked", None, now))
     elif verb == "set-model":
         conn.execute("UPDATE tasks SET model_override=NULL, provider_override=NULL WHERE id=?", (task_id,))
+    elif verb == "reassign":
+        # Like Hermes: a running card is refused unless --reclaim releases it first.
+        status = (conn.execute("SELECT status FROM tasks WHERE id=?", (task_id,)).fetchone() or [None])[0]
+        if status is None or (status == "running" and "--reclaim" not in rest):
+            code = 1
+        else:
+            if status == "running":
+                conn.execute("UPDATE tasks SET status='ready' WHERE id=?", (task_id,))
+            conn.execute("UPDATE tasks SET assignee=? WHERE id=?", (rest[2], task_id))
+            conn.execute("INSERT INTO task_events (task_id, kind, payload, created_at) VALUES (?,?,?,?)",
+                         (task_id, "assigned", json.dumps({"assignee": rest[2]}), now))
     conn.commit()
     conn.close()
 sys.exit(code)
@@ -158,7 +169,8 @@ def write_fake_hermes(directory: Path) -> str:
     """Write the fake ``hermes`` command; return the command string for ``--hermes``.
 
     It appends its arguments to ``$FAKE_HERMES_LOG`` and, when ``$FAKE_KANBAN_DB``
-    is set, applies ``schedule``, ``unblock`` and ``set-model`` to that database.
+    is set, applies ``schedule``, ``unblock``, ``set-model`` and ``reassign``
+    (``--reclaim`` needed for a running card) to that database.
     ``$FAKE_HERMES_EXIT`` sets a non-zero exit code (the change is then not applied).
     """
     script = directory / "fake_hermes.py"
@@ -377,9 +389,15 @@ class PluginFrameTests(unittest.TestCase):
         for section in ("routing", "peak_hold", "tool_results", "auxiliary_log"):
             self.assertIs(config[section]["enabled"], True, section)
         self.assertEqual(config["tool_results"]["tools"], ["terminal", "execute_code", "search_files", "browser_exec"])
-        for key, value in (("min_chars", 8000), ("max_chars", 100000), ("chunk_lines", 40), ("chunk_chars", 2000),
-                           ("args_chars", 2000), ("keep_threshold", 0.3), ("max_kept_ratio", 0.8)):
+        # Card t_df87b851 (Part 7 of the GLM routing request): the earlier values were min_chars 8000,
+        # chunk_lines 40, chunk_chars 2000, keep_threshold 0.3 and max_kept_ratio 0.8.
+        for key, value in (("min_chars", 2000), ("max_chars", 100000), ("chunk_lines", 10), ("chunk_chars", 500),
+                           ("args_chars", 2000), ("keep_threshold", 0.6), ("max_kept_ratio", 0.9)):
             self.assertEqual(config["tool_results"][key], value, key)
+        # Card t_df87b851 (Parts 3 and 4): both new routing settings are 5; 0 turns each off.
+        self.assertEqual((config["routing"]["control_group_every"], config["routing"]["max_glm_change_requests"]),
+                         (5, 5))
+        self.assertEqual(config["jev"]["timeout_seconds"], 5)
 
     def test_auxiliary_record(self):
         self.plugin._post_auxiliary_call(
@@ -430,7 +448,7 @@ class PluginFrameTests(unittest.TestCase):
                                         "settings", "tool_name"])
         self.assertEqual(seen["cache_dir"], Path(self.tmp.name) / "home" / "cache" / "jev")
         self.assertIs(seen["log"], self.plugin.jev_log.write)
-        self.assertEqual(seen["settings"]["min_chars"], 8000)
+        self.assertEqual(seen["settings"]["min_chars"], 2000)
 
     def test_tool_results_turns_off(self):
         module = mock.Mock(transform=mock.Mock(return_value="filtered"))
@@ -452,12 +470,13 @@ class PluginFrameTests(unittest.TestCase):
         self.assertEqual(calls, [None])
         self.assertEqual(read_records(self.log_dir, "decisions"), [])
 
-    def test_middleware_routes_the_three_kanban_tools(self):
+    def test_middleware_routes_the_four_kanban_tools(self):
         def next_call(payload=None):
             return "result"
 
         for tool, handler in (("kanban_create", "handle_create"), ("kanban_unblock", "handle_unblock"),
-                              ("kanban_request_review", "handle_request_review")):
+                              ("kanban_request_review", "handle_request_review"),
+                              ("kanban_request_changes", "handle_request_changes")):
             with self.subTest(tool=tool), mock.patch.object(self.plugin.routing, handler,
                                                             return_value="handled") as called:
                 out = self.plugin._tool_execution(tool_name=tool, args={"task_id": "t_0a1b2c3d"},

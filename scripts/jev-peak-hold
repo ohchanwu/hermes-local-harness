@@ -7,7 +7,10 @@ Commands:
           card assigned to a GLM worker profile listed in plugins/jev/config.json.
           Outside the window, or when the hold is turned off, release every card
           held with the marker jev-peak-hold. Without --apply nothing changes and
-          the planned holds and releases are printed. Idempotent.
+          the planned holds and releases are printed. Idempotent. Just before
+          each hold the card is read again; a card that is no longer ready or
+          todo for a GLM worker (for example one reassigned to a Claude worker)
+          is skipped ("skipped hold <board> <id>").
   off     Turn the hold off (switch file enabled: false), then release every
           card held with the marker at once.
   on      Turn the hold on (switch file enabled: true). Cards are held again
@@ -84,7 +87,9 @@ def _print_results(results: list) -> int:
     failures = 0
     for item in results:
         verb = "held" if item["action"] == "hold" else "released"
-        if item["applied"]:
+        if item.get("skipped"):
+            print(f"skipped hold {item['board']} {item['task_id']}: no longer a ready or todo card of a GLM worker")
+        elif item["applied"]:
             print(f"{verb} {item['board']} {item['task_id']}")
         else:
             failures += 1
@@ -163,7 +168,8 @@ def _status(config: dict, args: argparse.Namespace) -> int:
 
 def _run(config: dict, args: argparse.Namespace) -> int:
     now = _parse_now(args.now)
-    actions, switch_error, errors = peak_hold.plan(config, now, _boards(config, args))
+    boards = _boards(config, args)
+    actions, switch_error, errors = peak_hold.plan(config, now, boards)
     if switch_error:
         print(f"switch file error: {switch_error} (treated as on)")
         if args.apply:
@@ -177,7 +183,7 @@ def _run(config: dict, args: argparse.Namespace) -> int:
     if not actions:
         print("nothing to hold or release")
         return read_status
-    return max(_print_results(peak_hold.apply(config, actions, args.hermes)), read_status)
+    return max(_print_results(peak_hold.apply(config, actions, args.hermes, boards)), read_status)
 
 
 def main(argv: list[str] | None = None) -> int:
