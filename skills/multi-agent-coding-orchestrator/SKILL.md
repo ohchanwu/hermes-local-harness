@@ -27,9 +27,9 @@ Do not use this procedure for a simple question that needs no repository change 
 
 Project-isolated fleets:
 
-- Jobcron board `jobcron`: `jobcron-orchestrator` (`claude-opus-5-5`); implementation workers `jobcron-worker` (`claude-opus-5-5`) and `jobcron-worker-2` (`claude-opus-5-5`); independent `jobcron-reviewer` (`claude-fable-5-2`). Repository root: `/Users/chanbla11mit/projects/jobcron`; preview port: `17777`.
-- Cha PT board `cha-pt`: `chapt-orchestrator` (`claude-opus-5-5`); implementation workers `chapt-worker` (`claude-opus-5-5`) and `chapt-worker-2` (`claude-opus-5-5`); independent `chapt-reviewer` (`claude-fable-5-2`). Repository allowlist (exactly three): `/Users/chanbla11mit/projects/cha-pt`, `/Users/chanbla11mit/projects/cha-pt-frontend`, and `/Users/chanbla11mit/projects/cha-webpt-website-sync`; primary board root `/Users/chanbla11mit/projects/cha-pt`; frontend Hermes project `cha-pt-frontend`; scraper Hermes project `cha-webpt-website-sync`; backend preview port: `18080`.
-- Harness board `harness`: `harness-orchestrator` (`claude-opus-5-5`); implementation workers `harness-worker` (`claude-opus-5-5`) and `harness-worker-2` (`claude-opus-5-5`); independent `harness-reviewer` (`claude-fable-5-2`). Sole repository/default workdir: `/Users/chanbla11mit/hermes-local-harness`.
+- Jobcron board `jobcron`: `jobcron-orchestrator` (`claude-fable-5-2`); implementation workers `jobcron-worker` (`claude-opus-5-5`) and `jobcron-worker-2` (`claude-opus-5-5`); independent `jobcron-reviewer` (`claude-opus-5-5`). Repository root: `/Users/chanbla11mit/projects/jobcron`; preview port: `17777`.
+- Cha PT board `cha-pt`: `chapt-orchestrator` (`claude-fable-5-2`); implementation workers `chapt-worker` (`claude-opus-5-5`) and `chapt-worker-2` (`claude-opus-5-5`); independent `chapt-reviewer` (`claude-opus-5-5`). Repository allowlist (exactly three): `/Users/chanbla11mit/projects/cha-pt`, `/Users/chanbla11mit/projects/cha-pt-frontend`, and `/Users/chanbla11mit/projects/cha-webpt-website-sync`; primary board root `/Users/chanbla11mit/projects/cha-pt`; frontend Hermes project `cha-pt-frontend`; scraper Hermes project `cha-webpt-website-sync`; backend preview port: `18080`.
+- Harness board `harness`: `harness-orchestrator` (`claude-fable-5-2`); implementation workers `harness-worker` (`claude-opus-5-5`) and `harness-worker-2` (`claude-opus-5-5`); independent `harness-reviewer` (`claude-opus-5-5`). Sole repository/default workdir: `/Users/chanbla11mit/hermes-local-harness`.
 
 Each project profile has an independent Hermes home, memory, sessions, and fixed terminal root. Named boards provide separate databases, logs, attachments, and workspaces. A project orchestrator may assign only its matching workers and reviewer. Every card is pinned to one exact repository, repository-owned isolated worktree, protected baseline, and explicit test contract. A task or callback with a mismatched board, profile, repository, workspace, baseline, or test contract is invalid and must be blocked before file access or mutation.
 
@@ -440,7 +440,7 @@ Before declaring the harness or an autonomous workstream complete, verify:
 - Every active profile returns its configured model identity on a fresh inference probe.
 - The dispatch allowlist contains each project's workers and reviewer plus the intended legacy lanes, excludes project orchestrators, and has no project card assigned outside its project tuple.
 - Boards `jobcron`, `cha-pt`, and `harness` resolve only their declared repository/workspace allowlists.
-- Fresh project profile sessions have separate state homes and return `claude-opus-5-5` for orchestrator/worker and `claude-fable-5-2` for reviewer.
+- Fresh project profile sessions have separate state homes and return `claude-fable-5-2` for orchestrator, `claude-opus-5-5` for worker and `claude-opus-5-5` for reviewer.
 - No running implementation profile was removed during a lane swap.
 - Reviews can start while five implementation profiles are running.
 - Every code change reaches independent review before integration.

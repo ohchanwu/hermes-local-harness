@@ -8,7 +8,13 @@ model policy declare the same Fable model, claude-fable-5-2.
 
 FABLE_5_2_EDITS lists the exact (new, old) text this card changed in each
 orchestrator skill copy, so tests that pin older bytes of these files can
-reverse the change byte for byte with reverse_fable_5_2_edits(). This module
+reverse the change byte for byte with reverse_fable_5_2_edits().
+
+ROLE_MODEL_EDITS lists the exact (new, old) text that card t_0faca45d
+(2026-11-13: orchestrators to claude-fable-5-2, reviewers to claude-opus-5-5)
+changed later in the same lines. reverse_role_model_edits() reverses it, and
+reverse_fable_5_2_edits() reverses it first, so every caller that recovers the
+bytes from before this card also recovers them from before t_0faca45d. This module
 imports only test_jev_policy_sources, which imports no other test module, so
 any test module can import it.
 """
@@ -38,6 +44,19 @@ def _edit(text_of):
 
 
 _VERIFICATION = _edit(lambda model: f"and `{model}` for reviewer.")
+OPUS = "claude-opus-5-5"
+
+
+def _role_model_edits(prefixes):
+    """(new, old) text of the t_0faca45d edits in a copy whose Fixed Roster names these board prefixes."""
+    edits = []
+    for prefix in prefixes:
+        edits.append((f"`{prefix}-orchestrator` (`{NEW_MODEL}`);", f"`{prefix}-orchestrator` (`{OPUS}`);"))
+        edits.append((_reviewer(prefix, OPUS), _reviewer(prefix, NEW_MODEL)))
+    edits.append((f"return `{NEW_MODEL}` for orchestrator, `{OPUS}` for worker and `{OPUS}` for reviewer.",
+                  f"return `{OPUS}` for orchestrator/worker and `{NEW_MODEL}` for reviewer."))
+    return tuple(edits)
+
 # File -> ((new text, old text), ...). Each new text occurs exactly once.
 FABLE_5_2_EDITS = {
     SHARED: (_edit(lambda m: _reviewer("jobcron", m)), _edit(lambda m: _reviewer("chapt", m)),
@@ -45,27 +64,44 @@ FABLE_5_2_EDITS = {
     JOBCRON: (_edit(lambda m: _reviewer("jobcron", m)), _edit(lambda m: _reviewer("chapt", m)), _VERIFICATION),
     CHAPT: (_edit(lambda m: _reviewer("jobcron", m)), _edit(lambda m: _reviewer("chapt", m)), _VERIFICATION),
 }
+# File -> ((new text, old text), ...) of card t_0faca45d. Each new text occurs exactly once.
+ROLE_MODEL_EDITS = {
+    SHARED: _role_model_edits(("jobcron", "chapt", "harness")),
+    JOBCRON: _role_model_edits(("jobcron", "chapt")),
+    CHAPT: _role_model_edits(("jobcron", "chapt")),
+}
 # Bytes of each file at baseline bed49a9347ca14339f9eeadc27b08c1f962169be.
 BASELINE_SHA256 = {
     SHARED: "7ed84549c2ad2cfdee04cee3825ae8a2b61b73d111f8a1a7e60d116daed8b23f",
     JOBCRON: "e999adc7145a8b71db7bda8b7191f170d8ab5c2d67c9962f0f330ed9a74bf09c",
     CHAPT: "eb8380a518d73756527026aaffcb9cac5a23b98924d4405b649df49245adc852",
 }
-FABLE_PROFILES = ("advisor", "anki-reviewer", "chapt-reviewer", "harness-reviewer", "jobcron-reviewer",
-                  "jss-reviewer")
-FABLE_ROLES = ("advisor", "independent reviewer", "project independent reviewer")
+# Since card t_0faca45d (2026-11-13) the advisor and the orchestrators (default included) run Fable;
+# the reviewers moved to Opus.
+FABLE_PROFILES = ("advisor", "default", "anki-orchestrator", "chapt-orchestrator", "harness-orchestrator",
+                  "jobcron-orchestrator", "jss-orchestrator")
+FABLE_ROLES = ("advisor", "orchestrator", "project orchestrator")
 
 
-def reverse_fable_5_2_edits(relative_path, text):
-    """Return text with this card's edits reversed; text may be str or bytes."""
+def _reverse(edits, relative_path, text):
     as_bytes = isinstance(text, bytes)
     if as_bytes:
         text = text.decode()
-    for new, old in FABLE_5_2_EDITS.get(relative_path, ()):
+    for new, old in edits.get(relative_path, ()):
         if text.count(new) != 1:
             raise AssertionError(f"{relative_path}: expected one occurrence of {new[:60]!r}")
         text = text.replace(new, old, 1)
     return text.encode() if as_bytes else text
+
+
+def reverse_role_model_edits(relative_path, text):
+    """Return text with the t_0faca45d edits reversed; text may be str or bytes."""
+    return _reverse(ROLE_MODEL_EDITS, relative_path, text)
+
+
+def reverse_fable_5_2_edits(relative_path, text):
+    """Return text with the t_0faca45d edits and then this card's edits reversed; text may be str or bytes."""
+    return _reverse(FABLE_5_2_EDITS, relative_path, reverse_role_model_edits(relative_path, text))
 
 
 def load_script(name, relative_path):
@@ -86,7 +122,7 @@ class FableDeclaredModel(unittest.TestCase):
 
     def test_skill_copies_name_only_the_new_model(self):
         for path, edits in FABLE_5_2_EDITS.items():
-            text = (ROOT / path).read_text()
+            text = reverse_role_model_edits(path, (ROOT / path).read_text())
             with self.subTest(path=path):
                 self.assertNotIn(OLD_MODEL, text)
                 self.assertEqual(text.count(NEW_MODEL), len(edits))

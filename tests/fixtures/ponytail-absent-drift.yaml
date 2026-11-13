@@ -1,6 +1,6 @@
 {
   "profile_models": {
-    "default": "claude-opus-5-5",
+    "default": "claude-fable-5-2",
     "advisor": "claude-fable-5-2",
     "reviewer-sol": "gpt-5.6-sol",
     "worker-flash-1": "glm-5.3-flash",
@@ -13,22 +13,22 @@
     "worker-sol": "gpt-5.6-sol",
     "worker-astra": "gpt-6-astra",
     "worker-terra-2": "gpt-5.6-terra",
-    "jobcron-orchestrator": "claude-opus-5-5",
+    "jobcron-orchestrator": "claude-fable-5-2",
     "jobcron-worker": "claude-opus-5-5",
     "jobcron-worker-2": "claude-opus-5-5",
-    "jobcron-reviewer": "claude-fable-5-2",
-    "chapt-orchestrator": "claude-opus-5-5",
+    "jobcron-reviewer": "claude-opus-5-5",
+    "chapt-orchestrator": "claude-fable-5-2",
     "chapt-worker": "claude-opus-5-5",
     "chapt-worker-2": "claude-opus-5-5",
-    "chapt-reviewer": "claude-fable-5-2",
-    "harness-orchestrator": "claude-opus-5-5",
+    "chapt-reviewer": "claude-opus-5-5",
+    "harness-orchestrator": "claude-fable-5-2",
     "harness-worker": "claude-opus-5-5",
     "harness-worker-2": "claude-opus-5-5",
-    "harness-reviewer": "claude-fable-5-2",
-    "jss-orchestrator": "claude-opus-5-5",
+    "harness-reviewer": "claude-opus-5-5",
+    "jss-orchestrator": "claude-fable-5-2",
     "jss-worker": "claude-opus-5-5",
     "jss-worker-2": "claude-opus-5-5",
-    "jss-reviewer": "claude-fable-5-2",
+    "jss-reviewer": "claude-opus-5-5",
     "jobcron-worker-glm-1": "glm-5.3",
     "jobcron-worker-glm-2": "glm-5.3",
     "chapt-worker-glm-1": "glm-5.3",
@@ -37,10 +37,10 @@
     "harness-worker-glm-2": "glm-5.3",
     "jss-worker-glm-1": "glm-5.3",
     "jss-worker-glm-2": "glm-5.3",
-    "anki-orchestrator": "claude-opus-5-5",
+    "anki-orchestrator": "claude-fable-5-2",
     "anki-worker": "claude-opus-5-5",
     "anki-worker-2": "claude-opus-5-5",
-    "anki-reviewer": "claude-fable-5-2",
+    "anki-reviewer": "claude-opus-5-5",
     "anki-worker-glm-1": "glm-5.3",
     "anki-worker-glm-2": "glm-5.3"
   },
@@ -1027,7 +1027,7 @@
       "fallback_providers": [
         {
           "provider": "anthropic",
-          "model": "claude-opus-5-5"
+          "model": "claude-fable-5-2"
         }
       ],
       "auxiliary": {
@@ -1303,7 +1303,7 @@
       "fallback_providers": [
         {
           "provider": "anthropic",
-          "model": "claude-opus-5-5"
+          "model": "claude-fable-5-2"
         }
       ],
       "auxiliary": {
@@ -1717,7 +1717,7 @@
       "fallback_providers": [
         {
           "provider": "anthropic",
-          "model": "claude-fable-5-2"
+          "model": "claude-opus-5-5"
         }
       ],
       "auxiliary": {
@@ -1855,7 +1855,7 @@
       "fallback_providers": [
         {
           "provider": "anthropic",
-          "model": "claude-opus-5-5"
+          "model": "claude-fable-5-2"
         }
       ],
       "auxiliary": {
@@ -2269,7 +2269,7 @@
       "fallback_providers": [
         {
           "provider": "anthropic",
-          "model": "claude-fable-5-2"
+          "model": "claude-opus-5-5"
         }
       ],
       "auxiliary": {
@@ -2407,7 +2407,7 @@
       "fallback_providers": [
         {
           "provider": "anthropic",
-          "model": "claude-opus-5-5"
+          "model": "claude-fable-5-2"
         }
       ],
       "auxiliary": {
@@ -2821,7 +2821,7 @@
       "fallback_providers": [
         {
           "provider": "anthropic",
-          "model": "claude-fable-5-2"
+          "model": "claude-opus-5-5"
         }
       ],
       "auxiliary": {
@@ -2959,7 +2959,7 @@
       "fallback_providers": [
         {
           "provider": "anthropic",
-          "model": "claude-opus-5-5"
+          "model": "claude-fable-5-2"
         }
       ],
       "auxiliary": {
@@ -3373,7 +3373,7 @@
       "fallback_providers": [
         {
           "provider": "anthropic",
-          "model": "claude-fable-5-2"
+          "model": "claude-opus-5-5"
         }
       ],
       "auxiliary": {
@@ -3543,7 +3543,7 @@
       "fallback_providers": [
         {
           "provider": "anthropic",
-          "model": "claude-opus-5-5"
+          "model": "claude-fable-5-2"
         }
       ],
       "auxiliary": {
@@ -3957,7 +3957,7 @@
       "fallback_providers": [
         {
           "provider": "anthropic",
-          "model": "claude-fable-5-2"
+          "model": "claude-opus-5-5"
         }
       ],
       "auxiliary": {

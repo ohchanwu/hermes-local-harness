@@ -4,7 +4,7 @@ Private desired state for the local Hermes harness. This repository is not live 
 
 ## Switching a profile's model (Claude, GPT, GLM)
 
-Every active profile currently runs on the [Claude subscription provider](plugins/model-providers/claude-subscription/README.md#rollout-status-2026-10-17-kst). Opus 5.5 serves workers, orchestrators and the default home; Fable 5.2 serves reviewers and the Advisor. Under both Claude targets, the six light helper tasks run on Haiku 5.5 and the other ten helper tasks run on Opus 5.5 ([`procedures/haiku-helper-routing.md`](procedures/haiku-helper-routing.md)). To move any profile, use `scripts/switch-profile-model`. It sets the main model and all sixteen helper jobs in one step, after backing up the profile's `config.yaml`:
+Every active profile currently runs on the [Claude subscription provider](plugins/model-providers/claude-subscription/README.md#rollout-status-2026-10-17-kst). Since 2026-11-13 (card `t_0faca45d`), Fable 5.2 serves the orchestrators, the default home and the Advisor, and Opus 5.5 serves the workers and the reviewers; the reasoning effort of each role is in [`procedures/switching-hermes-models.md`](procedures/switching-hermes-models.md#role-models-and-reasoning-effort). Under both Claude targets, the six light helper tasks run on Haiku 5.5 and the other ten helper tasks run on Opus 5.5 ([`procedures/haiku-helper-routing.md`](procedures/haiku-helper-routing.md)). To move any profile, use `scripts/switch-profile-model`. It sets the main model and all sixteen helper jobs in one step, after backing up the profile's `config.yaml`:
 
 ```sh
 scripts/switch-profile-model --profile harness-worker --to glm --dry-run            # preview only

@@ -446,9 +446,12 @@ class JevPolicySources(unittest.TestCase):
                 self.assertIn("`/Users/chanbla11mit/projects/anki-addons`", self.text[path])
 
     def test_reversing_the_edits_recovers_the_baseline_bytes(self):
+        # The later model line edits of card t_0faca45d are reversed first. The import is local so
+        # that this module still imports no other test module when it is imported.
+        from test_fable_5_2_declared_model import reverse_role_model_edits
         for path, want in BASELINE_SHA256.items():
             with self.subTest(path=path):
-                original = reverse_jev_policy_edits(path, (ROOT / path).read_bytes())
+                original = reverse_jev_policy_edits(path, reverse_role_model_edits(path, (ROOT / path).read_bytes()))
                 self.assertEqual(hashlib.sha256(original).hexdigest(), want)
 
     def test_each_reviewer_names_exactly_the_four_implementation_profiles_of_its_board(self):

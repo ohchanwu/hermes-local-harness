@@ -243,10 +243,10 @@ class FleetDesiredState(unittest.TestCase):
 
     def test_profiles_models_and_dispatch(self):
         expected = {
-            ORCH: ("claude-opus-5-5", "claude-subscription", "orchestrator", False),
+            ORCH: ("claude-fable-5-2", "claude-subscription", "orchestrator", False),
             WORKER: ("claude-opus-5-5", "claude-subscription", "implementation", True),
             WORKER2: ("claude-opus-5-5", "claude-subscription", "implementation", True),
-            REVIEWER: ("claude-fable-5-2", "claude-subscription", "review", True),
+            REVIEWER: ("claude-opus-5-5", "claude-subscription", "review", True),
         }
         for name, (model, provider, toolsets, dispatchable) in expected.items():
             with self.subTest(profile=name):

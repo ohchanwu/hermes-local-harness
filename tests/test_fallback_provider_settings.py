@@ -30,21 +30,24 @@ FIXTURES = ROOT / "tests/fixtures"
 JOBCRON_PROFILES = ("jobcron-orchestrator", "jobcron-worker", "jobcron-worker-2", "jobcron-reviewer")
 # Identifiers chosen from the live Anthropic model list of 2026-11-11 (t_731d4476).
 OPUS, FABLE, HAIKU = "claude-opus-5-5", "claude-fable-5-2", "claude-haiku-5-5"
-JOBCRON_MAIN_FALLBACK = {"jobcron-orchestrator": OPUS, "jobcron-worker": OPUS, "jobcron-worker-2": OPUS,
-                         "jobcron-reviewer": FABLE}
-JOBCRON_PRIMARY = {"jobcron-orchestrator": "claude-opus-5-5", "jobcron-worker": "claude-opus-5-5",
-                   "jobcron-worker-2": "claude-opus-5-5", "jobcron-reviewer": "claude-fable-5-2"}
+# Card t_0faca45d (2026-11-13): the orchestrators run Fable and the reviewers Opus; each main
+# fallback names the profile's main model.
+JOBCRON_MAIN_FALLBACK = {"jobcron-orchestrator": FABLE, "jobcron-worker": OPUS, "jobcron-worker-2": OPUS,
+                         "jobcron-reviewer": OPUS}
+JOBCRON_PRIMARY = {"jobcron-orchestrator": "claude-fable-5-2", "jobcron-worker": "claude-opus-5-5",
+                   "jobcron-worker-2": "claude-opus-5-5", "jobcron-reviewer": "claude-opus-5-5"}
 HAIKU_TASKS = ("title_generation", "memory_query_rewrite", "tts_audio_tags", "profile_describer", "skills_hub",
                "vision")
 OPUS_TASKS = ("compression", "goal_judge", "review", "background_review", "kanban_decomposer", "triage_specifier",
               "curator", "monitor", "approval", "mcp")
 JOBCRON_CHAIN = {**{task: [{"provider": "anthropic", "model": HAIKU}] for task in HAIKU_TASKS},
                  **{task: [{"provider": "anthropic", "model": OPUS}] for task in OPUS_TASKS}}
-# t_875f53f3: the 18 other claude-subscription profiles; advisor and the reviewers fall back to Fable,
-# the others to Opus. Their auxiliary chains equal JOBCRON_CHAIN.
+# t_875f53f3: the 18 other claude-subscription profiles; since t_0faca45d the advisor, default and the
+# orchestrators fall back to Fable, the others to Opus. Their auxiliary chains equal JOBCRON_CHAIN.
 OTHER_PROFILES = ("default", "advisor", *(f"{project}-{role}" for project in ("chapt", "harness", "jss", "anki")
                                           for role in ("orchestrator", "worker", "worker-2", "reviewer")))
-FABLE_PRIMARY = {"advisor", "chapt-reviewer", "harness-reviewer", "jss-reviewer", "anki-reviewer"}
+FABLE_PRIMARY = {"advisor", "default", "chapt-orchestrator", "harness-orchestrator", "jss-orchestrator",
+                 "anki-orchestrator"}
 OTHER_MAIN_FALLBACK = {name: FABLE if name in FABLE_PRIMARY else OPUS for name in OTHER_PROFILES}
 OTHER_PRIMARY = {name: "claude-fable-5-2" if name in FABLE_PRIMARY else "claude-opus-5-5" for name in OTHER_PROFILES}
 MAIN_FALLBACK = {**JOBCRON_MAIN_FALLBACK, **OTHER_MAIN_FALLBACK}

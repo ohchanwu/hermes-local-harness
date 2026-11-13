@@ -26,7 +26,12 @@ from test_verify_fixture_isolation import ObservedReads, fixture_result
 FIXTURES = ROOT / "tests/fixtures"
 HAIKU, OPUS, FABLE = "claude-haiku-5-5", "claude-opus-5-5", "claude-fable-5-2"
 LIGHT = ("title_generation", "memory_query_rewrite", "tts_audio_tags", "profile_describer", "skills_hub", "vision")
+# The profiles that procedures/haiku-helper-routing.md switched with --to claude-fable on 2026-11-11.
 FABLE_PROFILES = ("advisor", "anki-reviewer", "chapt-reviewer", "harness-reviewer", "jobcron-reviewer", "jss-reviewer")
+# The profiles of SCOPE that roster.yaml declares on Fable since card t_0faca45d (2026-11-13): the
+# advisor and the project orchestrators. The reviewers moved to Opus.
+ROSTER_FABLE_PROFILES = ("advisor", "anki-orchestrator", "chapt-orchestrator", "harness-orchestrator",
+                         "jobcron-orchestrator", "jss-orchestrator")
 SCOPE = ("advisor", *(f"{project}-{role}" for project in ("anki", "chapt", "harness", "jobcron", "jss")
                       for role in ("orchestrator", "worker", "worker-2", "reviewer")))
 DECLARATION = {"light_tasks": HAIKU, "other_tasks": OPUS}
@@ -180,7 +185,7 @@ class AllowlistAndDeclarationTests(unittest.TestCase):
                 self.assertEqual(profile["auxiliary_models"], DECLARATION)
                 self.assertNotEqual(profile.get("lifecycle"), "retired")
                 self.assertEqual(profile["provider"], "claude-subscription")
-                target = "claude-fable" if name in FABLE_PROFILES else "claude-opus"
+                target = "claude-fable" if name in ROSTER_FABLE_PROFILES else "claude-opus"
                 self.assertEqual(profile["model"], switch.TARGETS[target][2])
                 # The roster declaration equals what the switch script writes for the profile's target.
                 self.assertEqual(switch.helper_models(target, profile["model"]), (HAIKU, OPUS))
@@ -355,7 +360,8 @@ class SwitchDryRunTests(unittest.TestCase):
         code, out = self.run_switch("--profile", "harness-reviewer", "--to", "claude-fable", "--dry-run")
         self.assertEqual(code, 0)
         self.assertEqual(self.planned(out, "harness-reviewer"), self.expected_writes(FABLE))
-        self.assertIn(f"harness-reviewer model {FABLE} -> {FABLE}, provider claude-subscription -> "
+        # The roster declares harness-reviewer on Opus since card t_0faca45d (2026-11-13).
+        self.assertIn(f"harness-reviewer model {OPUS} -> {FABLE}, provider claude-subscription -> "
                       "claude-subscription (dry run: nothing written)", out)
         self.assertNotIn("auxiliary_models", out)
         self.assertNotIn("fallback", out)

@@ -22,7 +22,7 @@ from incident_recovery_verify_fixture import LocalReads, ROOT, load_verifier
 # The owner model policy as verify-state records it; the roster is checked against it, not copied.
 _POLICY = load_verifier()
 OPUS = _POLICY.MODEL_POLICY_BY_ROLE["implementation"]
-FABLE = _POLICY.MODEL_POLICY_BY_ROLE["independent reviewer"]
+FABLE = _POLICY.MODEL_POLICY_BY_ROLE["advisor"]
 CLAUDE = _POLICY.MODEL_POLICY_PROVIDER
 GLM = tuple(f"{prefix}-worker-glm-{n}" for prefix in ("jobcron", "chapt", "harness", "jss", "anki") for n in (1, 2))
 # Owner decisions of 2026-11-12: the GLM workers of jobcron, cha-pt and harness are back in
@@ -80,10 +80,11 @@ class ModelPolicy(Base):
     """Item 1: expectations follow the owner model policy; out-of-policy live stays red."""
 
     def test_live_corrected_expectations(self):
-        for name in ("default", "jobcron-orchestrator", "jobcron-worker", "chapt-orchestrator",
-                     "chapt-worker", "harness-orchestrator", "harness-worker"):
+        # Card t_0faca45d (2026-11-13): reviewers on Opus, orchestrators (default included) on Fable.
+        for name in ("jobcron-worker", "chapt-worker", "harness-worker",
+                     "jobcron-reviewer", "chapt-reviewer", "harness-reviewer"):
             self.assertEqual((self.profiles[name]["model"], self.profiles[name]["provider"]), (OPUS, CLAUDE))
-        for name in ("advisor", "jobcron-reviewer", "chapt-reviewer", "harness-reviewer"):
+        for name in ("advisor", "default", "jobcron-orchestrator", "chapt-orchestrator", "harness-orchestrator"):
             self.assertEqual((self.profiles[name]["model"], self.profiles[name]["provider"]), (FABLE, CLAUDE))
 
     def test_every_non_retired_profile_is_in_policy(self):
@@ -94,7 +95,7 @@ class ModelPolicy(Base):
                     if profile["name"] in GLM_IN_SERVICE:
                         self.assertEqual((profile["model"], profile["provider"]), ("glm-5.3", "zai"))
                         continue
-                    want = FABLE if "reviewer" in profile["role"] or profile["role"] == "advisor" else OPUS
+                    want = FABLE if "orchestrator" in profile["role"] or profile["role"] == "advisor" else OPUS
                     self.assertEqual((profile["model"], profile["provider"]), (want, CLAUDE))
 
     def test_glm_worker_on_another_model_fails(self):
@@ -111,9 +112,9 @@ class ModelPolicy(Base):
             f"roster model policy drift harness-worker: expected {OPUS} on {CLAUDE}, "
             "declared gpt-6.1-sol on openai-codex"])
         reviewer = next(p for p in roster["profiles"] if p["name"] == "jss-reviewer")
-        reviewer["model"] = OPUS  # a reviewer on Opus is outside policy too
-        self.assertIn(f"roster model policy drift jss-reviewer: expected {FABLE} on "
-                      f"{CLAUDE}, declared {OPUS} on {CLAUDE}",
+        reviewer["model"] = FABLE  # a reviewer on Fable is outside policy too
+        self.assertIn(f"roster model policy drift jss-reviewer: expected {OPUS} on "
+                      f"{CLAUDE}, declared {FABLE} on {CLAUDE}",
                       quiet(self.verifier.check_model_policy, roster))
 
     def test_live_model_outside_policy_still_fails(self):
@@ -380,9 +381,9 @@ class SwitchKeepsRosterInStep(unittest.TestCase):
         self.assertIn("commit the roster.yaml change", out)
         # The verifier refuses to treat an out-of-policy roster as the new expectation.
         self.assertEqual(quiet(load_verifier().check_model_policy, load(self.roster)), [
-            f"roster model policy drift jss-reviewer: expected {FABLE} on {CLAUDE}, "
+            f"roster model policy drift jss-reviewer: expected {OPUS} on {CLAUDE}, "
             "declared gpt-6.1-sol on openai-codex"])
-        code, _ = self.run_switch("--to", "claude-fable")
+        code, _ = self.run_switch("--to", "claude-opus")
         self.assertEqual(code, 0)
         self.assertEqual(self.roster.read_text(), self.original)
         self.assertEqual((ROOT / "roster.yaml").read_text(), self.original)

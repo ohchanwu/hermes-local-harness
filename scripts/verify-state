@@ -327,18 +327,20 @@ RETIRED_PROFILES = (
     "worker-flash-1", "worker-flash-2", "worker-flash-3", "worker-glm-full",
 )
 RETIRED_LIFECYCLE = "retired"
-# Owner model policy (2026-10-19) for every non-retired roster profile: one
-# provider; Opus for orchestrators, workers and default/helpers, Fable for
-# reviewers and the advisor. Retired profiles keep their historical models.
+# Owner model policy for every non-retired roster profile: one provider; Fable
+# for the orchestrators (default included) and the advisor, Opus for the
+# workers, the reviewers and the helper tasks (owner decision of 2026-10-19,
+# changed on 2026-11-13 by card t_0faca45d: reviewers from Fable to Opus,
+# orchestrators from Opus to Fable). Retired profiles keep their historical models.
 MODEL_POLICY_PROVIDER = "claude-subscription"
 MODEL_POLICY_BY_ROLE = {
-    "orchestrator": "claude-opus-5-5",
-    "project orchestrator": "claude-opus-5-5",
+    "orchestrator": "claude-fable-5-2",
+    "project orchestrator": "claude-fable-5-2",
     "project implementation": "claude-opus-5-5",
     "implementation": "claude-opus-5-5",
     "advisor": "claude-fable-5-2",
-    "independent reviewer": "claude-fable-5-2",
-    "project independent reviewer": "claude-fable-5-2",
+    "independent reviewer": "claude-opus-5-5",
+    "project independent reviewer": "claude-opus-5-5",
 }
 # The GLM workers of PROJECT_GLM_WORKER_POOLS are outside MODEL_POLICY_BY_ROLE
 # (owner decision of 2026-11-12, card t_4f7740d0): each one runs this model and provider.

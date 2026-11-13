@@ -150,7 +150,7 @@
     {
       "name": "default",
       "role": "orchestrator",
-      "model": "claude-opus-5-5",
+      "model": "claude-fable-5-2",
       "provider": "claude-subscription",
       "installed": true,
       "dispatch_eligible": false,
@@ -167,7 +167,7 @@
       "fallback_providers": [
         {
           "provider": "anthropic",
-          "model": "claude-opus-5-5"
+          "model": "claude-fable-5-2"
         }
       ],
       "auxiliary_fallback_chain": {
@@ -646,7 +646,7 @@
     {
       "name": "jobcron-orchestrator",
       "role": "project orchestrator",
-      "model": "claude-opus-5-5",
+      "model": "claude-fable-5-2",
       "provider": "claude-subscription",
       "installed": true,
       "dispatch_eligible": false,
@@ -673,7 +673,7 @@
       "fallback_providers": [
         {
           "provider": "anthropic",
-          "model": "claude-opus-5-5"
+          "model": "claude-fable-5-2"
         }
       ],
       "auxiliary_fallback_chain": {
@@ -1044,7 +1044,7 @@
     {
       "name": "jobcron-reviewer",
       "role": "project independent reviewer",
-      "model": "claude-fable-5-2",
+      "model": "claude-opus-5-5",
       "provider": "claude-subscription",
       "installed": true,
       "dispatch_eligible": true,
@@ -1071,7 +1071,7 @@
       "fallback_providers": [
         {
           "provider": "anthropic",
-          "model": "claude-fable-5-2"
+          "model": "claude-opus-5-5"
         }
       ],
       "auxiliary_fallback_chain": {
@@ -1176,7 +1176,7 @@
     {
       "name": "chapt-orchestrator",
       "role": "project orchestrator",
-      "model": "claude-opus-5-5",
+      "model": "claude-fable-5-2",
       "provider": "claude-subscription",
       "installed": true,
       "dispatch_eligible": false,
@@ -1203,7 +1203,7 @@
       "fallback_providers": [
         {
           "provider": "anthropic",
-          "model": "claude-opus-5-5"
+          "model": "claude-fable-5-2"
         }
       ],
       "auxiliary_fallback_chain": {
@@ -1574,7 +1574,7 @@
     {
       "name": "chapt-reviewer",
       "role": "project independent reviewer",
-      "model": "claude-fable-5-2",
+      "model": "claude-opus-5-5",
       "provider": "claude-subscription",
       "installed": true,
       "dispatch_eligible": true,
@@ -1601,7 +1601,7 @@
       "fallback_providers": [
         {
           "provider": "anthropic",
-          "model": "claude-fable-5-2"
+          "model": "claude-opus-5-5"
         }
       ],
       "auxiliary_fallback_chain": {
@@ -1706,7 +1706,7 @@
     {
       "name": "harness-orchestrator",
       "role": "project orchestrator",
-      "model": "claude-opus-5-5",
+      "model": "claude-fable-5-2",
       "provider": "claude-subscription",
       "installed": true,
       "dispatch_eligible": false,
@@ -1733,7 +1733,7 @@
       "fallback_providers": [
         {
           "provider": "anthropic",
-          "model": "claude-opus-5-5"
+          "model": "claude-fable-5-2"
         }
       ],
       "auxiliary_fallback_chain": {
@@ -2104,7 +2104,7 @@
     {
       "name": "harness-reviewer",
       "role": "project independent reviewer",
-      "model": "claude-fable-5-2",
+      "model": "claude-opus-5-5",
       "provider": "claude-subscription",
       "installed": true,
       "dispatch_eligible": true,
@@ -2131,7 +2131,7 @@
       "fallback_providers": [
         {
           "provider": "anthropic",
-          "model": "claude-fable-5-2"
+          "model": "claude-opus-5-5"
         }
       ],
       "auxiliary_fallback_chain": {
@@ -2236,7 +2236,7 @@
     {
       "name": "jss-orchestrator",
       "role": "project orchestrator",
-      "model": "claude-opus-5-5",
+      "model": "claude-fable-5-2",
       "provider": "claude-subscription",
       "installed": true,
       "dispatch_eligible": false,
@@ -2263,7 +2263,7 @@
       "fallback_providers": [
         {
           "provider": "anthropic",
-          "model": "claude-opus-5-5"
+          "model": "claude-fable-5-2"
         }
       ],
       "auxiliary_fallback_chain": {
@@ -2634,7 +2634,7 @@
     {
       "name": "jss-reviewer",
       "role": "project independent reviewer",
-      "model": "claude-fable-5-2",
+      "model": "claude-opus-5-5",
       "provider": "claude-subscription",
       "installed": true,
       "dispatch_eligible": true,
@@ -2661,7 +2661,7 @@
       "fallback_providers": [
         {
           "provider": "anthropic",
-          "model": "claude-fable-5-2"
+          "model": "claude-opus-5-5"
         }
       ],
       "auxiliary_fallback_chain": {
@@ -2942,7 +2942,7 @@
     {
       "name": "anki-orchestrator",
       "role": "project orchestrator",
-      "model": "claude-opus-5-5",
+      "model": "claude-fable-5-2",
       "provider": "claude-subscription",
       "installed": true,
       "dispatch_eligible": false,
@@ -2969,7 +2969,7 @@
       "fallback_providers": [
         {
           "provider": "anthropic",
-          "model": "claude-opus-5-5"
+          "model": "claude-fable-5-2"
         }
       ],
       "auxiliary_fallback_chain": {
@@ -3340,7 +3340,7 @@
     {
       "name": "anki-reviewer",
       "role": "project independent reviewer",
-      "model": "claude-fable-5-2",
+      "model": "claude-opus-5-5",
       "provider": "claude-subscription",
       "installed": true,
       "dispatch_eligible": true,
@@ -3367,7 +3367,7 @@
       "fallback_providers": [
         {
           "provider": "anthropic",
-          "model": "claude-fable-5-2"
+          "model": "claude-opus-5-5"
         }
       ],
       "auxiliary_fallback_chain": {

@@ -40,7 +40,8 @@ ROSTER_BOARDS = {
 }
 FORBIDDEN = re.compile(r"gpt-6\.1-sol|gpt-6-astra|[Vv]alue-blind")
 MODEL_PAIR = re.compile(r"`([a-z0-9-]+)` \(`([a-z0-9.-]+)`\)")
-VERIFICATION = re.compile(r"return `([^`]+)` for orchestrator/worker and `([^`]+)` for reviewer\.")
+# Since card t_0faca45d the orchestrator (Fable) and the workers (Opus) run different models.
+VERIFICATION = re.compile(r"return `([^`]+)` for orchestrator, `([^`]+)` for worker and `([^`]+)` for reviewer\.")
 
 # Bytes of each file at baseline 44320e4a3226bfa057cb532af7fe00b97095cfe8,
 # recovered by reversing TERMINOLOGY_EDITS.
@@ -191,11 +192,12 @@ class OrchestratorSkillTerminologyTests(unittest.TestCase):
             matches = VERIFICATION.findall(self.text[path])
             with self.subTest(path=path):
                 self.assertEqual(len(matches), 1)
-                controller_or_worker, reviewer = matches[0]
+                orchestrator, worker, reviewer = matches[0]
                 for board in boards:
                     fleet = self.fleets[board]
-                    for name in (fleet["orchestrator"], *fleet["workers"]):
-                        self.assertEqual(self.models[name], controller_or_worker, name)
+                    self.assertEqual(self.models[fleet["orchestrator"]], orchestrator, fleet["orchestrator"])
+                    for name in fleet["workers"]:
+                        self.assertEqual(self.models[name], worker, name)
                     self.assertEqual(self.models[fleet["reviewer"]], reviewer, fleet["reviewer"])
         for path in (HARNESS, JSS):
             with self.subTest(path=path):
