@@ -64,5 +64,60 @@ Changes requested from Hermes Agent:
 ## Related
 - [Kanban dispatcher records a live worker as crashed and starts a second worker](261023-kanban-live-worker-marked-crashed-duplicate-dispatch.md): according to the specification of this card by harness-orchestrator, the crash record of run 99 that supplied the stored error text came from that defect (harness card `t_87bc9e2f`). This record describes a separate defect in the respawn guard.
 
+## Second occurrence (2026-11-14, board `jss-genr`, card `t_1b49542f`): a card in status `review`, held by the stored text of an earlier rate-limited run
+Reported: 2026-11-14, by `jss-orchestrator` (board `jss-genr`, card `t_1b49542f`, assignee `jss-reviewer`). Recorded from harness card `t_485c294f`. The filer reports the Hermes Agent version v0.21.5+6751.g9cf7960.
+
+All times are KST (UTC+09:00). Source references in this section are to the installed Hermes Agent at commit `9cf7960f274e`, the same commit as the references above (`git rev-parse HEAD` of the installed source, read on card `t_485c294f`). Only `hermes_cli/kanban_db_dispatch.py` and `hermes_cli/kanban_db.py` were read, as text, without running, importing or changing them. Board `jss-genr`, its database and its task logs were not read on card `t_485c294f`; the observations below are those that the filer reported.
+
+Observed (reported by the filer):
+- Runs 3 and 4 of the card ended with outcome `rate_limited`. Run 3 is listed with the time 2026-11-13 21:58 and the error text "pid 81706 exited rate-limited (quota wall) — requeued without counting a failure". Run 4 is listed with the time 22:37, pid 36401 and the same text.
+- Run 5 started at 23:08 and ended at 2026-11-14 00:33 with outcome `review_requested`; the worker exited with exit code 0. The worker's `kanban_request_review` moved the card to status `review` with assignee `jss-reviewer` at 00:33:46.
+- No review run started. The dispatcher appended `respawn_guarded` events with the payload `{'reason': 'blocker_auth'}` at 00:34:28, 00:35:29, 00:39:32, 00:40:33, 00:41:34, 00:42:34 and 00:43:35.
+- In the same period `jss-reviewer` started and finished review runs on two other cards (`t_9ded8f54`, `t_011b6e53`), so the reviewer profile was able to start.
+- At 00:44 the task row had `last_failure_error` = "pid 36401 exited rate-limited (quota wall) — requeued without counting a failure" and `consecutive_failures` None.
+- Expected: the review run starts on the next dispatcher pass on which the reviewer profile is free.
+
+Diagnosis of the second occurrence. Each statement is marked "Established from source" or "Not established".
+
+(a) Which alternatives of the regular expression match the stored text:
+- Established from source: `_RESPAWN_BLOCKER_RE` encloses all alternatives in `\b(` and `)\b` and is compiled with `re.IGNORECASE` (`hermes_cli/kanban_db_dispatch.py:63-71`). A copy of this pattern, evaluated with the Python standard library module `re`, finds exactly one match in the stored text "pid 36401 exited rate-limited (quota wall) — requeued without counting a failure": the word `quota`. The alternative `rate[\s_\-]?limit` does not match "rate-limited", because the character after "limit" is the word character "e", so the closing word boundary does not hold. This corrects the filer's statement that the words "rate-limited" and "quota" match.
+
+(b) Why the rate-limit branch of `check_respawn_guard` did not apply:
+- Established from source: `check_respawn_guard` selects the latest ended run of the card, ordered by `ended_at` (`hermes_cli/kanban_db_dispatch.py:1561-1566`). It returns before the regular expression check, with `rate_limit_cooldown` or with no reason, only when that run has outcome `rate_limited` (`hermes_cli/kanban_db_dispatch.py:1572-1583`). The comment at `hermes_cli/kanban_db_dispatch.py:1555-1556` states "LATEST run only: a newer crash/completion supersedes the rate-limit run". The docstring at `hermes_cli/kanban_db_dispatch.py:1533-1536` states that this branch is checked before `blocker_auth` because "the requeue stamps a quota-flavored ``last_failure_error`` that would otherwise park the task forever".
+- Established from source: `request_review` ends the open run with outcome `review_requested` through `_end_or_synthesize_run` (`hermes_cli/kanban_db.py:3534-3538`), and `_end_run` sets `ended_at` of that run to the current time (`hermes_cli/kanban_db.py:2042-2056`). After run 5 ended, the latest ended run therefore had outcome `review_requested`, the rate-limit branch did not apply, and, because that outcome is not `crashed`, the guard applied the regular expression to the stored text that names pid 36401 and returned `blocker_auth` (`hermes_cli/kanban_db_dispatch.py:1589-1592`).
+
+(c) Whether the guard applies to a card in status `review`:
+- Established from source: each dispatcher pass reads the unclaimed rows in status `review` when review dispatch is enabled (`hermes_cli/kanban_db_dispatch.py:2362`, `2269-2275`) and passes each row that has an assignee to `_dispatch_lane_task` with `lane="review"` (`hermes_cli/kanban_db_dispatch.py:2421-2428`), the same function that handles rows in status `ready` (`hermes_cli/kanban_db_dispatch.py:2400-2415`). `_dispatch_lane_task` calls `check_respawn_guard` before the claim (`hermes_cli/kanban_db_dispatch.py:2073`); when the guard returns a reason, it appends one `respawn_guarded` event with the payload `{"reason": ...}` and skips the row (`hermes_cli/kanban_db_dispatch.py:2074-2086`).
+- Established from source: in `check_respawn_guard`, the return for `lane == "review"` comes after the `blocker_auth` check (`hermes_cli/kanban_db_dispatch.py:1596-1597`). For a card in status `review`, the guard skips only the later checks, not `blocker_auth`.
+
+(d) Whether `request_review` changes `last_failure_error`:
+- Established from source: `request_review` (`hermes_cli/kanban_db.py:3426-3552`) changes the task row only in `status`, `claim_lock`, `claim_expires`, `worker_pid` and, when a reviewer is named, `assignee` (`hermes_cli/kanban_db.py:3507-3525`). It does not change `last_failure_error` and does not call `_clear_failure_counter`. `_end_run`, which it reaches through `_end_or_synthesize_run`, changes only the run row and `tasks.current_run_id` (`hermes_cli/kanban_db.py:2042-2057`).
+- Established from source: `request_review` writes the reviewer as the assignee in its own update (`hermes_cli/kanban_db.py:3507`, `3520`), not through `assign_task`. The change of assignee to the reviewer therefore does not set `last_failure_error` to NULL, unlike a change of assignee through `assign_task` (`hermes_cli/kanban_db.py:1639-1644`).
+- Established from source (text search of the two files read): in `hermes_cli/kanban_db.py`, the column is set to NULL only by `assign_task` (line 1643), by `unblock_task` (line 3752) and through `_clear_failure_counter` (`hermes_cli/kanban_db_dispatch.py:1510-1522`), which `reclaim_task` and `complete_task` call (`hermes_cli/kanban_db.py:2670`, `2901`). This agrees with Diagnosis (b) in the section `## Diagnosis` above.
+
+(e) Which code writes the rate-limit text to `tasks.last_failure_error`:
+- Established from source: `_classify_dead_worker_exit` builds the text "pid {pid} exited rate-limited (quota wall) — requeued without counting a failure" when the exit status of a dead worker is classified as `rate_limited` (`hermes_cli/kanban_db_dispatch.py:1097-1106`). `_classify_dead_worker` does not append the captured worker output for a rate-limited exit (`hermes_cli/kanban_db_dispatch.py:1057-1061`).
+- Established from source: `_reclaim_dead_workers`, which `detect_crashed_workers` calls (`hermes_cli/kanban_db_dispatch.py:1306`), ends the run with outcome `rate_limited` and this error text (`hermes_cli/kanban_db_dispatch.py:1181-1186`, `1041-1044`), and stores the first 500 characters of the text in `tasks.last_failure_error` without changing `consecutive_failures` (`hermes_cli/kanban_db_dispatch.py:1198-1207`). The comment at `hermes_cli/kanban_db_dispatch.py:1199-1203` states that the text is stored so that "a rate-limited requeue must show ``check_respawn_guard`` a quota blocker".
+- Established from source: in the two files read, `hermes_cli/kanban_db_dispatch.py:1102` is the only occurrence of the text "exited rate-limited (quota wall)".
+- Not established: whether other files of the installed source write the same text. They were not read on card `t_485c294f`.
+
+Workaround tried by the filer:
+- The filer ran `hermes kanban --board jss-genr assign t_1b49542f none` and then `hermes kanban --board jss-genr assign t_1b49542f jss-reviewer` at 00:47. Afterwards `last_failure_error` was None, the status was still `review` and the assignee was `jss-reviewer`.
+- Established from source: `assign_task` sets `consecutive_failures = 0` and `last_failure_error = NULL` when the assignee changes, and does not change the status (`hermes_cli/kanban_db.py:1639-1646`; see also Diagnosis (b) in the section `## Diagnosis` above). It refuses only a card in status `running` that has a claim (`hermes_cli/kanban_db.py:1634-1638`).
+- Not established: whether the review run then started. The filer had not observed it at filing time, and board `jss-genr` is not read on card `t_485c294f`.
+- Established from source: the block and unblock workaround of the first occurrence does not change a card in status `review`. `block_task` changes the status only of a card in status `running` or `ready` (its update has the condition `status IN ('running', 'ready')` and returns False when no row matches, `hermes_cli/kanban_db.py:3353-3368`), or classifies a card that is already in status `blocked` (`hermes_cli/kanban_db.py:3321-3335`). `unblock_task` changes only a card in status `blocked` or `scheduled` (`hermes_cli/kanban_db.py:3750-3756`). The workaround of the first occurrence is therefore not suitable for a card in status `review`.
+- Not established: whether the command `hermes kanban block` reaches `block_task` for every card. The command-line source was not read on card `t_485c294f`.
+
+Difference from the first occurrence:
+- The card was in status `review`, not `ready`.
+- The stored text was written by Hermes for a rate-limited exit (Diagnosis (e) of this section) and contains no captured worker output; the matched word `quota` is in the text that Hermes writes. Item 2 of `## Requested` (apply the regular expression only to the part of the error text written by Hermes) would therefore not prevent this occurrence. Item 1 (read a failure classification from the latest ended run) would prevent it, because the latest ended run, run 5, ended with outcome `review_requested`.
+- Additional change requested from Hermes Agent: clear `last_failure_error` in `request_review` when a run ends with a review request, as `complete_task` does through `_clear_failure_counter` (`hermes_cli/kanban_db.py:2901`). Diagnosis (d) of this section establishes that `request_review` does not change the column.
+
+Impact:
+- The filer reports that the card waited 13 minutes in status `review` without a review run.
+- No notification reported the hold: a `respawn_guarded` event produces no gateway notification (Diagnosis (d) in the section `## Diagnosis` above).
+- The filer states that the card would have waited until an operator message, and reports a deadline for reviewed work of 2026-11-15 23:00 while the owner was asleep.
+- Not checked upstream for this occurrence: network access was not authorized on this card.
+
 ## Upstream status
 Not checked: network access was not authorized on this card.
