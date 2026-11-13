@@ -58,11 +58,11 @@ JOBCRON_PRODUCTION_DEPLOYMENT = ("devops/production-deployment/SKILL.md",
                                  "devops/production-deployment/references/release-ci-portability.md")
 SHARED_SKILL = ROOT / "skills/multi-agent-coding-orchestrator/SKILL.md"
 VERSIONS = {
-    PROFILE_SKILLS["jobcron-orchestrator"]: "0.6.9-jobcron.10",  # raised by t_b7455361, t_b722c617 and t_ac454595
-    PROFILE_SKILLS["chapt-orchestrator"]: "0.6.7-chapt.9",  # raised by t_b722c617 and t_ac454595
-    PROFILE_SKILLS["harness-orchestrator"]: "0.6.7-harness.8",  # raised by t_b722c617 and t_ac454595
-    PROFILE_SKILLS["jss-orchestrator"]: "0.6.7-jss.10",  # raised by t_71b4ef4a and t_ac454595
-    SHARED_SKILL: "0.6.13",
+    PROFILE_SKILLS["jobcron-orchestrator"]: "0.6.9-jobcron.11",  # raised by t_b7455361, t_b722c617, t_ac454595 and t_46b5e63e
+    PROFILE_SKILLS["chapt-orchestrator"]: "0.6.7-chapt.10",  # raised by t_b722c617, t_ac454595 and t_46b5e63e
+    PROFILE_SKILLS["harness-orchestrator"]: "0.6.7-harness.9",  # raised by t_b722c617, t_ac454595 and t_46b5e63e
+    PROFILE_SKILLS["jss-orchestrator"]: "0.6.7-jss.11",  # raised by t_71b4ef4a, t_ac454595 and t_46b5e63e
+    SHARED_SKILL: "0.6.14",  # raised by t_46b5e63e
 }
 PROCEDURE = ROOT / "procedures/switching-hermes-models.md"
 JOBCRON_SOUL = ROOT / "policies/profile-souls/jobcron-orchestrator/SOUL.md"
@@ -488,7 +488,7 @@ class Pins(unittest.TestCase):
             "jobcron-orchestrator", JOBCRON_REFERENCE, overrides["jobcron-orchestrator"][JOBCRON_REFERENCE]),
             sha(reference))
         shared = next(e for e in self.snapshot["skill"]["shared_skills"] if e["name"] == "multi-agent-coding-orchestrator")
-        self.assertEqual(shared["version"], "0.6.13")
+        self.assertEqual(shared["version"], "0.6.14")
         self.assertEqual(shared["source"], "skills/multi-agent-coding-orchestrator")
         for rel, want in verifier.shared_skill_expected(shared).items():
             self.assertEqual(want, sha(SHARED_SKILL.parent / rel))

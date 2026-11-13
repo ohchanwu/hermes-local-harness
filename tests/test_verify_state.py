@@ -195,7 +195,7 @@ check("--fixture", str(FIXTURES / "deployed-skill-divergence.yaml"), code=1, tex
 # The canonical orchestration policy is versioned and its source-to-live hash
 # enforcement covers the default profile's deployed orchestrator skill.
 orchestrator = (ROOT / "skills" / "multi-agent-coding-orchestrator" / "SKILL.md").read_text()
-assert "version: 0.6.13" in orchestrator
+assert "version: 0.6.14" in orchestrator
 assert "Routing validation and dispatch receipt" in orchestrator
 assert "Authentication expiry blocks a fresh observation" in orchestrator
 assert "currently_actionable" in orchestrator
@@ -205,7 +205,7 @@ assert "harness-orchestrator" in orchestrator
 assert "docs/bugs" in orchestrator
 assert "claude-opus-5-5" in orchestrator
 # Terminal retry remains an explicit card-scoped v2 policy, never the default.
-assert "version: 0.6.13" in orchestrator
+assert "version: 0.6.14" in orchestrator
 assert "HUMAN_BLOCK" in orchestrator
 roster = json.loads((ROOT / "roster.yaml").read_text())
 assert roster["schema_version"] == 2

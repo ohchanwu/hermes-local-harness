@@ -24,13 +24,16 @@ ROUTING_POLICY_EDITS lists the exact (new, old) text this card changed in each
 file under policies/, so tests that pin older bytes of these files can reverse
 the change byte for byte with reverse_jev_routing_policy_edits().
 test_jev_policy_sources.reverse_jev_policy_edits() calls it first. This module
-imports no other test module, so any test module can import it.
+imports only test_stale_test_rule_policy, which imports no other test module at load
+time, so any test module can import it.
 """
 import hashlib
 import json
 import re
 from pathlib import Path
 import unittest
+
+from test_stale_test_rule_policy import reverse_stale_test_rule_edits
 
 ROOT = Path(__file__).resolve().parents[1]
 RELATIVE = "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md"
@@ -318,14 +321,19 @@ class RoutingPolicyText(unittest.TestCase):
         self.assertEqual(set(BASELINE_SHA256), set(ROUTING_POLICY_EDITS))
         for path, want in BASELINE_SHA256.items():
             with self.subTest(path=path):
-                original = reverse_jev_routing_policy_edits(path, (ROOT / path).read_bytes())
+                # The later edits of card t_46b5e63e are reversed first.
+                original = reverse_jev_routing_policy_edits(
+                    path, reverse_stale_test_rule_edits(path, (ROOT / path).read_bytes()))
                 self.assertEqual(hashlib.sha256(original).hexdigest(), want)
 
     def test_every_orchestrator_skill_states_the_rules_once(self):
         for key, (board, prefix, _claude, _glm) in BOARDS.items():
             text = self.text[skill(prefix)]
             with self.subTest(board=board):
-                self.assertRegex(text, rf"(?m)^version: {re.escape(VERSIONS[skill(prefix)][1])}$")
+                # Card t_46b5e63e raised each version by one step after this card.
+                current = {"harness": "0.6.7-harness.9", "chapt": "0.6.7-chapt.10", "jobcron": "0.6.9-jobcron.11",
+                           "jss": "0.6.7-jss.11", "anki": "0.6.10-anki.7"}[prefix]
+                self.assertRegex(text, rf"(?m)^version: {re.escape(current)}$")
                 self.assertEqual(text.count(SPLIT_RULE), 1)
                 self.assertEqual(text.count(escalation_skill_text(key)), 1)
                 self.assertEqual(text.count(ROUTE_DISABLING_RULE), 1)
@@ -363,6 +371,8 @@ class RoutingPolicyText(unittest.TestCase):
 
     def test_every_reviewer_soul_states_the_reassignment(self):
         block = (ROOT / "policies/writing-rules.md").read_text()
+        # Card t_46b5e63e appended policies/stale-test-rule.md after the writing rules.
+        block += "\n" + (ROOT / "policies/stale-test-rule.md").read_text()
         for key, (board, prefix, _claude, _glm) in BOARDS.items():
             text = self.text[soul(f"{prefix}-reviewer")]
             with self.subTest(board=board):
@@ -371,6 +381,8 @@ class RoutingPolicyText(unittest.TestCase):
 
     def test_every_glm_worker_soul_has_the_attachment_procedure(self):
         block = (ROOT / "policies/writing-rules.md").read_text()
+        # Card t_46b5e63e appended policies/stale-test-rule.md after the writing rules.
+        block += "\n" + (ROOT / "policies/stale-test-rule.md").read_text()
         for key in GLM_SOUL_KEYS:
             board = BOARDS[key][0]
             for profile in BOARDS[key][3]:

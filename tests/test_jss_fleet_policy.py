@@ -472,7 +472,7 @@ class RoleContracts(unittest.TestCase):
 
     def test_skill_version_size_and_sections(self):
         # Raised by the jev plugin policy change (t_71b4ef4a).
-        self.assertRegex(self.skill_raw, r"(?m)^version: 0\.6\.7-jss\.10$")  # raised by t_ac454595
+        self.assertRegex(self.skill_raw, r"(?m)^version: 0\.6\.7-jss\.11$")  # raised by t_ac454595 and t_46b5e63e
         # 260 lines plus the 4-line Pitfalls section (t_bd860536), the 9 lines of
         # repair_history candidate rules and example (t_6436ac1c), the 6-line
         # Skill Changes section (t_0a8674fe) and the one-line Hard Scope read-only

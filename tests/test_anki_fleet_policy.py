@@ -375,7 +375,7 @@ class RoleContracts(unittest.TestCase):
 
     def test_skill_version_scope_and_board_pinning(self):
         # Raised by the jev plugin policy change (t_71b4ef4a).
-        self.assertRegex(self.skill_raw, r"(?m)^version: 0\.6\.10-anki\.6$")  # raised by t_ac454595
+        self.assertRegex(self.skill_raw, r"(?m)^version: 0\.6\.10-anki\.7$")  # raised by t_ac454595 and t_46b5e63e
         history = "This caused the 2026-10-20 stalls of the JSS and Jobcron orchestrators."
         self.assertEqual(self.skill_raw.count(history), 1)
         rest = self.skill_raw.replace(history, "")
