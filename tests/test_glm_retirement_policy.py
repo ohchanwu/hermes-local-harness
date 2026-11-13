@@ -23,6 +23,7 @@ import unittest
 from unittest.mock import patch
 
 from incident_recovery_verify_fixture import LocalReads, ROOT, load_verifier, resolved_fixture
+from jss_download_install_edits import reverse_download_install_edits
 from rule_text import assert_rule
 from test_jobcron_app_only_deploy_authorization import reverse_app_only_deploy_edits
 from test_jev_policy_sources import reverse_jev_policy_edits
@@ -61,7 +62,7 @@ VERSIONS = {
     PROFILE_SKILLS["jobcron-orchestrator"]: "0.6.9-jobcron.11",  # raised by t_b7455361, t_b722c617, t_ac454595 and t_46b5e63e
     PROFILE_SKILLS["chapt-orchestrator"]: "0.6.7-chapt.10",  # raised by t_b722c617, t_ac454595 and t_46b5e63e
     PROFILE_SKILLS["harness-orchestrator"]: "0.6.7-harness.9",  # raised by t_b722c617, t_ac454595 and t_46b5e63e
-    PROFILE_SKILLS["jss-orchestrator"]: "0.6.7-jss.11",  # raised by t_71b4ef4a, t_ac454595 and t_46b5e63e
+    PROFILE_SKILLS["jss-orchestrator"]: "0.6.7-jss.12",  # raised by t_71b4ef4a, t_ac454595, t_46b5e63e and t_89838618
     SHARED_SKILL: "0.6.14",  # raised by t_46b5e63e
 }
 PROCEDURE = ROOT / "procedures/switching-hermes-models.md"
@@ -100,7 +101,9 @@ def without_jev_text(path):
     in the exact sentences that tests/test_jev_policy_sources.py pins. Every other
     text of these files still names no GLM worker and no GLM lane.
     """
-    return reverse_jev_policy_edits(path.relative_to(ROOT).as_posix(), path.read_text())
+    relative = path.relative_to(ROOT).as_posix()
+    # The later download and install change (t_89838618) is reversed first.
+    return reverse_jev_policy_edits(relative, reverse_download_install_edits(relative, path.read_text()))
 
 
 def sha_bytes(content):

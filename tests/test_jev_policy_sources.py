@@ -36,6 +36,7 @@ import re
 from pathlib import Path
 import unittest
 
+from jss_download_install_edits import reverse_download_install_edits
 from test_jev_routing_policy_text import reverse_jev_routing_policy_edits
 from test_stale_test_rule_policy import reverse_stale_test_rule_edits
 
@@ -400,9 +401,9 @@ BASELINE_SHA256 = {
     skill("jss"): "bd9fdea67d1ce063d4e99dd2ce29591c58f664c2da6d9a4282a141f344be6c21",
     skill("anki"): "c9c682d4c3333f23237de50f3a44d0f3eacd3c42b24039663a8ba1e1104baefd",
 }
-# Raised again by cards t_ac454595 and t_46b5e63e.
+# Raised again by cards t_ac454595 and t_46b5e63e, and for jss by t_89838618.
 VERSIONS = {skill("harness"): "0.6.7-harness.9", skill("chapt"): "0.6.7-chapt.10",
-            skill("jobcron"): "0.6.9-jobcron.11", skill("jss"): "0.6.7-jss.11", skill("anki"): "0.6.10-anki.7"}
+            skill("jobcron"): "0.6.9-jobcron.11", skill("jss"): "0.6.7-jss.12", skill("anki"): "0.6.10-anki.7"}
 # The GLM worker SOULs in this repository (the jobcron GLM workers have none).
 GLM_WORKER_SOUL_BOARDS = ("harness", "chapt", "jss", "anki")
 ANKI_GLM_SOULS = (soul("anki-worker-glm-1"), soul("anki-worker-glm-2"))
@@ -458,13 +459,14 @@ class JevPolicySources(unittest.TestCase):
                 self.assertIn("`/Users/chanbla11mit/projects/anki-addons`", self.text[path])
 
     def test_reversing_the_edits_recovers_the_baseline_bytes(self):
-        # The later edits of card t_46b5e63e and then the later model line edits of card t_0faca45d
-        # are reversed first. The import is local so that this module still imports no other test
-        # module when it is imported.
+        # The later edits of card t_89838618, then those of card t_46b5e63e and then the later model
+        # line edits of card t_0faca45d are reversed first. The import is local so that this module
+        # still imports no other test module when it is imported.
         from test_fable_5_2_declared_model import reverse_role_model_edits
         for path, want in BASELINE_SHA256.items():
             with self.subTest(path=path):
-                current = reverse_stale_test_rule_edits(path, (ROOT / path).read_bytes())
+                current = reverse_download_install_edits(path, (ROOT / path).read_bytes())
+                current = reverse_stale_test_rule_edits(path, current)
                 original = reverse_jev_policy_edits(path, reverse_role_model_edits(path, current))
                 self.assertEqual(hashlib.sha256(original).hexdigest(), want)
 

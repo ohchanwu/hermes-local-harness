@@ -30,6 +30,7 @@ from contextlib import redirect_stdout
 from importlib.machinery import SourceFileLoader
 from pathlib import Path
 
+from jss_download_install_edits import reverse_download_install_edits
 from test_anki_apply_tool_card_contracts_reference import reverse_apply_tool_reference_edits
 from test_orchestrator_skill_changes_policy import reverse_skill_changes_edits
 from test_jobcron_app_only_deploy_authorization import reverse_app_only_deploy_edits
@@ -226,8 +227,10 @@ class InstructionText(unittest.TestCase):
             with self.subTest(path=path):
                 # The later owner-requested application-only production deploy exception
                 # (t_b7455361) raised the Jobcron version again; reverse it first.
-                # The jev plugin policy change (t_b722c617) raised three versions after that.
-                text = reverse_app_only_deploy_edits(path, reverse_jev_policy_edits(path, self.text[path]))
+                # The jev plugin policy change (t_b722c617) raised three versions after that, and the
+                # download and install change (t_89838618) raised the jss version after that.
+                text = reverse_download_install_edits(path, self.text[path])
+                text = reverse_app_only_deploy_edits(path, reverse_jev_policy_edits(path, text))
                 self.assertEqual(re.findall(r"(?m)^version: (.+)$", text), [new])
         snapshot = json.loads((ROOT / SNAPSHOT).read_text())
         shared = next(entry for entry in snapshot["skill"]["shared_skills"]
@@ -241,8 +244,10 @@ class InstructionText(unittest.TestCase):
                 # Reverse the later declared Fable model change (t_a6bbe808), the owner-requested
                 # application-only production deploy exception (t_b7455361), the
                 # apply-tool-card-contracts pointer (t_c9d4d5c8) and Skill Changes section
-                # (t_0a8674fe) first.
-                current = reverse_read_only_exception_edits(path, reverse_jev_policy_edits(path, (ROOT / path).read_bytes()))
+                # (t_0a8674fe) first. The later download and install change (t_89838618) is reversed
+                # before all of them.
+                current = reverse_download_install_edits(path, (ROOT / path).read_bytes())
+                current = reverse_read_only_exception_edits(path, reverse_jev_policy_edits(path, current))
                 current = reverse_fable_5_2_edits(path, current)
                 current = reverse_app_only_deploy_edits(path, current)
                 current = reverse_apply_tool_reference_edits(path, current)

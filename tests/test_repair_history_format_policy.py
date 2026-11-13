@@ -24,6 +24,7 @@ import unittest
 from importlib.machinery import SourceFileLoader
 from pathlib import Path
 
+from jss_download_install_edits import reverse_download_install_edits
 from test_anki_apply_tool_card_contracts_reference import reverse_apply_tool_reference_edits
 from test_card_contract_line_start_policy import reverse_owner_path_edits
 from test_jobcron_app_only_deploy_authorization import reverse_app_only_deploy_edits
@@ -430,9 +431,11 @@ class InstructionTextTests(unittest.TestCase):
         # tests/test_repair_history_candidate_rules_policy.py checks that change, and it is
         # reversed here so these checks keep reading the text this card wrote. The later
         # owner-requested application-only production deploy exception (t_b7455361) is
-        # reversed before it, and the jev plugin policy change (t_b722c617) before that.
+        # reversed before it, and the jev plugin policy change (t_b722c617) before that. The
+        # download and install change (t_89838618) is reversed first.
         self.text = {path: reverse_candidate_rule_edits(
-                         path, reverse_app_only_deploy_edits(path, reverse_jev_policy_edits(path, (ROOT / path).read_text())))
+                         path, reverse_app_only_deploy_edits(path, reverse_jev_policy_edits(
+                             path, reverse_download_install_edits(path, (ROOT / path).read_text()))))
                      for path in SKILL_FILES + POLICY_FILES}
 
     def example_lines(self, path):
@@ -488,8 +491,10 @@ class InstructionTextTests(unittest.TestCase):
                 # application-only production deploy exception (t_b7455361), the
                 # apply-tool-card-contracts pointer (t_c9d4d5c8), the Skill Changes section
                 # (t_0a8674fe), the repair_history candidate rule change (t_6436ac1c) and the
-                # owner shell command path change (t_bd860536) first.
-                current = reverse_read_only_exception_edits(path, reverse_jev_policy_edits(path, (ROOT / path).read_bytes()))
+                # owner shell command path change (t_bd860536) first. The later download and install
+                # change (t_89838618) is reversed before all of them.
+                current = reverse_download_install_edits(path, (ROOT / path).read_bytes())
+                current = reverse_read_only_exception_edits(path, reverse_jev_policy_edits(path, current))
                 current = reverse_fable_5_2_edits(path, current)
                 current = reverse_app_only_deploy_edits(path, current)
                 current = reverse_apply_tool_reference_edits(path, current)

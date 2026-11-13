@@ -18,6 +18,7 @@ import unittest
 from unittest.mock import patch
 
 from incident_recovery_verify_fixture import LocalReads, ROOT, load_verifier, resolved_fixture
+from jss_download_install_edits import reverse_download_install_edits
 from test_jev_policy_sources import reverse_jev_policy_edits
 
 FLEETS = {"jobcron": "jobcron", "cha-pt": "chapt", "harness": "harness", "jss-genr": "jss"}
@@ -60,7 +61,7 @@ VERSIONS = {
     PROFILE_SKILLS["jobcron"]: "0.6.9-jobcron.11",  # raised by t_b7455361, t_b722c617, t_ac454595 and t_46b5e63e
     PROFILE_SKILLS["chapt"]: "0.6.7-chapt.10",  # raised by t_b722c617, t_ac454595 and t_46b5e63e
     PROFILE_SKILLS["harness"]: "0.6.7-harness.9",  # raised by t_b722c617, t_ac454595 and t_46b5e63e
-    PROFILE_SKILLS["jss"]: "0.6.7-jss.11",  # raised by t_71b4ef4a, t_ac454595 and t_46b5e63e
+    PROFILE_SKILLS["jss"]: "0.6.7-jss.12",  # raised by t_71b4ef4a, t_ac454595, t_46b5e63e and t_89838618
     # The shared skill's version is recorded in the snapshot; read it rather than copy it.
     SHARED_SKILL: next(entry["version"] for entry in json.loads(
         (ROOT / "snapshots/sanitized-current-state.yaml").read_text())["skill"]["shared_skills"]
@@ -313,7 +314,10 @@ class PolicyText(unittest.TestCase):
                 self.assertNotIn("one implementation worker", text)
                 self.assertNotIn("The sole implementation worker", text)
                 # The jev plugin policy text (t_b722c617) names the board's GLM workers; no other text does.
-                self.assertIsNone(GLM_NAME.search(reverse_jev_policy_edits(path.relative_to(ROOT).as_posix(), text)))
+                # The later download and install change (t_89838618) is reversed first.
+                relative = path.relative_to(ROOT).as_posix()
+                earlier = reverse_download_install_edits(relative, text)
+                self.assertIsNone(GLM_NAME.search(reverse_jev_policy_edits(relative, earlier)))
         for prefix in ("harness", "jss"):
             text = PROFILE_SKILLS[prefix].read_text()
             self.assertIn(f"- The implementation workers are `{prefix}-worker` and `{prefix}-worker-2`.\n", text)
