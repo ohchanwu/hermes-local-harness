@@ -4,26 +4,37 @@
 Usage:
   scripts/jev-route-notice [--log-dir DIR] [--since DAYS] [--after DATETIME]
                            [--kanban-db PATH ...] [--state-db PATH ...]
-                           [--report-script PATH]
+                           [--report-script PATH] [--config PATH]
 
 The options --log-dir, --since, --after, --kanban-db and --state-db have the
 same meaning and defaults as in scripts/jev-report. --report-script is the path
 of scripts/jev-report; default: the file jev-report next to this script (after
+symbolic links are resolved). --config is the jev plugin settings file;
+default: plugins/jev/config.json of the checkout that holds this script (after
 symbolic links are resolved).
 
 The script runs the calculation of section 1 of scripts/jev-report (the Claude
 tokens saved per route over all boards and the rule line "disable this route:
-owner permission required"). It reads the logs and databases only; it writes no
-file and changes no setting.
+owner permission required"). It reads the logs, the databases and the settings
+file only; it writes no file (no bytecode file either) and changes no setting.
 
-- When the report has a rule line for at least one route, the script produces
-  one message text and passes it to the sender once. The text names each such
-  route with the saved figure, the mean Claude tokens per control card and per
-  GLM-routed card, and the two card counts. It asks the owner for permission to
-  turn off the route and states that the route stays on until the owner
-  answers.
-- When the report has no rule line, the script produces nothing and calls the
-  sender zero times.
+- A route counts as on when at least one board in the settings file still
+  offers it, by the same conditions as plugins/jev/routing.py: `routing.enabled`
+  is true, the board has at least two enabled routes, the route is one of them,
+  and the worker list named by the route's `assignee_from` is not empty. A
+  route with a rule line that is off on every board gets no message, because
+  the owner's permission for it has already been carried out; one line on
+  standard error names it. When the settings file cannot be read, cannot be
+  parsed, or does not have the expected structure, every route counts as on
+  and one line on standard error gives the error class.
+- When the report has a rule line for at least one route that is on, the
+  script produces one message text and passes it to the sender once. The text
+  names each such route with the saved figure, the mean Claude tokens per
+  control card and per GLM-routed card, and the two card counts. It asks the
+  owner for permission to turn off the route and states that the route stays
+  on until the owner answers.
+- When the report has no rule line for a route that is on, the script
+  produces nothing on standard output and calls the sender zero times.
 
 The default sender writes the text to standard output. The intended delivery is
 a Hermes scheduled job created with `hermes cron create --no-agent`: such a job
@@ -42,6 +53,7 @@ never card titles, card bodies, run summaries, tool output or message text.
 import argparse
 import importlib.machinery
 import importlib.util
+import json
 import os
 import sys
 
@@ -52,21 +64,99 @@ def default_report_script():
     return os.path.join(os.path.dirname(os.path.realpath(__file__)), "jev-report")
 
 
+def default_config():
+    checkout = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+    return os.path.join(checkout, "plugins", "jev", "config.json")
+
+
 def load_report(path):
+    """Load scripts/jev-report as a module without writing a bytecode file."""
     loader = importlib.machinery.SourceFileLoader("jev_report_for_notice", path)
     module_spec = importlib.util.spec_from_loader(loader.name, loader)
     module = importlib.util.module_from_spec(module_spec)
-    loader.exec_module(module)
+    previous = sys.dont_write_bytecode
+    sys.dont_write_bytecode = True
+    try:
+        loader.exec_module(module)
+    finally:
+        sys.dont_write_bytecode = previous
     return module
+
+
+class SettingsUnreadable(Exception):
+    """The settings file cannot be read, parsed or interpreted."""
+
+    def __init__(self, error_class):
+        super().__init__(error_class)
+        self.error_class = error_class
+
+
+def read_settings(path):
+    """The parsed settings file; raises SettingsUnreadable with an error class."""
+    try:
+        with open(path, encoding="utf-8") as handle:
+            config = json.load(handle)
+    except (OSError, ValueError) as exc:  # ValueError covers JSONDecodeError and UnicodeDecodeError
+        raise SettingsUnreadable(type(exc).__name__) from None
+    routing = config.get("routing") if isinstance(config, dict) else None
+    if not isinstance(routing, dict) or not isinstance(routing.get("boards", {}), dict):
+        raise SettingsUnreadable("UnexpectedStructure")
+    return config
+
+
+def route_is_on(config, route_name):
+    """True when at least one board still offers the route (plugins/jev/routing.py, decide)."""
+    routing = config["routing"]
+    if not routing.get("enabled", False):
+        return False
+    for board_cfg in (routing.get("boards") or {}).values():
+        if not isinstance(board_cfg, dict):
+            continue
+        routes = [r for r in board_cfg.get("routes") or []
+                  if isinstance(r, dict) and r.get("enabled") and r.get("name")]
+        if len(routes) < 2:
+            continue  # the plugin asks no route question on such a board
+        for entry in routes:
+            if str(entry["name"]) != route_name:
+                continue
+            pool_key = entry.get("assignee_from")
+            if pool_key and not board_cfg.get(str(pool_key)):
+                continue  # the plugin records no_glm_workers and keeps the card on Claude
+            return True
+    return False
 
 
 def tokens(value):
     return f"{value:.0f}"
 
 
-def message_text(rows, window):
-    """One message for every all-boards row whose rule applies, or None."""
-    flagged = [r for r in rows if r.get("scope") == "all" and r.get("rule")]
+def flagged_rows(rows):
+    """The all-boards rows whose rule line applies."""
+    return [r for r in rows if r.get("scope") == "all" and r.get("rule")]
+
+
+def rows_of_routes_that_are_on(flagged, config_path):
+    """flagged without the routes that are off on every board in the settings file."""
+    if not flagged:
+        return flagged
+    try:
+        config = read_settings(config_path)
+    except SettingsUnreadable as exc:
+        sys.stderr.write(f"jev-route-notice: cannot read {config_path}: {exc.error_class}; "
+                         "every route counts as on\n")
+        return flagged
+    kept = []
+    for row in flagged:
+        if route_is_on(config, row["route"]):
+            kept.append(row)
+        else:
+            sys.stderr.write(f"jev-route-notice: route {row['route']} has a rule line and is off "
+                             f"on every board in {config_path}; no message for it\n")
+    return kept
+
+
+def message_text(flagged, window):
+    """One message for the given all-boards rows whose rule applies, or None."""
     if not flagged:
         return None
     names = ", ".join(r["route"] for r in flagged)
@@ -118,6 +208,9 @@ def run(argv=None, sender=send_to_stdout, now=None):
         description="Owner notification before a jev route is disabled. Reads only.")
     parser.add_argument("--report-script", metavar="PATH",
                         help="path of scripts/jev-report (default: jev-report next to this script)")
+    parser.add_argument("--config", metavar="PATH", default=default_config(),
+                        help="jev plugin settings file, read only (default: plugins/jev/config.json "
+                             "of the checkout that holds this script)")
     try:
         args = parser.parse_args(argv)
     except SystemExit as exc:
@@ -128,7 +221,8 @@ def run(argv=None, sender=send_to_stdout, now=None):
     except Exception as exc:  # the scheduled job must report a failed run, not stay silent
         sys.stderr.write(f"jev-route-notice: report calculation failed: {type(exc).__name__}\n")
         return 1
-    text = message_text(rows, report.window_text(since, after))
+    flagged = rows_of_routes_that_are_on(flagged_rows(rows), args.config)
+    text = message_text(flagged, report.window_text(since, after))
     if text is not None:
         sender(text)
     return 0

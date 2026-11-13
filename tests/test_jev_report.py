@@ -582,6 +582,21 @@ class SavingsTests(unittest.TestCase):
         self.assertEqual(text.count(report.RULE_TEXT), 1)
         self.assertFalse(row_for(rows, "board", "easy", "harness")["rule"])
 
+    def test_rule_line_only_per_route_over_all_boards(self):
+        # Both minimums are met on one board; only the all-boards row has the rule line.
+        with tempfile.TemporaryDirectory() as tmp:
+            cards = (specs("g", 10, "harness", "easy", "glm", 0, 0, 1200)
+                     + specs("c", 3, "harness", "easy", "control", 0, 0, 1000))
+            fixture = SavingsFixture(tmp, cards)
+            rows, text = fixture.rows(), fixture.text()
+            board_row = row_for(rows, "board", "easy", "harness")
+            self.assertEqual((board_row["glm"]["cards"], board_row["control"]["cards"]), (10, 3))
+            self.assertEqual(board_row["saved"], -2000)
+            self.assertFalse(board_row["rule"])
+            self.assertTrue(row_for(rows, "all", "easy")["rule"])
+            self.assertEqual(text.count(report.RULE_TEXT), 1)
+            self.assertIn("  route easy: " + report.RULE_TEXT + "\n", text)
+
     def test_rule_line_when_saved_is_zero(self):
         rows, text = self.rule_rows(10, 3, 1000, 1000)
         self.assertEqual(row_for(rows, "all", "easy")["saved"], 0)
