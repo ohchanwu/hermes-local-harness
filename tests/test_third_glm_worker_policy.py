@@ -370,7 +370,11 @@ class Procedures(unittest.TestCase):
                 "python3 /Users/chanbla11mit/hermes-local-harness/scripts/switch-profile-model --profile <profile> "
                 "--to glm --dispatch add --clear-fallbacks",
                 "hermes -p <profile> auth add zai", "Nobody else runs this command or handles the key.",
-                "on the five orchestrator profiles only after all five new profiles have their login",
+                "Every profile that has the `jev` plugin routes its own `kanban_create` calls, not only the orchestrators",
+                "Only after all five new profiles have their Z.ai login, install the reviewed commit",
+                "on no profile before that point and in this order",
+                "file:///Users/chanbla11mit/hermes-local-harness#plugins/jev --ref <reviewed commit> --enable --force",
+                "Deploy the five reviewer SOULs before step 7",
                 "a GLM worker without a Z.ai login fails its run",
                 # The live labels of scripts/verify-state (fixture mode prints `dispatch_profiles` instead).
                 "`FAIL: missing profile: <profile>`", "`FAIL: provider drift <profile>: expected zai`",
@@ -382,8 +386,20 @@ class Procedures(unittest.TestCase):
                 "`FAIL: profile SOUL drift <profile>`"):
             with self.subTest(marker=marker[:50]):
                 self.assertIn(marker, self.section)
-        # The owner's login comes after the dispatch entry, and the orchestrator install after the login.
+        # The owner's login comes after the dispatch entry. The install of the reviewed commit comes after
+        # the login, first on the new profiles and the reviewers, then on the other 26 profiles.
         self.assertLess(self.section.index("--dispatch add"), self.section.index("auth add zai"))
+        install_step = self.section.index("\n7. This step is done once for all 36 profiles")
+        self.assertLess(self.section.index("auth add zai"), install_step)
+        self.assertLess(install_step, self.section.index("1. on the five new profiles, then on the five reviewers"))
+        self.assertLess(self.section.index("1. on the five new profiles, then on the five reviewers"),
+                        self.section.index("2. then on the other 26 profiles of the 36"))
+        self.assertLess(install_step, self.section.index("\n8. Run `python3"))
+        # Before step 7 no step installs the reviewed commit.
+        self.assertNotIn("plugins install", self.section[:install_step])
+        self.assertNotIn("three-worker", self.section)
+        self.assertNotIn("the orchestrators route cards to the new profiles", self.section)
+        self.assertNotIn("have an effect only in profiles that call `kanban_create`", self.text)
         for text in (self.section,):
             self.assertNotIn("~/", text)
             self.assertNotIn("$HOME", text)
