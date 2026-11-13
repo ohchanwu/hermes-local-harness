@@ -1010,13 +1010,14 @@ PROJECT_WORKER_POOLS = {
 # fleet workers (project_isolation `workers` lists only PROJECT_WORKER_POOLS), but they
 # are in kanban.dispatch_profiles and may be the assignee of an implementation card.
 # Card t_71b4ef4a (owner approval of 2026-11-12 for every board) added the GLM workers
-# of the jss-genr and anki boards.
+# of the jss-genr and anki boards. Card t_f4ce916d (owner request of 2026-11-14) added
+# a third GLM worker to every board.
 PROJECT_GLM_WORKER_POOLS = {
-    "jobcron": ["jobcron-worker-glm-1", "jobcron-worker-glm-2"],
-    "cha-pt": ["chapt-worker-glm-1", "chapt-worker-glm-2"],
-    "harness": ["harness-worker-glm-1", "harness-worker-glm-2"],
-    "jss-genr": ["jss-worker-glm-1", "jss-worker-glm-2"],
-    "anki": ["anki-worker-glm-1", "anki-worker-glm-2"],
+    "jobcron": ["jobcron-worker-glm-1", "jobcron-worker-glm-2", "jobcron-worker-glm-3"],
+    "cha-pt": ["chapt-worker-glm-1", "chapt-worker-glm-2", "chapt-worker-glm-3"],
+    "harness": ["harness-worker-glm-1", "harness-worker-glm-2", "harness-worker-glm-3"],
+    "jss-genr": ["jss-worker-glm-1", "jss-worker-glm-2", "jss-worker-glm-3"],
+    "anki": ["anki-worker-glm-1", "anki-worker-glm-2", "anki-worker-glm-3"],
 }
 CHAPT_ASSIGNEES = {"chapt-worker", "chapt-worker-2", *PROJECT_GLM_WORKER_POOLS["cha-pt"], "chapt-reviewer"}
 HARNESS_ASSIGNEES = {"harness-worker", "harness-worker-2", *PROJECT_GLM_WORKER_POOLS["harness"], "harness-reviewer"}

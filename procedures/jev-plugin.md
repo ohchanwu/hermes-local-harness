@@ -31,10 +31,10 @@ Then, for either source:
 
 Plugins load only when they are listed in the profile's `plugins.enabled` (Hermes source `hermes_cli/plugins.py` line 1481), which `--enable` does.
 
-Profiles (31 in total; `roster.yaml` lists `jev` in `required_plugins` of exactly these, and `scripts/verify-state` checks that list):
+Profiles (36 in total; `roster.yaml` lists `jev` in `required_plugins` of exactly these, and `scripts/verify-state` checks that list):
 
 - The 21 Claude subscription profiles: `advisor`, and the orchestrator, reviewer and two Claude workers of each of the five boards (`jobcron-orchestrator`, `jobcron-reviewer`, `jobcron-worker`, `jobcron-worker-2`, `chapt-orchestrator`, `chapt-reviewer`, `chapt-worker`, `chapt-worker-2`, `harness-orchestrator`, `harness-reviewer`, `harness-worker`, `harness-worker-2`, `jss-orchestrator`, `jss-reviewer`, `jss-worker`, `jss-worker-2`, `anki-orchestrator`, `anki-reviewer`, `anki-worker`, `anki-worker-2`). Routing and the `kanban_unblock` part of the peak-hours hold have an effect only in profiles that call `kanban_create` and `kanban_unblock` (the orchestrators); the auxiliary log and the tool result filter apply in every profile.
-- The ten GLM worker profiles that the routes use, two for each board: `jobcron-worker-glm-1`, `jobcron-worker-glm-2`, `chapt-worker-glm-1`, `chapt-worker-glm-2`, `harness-worker-glm-1`, `harness-worker-glm-2`, `jss-worker-glm-1`, `jss-worker-glm-2`, `anki-worker-glm-1`, `anki-worker-glm-2`. The plugin must run in these profiles so that the card's model override is cleared at the review handoff (see "Model override at the review handoff"). `anki-worker-glm-1` and `anki-worker-glm-2` do not exist yet; create them first (see "Creating the Anki GLM worker profiles").
+- The fifteen GLM worker profiles that the routes use, three for each board: `jobcron-worker-glm-1`, `jobcron-worker-glm-2`, `jobcron-worker-glm-3`, `chapt-worker-glm-1`, `chapt-worker-glm-2`, `chapt-worker-glm-3`, `harness-worker-glm-1`, `harness-worker-glm-2`, `harness-worker-glm-3`, `jss-worker-glm-1`, `jss-worker-glm-2`, `jss-worker-glm-3`, `anki-worker-glm-1`, `anki-worker-glm-2`, `anki-worker-glm-3`. The plugin must run in these profiles so that the card's model override is cleared at the review handoff (see "Model override at the review handoff"). The five profiles whose names end in `-glm-3` do not exist yet; create them first (see "Creating the third GLM worker profile of each board").
 
 Gateway-served sessions load the installed plugin code when the install command prints `Gateway reloaded plugins` (see above); otherwise after the owner runs `hermes gateway restart` from a separate shell. Workers and reviewers started by the dispatcher load it when they start (`hermes -p <profile> --cli ... chat -q`), because each run is a new process.
 
@@ -82,6 +82,76 @@ Card `t_71b4ef4a` added `anki-worker-glm-1` and `anki-worker-glm-2` to `roster.y
 
 `jss-worker-glm-1` and `jss-worker-glm-2` exist, run `glm-5.3` on provider `zai` and have no `auth.json` either. They need the same owner step 7 (`hermes -p jss-worker-glm-1 auth add zai` and `hermes -p jss-worker-glm-2 auth add zai`), their SOULs from `/Users/chanbla11mit/hermes-local-harness/policies/profile-souls/jss-worker-glm-1/SOUL.md` and `/Users/chanbla11mit/hermes-local-harness/policies/profile-souls/jss-worker-glm-2/SOUL.md`, the `jev` plugin, and an entry in `kanban.dispatch_profiles`. A GLM worker without a Z.ai login fails its run when the dispatcher starts it, so add the login before the board's routes take effect.
 
+## Creating the third GLM worker profile of each board
+
+Card `t_f4ce916d` (owner request of 2026-11-14: one more GLM worker for every board, the same as the existing GLM workers, routed by the `jev` plugin to `glm-5.3-flash` or `glm-5.3`) added `harness-worker-glm-3`, `chapt-worker-glm-3`, `jobcron-worker-glm-3`, `jss-worker-glm-3` and `anki-worker-glm-3` to `roster.yaml`, `scripts/verify-state`, `snapshots/sanitized-current-state.yaml`, `plugins/jev/config.json` and the policy sources only. A later deployment card creates the five profiles with the owner's authorization. Until then `scripts/verify-state` reports them as missing (see step 7).
+
+Each new profile is a copy of the first GLM worker of the same board:
+
+| New profile | Source profile | SOUL of the new profile |
+|---|---|---|
+| `harness-worker-glm-3` | `harness-worker-glm-1` | `/Users/chanbla11mit/hermes-local-harness/policies/profile-souls/harness-worker-glm-3/SOUL.md` |
+| `chapt-worker-glm-3` | `chapt-worker-glm-1` | `/Users/chanbla11mit/hermes-local-harness/policies/profile-souls/chapt-worker-glm-3/SOUL.md` |
+| `jobcron-worker-glm-3` | `jobcron-worker-glm-1` | made from `/Users/chanbla11mit/.hermes/profiles/jobcron-worker-glm-1/SOUL.md` (step 3) |
+| `jss-worker-glm-3` | `jss-worker-glm-1` | `/Users/chanbla11mit/hermes-local-harness/policies/profile-souls/jss-worker-glm-3/SOUL.md` |
+| `anki-worker-glm-3` | `anki-worker-glm-1` | `/Users/chanbla11mit/hermes-local-harness/policies/profile-souls/anki-worker-glm-3/SOUL.md` |
+
+For each `<profile>` with its `<source>` from the table:
+
+1. Copy the source profile:
+
+        hermes profile create <profile> --clone-from <source>
+
+   Without `--clone-all`, `create_profile` calls `_bootstrap_profile_dir` (Hermes source `/Users/chanbla11mit/.hermes/hermes-agent/hermes_cli/profiles.py`, Hermes commit `9cf7960f27`), which copies these files and directories of `<source>`, each only when it exists (the same function also calls `clone_memory_provider_config`, and `create_profile` then removes messaging channel settings with `strip_channel_settings`):
+   - `config.yaml` (`_CLONE_CONFIG_FILES`). Read on 2026-11-14 for card `t_f4ce916d` (key values only): in all five source profiles `model.default` is `glm-5.3`, `model.provider` is `zai`, `model.base_url` is `https://api.z.ai/api/coding/paas/v4`, every helper task under `auxiliary` has provider `zai` and model `glm-5.3` and no `fallback_chain` entries, `plugins.enabled` is `[jev]` and `plugins.disabled` is `[]`, and there is no fallback: `fallback_providers` is absent in four of the profiles and `[]` in `anki-worker-glm-1`.
+   - `.env` (`_CLONE_CONFIG_FILES`), copied as a whole file with mode 0600 (`_clone_file`). Nobody opens, prints or changes the copied `.env`. The controller of card `t_f4ce916d` checked on 2026-11-14, without reading any value, that the `.env` of every existing GLM worker has no line that starts with `ANTHROPIC_API`.
+   - `SOUL.md` (`_CLONE_CONFIG_FILES`); step 3 replaces it.
+   - the installed skills, the directory `skills/`.
+   - `memories/MEMORY.md` and `memories/USER.md` (`_CLONE_SUBDIR_FILES`). On 2026-11-14 `harness-worker-glm-1`, `chapt-worker-glm-1` and `jobcron-worker-glm-1` have `memories/MEMORY.md`; no source profile has `memories/USER.md`.
+   - the directory `plugins/` with `.install-metadata.json` (`_clone_plugins`). On 2026-11-14 it holds the plugin directory `jev` in all five source profiles and also `model-providers` (with `claude-subscription` in it) in `anki-worker-glm-1`.
+
+   The copy contains no `auth.json`: `auth.json` is in none of these lists (only `--clone-all` copies the whole profile directory, and this procedure does not use it). The new profile therefore has no Z.ai login until step 6.
+2. Delete the copied memory files, as `procedures/manual-apply.md` requires for a copied profile. `-f` is needed because a source profile can have neither file:
+
+        rm -f /Users/chanbla11mit/.hermes/profiles/<profile>/memories/MEMORY.md /Users/chanbla11mit/.hermes/profiles/<profile>/memories/USER.md
+
+3. Replace the copied SOUL:
+   - For `harness-worker-glm-3`, `chapt-worker-glm-3`, `jss-worker-glm-3` and `anki-worker-glm-3`, copy the tracked source:
+
+            cp /Users/chanbla11mit/hermes-local-harness/policies/profile-souls/<profile>/SOUL.md /Users/chanbla11mit/.hermes/profiles/<profile>/SOUL.md
+
+   - For `jobcron-worker-glm-3`, which has no tracked source, write the live file of `jobcron-worker-glm-1` with the profile name and the worker number replaced:
+
+            sed -e 's/jobcron-worker-glm-1/jobcron-worker-glm-3/g' -e 's/implementation worker 1/implementation worker 3/g' /Users/chanbla11mit/.hermes/profiles/jobcron-worker-glm-1/SOUL.md > /Users/chanbla11mit/.hermes/profiles/jobcron-worker-glm-3/SOUL.md
+
+     On 2026-11-14 that live file has `implementation worker 1` once (first line: `You are Jobcron GLM Full implementation worker 1.`) and `jobcron-worker-glm-1` twice (the paths in the attachment and diff paragraph). Afterwards `diff /Users/chanbla11mit/.hermes/profiles/jobcron-worker-glm-1/SOUL.md /Users/chanbla11mit/.hermes/profiles/jobcron-worker-glm-3/SOUL.md` shows only these replacements.
+4. Check the plugins:
+
+        hermes -p <profile> plugins list --plain --no-bundled
+        ls -a /Users/chanbla11mit/.hermes/profiles/<profile>/plugins /Users/chanbla11mit/.hermes/profiles/<source>/plugins
+
+   The first command must print the line of `jev` with the status `enabled`, and the same plugin lines as `hermes -p <source> plugins list --plain --no-bundled`. The two directory listings must be equal: only the plugins of `<source>` are present. The copied `jev` is the commit that is installed in `<source>`, whose `config.json` names only two GLM workers per board. The plugin in a GLM worker clears the card's model override at the review handoff only when the profile's own name is among the `glm_workers` of its installed `config.json` (`/Users/chanbla11mit/hermes-local-harness/plugins/jev/routing.py`, `handle_request_review`), and the plugin in a reviewer moves a card to a Claude worker after the fifth change request only when the card's assignee is among the board's `glm_workers` of the reviewer's installed `config.json` (`handle_request_changes`). Therefore install the reviewed commit of the three-worker `config.json` on the five new profiles and on the other worker and reviewer profiles of the 36 by "Install on a profile", and on the orchestrator profiles only as step 6 says.
+5. Add the profile to `kanban.dispatch_profiles` of `/Users/chanbla11mit/.hermes/config.yaml`. The switch script writes this entry only together with `--to`; with `--to glm` it sets the same model, provider, base URL and helper tasks that the copy already has, with `--clear-fallbacks` it writes `fallback_providers` `[]` and `[]` for every `auxiliary.<task>.fallback_chain`, and it backs up the profile's `config.yaml` first. Preview with `--dry-run`, then run:
+
+        python3 /Users/chanbla11mit/hermes-local-harness/scripts/switch-profile-model --profile <profile> --to glm --dispatch add --clear-fallbacks
+
+   The script also writes the profile's model and provider into `/Users/chanbla11mit/hermes-local-harness/roster.yaml`; they are already `glm-5.3` and `zai`, so `git -C /Users/chanbla11mit/hermes-local-harness status --porcelain` stays empty.
+6. The owner adds the Z.ai login of the profile, because the copy has no `auth.json`:
+
+        hermes -p <profile> auth add zai
+
+   Nobody else runs this command or handles the key. Install the `jev` plugin with the three-worker `config.json` on the five orchestrator profiles only after all five new profiles have their login: from that install on, the orchestrators route cards to the new profiles, and a GLM worker without a Z.ai login fails its run when the dispatcher starts it.
+7. Run `python3 /Users/chanbla11mit/hermes-local-harness/scripts/verify-state`. Afterwards none of these lines may be printed for the profile:
+   - `FAIL: missing profile: <profile>`
+   - `FAIL: GLM worker missing from dispatch_profiles: <profile>`
+   - `FAIL: dispatch drift: expected [...], actual [...]` (one line for the whole list; it is absent when the list holds every expected profile)
+   - `FAIL: plugin drift <profile>: required jev not enabled (actual ...)`
+   - `FAIL: deployed skill copy missing: <skill> <profile>`, for each shared skill whose `deploy_profiles` in `/Users/chanbla11mit/hermes-local-harness/snapshots/sanitized-current-state.yaml` names the profile (the copy of step 1 brings these skills)
+   - `FAIL: fallback drift <profile> ...`
+   - `WARN: dormant unexpected plugin <profile>: <plugin>`
+
+   The SOULs of the five reviewers and the five orchestrators and the five orchestrator skills that card `t_f4ce916d` changed are deployed by the same deployment card; after that deployment `FAIL: profile SOUL drift <profile>` and the drift lines of the orchestrator skill (`FAIL: profile-local skill override drift: <orchestrator profile>/autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md`) must be absent for those profiles as well.
+
 ## Attachment and diff procedure of the GLM workers
 
 Card `t_ac454595` (GLM routing request of 2026-11-13, Part 6.3) added an exact procedure for attaching a file to a card and for producing the diff that the reviewer reads to the instructions of the ten GLM workers. On card `t_7097923f` a GLM worker had four failed `kanban_attach` and `kanban_attach_url` calls, and the reviewer rejected a malformed diff. The procedure rests on these facts of the installed Hermes source `/Users/chanbla11mit/.hermes/hermes-agent`:
@@ -92,9 +162,11 @@ Card `t_ac454595` (GLM routing request of 2026-11-13, Part 6.3) added an exact p
 - `hermes kanban --board <board> attach <task id> <path> [--name <file name>]` reads a local file, stores it with the same 25 MB limit, and refuses a task other than `HERMES_KANBAN_TASK` (`/Users/chanbla11mit/.hermes/hermes-agent/hermes_cli/kanban.py`, `_cmd_attach` and `_worker_run_id_for`).
 - The tool result filter of this plugin cuts a line longer than `chunk_chars` (500) into pieces and can shorten a `terminal` or `execute_code` result of more than 2,000 characters (`/Users/chanbla11mit/hermes-local-harness/plugins/jev/tool_filter.py`, `_split_units` and `_make_chunks`), so Base64 text longer than that cannot be copied reliably from a tool result.
 
-The tracked SOUL sources of the eight GLM workers that have one contain the procedure as one paragraph: `/Users/chanbla11mit/hermes-local-harness/policies/profile-souls/harness-worker-glm-1/SOUL.md`, `/Users/chanbla11mit/hermes-local-harness/policies/profile-souls/harness-worker-glm-2/SOUL.md`, `/Users/chanbla11mit/hermes-local-harness/policies/profile-souls/chapt-worker-glm-1/SOUL.md`, `/Users/chanbla11mit/hermes-local-harness/policies/profile-souls/chapt-worker-glm-2/SOUL.md`, `/Users/chanbla11mit/hermes-local-harness/policies/profile-souls/jss-worker-glm-1/SOUL.md`, `/Users/chanbla11mit/hermes-local-harness/policies/profile-souls/jss-worker-glm-2/SOUL.md`, `/Users/chanbla11mit/hermes-local-harness/policies/profile-souls/anki-worker-glm-1/SOUL.md`, `/Users/chanbla11mit/hermes-local-harness/policies/profile-souls/anki-worker-glm-2/SOUL.md`.
+The tracked SOUL sources of the twelve GLM workers that have one contain the procedure as one paragraph: `/Users/chanbla11mit/hermes-local-harness/policies/profile-souls/harness-worker-glm-1/SOUL.md`, `/Users/chanbla11mit/hermes-local-harness/policies/profile-souls/harness-worker-glm-2/SOUL.md`, `/Users/chanbla11mit/hermes-local-harness/policies/profile-souls/harness-worker-glm-3/SOUL.md`, `/Users/chanbla11mit/hermes-local-harness/policies/profile-souls/chapt-worker-glm-1/SOUL.md`, `/Users/chanbla11mit/hermes-local-harness/policies/profile-souls/chapt-worker-glm-2/SOUL.md`, `/Users/chanbla11mit/hermes-local-harness/policies/profile-souls/chapt-worker-glm-3/SOUL.md`, `/Users/chanbla11mit/hermes-local-harness/policies/profile-souls/jss-worker-glm-1/SOUL.md`, `/Users/chanbla11mit/hermes-local-harness/policies/profile-souls/jss-worker-glm-2/SOUL.md`, `/Users/chanbla11mit/hermes-local-harness/policies/profile-souls/jss-worker-glm-3/SOUL.md`, `/Users/chanbla11mit/hermes-local-harness/policies/profile-souls/anki-worker-glm-1/SOUL.md`, `/Users/chanbla11mit/hermes-local-harness/policies/profile-souls/anki-worker-glm-2/SOUL.md`, `/Users/chanbla11mit/hermes-local-harness/policies/profile-souls/anki-worker-glm-3/SOUL.md`.
 
 `jobcron-worker-glm-1` and `jobcron-worker-glm-2` have no SOUL source in this repository: `/Users/chanbla11mit/hermes-local-harness/roster.yaml` (`profile_souls`) and `/Users/chanbla11mit/hermes-local-harness/scripts/verify-state` (`PROFILE_SOUL_PATHS`) do not list them, and `/Users/chanbla11mit/hermes-local-harness/policies/profile-souls/` has no directory for them (the same holds for `jobcron-worker` and `jobcron-worker-2`). Their live files `/Users/chanbla11mit/.hermes/profiles/jobcron-worker-glm-1/SOUL.md` and `/Users/chanbla11mit/.hermes/profiles/jobcron-worker-glm-2/SOUL.md` have no line that starts with `#` (SHA-256 on 2026-11-13: `dbd702cf57c46b29e49373497e1ac2d1d6a43b3eba14682aa22f26c6e797b930` and `e05167d0aab81cd1c2f79c2caeaa181dc809e55a34d9d8cb916d3f449dc9c623`). Card `t_7e73d1b4` added the paragraph below for each of the two profiles to its live file on 2026-11-13, with the owner's authorization, as a new paragraph at the end of the file after one empty line, because neither file has a paragraph that starts with `Terminology and wording`. The SHA-256 values above are the values before the change; the values after the change are `ea3494552afed57734131fabafcd8b62205bb2a6ac9f9f63398dae11e1510968` (`jobcron-worker-glm-1`) and `d6e711330a6576958eb4c053b26e826b59c181532b3bd6127e2e72e64497fc0a` (`jobcron-worker-glm-2`).
+
+`jobcron-worker-glm-3` has no SOUL source in this repository either. Its live file is the live file of `jobcron-worker-glm-1` with `jobcron-worker-glm-1` replaced by `jobcron-worker-glm-3` and `implementation worker 1` replaced by `implementation worker 3` (see "Creating the third GLM worker profile of each board", step 3), so it contains the paragraph for `jobcron-worker-glm-1` below with that replacement.
 
 Paragraph for `jobcron-worker-glm-1`:
 
@@ -162,19 +234,19 @@ For each `kanban_create` call the plugin sends Jev one Choice question. The stat
 
 Card `t_df87b851` set these three texts on all five boards (the owner's instruction of 2026-11-13 to change every route of every board). The earlier texts named topics (`easy`: a documentation or wording edit; `hard`: security, payment, migration or deployment work); the new texts decide by how exactly the card is specified.
 
-The route is applied only when all three conditions hold: the orchestrator left `model` empty, the `assignee` is one of the board's `implementation_workers`, and the chosen route's probability is at least `threshold`. Otherwise the card is created exactly as the orchestrator asked. On `easy` or `medium` the plugin sets `assignee` to the next GLM worker of the board (the two alternate; the counter is in `<log dir>/routing-state.json`, which holds only board names, route names and counters), sets `model` and `provider`, and replaces the profile name on a body line that starts with `Assigned worker EXACT `. The reviewer is not changed. Any Jev error, timeout, HTTP error, missing key or unexpected answer leaves the card unchanged.
+The route is applied only when all three conditions hold: the orchestrator left `model` empty, the `assignee` is one of the board's `implementation_workers`, and the chosen route's probability is at least `threshold`. Otherwise the card is created exactly as the orchestrator asked. On `easy` or `medium` the plugin sets `assignee` to the next GLM worker of the board (the three take turns; the counter is in `<log dir>/routing-state.json`, which holds only board names, route names and counters), sets `model` and `provider`, and replaces the profile name on a body line that starts with `Assigned worker EXACT `. The reviewer is not changed. Any Jev error, timeout, HTTP error, missing key or unexpected answer leaves the card unchanged.
 
 A repeated `kanban_create` with an `idempotency_key` that Hermes already knows returns the existing card, and Hermes does not apply the new arguments to it. The plugin cannot tell this case from a new card: the alternation counter and the control group counter still advance, and the `route` record says `applied` `true` (or `not_applied_reason` `control_group`) although the existing card is unchanged.
 
 | Board | Implementation workers | GLM workers | Enabled routes |
 |---|---|---|---|
-| `jobcron` | `jobcron-worker`, `jobcron-worker-2` | `jobcron-worker-glm-1`, `jobcron-worker-glm-2` | `easy`, `medium`, `hard` |
-| `cha-pt` | `chapt-worker`, `chapt-worker-2` | `chapt-worker-glm-1`, `chapt-worker-glm-2` | `easy`, `medium`, `hard` |
-| `harness` | `harness-worker`, `harness-worker-2` | `harness-worker-glm-1`, `harness-worker-glm-2` | `easy`, `medium`, `hard` |
-| `jss-genr` | `jss-worker`, `jss-worker-2` | `jss-worker-glm-1`, `jss-worker-glm-2` | `easy`, `medium`, `hard` |
-| `anki` | `anki-worker`, `anki-worker-2` | `anki-worker-glm-1`, `anki-worker-glm-2` | `easy`, `medium`, `hard` |
+| `jobcron` | `jobcron-worker`, `jobcron-worker-2` | `jobcron-worker-glm-1`, `jobcron-worker-glm-2`, `jobcron-worker-glm-3` | `easy`, `medium`, `hard` |
+| `cha-pt` | `chapt-worker`, `chapt-worker-2` | `chapt-worker-glm-1`, `chapt-worker-glm-2`, `chapt-worker-glm-3` | `easy`, `medium`, `hard` |
+| `harness` | `harness-worker`, `harness-worker-2` | `harness-worker-glm-1`, `harness-worker-glm-2`, `harness-worker-glm-3` | `easy`, `medium`, `hard` |
+| `jss-genr` | `jss-worker`, `jss-worker-2` | `jss-worker-glm-1`, `jss-worker-glm-2`, `jss-worker-glm-3` | `easy`, `medium`, `hard` |
+| `anki` | `anki-worker`, `anki-worker-2` | `anki-worker-glm-1`, `anki-worker-glm-2`, `anki-worker-glm-3` | `easy`, `medium`, `hard` |
 
-Every board has GLM routing (card `t_71b4ef4a` added `jss-genr` and `anki`). Every board uses the same three routes with the same models, providers and criteria. A board whose `easy` and `medium` routes are both disabled in `config.json` gets no Jev call, and its cards stay on Claude.
+Every board has GLM routing (card `t_71b4ef4a` added `jss-genr` and `anki`). Card `t_f4ce916d` added the third GLM worker of every board on 2026-11-14. Every board uses the same three routes with the same models, providers and criteria. A board whose `easy` and `medium` routes are both disabled in `config.json` gets no Jev call, and its cards stay on Claude.
 
 ### Model override at the review handoff
 

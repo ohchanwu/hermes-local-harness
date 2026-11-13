@@ -29,7 +29,7 @@ JSS = (ORCH, WORKER, WORKER2, REVIEWER)
 WORKERS = (WORKER, WORKER2)
 # Back in service for the jev plugin since 2026-11-12 (card t_71b4ef4a); their SOULs are
 # tracked sources too.
-GLM_WORKERS = ("jss-worker-glm-1", "jss-worker-glm-2")
+GLM_WORKERS = ("jss-worker-glm-1", "jss-worker-glm-2", "jss-worker-glm-3")
 NON_ORCH_SOULS = (WORKER, WORKER2, REVIEWER, *GLM_WORKERS)
 SITE = "/Users/chanbla11mit/mystuff/projects/ohchanwu.dev"
 FLEETS = {"jobcron", "cha-pt", "harness", "jss-genr", "anki"}
@@ -92,11 +92,13 @@ EXCEPTION_PRIVACY = (
     "the jss-genr repository")
 EXCEPTION_RULES = (EXCEPTION_REPOSITORIES, EXCEPTION_PERMITTED, EXCEPTION_PROHIBITED,
                    EXCEPTION_MERGED_NOT_DEPLOYED, EXCEPTION_SHA_AND_DATE, EXCEPTION_PRIVACY)
-# The jev plugin policy change (t_71b4ef4a) names the four jss-genr implementation profiles.
+# The jev plugin policy change (t_71b4ef4a) named the four jss-genr implementation profiles; card
+# t_f4ce916d added the third GLM worker.
 REVIEWER_FIRST_LINE = (
     "You are the independent jss-genr reviewer. Accept review only for a card on board `jss-genr`, "
-    "implemented by one of the four jss-genr implementation profiles `jss-worker`, `jss-worker-2`, "
-    "`jss-worker-glm-1` or `jss-worker-glm-2`, and pinned to repository `/Users/chanbla11mit/projects/jss-genr`.")
+    "implemented by one of the five jss-genr implementation profiles `jss-worker`, `jss-worker-2`, "
+    "`jss-worker-glm-1`, `jss-worker-glm-2` or `jss-worker-glm-3`, and pinned to repository "
+    "`/Users/chanbla11mit/projects/jss-genr`.")
 # Sentences that limit access to other repositories name the exception instead of contradicting it.
 ACCESS_LIMIT = re.compile(r"(?i)never access|or access jobcron|may not probe|operate only on|use only `")
 EXCEPTION_REFERENCE = "the reads that the read-only repository exception"
@@ -475,7 +477,7 @@ class RoleContracts(unittest.TestCase):
 
     def test_skill_version_size_and_sections(self):
         # Raised by the jev plugin policy change (t_71b4ef4a).
-        self.assertRegex(self.skill_raw, r"(?m)^version: 0\.6\.7-jss\.12$")  # raised by t_ac454595, t_46b5e63e and t_89838618
+        self.assertRegex(self.skill_raw, r"(?m)^version: 0\.6\.7-jss\.13$")  # raised by t_ac454595, t_46b5e63e, t_89838618 and t_f4ce916d
         # 260 lines plus the 4-line Pitfalls section (t_bd860536), the 9 lines of
         # repair_history candidate rules and example (t_6436ac1c), the 6-line
         # Skill Changes section (t_0a8674fe) and the one-line Hard Scope read-only
@@ -925,7 +927,9 @@ class ReadOnlyRepositoryException(unittest.TestCase):
                 self.assertEqual(hashlib.sha256(original).hexdigest(), BASELINE_SHA256[path])
 
     def test_worker_souls_are_unchanged_and_carry_no_exception(self):
-        for profile in (*WORKERS, *GLM_WORKERS):
+        # The SOUL of the third GLM worker (card t_f4ce916d) is a copy of the first one, which
+        # tests/test_third_glm_worker_policy.py checks; it has no bytes at this card's baseline.
+        for profile in (*WORKERS, *GLM_WORKERS[:2]):
             relative = f"policies/profile-souls/{profile}/SOUL.md"
             text = soul_path(profile).read_text()
             with self.subTest(profile=profile):
@@ -1012,7 +1016,9 @@ class DownloadAndInstallOwnerDecision(unittest.TestCase):
         "policies/profile-souls/jss-worker-glm-2/SOUL.md":
             "f1d8319c613637db122c0e90a9d0e45637caf297a8a19637d65bead0a6372061",
     }
-    WORKER_PROFILES = (*WORKERS, *GLM_WORKERS)
+    # The six sources of card t_89838618; the SOUL of the third GLM worker (card t_f4ce916d) is a copy
+    # of the first one, which tests/test_third_glm_worker_policy.py checks.
+    WORKER_PROFILES = (*WORKERS, *GLM_WORKERS[:2])
     # Sentences of the six sources that name an install or a download and are neither the owner
     # decision nor a sentence that limits an install to a source that is not reputable.
     OTHER_INSTALL_SENTENCES = (
@@ -1072,7 +1078,8 @@ class DownloadAndInstallOwnerDecision(unittest.TestCase):
         self.assertIn(self.SKILL_COMPLETION_LINE, section(self.skill_raw, "Completion Gate"))
 
     def test_skill_version_line(self):
-        self.assertEqual(re.findall(r"(?m)^version: (.+)$", self.skill_raw), ["0.6.7-jss.12"])
+        # Card t_f4ce916d raised the version by one more step.
+        self.assertEqual(re.findall(r"(?m)^version: (.+)$", self.skill_raw), ["0.6.7-jss.13"])
 
     def test_no_source_keeps_the_removed_wording(self):
         for path, text in self.raw.items():

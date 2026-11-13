@@ -8,8 +8,10 @@ The cases below remove the block from one SOUL and require the verifier to fail.
 reverse_stale_test_rule_edits() lets tests that compare a file with an earlier
 reviewed version reverse this card's change: for a file that this card changed, when
 the given bytes are the bytes of that file after this card, it returns the bytes of
-the file at this card's baseline commit. This module imports no other test module
-at load time, so any test module can import it.
+the file at this card's baseline commit; it reverses the later edits of card t_f4ce916d
+first. This module imports only jss_download_install_edits and
+test_third_glm_worker_policy at load time, which import no other test module, so any test
+module can import it.
 """
 from contextlib import redirect_stdout
 import copy
@@ -23,6 +25,7 @@ import unittest
 from unittest.mock import patch
 
 from jss_download_install_edits import reverse_download_install_edits
+from test_third_glm_worker_policy import reverse_third_glm_worker_edits
 
 ROOT = Path(__file__).resolve().parents[1]
 BASELINE = "d338ca675793238535ade9ef2a02c83488353e67"
@@ -110,7 +113,9 @@ def baseline_bytes(relative_path):
 
 def reverse_stale_test_rule_edits(relative_path, text):
     """Return the bytes of relative_path at BASELINE when text is that file after card
-    t_46b5e63e, else text unchanged; text may be str or bytes."""
+    t_46b5e63e, else text unchanged; text may be str or bytes. The later edits of card
+    t_f4ce916d are reversed first."""
+    text = reverse_third_glm_worker_edits(relative_path, text)
     want = AFTER_SHA256.get(relative_path)
     if want is None:
         return text
@@ -130,8 +135,10 @@ class PolicyFile(unittest.TestCase):
         self.assertTrue(AFTER_SHA256)
         for relative_path, want in AFTER_SHA256.items():
             with self.subTest(path=relative_path):
-                # The later download and install change (t_89838618) is reversed first.
+                # The later download and install change (t_89838618) and the later third GLM worker
+                # change (t_f4ce916d) are reversed first.
                 current = reverse_download_install_edits(relative_path, (ROOT / relative_path).read_bytes())
+                current = reverse_third_glm_worker_edits(relative_path, current)
                 self.assertEqual(hashlib.sha256(current).hexdigest(), want)
                 self.assertEqual(reverse_stale_test_rule_edits(relative_path, current), baseline_bytes(relative_path))
                 self.assertEqual(reverse_stale_test_rule_edits(relative_path, current.decode()),

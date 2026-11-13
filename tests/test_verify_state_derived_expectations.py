@@ -200,7 +200,8 @@ class DerivedExpectations(unittest.TestCase):
                 "profile SOUL drift harness-reviewer",
                 f"profile-local skill override drift: harness-orchestrator/{RELATIVE}",
             })
-            self.assertEqual(len(stale), 17)  # card t_c8c6860f: +6 GLM workers of jobcron/chapt/harness
+            # card t_c8c6860f: +6 GLM workers of jobcron/chapt/harness; card t_f4ce916d: +3 third GLM workers.
+            self.assertEqual(len(stale), 20)
             # Redeploying the changed sources (new observation, still no pin edit) is green.
             code, fails, output = run_main(root, redeployed(tree_verifier(root), self.clean))
             self.assertEqual((code, fails), (0, set()), output)
@@ -286,7 +287,8 @@ class DerivedExpectations(unittest.TestCase):
 
     # (e)
     def test_profile_present_live_but_absent_from_roster_fails(self):
-        ghost = "harness-worker-glm-3"  # GLM-like name, but not a retired roster profile
+        # GLM-like name, but not a roster profile (card t_f4ce916d declared harness-worker-glm-3).
+        ghost = "harness-worker-glm-4"
         self.assertNotIn(ghost, self.retired)
         fixture = copy.deepcopy(self.clean)
         fixture["profile_models"][ghost] = "glm-5.3"

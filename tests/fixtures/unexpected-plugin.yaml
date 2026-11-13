@@ -31,18 +31,23 @@
     "jss-reviewer": "claude-opus-5-5",
     "jobcron-worker-glm-1": "glm-5.3",
     "jobcron-worker-glm-2": "glm-5.3",
+    "jobcron-worker-glm-3": "glm-5.3",
     "chapt-worker-glm-1": "glm-5.3",
     "chapt-worker-glm-2": "glm-5.3",
+    "chapt-worker-glm-3": "glm-5.3",
     "harness-worker-glm-1": "glm-5.3",
     "harness-worker-glm-2": "glm-5.3",
+    "harness-worker-glm-3": "glm-5.3",
     "jss-worker-glm-1": "glm-5.3",
     "jss-worker-glm-2": "glm-5.3",
+    "jss-worker-glm-3": "glm-5.3",
     "anki-orchestrator": "claude-fable-5-2",
     "anki-worker": "claude-opus-5-5",
     "anki-worker-2": "claude-opus-5-5",
     "anki-reviewer": "claude-opus-5-5",
     "anki-worker-glm-1": "glm-5.3",
-    "anki-worker-glm-2": "glm-5.3"
+    "anki-worker-glm-2": "glm-5.3",
+    "anki-worker-glm-3": "glm-5.3"
   },
   "profile_providers": {
     "default": "claude-subscription",
@@ -76,18 +81,23 @@
     "jss-reviewer": "claude-subscription",
     "jobcron-worker-glm-1": "zai",
     "jobcron-worker-glm-2": "zai",
+    "jobcron-worker-glm-3": "zai",
     "chapt-worker-glm-1": "zai",
     "chapt-worker-glm-2": "zai",
+    "chapt-worker-glm-3": "zai",
     "harness-worker-glm-1": "zai",
     "harness-worker-glm-2": "zai",
+    "harness-worker-glm-3": "zai",
     "jss-worker-glm-1": "zai",
     "jss-worker-glm-2": "zai",
+    "jss-worker-glm-3": "zai",
     "anki-orchestrator": "claude-subscription",
     "anki-worker": "claude-subscription",
     "anki-worker-2": "claude-subscription",
     "anki-reviewer": "claude-subscription",
     "anki-worker-glm-1": "zai",
-    "anki-worker-glm-2": "zai"
+    "anki-worker-glm-2": "zai",
+    "anki-worker-glm-3": "zai"
   },
   "plugins": {
     "default": {
@@ -217,10 +227,16 @@
     "jobcron-worker-glm-2": {
       "jev": "enabled      user     0.1.0    jev"
     },
+    "jobcron-worker-glm-3": {
+      "jev": "enabled      user     0.1.0    jev"
+    },
     "chapt-worker-glm-1": {
       "jev": "enabled      user     0.1.0    jev"
     },
     "chapt-worker-glm-2": {
+      "jev": "enabled      user     0.1.0    jev"
+    },
+    "chapt-worker-glm-3": {
       "jev": "enabled      user     0.1.0    jev"
     },
     "harness-worker-glm-1": {
@@ -229,10 +245,16 @@
     "harness-worker-glm-2": {
       "jev": "enabled      user     0.1.0    jev"
     },
+    "harness-worker-glm-3": {
+      "jev": "enabled      user     0.1.0    jev"
+    },
     "jss-worker-glm-1": {
       "jev": "enabled      user     0.1.0    jev"
     },
     "jss-worker-glm-2": {
+      "jev": "enabled      user     0.1.0    jev"
+    },
+    "jss-worker-glm-3": {
       "jev": "enabled      user     0.1.0    jev"
     },
     "anki-orchestrator": {
@@ -258,6 +280,9 @@
     },
     "anki-worker-glm-2": {
       "jev": "enabled      user     0.1.0    jev"
+    },
+    "anki-worker-glm-3": {
+      "jev": "enabled      user     0.1.0    jev"
     }
   },
   "dispatch_profiles": [
@@ -278,14 +303,19 @@
     "anki-reviewer",
     "jobcron-worker-glm-1",
     "jobcron-worker-glm-2",
+    "jobcron-worker-glm-3",
     "chapt-worker-glm-1",
     "chapt-worker-glm-2",
+    "chapt-worker-glm-3",
     "harness-worker-glm-1",
     "harness-worker-glm-2",
+    "harness-worker-glm-3",
     "jss-worker-glm-1",
     "jss-worker-glm-2",
+    "jss-worker-glm-3",
     "anki-worker-glm-1",
-    "anki-worker-glm-2"
+    "anki-worker-glm-2",
+    "anki-worker-glm-3"
   ],
   "kanban": {
     "max_in_progress": null,
@@ -363,6 +393,9 @@
       "jobcron-worker-glm-2": {
         "SKILL.md": "tracked-source"
       },
+      "jobcron-worker-glm-3": {
+        "SKILL.md": "tracked-source"
+      },
       "chapt-worker": {
         "SKILL.md": "tracked-source"
       },
@@ -373,6 +406,9 @@
         "SKILL.md": "tracked-source"
       },
       "chapt-worker-glm-2": {
+        "SKILL.md": "tracked-source"
+      },
+      "chapt-worker-glm-3": {
         "SKILL.md": "tracked-source"
       },
       "harness-worker": {
@@ -387,6 +423,9 @@
       "harness-worker-glm-2": {
         "SKILL.md": "tracked-source"
       },
+      "harness-worker-glm-3": {
+        "SKILL.md": "tracked-source"
+      },
       "jss-worker": {
         "SKILL.md": "tracked-source"
       },
@@ -399,6 +438,9 @@
       "jss-worker-glm-2": {
         "SKILL.md": "tracked-source"
       },
+      "jss-worker-glm-3": {
+        "SKILL.md": "tracked-source"
+      },
       "anki-worker": {
         "SKILL.md": "tracked-source"
       },
@@ -409,6 +451,9 @@
         "SKILL.md": "tracked-source"
       },
       "anki-worker-glm-2": {
+        "SKILL.md": "tracked-source"
+      },
+      "anki-worker-glm-3": {
         "SKILL.md": "tracked-source"
       }
     },
@@ -455,6 +500,9 @@
       "jobcron-worker-glm-2": {
         "SKILL.md": "tracked-source"
       },
+      "jobcron-worker-glm-3": {
+        "SKILL.md": "tracked-source"
+      },
       "chapt-worker": {
         "SKILL.md": "tracked-source"
       },
@@ -465,6 +513,9 @@
         "SKILL.md": "tracked-source"
       },
       "chapt-worker-glm-2": {
+        "SKILL.md": "tracked-source"
+      },
+      "chapt-worker-glm-3": {
         "SKILL.md": "tracked-source"
       },
       "harness-worker": {
@@ -479,6 +530,9 @@
       "harness-worker-glm-2": {
         "SKILL.md": "tracked-source"
       },
+      "harness-worker-glm-3": {
+        "SKILL.md": "tracked-source"
+      },
       "jss-worker": {
         "SKILL.md": "tracked-source"
       },
@@ -491,6 +545,9 @@
       "jss-worker-glm-2": {
         "SKILL.md": "tracked-source"
       },
+      "jss-worker-glm-3": {
+        "SKILL.md": "tracked-source"
+      },
       "anki-worker": {
         "SKILL.md": "tracked-source"
       },
@@ -501,6 +558,9 @@
         "SKILL.md": "tracked-source"
       },
       "anki-worker-glm-2": {
+        "SKILL.md": "tracked-source"
+      },
+      "anki-worker-glm-3": {
         "SKILL.md": "tracked-source"
       }
     },
@@ -575,6 +635,11 @@
         "references/live-state-reconciliation.md": "tracked-source",
         "references/release-ci-portability.md": "tracked-source"
       },
+      "jobcron-worker-glm-3": {
+        "SKILL.md": "tracked-source",
+        "references/live-state-reconciliation.md": "tracked-source",
+        "references/release-ci-portability.md": "tracked-source"
+      },
       "jobcron-orchestrator": {
         "SKILL.md": "tracked-source",
         "references/live-state-reconciliation.md": "tracked-source",
@@ -605,6 +670,11 @@
         "references/live-state-reconciliation.md": "tracked-source",
         "references/release-ci-portability.md": "tracked-source"
       },
+      "chapt-worker-glm-3": {
+        "SKILL.md": "tracked-source",
+        "references/live-state-reconciliation.md": "tracked-source",
+        "references/release-ci-portability.md": "tracked-source"
+      },
       "chapt-orchestrator": {
         "SKILL.md": "tracked-source",
         "references/live-state-reconciliation.md": "tracked-source",
@@ -631,6 +701,11 @@
         "references/release-ci-portability.md": "tracked-source"
       },
       "harness-worker-glm-2": {
+        "SKILL.md": "tracked-source",
+        "references/live-state-reconciliation.md": "tracked-source",
+        "references/release-ci-portability.md": "tracked-source"
+      },
+      "harness-worker-glm-3": {
         "SKILL.md": "tracked-source",
         "references/live-state-reconciliation.md": "tracked-source",
         "references/release-ci-portability.md": "tracked-source"
@@ -717,6 +792,11 @@
         "references/temporary-cloud-bootstrap-iam.md": "tracked-source",
         "references/frontend-origin-separation.md": "tracked-source"
       },
+      "jobcron-worker-glm-3": {
+        "SKILL.md": "tracked-source",
+        "references/temporary-cloud-bootstrap-iam.md": "tracked-source",
+        "references/frontend-origin-separation.md": "tracked-source"
+      },
       "chapt-worker": {
         "SKILL.md": "tracked-source",
         "references/temporary-cloud-bootstrap-iam.md": "tracked-source",
@@ -737,6 +817,11 @@
         "references/temporary-cloud-bootstrap-iam.md": "tracked-source",
         "references/frontend-origin-separation.md": "tracked-source"
       },
+      "chapt-worker-glm-3": {
+        "SKILL.md": "tracked-source",
+        "references/temporary-cloud-bootstrap-iam.md": "tracked-source",
+        "references/frontend-origin-separation.md": "tracked-source"
+      },
       "harness-worker": {
         "SKILL.md": "tracked-source",
         "references/temporary-cloud-bootstrap-iam.md": "tracked-source",
@@ -753,6 +838,11 @@
         "references/frontend-origin-separation.md": "tracked-source"
       },
       "harness-worker-glm-2": {
+        "SKILL.md": "tracked-source",
+        "references/temporary-cloud-bootstrap-iam.md": "tracked-source",
+        "references/frontend-origin-separation.md": "tracked-source"
+      },
+      "harness-worker-glm-3": {
         "SKILL.md": "tracked-source",
         "references/temporary-cloud-bootstrap-iam.md": "tracked-source",
         "references/frontend-origin-separation.md": "tracked-source"
@@ -794,6 +884,9 @@
       "jobcron-worker-glm-2": {
         "SKILL.md": "tracked-source"
       },
+      "jobcron-worker-glm-3": {
+        "SKILL.md": "tracked-source"
+      },
       "jobcron-reviewer": {
         "SKILL.md": "tracked-source"
       },
@@ -810,6 +903,9 @@
         "SKILL.md": "tracked-source"
       },
       "chapt-worker-glm-2": {
+        "SKILL.md": "tracked-source"
+      },
+      "chapt-worker-glm-3": {
         "SKILL.md": "tracked-source"
       },
       "chapt-reviewer": {
@@ -1031,18 +1127,23 @@
     "jss-reviewer": "off",
     "jobcron-worker-glm-1": "off",
     "jobcron-worker-glm-2": "off",
+    "jobcron-worker-glm-3": "off",
     "chapt-worker-glm-1": "off",
     "chapt-worker-glm-2": "off",
+    "chapt-worker-glm-3": "off",
     "harness-worker-glm-1": "off",
     "harness-worker-glm-2": "off",
+    "harness-worker-glm-3": "off",
     "jss-worker-glm-1": "off",
     "jss-worker-glm-2": "off",
+    "jss-worker-glm-3": "off",
     "anki-orchestrator": "off",
     "anki-worker": "off",
     "anki-worker-2": "off",
     "anki-reviewer": "off",
     "anki-worker-glm-1": "off",
-    "anki-worker-glm-2": "off"
+    "anki-worker-glm-2": "off",
+    "anki-worker-glm-3": "off"
   },
   "profile_soul_hashes": {
     "chapt-orchestrator": "tracked-source",
@@ -3650,11 +3751,19 @@
       "fallback_providers": [],
       "auxiliary": {}
     },
+    "jobcron-worker-glm-3": {
+      "fallback_providers": [],
+      "auxiliary": {}
+    },
     "chapt-worker-glm-1": {
       "fallback_providers": [],
       "auxiliary": {}
     },
     "chapt-worker-glm-2": {
+      "fallback_providers": [],
+      "auxiliary": {}
+    },
+    "chapt-worker-glm-3": {
       "fallback_providers": [],
       "auxiliary": {}
     },
@@ -3666,11 +3775,19 @@
       "fallback_providers": [],
       "auxiliary": {}
     },
+    "harness-worker-glm-3": {
+      "fallback_providers": [],
+      "auxiliary": {}
+    },
     "jss-worker-glm-1": {
       "fallback_providers": [],
       "auxiliary": {}
     },
     "jss-worker-glm-2": {
+      "fallback_providers": [],
+      "auxiliary": {}
+    },
+    "jss-worker-glm-3": {
       "fallback_providers": [],
       "auxiliary": {}
     },
@@ -4231,6 +4348,10 @@
       "auxiliary": {}
     },
     "anki-worker-glm-2": {
+      "fallback_providers": [],
+      "auxiliary": {}
+    },
+    "anki-worker-glm-3": {
       "fallback_providers": [],
       "auxiliary": {}
     }

@@ -464,11 +464,15 @@ assert roster["project_dispatch_allowlist"] == [
     "jss-worker", "jss-reviewer",
     "harness-worker-2", "chapt-worker-2", "jobcron-worker-2", "jss-worker-2",
     "anki-worker", "anki-worker-2", "anki-reviewer",
-    # GLM workers back in service for the jev plugin (card t_4f7740d0).
-    "jobcron-worker-glm-1", "jobcron-worker-glm-2", "chapt-worker-glm-1", "chapt-worker-glm-2",
-    "harness-worker-glm-1", "harness-worker-glm-2",
-    # GLM workers of jss-genr and anki for the jev plugin (card t_71b4ef4a).
-    "jss-worker-glm-1", "jss-worker-glm-2", "anki-worker-glm-1", "anki-worker-glm-2"]
+    # GLM workers back in service for the jev plugin (card t_4f7740d0), with the third GLM worker of
+    # each board (card t_f4ce916d) after the second.
+    "jobcron-worker-glm-1", "jobcron-worker-glm-2", "jobcron-worker-glm-3",
+    "chapt-worker-glm-1", "chapt-worker-glm-2", "chapt-worker-glm-3",
+    "harness-worker-glm-1", "harness-worker-glm-2", "harness-worker-glm-3",
+    # GLM workers of jss-genr and anki for the jev plugin (card t_71b4ef4a), and their third GLM
+    # workers (card t_f4ce916d).
+    "jss-worker-glm-1", "jss-worker-glm-2", "jss-worker-glm-3",
+    "anki-worker-glm-1", "anki-worker-glm-2", "anki-worker-glm-3"]
 roster_profiles = {profile["name"]: profile for profile in roster["profiles"]}
 assert roster["approval_policy"]["mode"] == "off"
 assert roster["approval_policy"]["profiles"] == list(roster_profiles)

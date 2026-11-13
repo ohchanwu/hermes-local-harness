@@ -29,19 +29,20 @@ SECOND = tuple(pool[1] for pool in POOLS.values())
 ALL_POOLS = {**POOLS, "anki": ["anki-worker", "anki-worker-2"]}
 # Owner decisions of 2026-11-12: the GLM workers of jobcron, cha-pt and harness are back in
 # service for the jev plugin (card t_4f7740d0), and the GLM workers of jss-genr and anki
-# joined them (card t_71b4ef4a). The generic GLM profiles stay retired.
+# joined them (card t_71b4ef4a). Card t_f4ce916d (owner request of 2026-11-14) added a third GLM
+# worker to every board. The generic GLM profiles stay retired.
 GLM_IN_SERVICE = tuple(f"{prefix}-worker-glm-{n}" for prefix in ("jobcron", "chapt", "harness", "jss", "anki")
-                       for n in (1, 2))
+                       for n in (1, 2, 3))
 GLM_RETIRED = ("worker-flash-1", "worker-flash-2", "worker-flash-3", "worker-glm-full")
 # Live default-home kanban.dispatch_profiles order after the controller's 2026-10-18 change,
-# followed by the GLM workers in service (cards t_4f7740d0 and t_71b4ef4a).
+# followed by the GLM workers in service (cards t_4f7740d0, t_71b4ef4a and t_f4ce916d).
 PROJECT_DISPATCH = [
     "jobcron-worker", "jobcron-reviewer", "chapt-worker", "chapt-reviewer",
     "harness-worker", "harness-reviewer", "jss-worker", "jss-reviewer",
     "harness-worker-2", "chapt-worker-2", "jobcron-worker-2", "jss-worker-2",
     "anki-worker", "anki-worker-2", "anki-reviewer", *GLM_IN_SERVICE,
 ]
-GLM = tuple(f"{prefix}-worker-glm-{n}" for prefix in (*FLEETS.values(), "anki") for n in (1, 2))
+GLM = tuple(f"{prefix}-worker-glm-{n}" for prefix in (*FLEETS.values(), "anki") for n in (1, 2, 3))
 GLM_NAME = re.compile(r"\b(?:jobcron|chapt|harness|jss|anki)-worker-glm-\d\b")
 RULE = ("Spread independent ready cards across the two workers; keep cards that touch the same files "
         "serialized or dependency-linked.")
@@ -58,10 +59,10 @@ JOBCRON_PRODUCTION_DEPLOYMENT = ("devops/production-deployment/SKILL.md",
                                  "devops/production-deployment/references/release-ci-portability.md")
 SHARED_SKILL = ROOT / "skills/multi-agent-coding-orchestrator/SKILL.md"
 VERSIONS = {
-    PROFILE_SKILLS["jobcron"]: "0.6.9-jobcron.11",  # raised by t_b7455361, t_b722c617, t_ac454595 and t_46b5e63e
-    PROFILE_SKILLS["chapt"]: "0.6.7-chapt.10",  # raised by t_b722c617, t_ac454595 and t_46b5e63e
-    PROFILE_SKILLS["harness"]: "0.6.7-harness.9",  # raised by t_b722c617, t_ac454595 and t_46b5e63e
-    PROFILE_SKILLS["jss"]: "0.6.7-jss.12",  # raised by t_71b4ef4a, t_ac454595, t_46b5e63e and t_89838618
+    PROFILE_SKILLS["jobcron"]: "0.6.9-jobcron.12",  # raised by t_b7455361, t_b722c617, t_ac454595, t_46b5e63e and t_f4ce916d
+    PROFILE_SKILLS["chapt"]: "0.6.7-chapt.11",  # raised by t_b722c617, t_ac454595, t_46b5e63e and t_f4ce916d
+    PROFILE_SKILLS["harness"]: "0.6.7-harness.10",  # raised by t_b722c617, t_ac454595, t_46b5e63e and t_f4ce916d
+    PROFILE_SKILLS["jss"]: "0.6.7-jss.13",  # raised by t_71b4ef4a, t_ac454595, t_46b5e63e, t_89838618 and t_f4ce916d
     # The shared skill's version is recorded in the snapshot; read it rather than copy it.
     SHARED_SKILL: next(entry["version"] for entry in json.loads(
         (ROOT / "snapshots/sanitized-current-state.yaml").read_text())["skill"]["shared_skills"]
@@ -159,8 +160,8 @@ class DesiredState(unittest.TestCase):
         for name in SECOND:
             self.assertIsNone(GLM_NAME.search(name))
         # Owner decision 2026-10-19: the GLM workers stay declared. The generic GLM profiles
-        # stay retired; the ten GLM workers of the five boards are in service (cards
-        # t_4f7740d0 and t_71b4ef4a) but are not fleet workers and have no profile_souls entry.
+        # stay retired; the fifteen GLM workers of the five boards are in service (cards
+        # t_4f7740d0, t_71b4ef4a and t_f4ce916d) but are not fleet workers and have no profile_souls entry.
         for name in GLM_RETIRED:
             self.assertEqual(self.profiles[name]["lifecycle"], "retired")
             self.assertFalse(self.profiles[name]["dispatch_eligible"])
@@ -187,7 +188,7 @@ class Verifier(unittest.TestCase):
                                   (self.verifier.HARNESS_ASSIGNEES, "harness"),
                                   (self.verifier.JSS_ASSIGNEES, "jss"),
                                   (self.verifier.ANKI_ASSIGNEES, "anki")):
-            extra = {f"{prefix}-worker-glm-1", f"{prefix}-worker-glm-2"}
+            extra = {f"{prefix}-worker-glm-1", f"{prefix}-worker-glm-2", f"{prefix}-worker-glm-3"}
             self.assertEqual(assignees, {f"{prefix}-worker", f"{prefix}-worker-2", f"{prefix}-reviewer", *extra})
         for profile in PINNED_WORKERS:
             self.assertEqual(self.verifier.PROFILE_SOUL_PATHS[f"{profile}-2"], {

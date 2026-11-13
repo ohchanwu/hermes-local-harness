@@ -179,14 +179,15 @@ class RoutingTests(unittest.TestCase):
 
     def test_every_board_has_glm_routing(self):
         # Card t_71b4ef4a: jss-genr and anki have GLM workers and the easy and medium
-        # routes like the other three boards.
+        # routes like the other three boards. Card t_f4ce916d: the shipped config.json names
+        # exactly three GLM workers on every board.
         boards = self.config["routing"]["boards"]
         self.assertEqual(sorted(boards), ["anki", "cha-pt", "harness", "jobcron", "jss-genr"])
-        glm_workers = {"jobcron": ["jobcron-worker-glm-1", "jobcron-worker-glm-2"],
-                       "cha-pt": ["chapt-worker-glm-1", "chapt-worker-glm-2"],
-                       "harness": ["harness-worker-glm-1", "harness-worker-glm-2"],
-                       "jss-genr": ["jss-worker-glm-1", "jss-worker-glm-2"],
-                       "anki": ["anki-worker-glm-1", "anki-worker-glm-2"]}
+        glm_workers = {"jobcron": ["jobcron-worker-glm-1", "jobcron-worker-glm-2", "jobcron-worker-glm-3"],
+                       "cha-pt": ["chapt-worker-glm-1", "chapt-worker-glm-2", "chapt-worker-glm-3"],
+                       "harness": ["harness-worker-glm-1", "harness-worker-glm-2", "harness-worker-glm-3"],
+                       "jss-genr": ["jss-worker-glm-1", "jss-worker-glm-2", "jss-worker-glm-3"],
+                       "anki": ["anki-worker-glm-1", "anki-worker-glm-2", "anki-worker-glm-3"]}
         reference = boards["harness"]["routes"]
         for board, entry in boards.items():
             with self.subTest(board=board):
@@ -302,8 +303,8 @@ class RoutingTests(unittest.TestCase):
         self.fake.choice("easy", probs(easy=0.9, medium=0.05, hard=0.05))
         sent = [self.create(self.card())[0].calls[0] for _ in range(5)]
         self.assertEqual([s["assignee"] for s in sent[:4]],
-                         ["harness-worker-glm-1", "harness-worker-glm-2", "harness-worker-glm-1",
-                          "harness-worker-glm-2"])
+                         ["harness-worker-glm-1", "harness-worker-glm-2", "harness-worker-glm-3",
+                          "harness-worker-glm-1"])
         self.assertIsNone(sent[4])  # the fifth card is created exactly as the orchestrator asked
         record = self.last_decision()
         self.assertEqual((record["event"], record["applied"], record["not_applied_reason"], record["route"]),
@@ -311,9 +312,9 @@ class RoutingTests(unittest.TestCase):
         self.assertAlmostEqual(record["probabilities"]["easy"], 0.9)
         self.assertEqual((record["original_assignee"], record["new_assignee"]), ("harness-worker", "harness-worker"))
         self.assertEqual(record["task_id"], "t_0a1b2c3d")
-        # The alternation counter did not advance for the control card: the sixth card gets glm-1.
-        self.assertEqual(self.control_state()["counters"], {"harness": 0})
-        self.assertEqual(self.create(self.card())[0].calls[0]["assignee"], "harness-worker-glm-1")
+        # The alternation counter did not advance for the control card: the sixth card gets glm-2.
+        self.assertEqual(self.control_state()["counters"], {"harness": 1})
+        self.assertEqual(self.create(self.card())[0].calls[0]["assignee"], "harness-worker-glm-2")
         decisions = read_records(self.log_dir, "decisions")
         self.assertEqual([r["not_applied_reason"] for r in decisions], [None] * 4 + ["control_group", None])
 
@@ -381,12 +382,23 @@ class RoutingTests(unittest.TestCase):
     def test_alternation_between_glm_workers(self):
         self.fake.choice("easy", probs(easy=0.9))
         chosen = [self.create(self.card())[0].calls[0]["assignee"] for _ in range(3)]
-        self.assertEqual(chosen, ["harness-worker-glm-1", "harness-worker-glm-2", "harness-worker-glm-1"])
+        # The three GLM workers of the board take turns (card t_f4ce916d).
+        self.assertEqual(chosen, ["harness-worker-glm-1", "harness-worker-glm-2", "harness-worker-glm-3"])
         other = self.create(self.card(board="cha-pt", assignee="chapt-worker"))[0].calls[0]["assignee"]
         self.assertEqual(other, "chapt-worker-glm-1")
         state = json.loads((self.log_dir / "routing-state.json").read_text(encoding="utf-8"))
-        self.assertEqual(state["counters"], {"harness": 1, "cha-pt": 1})
+        self.assertEqual(state["counters"], {"harness": 0, "cha-pt": 1})
         self.assertEqual(state["control_group_counters"], {"harness": {"easy": 3}, "cha-pt": {"easy": 1}})
+
+    def test_next_glm_worker_returns_each_of_the_three_workers_once_in_three_calls(self):
+        for board, entry in CONFIG["routing"]["boards"].items():
+            workers = entry["glm_workers"]
+            with self.subTest(board=board), tempfile.TemporaryDirectory(prefix="jev-rotation-") as directory:
+                chosen = [routing.next_glm_worker(board, workers, Path(directory)) for _ in range(3)]
+                self.assertEqual(len(workers), 3)
+                self.assertEqual(chosen, workers)
+                # The fourth call starts the next turn with the first worker.
+                self.assertEqual(routing.next_glm_worker(board, workers, Path(directory)), workers[0])
 
     def test_assigned_worker_line_rewrite(self):
         self.fake.choice("medium", probs(medium=0.8))

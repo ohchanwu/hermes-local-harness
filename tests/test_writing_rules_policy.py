@@ -32,6 +32,9 @@ POLICY_SHA256 = "36609ae76520b9eef3aa4d8cf795f7844aebc91fb8e0ee072b0843d232d2044
 REVIEWERS = ("chapt-reviewer", "harness-reviewer", "jobcron-reviewer", "jss-reviewer")
 LATER_SOULS = ("anki-orchestrator", "anki-worker", "anki-worker-2", "anki-reviewer",
                "anki-worker-glm-1", "anki-worker-glm-2")
+# The SOULs of the third GLM workers (card t_f4ce916d) were written after card t_46b5e63e, with
+# its stale test rule already appended after the block.
+THIRD_GLM_SOULS = ("anki-worker-glm-3", "chapt-worker-glm-3", "harness-worker-glm-3", "jss-worker-glm-3")
 REVIEWER_SENTENCE = (b"Reject a card, document, or commit that introduces a coined compound term or a "
                      b"'(project term)' that is not defined in the repository glossary.\n")
 OK = "OK: desired state matches observed state"
@@ -70,12 +73,16 @@ class TrackedText(unittest.TestCase):
         # SOULs added after BASELINE (the anki fleet, t_06fc410a; the anki GLM workers,
         # t_71b4ef4a) have no baseline bytes; they were written with the block already at
         # their end.
-        later = {path for path in all_souls if path.parent.name in LATER_SOULS}
-        self.assertEqual({path.parent.name for path in later}, set(LATER_SOULS))
+        later = {path for path in all_souls if path.parent.name in (*LATER_SOULS, *THIRD_GLM_SOULS)}
+        self.assertEqual({path.parent.name for path in later}, {*LATER_SOULS, *THIRD_GLM_SOULS})
+        stale_rule = b"\n" + (ROOT / "policies/stale-test-rule.md").read_bytes()
         for path in sorted(later):
             with self.subTest(profile=path.parent.name):
                 # The later append of card t_46b5e63e is reversed first.
                 text = reverse_stale_test_rule_edits(path.relative_to(ROOT).as_posix(), path.read_bytes())
+                if path.parent.name in THIRD_GLM_SOULS:
+                    self.assertTrue(text.endswith(stale_rule))
+                    text = text[:-len(stale_rule)]
                 self.assertTrue(text.endswith(b"\n\n" + block))
                 self.assertEqual(text.count(block), 1)
                 self.assertEqual(text.count(REVIEWER_SENTENCE), 1 if path.parent.name == "anki-reviewer" else 0)

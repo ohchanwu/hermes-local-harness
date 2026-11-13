@@ -118,18 +118,23 @@
       "jss-reviewer",
       "jobcron-worker-glm-1",
       "jobcron-worker-glm-2",
+      "jobcron-worker-glm-3",
       "chapt-worker-glm-1",
       "chapt-worker-glm-2",
+      "chapt-worker-glm-3",
       "harness-worker-glm-1",
       "harness-worker-glm-2",
+      "harness-worker-glm-3",
       "jss-worker-glm-1",
       "jss-worker-glm-2",
+      "jss-worker-glm-3",
       "anki-orchestrator",
       "anki-worker",
       "anki-worker-2",
       "anki-reviewer",
       "anki-worker-glm-1",
-      "anki-worker-glm-2"
+      "anki-worker-glm-2",
+      "anki-worker-glm-3"
     ]
   },
   "dispatch_pool": {
@@ -2808,6 +2813,28 @@
       "installed_disabled_plugins": []
     },
     {
+      "name": "jobcron-worker-glm-3",
+      "role": "project implementation",
+      "model": "glm-5.3",
+      "provider": "zai",
+      "installed": true,
+      "dispatch_eligible": true,
+      "in_dispatch_pool": true,
+      "lifecycle": "project-active",
+      "concurrency_limit": 1,
+      "modes": [
+        "project-isolated",
+        "jobcron"
+      ],
+      "toolsets": "implementation",
+      "credential_required": true,
+      "credential_present": null,
+      "required_plugins": [
+        "jev"
+      ],
+      "installed_disabled_plugins": []
+    },
+    {
       "name": "chapt-worker-glm-1",
       "role": "project implementation",
       "model": "glm-5.3",
@@ -2831,6 +2858,28 @@
     },
     {
       "name": "chapt-worker-glm-2",
+      "role": "project implementation",
+      "model": "glm-5.3",
+      "provider": "zai",
+      "installed": true,
+      "dispatch_eligible": true,
+      "in_dispatch_pool": true,
+      "lifecycle": "project-active",
+      "concurrency_limit": 1,
+      "modes": [
+        "project-isolated",
+        "cha-pt"
+      ],
+      "toolsets": "implementation",
+      "credential_required": true,
+      "credential_present": null,
+      "required_plugins": [
+        "jev"
+      ],
+      "installed_disabled_plugins": []
+    },
+    {
+      "name": "chapt-worker-glm-3",
       "role": "project implementation",
       "model": "glm-5.3",
       "provider": "zai",
@@ -2896,6 +2945,28 @@
       "installed_disabled_plugins": []
     },
     {
+      "name": "harness-worker-glm-3",
+      "role": "project implementation",
+      "model": "glm-5.3",
+      "provider": "zai",
+      "installed": true,
+      "dispatch_eligible": true,
+      "in_dispatch_pool": true,
+      "lifecycle": "project-active",
+      "concurrency_limit": 1,
+      "modes": [
+        "project-isolated",
+        "harness"
+      ],
+      "toolsets": "implementation",
+      "credential_required": true,
+      "credential_present": null,
+      "required_plugins": [
+        "jev"
+      ],
+      "installed_disabled_plugins": []
+    },
+    {
       "name": "jss-worker-glm-1",
       "role": "project implementation",
       "model": "glm-5.3",
@@ -2919,6 +2990,28 @@
     },
     {
       "name": "jss-worker-glm-2",
+      "role": "project implementation",
+      "model": "glm-5.3",
+      "provider": "zai",
+      "installed": true,
+      "dispatch_eligible": true,
+      "in_dispatch_pool": true,
+      "lifecycle": "project-active",
+      "concurrency_limit": 1,
+      "modes": [
+        "project-isolated",
+        "jss-genr"
+      ],
+      "toolsets": "implementation",
+      "credential_required": true,
+      "credential_present": null,
+      "required_plugins": [
+        "jev"
+      ],
+      "installed_disabled_plugins": []
+    },
+    {
+      "name": "jss-worker-glm-3",
       "role": "project implementation",
       "model": "glm-5.3",
       "provider": "zai",
@@ -3512,6 +3605,28 @@
         "jev"
       ],
       "installed_disabled_plugins": []
+    },
+    {
+      "name": "anki-worker-glm-3",
+      "role": "project implementation",
+      "model": "glm-5.3",
+      "provider": "zai",
+      "installed": true,
+      "dispatch_eligible": true,
+      "in_dispatch_pool": true,
+      "lifecycle": "project-active",
+      "concurrency_limit": 1,
+      "modes": [
+        "project-isolated",
+        "anki"
+      ],
+      "toolsets": "implementation",
+      "credential_required": true,
+      "credential_present": null,
+      "required_plugins": [
+        "jev"
+      ],
+      "installed_disabled_plugins": []
     }
   ],
   "project_fleets": {
@@ -3702,13 +3817,18 @@
     "anki-reviewer",
     "jobcron-worker-glm-1",
     "jobcron-worker-glm-2",
+    "jobcron-worker-glm-3",
     "chapt-worker-glm-1",
     "chapt-worker-glm-2",
+    "chapt-worker-glm-3",
     "harness-worker-glm-1",
     "harness-worker-glm-2",
+    "harness-worker-glm-3",
     "jss-worker-glm-1",
     "jss-worker-glm-2",
+    "jss-worker-glm-3",
     "anki-worker-glm-1",
-    "anki-worker-glm-2"
+    "anki-worker-glm-2",
+    "anki-worker-glm-3"
   ]
 }
