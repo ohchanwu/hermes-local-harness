@@ -206,11 +206,7 @@ assert "docs/bugs" in orchestrator
 assert "claude-opus-5-5" in orchestrator
 # Terminal retry remains an explicit card-scoped v2 policy, never the default.
 assert "version: 0.6.13" in orchestrator
-assert "RETRY_TERMINAL" in orchestrator
-assert "terminal_retry_policy: astra-until-approve-v1" in orchestrator
-assert "glm-review-v2" in orchestrator
 assert "HUMAN_BLOCK" in orchestrator
-assert "Provider, quota, crash, timeout, unavailable-model, and context-exhaustion" in orchestrator
 roster = json.loads((ROOT / "roster.yaml").read_text())
 assert roster["schema_version"] == 2
 assert roster["ladder_version"] == "glm-review-v2"

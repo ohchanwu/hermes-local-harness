@@ -143,7 +143,11 @@ class SkillChangesSection(unittest.TestCase):
                 headings = re.findall(r"^## .*$", self.text[path], re.M)
                 index = headings.index("## Skill Changes")
                 self.assertEqual(headings[index - 1], "## Skills")
-                self.assertEqual(headings[index + 1] + "\n", NEXT_HEADING[path])
+                # Card t_46b5e63e deleted the sections from "## Routing Rubric" to the end of
+                # "## Escalation Mechanics" in the Jobcron and Cha PT copies.
+                following = {**NEXT_HEADING, JOBCRON: "## Routing validation and dispatch receipt\n",
+                             CHAPT: "## Routing validation and dispatch receipt\n"}
+                self.assertEqual(headings[index + 1] + "\n", following[path])
 
     def test_project_orchestrators_file_under_harness_bug_report(self):
         for path in (JOBCRON, CHAPT, JSS, ANKI):

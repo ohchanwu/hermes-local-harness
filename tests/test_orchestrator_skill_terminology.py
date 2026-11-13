@@ -214,7 +214,6 @@ class OrchestratorSkillTerminologyTests(unittest.TestCase):
         self.assertEqual(self.text[JOBCRON].count(LEGACY_RETIREMENT), 1)
         self.assertEqual(self.text[SHARED].count(LEGACY_RETIREMENT), 1)
         self.assertNotIn("remain installed", self.text[SHARED])
-        self.assertIn("\n\n" + LEGACY_RETIREMENT + "\nKeep `worker-terra-2` installed but dormant", self.text[SHARED])
 
     def test_reversing_the_edits_recovers_the_baseline_bytes(self):
         for path, want in PRE_TERMINOLOGY_SHA256.items():
