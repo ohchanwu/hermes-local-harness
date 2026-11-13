@@ -22,6 +22,7 @@ import re
 from pathlib import Path
 import unittest
 
+from jss_download_install_edits import reverse_download_install_edits
 from test_anki_apply_tool_card_contracts_reference import reverse_apply_tool_reference_edits
 from test_jobcron_app_only_deploy_authorization import reverse_app_only_deploy_edits
 from test_jss_fleet_policy import reverse_read_only_exception_edits
@@ -48,7 +49,7 @@ VERSIONS = {
     HARNESS: "0.6.7-harness.9",  # raised by t_ac454595 and t_46b5e63e
     JOBCRON: "0.6.9-jobcron.11",  # raised by t_ac454595 and t_46b5e63e
     CHAPT: "0.6.7-chapt.10",  # raised by t_ac454595 and t_46b5e63e
-    JSS: "0.6.7-jss.11",  # raised by t_ac454595 and t_46b5e63e
+    JSS: "0.6.7-jss.12",  # raised by t_ac454595, t_46b5e63e and t_89838618
     ANKI: "0.6.10-anki.7",  # raised by t_ac454595 and t_46b5e63e
 }
 
@@ -166,8 +167,10 @@ class SkillChangesSection(unittest.TestCase):
             with self.subTest(path=path):
                 # Reverse the later declared Fable model change (t_a6bbe808), the owner-requested
                 # application-only production deploy exception (t_b7455361) and
-                # apply-tool-card-contracts pointer (t_c9d4d5c8) first.
-                current = reverse_read_only_exception_edits(path, reverse_jev_policy_edits(path, (ROOT / path).read_bytes()))
+                # apply-tool-card-contracts pointer (t_c9d4d5c8) first. The later download and install
+                # change (t_89838618) is reversed before all of them.
+                current = reverse_download_install_edits(path, (ROOT / path).read_bytes())
+                current = reverse_read_only_exception_edits(path, reverse_jev_policy_edits(path, current))
                 current = reverse_fable_5_2_edits(path, current)
                 current = reverse_app_only_deploy_edits(path, current)
                 current = reverse_apply_tool_reference_edits(path, current)

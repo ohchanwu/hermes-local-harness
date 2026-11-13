@@ -33,6 +33,7 @@ import re
 from pathlib import Path
 import unittest
 
+from jss_download_install_edits import reverse_download_install_edits
 from test_stale_test_rule_policy import reverse_stale_test_rule_edits
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -321,18 +322,19 @@ class RoutingPolicyText(unittest.TestCase):
         self.assertEqual(set(BASELINE_SHA256), set(ROUTING_POLICY_EDITS))
         for path, want in BASELINE_SHA256.items():
             with self.subTest(path=path):
-                # The later edits of card t_46b5e63e are reversed first.
-                original = reverse_jev_routing_policy_edits(
-                    path, reverse_stale_test_rule_edits(path, (ROOT / path).read_bytes()))
+                # The later edits of card t_89838618 and then those of card t_46b5e63e are reversed first.
+                current = reverse_download_install_edits(path, (ROOT / path).read_bytes())
+                original = reverse_jev_routing_policy_edits(path, reverse_stale_test_rule_edits(path, current))
                 self.assertEqual(hashlib.sha256(original).hexdigest(), want)
 
     def test_every_orchestrator_skill_states_the_rules_once(self):
         for key, (board, prefix, _claude, _glm) in BOARDS.items():
             text = self.text[skill(prefix)]
             with self.subTest(board=board):
-                # Card t_46b5e63e raised each version by one step after this card.
+                # Card t_46b5e63e raised each version by one step after this card; card t_89838618 raised
+                # the jss version by one more step.
                 current = {"harness": "0.6.7-harness.9", "chapt": "0.6.7-chapt.10", "jobcron": "0.6.9-jobcron.11",
-                           "jss": "0.6.7-jss.11", "anki": "0.6.10-anki.7"}[prefix]
+                           "jss": "0.6.7-jss.12", "anki": "0.6.10-anki.7"}[prefix]
                 self.assertRegex(text, rf"(?m)^version: {re.escape(current)}$")
                 self.assertEqual(text.count(SPLIT_RULE), 1)
                 self.assertEqual(text.count(escalation_skill_text(key)), 1)

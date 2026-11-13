@@ -18,6 +18,7 @@ import unittest
 from unittest.mock import patch
 
 from incident_recovery_verify_fixture import LocalReads, ROOT, load_verifier, resolved_fixture
+from jss_download_install_edits import reverse_download_install_edits
 from rule_text import assert_rule
 from test_jev_policy_sources import reverse_jev_policy_edits
 
@@ -413,7 +414,9 @@ class RoleContracts(unittest.TestCase):
                 self.assertIn("block without editing", body)
                 self.assertIn("create each exclusively and block if a target already exists", body)
                 self.assertIn("Do not commit.", body)
-                self.assertIn("never install, download, or commit dependencies", body)
+                # Owner decision, 2026-11-13 (t_89838618): downloads and installs from a reputable source
+                # are permitted; DownloadAndInstallOwnerDecision pins the full sentence.
+                self.assertIn("never commit dependencies", body)
                 self.assertIn("Never delegate", body)
 
     def test_write_scope_is_new_files_under_profile_or_one_company(self):
@@ -472,14 +475,15 @@ class RoleContracts(unittest.TestCase):
 
     def test_skill_version_size_and_sections(self):
         # Raised by the jev plugin policy change (t_71b4ef4a).
-        self.assertRegex(self.skill_raw, r"(?m)^version: 0\.6\.7-jss\.11$")  # raised by t_ac454595 and t_46b5e63e
+        self.assertRegex(self.skill_raw, r"(?m)^version: 0\.6\.7-jss\.12$")  # raised by t_ac454595, t_46b5e63e and t_89838618
         # 260 lines plus the 4-line Pitfalls section (t_bd860536), the 9 lines of
         # repair_history candidate rules and example (t_6436ac1c), the 6-line
         # Skill Changes section (t_0a8674fe) and the one-line Hard Scope read-only
         # repository exception (t_3af6293c), which fits inside the same cap, plus the
         # jev plugin lines in Hard Scope and Worker Selection (t_71b4ef4a), plus the 5 lines of the card
-        # splitting rule (with its blank line) and the 3 jev routing bullets in Worker Selection (t_ac454595).
-        self.assertLessEqual(len(self.skill_raw.splitlines()), 281 + 5)
+        # splitting rule (with its blank line) and the 3 jev routing bullets in Worker Selection (t_ac454595),
+        # plus the one-line Hard Scope list item of the owner decision of 2026-11-13 (t_89838618).
+        self.assertLessEqual(len(self.skill_raw.splitlines()), 281 + 5 + 1)
         self.assertEqual(re.findall(r"^## (.+)$", self.skill_raw, re.M), [
             "Hard Scope", "Privacy Gate", "Card Kinds", "Role Separation", "Card Contract",
             "Card Setup", "Worker Selection", "Worktree and Baseline Gate", "Skills", "Skill Changes",
@@ -913,8 +917,10 @@ class ReadOnlyRepositoryException(unittest.TestCase):
     def test_reversing_the_edits_recovers_the_baseline_bytes(self):
         for path in self.raw:
             with self.subTest(path=path):
-                # The later jev plugin policy change (t_71b4ef4a) is reversed first.
-                current = reverse_jev_policy_edits(path, (ROOT / path).read_bytes())
+                # The later download and install change (t_89838618) and then the jev plugin policy
+                # change (t_71b4ef4a) are reversed first.
+                current = reverse_download_install_edits(path, (ROOT / path).read_bytes())
+                current = reverse_jev_policy_edits(path, current)
                 original = reverse_read_only_exception_edits(path, current)
                 self.assertEqual(hashlib.sha256(original).hexdigest(), BASELINE_SHA256[path])
 
@@ -923,8 +929,10 @@ class ReadOnlyRepositoryException(unittest.TestCase):
             relative = f"policies/profile-souls/{profile}/SOUL.md"
             text = soul_path(profile).read_text()
             with self.subTest(profile=profile):
-                # The jev plugin policy change (t_71b4ef4a) changed the GLM worker SOULs only.
-                current = reverse_jev_policy_edits(relative, soul_path(profile).read_bytes())
+                # The jev plugin policy change (t_71b4ef4a) changed the GLM worker SOULs only. The later
+                # download and install change (t_89838618) changed all four and is reversed first.
+                current = reverse_download_install_edits(relative, soul_path(profile).read_bytes())
+                current = reverse_jev_policy_edits(relative, current)
                 self.assertEqual(hashlib.sha256(current).hexdigest(), BASELINE_SHA256[relative])
                 self.assertNotIn(EXCEPTION_LEAD, text)
                 self.assertNotIn("read-only repository exception", text)
@@ -943,6 +951,191 @@ class ReadOnlyRepositoryException(unittest.TestCase):
             with self.subTest(repo=repo):
                 self.assertIn("jss-genr card contract drift t_jss: expected exact repository", errors)
                 self.assertIn("jss-genr card contract drift t_jss: isolated worktree mismatch", errors)
+
+
+class DownloadAndInstallOwnerDecision(unittest.TestCase):
+    """Owner decision, 2026-11-13 (t_89838618): the rule that a download needs explicit owner
+    approval is removed, and an install from a reputable source needs no owner approval
+    ("Installs too, so long as they're from reputable sources"). An install from another source
+    still needs explicit owner authorization, and dependencies are still never committed."""
+
+    DECISION_DATE = "Owner decision, 2026-11-13: "
+    DOWNLOAD = ("downloading a file that the work needs (for example icon SVG files, technology logos, reference "
+                "images) needs no owner approval, and installing a package from a reputable source needs no owner "
+                "approval.")
+    DEFINITION = ("\"Reputable sources\" is the owner's wording; a reputable source is the official package registry "
+                  "of the language or platform, or the publisher's own distribution channel (for example the npm "
+                  "registry, PyPI, Homebrew).")
+    OTHER_SOURCE = "An install from any other source still needs explicit owner authorization."
+    NOT_COMMITTED = "Dependencies are still never committed."
+    LICENCE = "A downloaded file keeps the licence notice that its source requires."
+    UNCHANGED_RULES = ("The privacy gate and the jss-genr repository's own rules on where third-party material is "
+                       "stored are unchanged.")
+    DECISION = " ".join((DECISION_DATE + DOWNLOAD, DEFINITION, OTHER_SOURCE, NOT_COMMITTED, LICENCE, UNCHANGED_RULES))
+    WORKER_SENTENCE = (
+        "Owner decision, 2026-11-13: you may download a file that the card's work needs and install a package from "
+        "a reputable source (the official package registry of the language or platform, or the publisher's own "
+        "distribution channel); for an install from any other source, block with the exact need.")
+    ORCH_AUTHORIZATION = (
+        "Never push, use `gh`, open a PR, deploy, submit an application, log in to a job site, write to the "
+        "portfolio site repository, access credentials, change live profile, skill, board, or gateway state, or "
+        "perform another external write without explicit owner authorization.")
+    SKILL_AUTHORIZATION = (
+        "- Credentials, installs from a source that is not reputable, live profile, skill, board, or gateway "
+        "changes, and other external writes require separate explicit owner authorization.")
+    SKILL_REPOSITORY_CARD = (
+        "- Work only in the isolated worktree. It has no `profile/`, `companies/`, or `resume/node_modules`; "
+        "reference the main checkout's copies read-only (for example `NODE_PATH`). Never commit dependencies; a "
+        "worker may download a file that the card's work needs and may install a package from a reputable source "
+        "as Hard Scope defines it; if a build needs an install from another source, block with the exact error.")
+    SKILL_CONTRACT_ITEM = (
+        "13. The privacy gate and explicit prohibitions on push, PR, deployment, application submission, job-site "
+        "login, installs from a source that is not reputable, live policy changes, credentials, and other external "
+        "writes without separate owner authorization.")
+    SKILL_ASK_ITEM = "- installs from a source that is not reputable"
+    # Card t_89838618 item 2: an install from another source without owner authorization is
+    # still an unauthorized install, so this Completion Gate line stays unchanged.
+    SKILL_COMPLETION_LINE = (
+        "- No privacy leak and no unauthorized push, PR, deployment, application submission, job-site login, "
+        "install, policy rollout, credential operation, or external write occurred.")
+    REMOVED = ("install or download dependencies", "installs or downloads",
+               "never install, download, or commit dependencies")
+    # SHA-256 of each changed source at baseline f706e5d949a8fe89b29425c2675cc93ac86a1e98.
+    BASELINE_SHA256 = {
+        ORCH_SOUL_RELATIVE: "7bd7a0fc43941f32c030ede6c583250a38c8c89d1e03b03960215e5f86305984",
+        SKILL_RELATIVE: "598f4329c570f6baafa3e6bc32b15b35ae3d7fa266cd57dbd7b83d031e6c47f6",
+        "policies/profile-souls/jss-worker/SOUL.md": "917ed645845150d4d69a842eb059dd2ef8e53d15e04072282947ae45556637c2",
+        "policies/profile-souls/jss-worker-2/SOUL.md":
+            "917ed645845150d4d69a842eb059dd2ef8e53d15e04072282947ae45556637c2",
+        "policies/profile-souls/jss-worker-glm-1/SOUL.md":
+            "9e0a1e3fc1bf83f23fc512c3f3b7b84b8ca838cdd2cae2671aa0aa5d165f6d9d",
+        "policies/profile-souls/jss-worker-glm-2/SOUL.md":
+            "f1d8319c613637db122c0e90a9d0e45637caf297a8a19637d65bead0a6372061",
+    }
+    WORKER_PROFILES = (*WORKERS, *GLM_WORKERS)
+    # Sentences of the six sources that name an install or a download and are neither the owner
+    # decision nor a sentence that limits an install to a source that is not reputable.
+    OTHER_INSTALL_SENTENCES = (
+        "the plugin is installed by the normal procedure",
+        "Never modify the installed Hermes source.",
+        "job-site login, install, policy rollout, credential operation, or external write occurred.",
+    )
+
+    @classmethod
+    def setUpClass(cls):
+        cls.raw = {path: (ROOT / path).read_text() for path in cls.BASELINE_SHA256}
+        cls.orch = cls.raw[ORCH_SOUL_RELATIVE]
+        cls.skill_raw = cls.raw[SKILL_RELATIVE]
+
+    def worker_text(self, profile):
+        return self.raw[f"policies/profile-souls/{profile}/SOUL.md"]
+
+    def test_orchestrator_soul_states_the_owner_decision_after_the_authorization_sentence(self):
+        self.assertEqual(self.orch.count(self.DECISION), 1)
+        self.assertEqual(self.orch.count(self.DECISION_DATE), 1)
+        self.assertIn(f"{self.ORCH_AUTHORIZATION} {self.DECISION} Sole standing exception (owner decision, "
+                      "2026-10-18)", self.orch)
+        self.assertIn("The repository has a public remote, and nothing is ever pushed. " + self.ORCH_AUTHORIZATION,
+                      self.orch)
+
+    def test_skill_hard_scope_states_the_owner_decision_as_its_own_list_item(self):
+        lines = self.skill_raw.splitlines()
+        self.assertEqual(lines.count(self.SKILL_AUTHORIZATION), 1)
+        index = lines.index(self.SKILL_AUTHORIZATION)
+        self.assertEqual(lines[index + 1], f"- {self.DECISION}")
+        self.assertEqual(self.skill_raw.count(self.DECISION), 1)
+        self.assertEqual(self.skill_raw.count(self.DECISION_DATE), 1)
+        hard_scope = section(self.skill_raw, "Hard Scope")
+        self.assertIn(self.SKILL_AUTHORIZATION, hard_scope)
+        self.assertIn(f"- {self.DECISION}", hard_scope)
+
+    def test_decision_pins_the_definition_the_other_source_rule_and_no_committed_dependencies(self):
+        for path in (ORCH_SOUL_RELATIVE, SKILL_RELATIVE):
+            with self.subTest(path=path):
+                text = self.raw[path]
+                for statement in (self.DECISION_DATE + self.DOWNLOAD, self.DEFINITION, self.OTHER_SOURCE,
+                                  self.NOT_COMMITTED, self.LICENCE, self.UNCHANGED_RULES):
+                    self.assertEqual(text.count(statement), 1, statement)
+                # The path from the filer's proposal is not written into the sources (card item 7).
+                self.assertNotIn("portfolio-examples", text)
+
+    def test_skill_repository_card_contract_and_ask_list(self):
+        lines = self.skill_raw.splitlines()
+        for line in (self.SKILL_REPOSITORY_CARD, self.SKILL_CONTRACT_ITEM, self.SKILL_ASK_ITEM,
+                     self.SKILL_COMPLETION_LINE):
+            with self.subTest(line=line[:60]):
+                self.assertEqual(lines.count(line), 1)
+        ask = section(self.skill_raw, "Autonomy").split("Ask only for:", 1)[1]
+        self.assertIn(self.SKILL_ASK_ITEM, ask.split("These owner questions", 1)[0])
+        self.assertIn(self.SKILL_REPOSITORY_CARD, section(self.skill_raw, "Card Kinds"))
+        self.assertIn(self.SKILL_CONTRACT_ITEM, section(self.skill_raw, "Card Contract"))
+        self.assertIn(self.SKILL_COMPLETION_LINE, section(self.skill_raw, "Completion Gate"))
+
+    def test_skill_version_line(self):
+        self.assertEqual(re.findall(r"(?m)^version: (.+)$", self.skill_raw), ["0.6.7-jss.12"])
+
+    def test_no_source_keeps_the_removed_wording(self):
+        for path, text in self.raw.items():
+            lower = flat(text).lower()
+            for phrase in self.REMOVED:
+                with self.subTest(path=path, phrase=phrase):
+                    self.assertNotIn(phrase.lower(), lower)
+
+    def test_no_other_sentence_requires_approval_for_a_download_or_a_reputable_install(self):
+        decision = (self.DECISION, self.WORKER_SENTENCE)
+        for path, text in self.raw.items():
+            for sentence in re.split(r"(?<=[.;])\s+", flat(text)):
+                sentence = sentence.removeprefix("- ")
+                if not re.search(r"(?i)\b(install|download)", sentence):
+                    continue
+                with self.subTest(path=path, sentence=sentence[:80]):
+                    permitted = (any(sentence in whole for whole in decision)
+                                 or "not reputable" in sentence or "another source" in sentence
+                                 or "may download a file that the card's work needs" in sentence
+                                 or any(other in sentence for other in self.OTHER_INSTALL_SENTENCES))
+                    self.assertTrue(permitted, sentence)
+
+    def test_worker_souls_state_the_same_owner_decision_sentence(self):
+        sentences = {}
+        for profile in self.WORKER_PROFILES:
+            text = self.worker_text(profile)
+            with self.subTest(profile=profile):
+                self.assertEqual(text.count("never commit dependencies"), 1)
+                self.assertEqual(text.count(self.WORKER_SENTENCE), 1)
+                self.assertIn("reference the main checkout's copies read-only and never commit dependencies. "
+                              f"{self.WORKER_SENTENCE} Commit locally after the checks pass", text)
+                found = re.findall(r"Owner decision, 2026-11-13: [^\n]*?exact need\.", text)
+                self.assertEqual(len(found), 1)
+                sentences[profile] = found[0]
+        self.assertEqual(set(sentences.values()), {self.WORKER_SENTENCE})
+
+    def test_unchanged_rules_stay(self):
+        self.assertIn("Never modify the installed Hermes source.", self.skill_raw)
+        self.assertIn("Privacy is a hard gate on every card.", self.skill_raw)
+        self.assertIn("Privacy is a hard gate: never copy anything from `profile/`, `companies/`, or "
+                      "`resume/resources/` into tracked files or commits.", self.orch)
+        for profile in self.WORKER_PROFILES:
+            with self.subTest(profile=profile):
+                self.assertIn("Never delegate, touch Jobcron, Cha PT, or Harness work, use another board or checkout, "
+                              "push, use `gh`, open a PR, deploy, submit an application, log in to a job site, write "
+                              "to the portfolio site repository, access credentials, or perform another external "
+                              "write without explicit owner authorization.", self.worker_text(profile))
+
+    def test_reversal_returns_the_baseline_bytes_of_each_changed_source(self):
+        for path, want in self.BASELINE_SHA256.items():
+            with self.subTest(path=path):
+                data = (ROOT / path).read_bytes()
+                original = reverse_download_install_edits(path, data)
+                self.assertEqual(hashlib.sha256(original).hexdigest(), want)
+                self.assertEqual(reverse_download_install_edits(path, data.decode()), original.decode())
+
+    def test_reversal_leaves_other_paths_unchanged(self):
+        for path in (REVIEWER_SOUL_RELATIVE, "policies/profile-souls/anki-orchestrator/SOUL.md"):
+            data = (ROOT / path).read_bytes()
+            with self.subTest(path=path):
+                self.assertEqual(reverse_download_install_edits(path, data), data)
+                self.assertEqual(reverse_download_install_edits(path, data.decode()), data.decode())
+        self.assertNotIn("2026-11-13", soul_path(REVIEWER).read_text())
 
 
 def fixture_main(fixture):

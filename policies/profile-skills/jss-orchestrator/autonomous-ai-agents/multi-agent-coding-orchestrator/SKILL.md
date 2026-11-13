@@ -1,7 +1,7 @@
 ---
 name: multi-agent-coding-orchestrator
 description: "Use when orchestrating jss-genr repository and writing-round work."
-version: 0.6.7-jss.11
+version: 0.6.7-jss.12
 author: chanbla11mit, Hermes Agent
 license: MIT
 platforms: [macos]
@@ -28,7 +28,8 @@ Coordinate work for board `jss-genr` and repository `/Users/chanbla11mit/project
 - The sole independent reviewer is `jss-reviewer`.
 - The repository has a public GitHub remote, and nothing is ever pushed. Never run `git push` or `gh`, open a PR, deploy, submit an application, or log in to a job site. Posting text and 문항 come from the owner.
 - Sole push exception (owner decision, 2026-10-18; this case alone): an owner message saying "update my portfolio" authorizes (a) the site change it describes, (b) reviewed site cards that write to `/Users/chanbla11mit/mystuff/projects/ohchanwu.dev` (record the triggering message and date on the card), and (c) the controller's own `git push origin main` of the reviewed commits after local integration there, without another prompt. Before pushing: `git -C <site> log origin/main..main` shows only the reviewed commits, the diff carries no `profile/`, `companies/`, or `resume/resources/` content, and no untracked file (`terraform.tfstate`, `.terraform/`, `docs/` drafts) is staged. Never force-push, push the jss-genr repository, push another branch or remote, use `gh`, or change deployment settings or Terraform state. Workers never push. Anything outside this case still needs explicit owner authorization.
-- Credentials, installs or downloads (`npm install`, `make setup`, pip), live profile, skill, board, or gateway changes, and other external writes require separate explicit owner authorization.
+- Credentials, installs from a source that is not reputable, live profile, skill, board, or gateway changes, and other external writes require separate explicit owner authorization.
+- Owner decision, 2026-11-13: downloading a file that the work needs (for example icon SVG files, technology logos, reference images) needs no owner approval, and installing a package from a reputable source needs no owner approval. "Reputable sources" is the owner's wording; a reputable source is the official package registry of the language or platform, or the publisher's own distribution channel (for example the npm registry, PyPI, Homebrew). An install from any other source still needs explicit owner authorization. Dependencies are still never committed. A downloaded file keeps the licence notice that its source requires. The privacy gate and the jss-genr repository's own rules on where third-party material is stored are unchanged.
 
 If any board, repository, card-kind, profile, worktree, baseline, write-target, test-contract, or reviewer boundary is absent or inconsistent, stop before file access or mutation.
 
@@ -48,7 +49,7 @@ Every card declares exactly one kind: `Card kind EXACT repository.` or `Card kin
 
 Repository card: `tools/`, `resume/` HTML/PDF build and QA, `guides/`, `CLAUDE.md`, `README.md`.
 
-- Work only in the isolated worktree. It has no `profile/`, `companies/`, or `resume/node_modules`; reference the main checkout's copies read-only (for example `NODE_PATH`). Never install, download, or commit dependencies; if a build cannot run without that, block with the exact error.
+- Work only in the isolated worktree. It has no `profile/`, `companies/`, or `resume/node_modules`; reference the main checkout's copies read-only (for example `NODE_PATH`). Never commit dependencies; a worker may download a file that the card's work needs and may install a package from a reputable source as Hard Scope defines it; if a build needs an install from another source, block with the exact error.
 - Tests are executable commands the repository defines, for example `python3 tools/charcount.py <sample>`, `python3 tools/check-materials.py --no-links`, `make -C resume pdf`, and `make -C resume qa`. Resume cards also follow `resume/AGENTS.md`: snapshot commit before any build, render and visually inspect every page, report the QA numbers.
 - Deliver one local candidate commit on the task branch (plus any snapshot commit `resume/AGENTS.md` requires before a build), same-card review by `jss-reviewer`, and controller local integration.
 
@@ -93,7 +94,7 @@ Every card must contain:
 10. `Reviewer EXACT jss-reviewer.`
 11. A per-run runtime cap with rationale.
 12. The required handoff: the local commit for repository cards; for writing rounds, the new file names with SHA-256 and the drafts listing taken before writing.
-13. The privacy gate and explicit prohibitions on push, PR, deployment, application submission, job-site login, installs, live policy changes, credentials, and other external writes without separate owner authorization.
+13. The privacy gate and explicit prohibitions on push, PR, deployment, application submission, job-site login, installs from a source that is not reputable, live policy changes, credentials, and other external writes without separate owner authorization.
 14. Skill-policy metadata stating whether `minimal-implementation` is enabled.
 
 Item 1 writes the repository line in exactly the form `Repository <exact repository path> ONLY.` `scripts/verify-state` accepts no other repository wording; a repository line that uses `EXACT` instead of `ONLY` fails the card contract check.
@@ -211,7 +212,7 @@ Ask only for:
 
 - external writes (push, PR, deploy, application submission, portfolio-site sync), except the "update my portfolio" site push in Hard Scope
 - credentials, MFA, or job-site logins
-- installs or downloads
+- installs from a source that is not reputable
 - live profile, skill, policy, board, or gateway changes
 - product decisions, which here include unverified facts (`CLAUDE.md` rule 1), sensitive material (rule 6), which suggestions to adopt, and "final"
 - `profile/facts.md` or `profile/voice.md` changes, made only after the owner's explicit confirmation that you relay on the card

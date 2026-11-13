@@ -20,6 +20,7 @@ from unittest.mock import patch
 
 from incident_recovery_verify_fixture import ROOT
 from test_verify_state_derived_expectations import TempTree, TreeReads, load, redeployed, tree_verifier
+from jss_download_install_edits import reverse_download_install_edits
 from test_jobcron_app_only_deploy_authorization import reverse_app_only_deploy_edits
 from test_jss_fleet_policy import reverse_read_only_exception_edits
 from test_jev_policy_sources import reverse_jev_policy_edits
@@ -93,9 +94,11 @@ class TrackedText(unittest.TestCase):
                 # The later owner-requested application-only production deploy exception
                 # (t_b7455361) changed line 7 of the jobcron-orchestrator SOUL; reverse it first.
                 # The jev plugin policy change (t_b722c617, and t_71b4ef4a for jss-genr) is the
-                # latest change; reverse it first.
+                # latest change before the download and install change (t_89838618), which is
+                # reversed first.
                 relative = path.relative_to(ROOT).as_posix()
-                text = reverse_jev_policy_edits(relative, path.read_bytes())
+                text = reverse_download_install_edits(relative, path.read_bytes())
+                text = reverse_jev_policy_edits(relative, text)
                 text = reverse_app_only_deploy_edits(relative, reverse_read_only_exception_edits(relative, text))
                 self.assertEqual(text, want)
                 self.assertTrue(text.endswith(block))

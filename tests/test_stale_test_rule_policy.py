@@ -22,6 +22,8 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
+from jss_download_install_edits import reverse_download_install_edits
+
 ROOT = Path(__file__).resolve().parents[1]
 BASELINE = "d338ca675793238535ade9ef2a02c83488353e67"
 POLICY = "policies/stale-test-rule.md"
@@ -128,7 +130,8 @@ class PolicyFile(unittest.TestCase):
         self.assertTrue(AFTER_SHA256)
         for relative_path, want in AFTER_SHA256.items():
             with self.subTest(path=relative_path):
-                current = (ROOT / relative_path).read_bytes()
+                # The later download and install change (t_89838618) is reversed first.
+                current = reverse_download_install_edits(relative_path, (ROOT / relative_path).read_bytes())
                 self.assertEqual(hashlib.sha256(current).hexdigest(), want)
                 self.assertEqual(reverse_stale_test_rule_edits(relative_path, current), baseline_bytes(relative_path))
                 self.assertEqual(reverse_stale_test_rule_edits(relative_path, current.decode()),
