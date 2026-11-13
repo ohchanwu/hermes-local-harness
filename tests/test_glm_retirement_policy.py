@@ -171,11 +171,22 @@ class DesiredState(unittest.TestCase):
         lists = {
             "profile_souls": list(self.snapshot["profile_souls"]),
         }
-        for entry in self.snapshot["skill"]["shared_skills"]:
-            lists[f"deploy {entry['name']}"] = entry["deploy_profiles"]
         for label, listing in lists.items():
             with self.subTest(list=label):
                 self.assertEqual([name for name in listing if name in GLM], [])
+        # Card t_c8c6860f replaced the 2026-10-18 retirement rule (no GLM worker in
+        # any deploy_profiles list) with the declaration rule of that card: for every
+        # shared skill and every board, each GLM worker in service is in the list
+        # exactly when the Claude worker 1 of the same board is.
+        for entry in self.snapshot["skill"]["shared_skills"]:
+            deploy = entry["deploy_profiles"]
+            for fleet in self.roster["project_fleets"].values():
+                worker1 = fleet["worker"]
+                for name in (worker for worker in GLM_IN_SERVICE if worker.startswith(f"{worker1}-glm-")):
+                    with self.subTest(skill=entry["name"], glm_worker=name):
+                        self.assertEqual(name in deploy, worker1 in deploy)
+        self.assertEqual(quiet(self.verifier.check_glm_worker_skill_declarations,
+                               self.snapshot["skill"], self.roster), [])
         self.assertEqual(self.snapshot["project_isolation"], self.roster["project_fleets"])
         self.assertEqual(self.snapshot["approvals"], self.roster["approval_policy"])
 
@@ -523,9 +534,15 @@ class Pins(unittest.TestCase):
                 for profile, path in PROFILE_SKILLS.items():
                     self.assertEqual(data["profile_local_skill_overrides"][profile][RELATIVE], sha(path))
                 # Retired GLM workers are observed installed profiles (owner decision
-                # 2026-10-19) but never carry a skill deployment or a fleet slot.
-                observed = {key: data[key] for key in ("skill_files", "project_isolation")}
-                self.assertIsNone(GLM_NAME.search(json.dumps(observed)))
+                # 2026-10-19) but never carry a fleet slot. Card t_c8c6860f declared
+                # the GLM workers in service in the shared skill deploy lists, so a
+                # fixture observes exactly the desired matrix for them.
+                self.assertIsNone(GLM_NAME.search(json.dumps(data["project_isolation"])))
+                deployed = data["skill_files"]
+                for entry in self.snapshot["skill"]["shared_skills"]:
+                    want = [profile for profile in entry["deploy_profiles"] if profile in GLM]
+                    self.assertEqual([profile for profile in deployed.get(entry["name"], {}) if profile in GLM],
+                                     want)
                 if "profile_models" in data:
                     self.assertEqual({n: data["profile_models"].get(n) for n in GLM},
                                      {p["name"]: p["model"] for p in self.roster["profiles"] if p["name"] in GLM})

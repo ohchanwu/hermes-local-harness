@@ -354,10 +354,22 @@
       "jobcron-worker-2": {
         "SKILL.md": "tracked-source"
       },
+      "jobcron-worker-glm-1": {
+        "SKILL.md": "tracked-source"
+      },
+      "jobcron-worker-glm-2": {
+        "SKILL.md": "tracked-source"
+      },
       "chapt-worker": {
         "SKILL.md": "tracked-source"
       },
       "chapt-worker-2": {
+        "SKILL.md": "tracked-source"
+      },
+      "chapt-worker-glm-1": {
+        "SKILL.md": "tracked-source"
+      },
+      "chapt-worker-glm-2": {
         "SKILL.md": "tracked-source"
       },
       "harness-worker": {
@@ -366,16 +378,34 @@
       "harness-worker-2": {
         "SKILL.md": "tracked-source"
       },
+      "harness-worker-glm-1": {
+        "SKILL.md": "tracked-source"
+      },
+      "harness-worker-glm-2": {
+        "SKILL.md": "tracked-source"
+      },
       "jss-worker": {
         "SKILL.md": "tracked-source"
       },
       "jss-worker-2": {
         "SKILL.md": "tracked-source"
       },
+      "jss-worker-glm-1": {
+        "SKILL.md": "tracked-source"
+      },
+      "jss-worker-glm-2": {
+        "SKILL.md": "tracked-source"
+      },
       "anki-worker": {
         "SKILL.md": "tracked-source"
       },
       "anki-worker-2": {
+        "SKILL.md": "tracked-source"
+      },
+      "anki-worker-glm-1": {
+        "SKILL.md": "tracked-source"
+      },
+      "anki-worker-glm-2": {
         "SKILL.md": "tracked-source"
       }
     },
@@ -416,10 +446,22 @@
       "jobcron-worker-2": {
         "SKILL.md": "tracked-source"
       },
+      "jobcron-worker-glm-1": {
+        "SKILL.md": "tracked-source"
+      },
+      "jobcron-worker-glm-2": {
+        "SKILL.md": "tracked-source"
+      },
       "chapt-worker": {
         "SKILL.md": "tracked-source"
       },
       "chapt-worker-2": {
+        "SKILL.md": "tracked-source"
+      },
+      "chapt-worker-glm-1": {
+        "SKILL.md": "tracked-source"
+      },
+      "chapt-worker-glm-2": {
         "SKILL.md": "tracked-source"
       },
       "harness-worker": {
@@ -428,16 +470,34 @@
       "harness-worker-2": {
         "SKILL.md": "tracked-source"
       },
+      "harness-worker-glm-1": {
+        "SKILL.md": "tracked-source"
+      },
+      "harness-worker-glm-2": {
+        "SKILL.md": "tracked-source"
+      },
       "jss-worker": {
         "SKILL.md": "tracked-source"
       },
       "jss-worker-2": {
         "SKILL.md": "tracked-source"
       },
+      "jss-worker-glm-1": {
+        "SKILL.md": "tracked-source"
+      },
+      "jss-worker-glm-2": {
+        "SKILL.md": "tracked-source"
+      },
       "anki-worker": {
         "SKILL.md": "tracked-source"
       },
       "anki-worker-2": {
+        "SKILL.md": "tracked-source"
+      },
+      "anki-worker-glm-1": {
+        "SKILL.md": "tracked-source"
+      },
+      "anki-worker-glm-2": {
         "SKILL.md": "tracked-source"
       }
     },
@@ -502,6 +562,16 @@
         "references/live-state-reconciliation.md": "tracked-source",
         "references/release-ci-portability.md": "tracked-source"
       },
+      "jobcron-worker-glm-1": {
+        "SKILL.md": "tracked-source",
+        "references/live-state-reconciliation.md": "tracked-source",
+        "references/release-ci-portability.md": "tracked-source"
+      },
+      "jobcron-worker-glm-2": {
+        "SKILL.md": "tracked-source",
+        "references/live-state-reconciliation.md": "tracked-source",
+        "references/release-ci-portability.md": "tracked-source"
+      },
       "jobcron-orchestrator": {
         "SKILL.md": "tracked-source",
         "references/live-state-reconciliation.md": "tracked-source",
@@ -522,6 +592,16 @@
         "references/live-state-reconciliation.md": "tracked-source",
         "references/release-ci-portability.md": "tracked-source"
       },
+      "chapt-worker-glm-1": {
+        "SKILL.md": "tracked-source",
+        "references/live-state-reconciliation.md": "tracked-source",
+        "references/release-ci-portability.md": "tracked-source"
+      },
+      "chapt-worker-glm-2": {
+        "SKILL.md": "tracked-source",
+        "references/live-state-reconciliation.md": "tracked-source",
+        "references/release-ci-portability.md": "tracked-source"
+      },
       "chapt-orchestrator": {
         "SKILL.md": "tracked-source",
         "references/live-state-reconciliation.md": "tracked-source",
@@ -538,6 +618,16 @@
         "references/release-ci-portability.md": "tracked-source"
       },
       "harness-worker-2": {
+        "SKILL.md": "tracked-source",
+        "references/live-state-reconciliation.md": "tracked-source",
+        "references/release-ci-portability.md": "tracked-source"
+      },
+      "harness-worker-glm-1": {
+        "SKILL.md": "tracked-source",
+        "references/live-state-reconciliation.md": "tracked-source",
+        "references/release-ci-portability.md": "tracked-source"
+      },
+      "harness-worker-glm-2": {
         "SKILL.md": "tracked-source",
         "references/live-state-reconciliation.md": "tracked-source",
         "references/release-ci-portability.md": "tracked-source"
@@ -614,6 +704,16 @@
         "references/temporary-cloud-bootstrap-iam.md": "tracked-source",
         "references/frontend-origin-separation.md": "tracked-source"
       },
+      "jobcron-worker-glm-1": {
+        "SKILL.md": "tracked-source",
+        "references/temporary-cloud-bootstrap-iam.md": "tracked-source",
+        "references/frontend-origin-separation.md": "tracked-source"
+      },
+      "jobcron-worker-glm-2": {
+        "SKILL.md": "tracked-source",
+        "references/temporary-cloud-bootstrap-iam.md": "tracked-source",
+        "references/frontend-origin-separation.md": "tracked-source"
+      },
       "chapt-worker": {
         "SKILL.md": "tracked-source",
         "references/temporary-cloud-bootstrap-iam.md": "tracked-source",
@@ -624,12 +724,32 @@
         "references/temporary-cloud-bootstrap-iam.md": "tracked-source",
         "references/frontend-origin-separation.md": "tracked-source"
       },
+      "chapt-worker-glm-1": {
+        "SKILL.md": "tracked-source",
+        "references/temporary-cloud-bootstrap-iam.md": "tracked-source",
+        "references/frontend-origin-separation.md": "tracked-source"
+      },
+      "chapt-worker-glm-2": {
+        "SKILL.md": "tracked-source",
+        "references/temporary-cloud-bootstrap-iam.md": "tracked-source",
+        "references/frontend-origin-separation.md": "tracked-source"
+      },
       "harness-worker": {
         "SKILL.md": "tracked-source",
         "references/temporary-cloud-bootstrap-iam.md": "tracked-source",
         "references/frontend-origin-separation.md": "tracked-source"
       },
       "harness-worker-2": {
+        "SKILL.md": "tracked-source",
+        "references/temporary-cloud-bootstrap-iam.md": "tracked-source",
+        "references/frontend-origin-separation.md": "tracked-source"
+      },
+      "harness-worker-glm-1": {
+        "SKILL.md": "tracked-source",
+        "references/temporary-cloud-bootstrap-iam.md": "tracked-source",
+        "references/frontend-origin-separation.md": "tracked-source"
+      },
+      "harness-worker-glm-2": {
         "SKILL.md": "tracked-source",
         "references/temporary-cloud-bootstrap-iam.md": "tracked-source",
         "references/frontend-origin-separation.md": "tracked-source"
@@ -665,6 +785,12 @@
       "jobcron-worker-2": {
         "SKILL.md": "tracked-source"
       },
+      "jobcron-worker-glm-1": {
+        "SKILL.md": "tracked-source"
+      },
+      "jobcron-worker-glm-2": {
+        "SKILL.md": "tracked-source"
+      },
       "jobcron-reviewer": {
         "SKILL.md": "tracked-source"
       },
@@ -675,6 +801,12 @@
         "SKILL.md": "tracked-source"
       },
       "chapt-worker-2": {
+        "SKILL.md": "tracked-source"
+      },
+      "chapt-worker-glm-1": {
+        "SKILL.md": "tracked-source"
+      },
+      "chapt-worker-glm-2": {
         "SKILL.md": "tracked-source"
       },
       "chapt-reviewer": {

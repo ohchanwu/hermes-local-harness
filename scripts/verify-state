@@ -195,15 +195,51 @@ def shared_skill_declaration_valid(entry):
             and all(relative_file_path(rel) for rel in files))
 
 
+def glm_workers_of_board(roster, board):
+    """Sorted names of one board's GLM workers, taken from roster fields only: the
+    non-retired profiles whose `modes` field is ["project-isolated", <board>] and
+    whose provider is GLM_WORKER_PROVIDER."""
+    profiles = roster.get("profiles", []) if isinstance(roster, dict) else []
+    return sorted(p.get("name") for p in profiles
+                  if isinstance(p, dict) and p.get("modes") == ["project-isolated", board]
+                  and p.get("provider") == GLM_WORKER_PROVIDER
+                  and p.get("lifecycle") != RETIRED_LIFECYCLE)
+
+
+def check_glm_worker_skill_declarations(errors, skill, roster):
+    """Card t_c8c6860f: for every shared skill and every board of the roster's
+    project_fleets, each GLM worker of the board is in deploy_profiles exactly
+    when the board's Claude worker 1 (the fleet's `worker` field) is, so a GLM
+    worker can never be left out of, or added outside, its board's skill set."""
+    entries = skill.get("shared_skills", []) if isinstance(skill, dict) else []
+    fleets = (roster.get("project_fleets") or {}) if isinstance(roster, dict) else {}
+    for entry in entries:
+        deploy = entry.get("deploy_profiles") if isinstance(entry, dict) else None
+        if not isinstance(deploy, list):
+            continue  # shared_skill_declaration_valid reports the malformed declaration
+        name = entry.get("name")
+        for fleet in fleets.values():
+            if not isinstance(fleet, dict) or not isinstance(fleet.get("worker"), str):
+                continue
+            worker1 = fleet["worker"]
+            for profile in glm_workers_of_board(roster, fleet.get("board")):
+                if profile in deploy and worker1 not in deploy:
+                    fail(errors, f"unexpected GLM worker in shared skill deploy_profiles: {name} {profile}")
+                elif worker1 in deploy and profile not in deploy:
+                    fail(errors, f"GLM worker missing from shared skill deploy_profiles: {name} {profile}")
+
+
 def check_skill(errors, deployed_hashes, retired=()):
     """deployed_hashes: {skill: {profile: {rel: sha-or-None}}} of deployed copies, or None to check tracked only.
 
     Expected bytes come from each skill's tracked source. Retired roster profiles
     are excluded from deployment checks; a file a profile-local override declares
     is owned by check_profile_local_skill_overrides; any other copy must equal
-    the tracked source exactly."""
+    the tracked source exactly. The declaration itself is guarded by
+    check_glm_worker_skill_declarations, which runs here in every mode."""
     skill = load(ROOT / "snapshots/sanitized-current-state.yaml")["skill"]
     local_overrides = skill.get("profile_local_skill_overrides", {})
+    check_glm_worker_skill_declarations(errors, skill, load(ROOT / "roster.yaml"))
     for entry in skill["shared_skills"]:
         if not shared_skill_declaration_valid(entry):
             label = entry.get("name") if isinstance(entry, dict) else entry

@@ -200,7 +200,7 @@ class DerivedExpectations(unittest.TestCase):
                 "profile SOUL drift harness-reviewer",
                 f"profile-local skill override drift: harness-orchestrator/{RELATIVE}",
             })
-            self.assertEqual(len(stale), 11)
+            self.assertEqual(len(stale), 17)  # card t_c8c6860f: +6 GLM workers of jobcron/chapt/harness
             # Redeploying the changed sources (new observation, still no pin edit) is green.
             code, fails, output = run_main(root, redeployed(tree_verifier(root), self.clean))
             self.assertEqual((code, fails), (0, set()), output)
