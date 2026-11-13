@@ -2,7 +2,7 @@
 """Read-only report on the jev plugin logs (Part D of the jev plugin).
 
 Usage:
-  scripts/jev-report [--log-dir DIR] [--since DAYS]
+  scripts/jev-report [--log-dir DIR] [--since DAYS] [--after DATETIME]
                      [--kanban-db PATH ...] [--state-db PATH ...]
 
 Inputs (nothing is written; every database is opened with SQLite's read-only
@@ -10,24 +10,63 @@ mode, mode=ro):
   --log-dir     directory with decisions.jsonl, tool_results.jsonl and
                 auxiliary.jsonl. Default: the environment variable
                 HERMES_JEV_LOG_DIR, else /Users/chanbla11mit/.hermes/jev/logs.
-  --since       only log records whose `ts` is within this many days (default 30).
+  --since       only log records whose `ts` is within this many days. Default
+                30 days; without a default day limit when --after is given.
+  --after       only log records whose `ts` is later than this date and time,
+                written as ISO 8601 with a UTC offset, for example
+                2026-11-14T09:00:00+09:00 (the deployment time of the routing
+                change). With --since as well, both limits apply.
   --kanban-db   board database (tables tasks, task_runs); may be repeated.
                 Default: /Users/chanbla11mit/.hermes/kanban.db (board `default`)
                 and /Users/chanbla11mit/.hermes/kanban/boards/<board>/kanban.db.
-  --state-db    worker session database (tables sessions,
+  --state-db    session database of a profile (tables sessions,
                 session_model_usage); may be repeated. Default:
                 /Users/chanbla11mit/.hermes/state.db and
-                /Users/chanbla11mit/.hermes/profiles/<profile>/state.db.
+                /Users/chanbla11mit/.hermes/profiles/<profile>/state.db, so the
+                sessions of every profile (Claude workers, GLM workers and
+                reviewers) are read.
 
-A worker session belongs to a card run when the session has source `kanban`,
-started between 60 seconds before the run started and the end of the run (or
-now, for a running run), its profile_name is empty or equal to the run profile,
-and its cwd is empty, equal to the card's workspace_path, or below it.
+A session belongs to a card run (a worker run or a reviewer run) when the
+session has source `kanban`, started between 60 seconds before the run started
+and the end of the run (or now, for a running run), its profile_name is empty
+or equal to the run profile, and its cwd is empty, equal to the card's
+workspace_path, or below it. A session whose parent_session_id chain leads to
+such a session in the same database (a subagent session) also belongs to the
+card run.
+
+Tokens of a session are taken per model from session_model_usage (the main
+model and every auxiliary model call). A session without session_model_usage
+rows uses the model and token columns of its sessions row. A model whose name
+contains `claude` counts as Claude, a model whose name contains `glm` counts as
+GLM, every other model counts as other. Tokens of a card are the input, output,
+cache read and cache write tokens of all sessions of all its runs; Claude
+tokens and GLM tokens are reported separately.
 
 Sections:
   1. Card model routing: per route, number of cards, tokens per card from the
-     worker sessions, and the share of cards with at least one run whose
-     outcome is changes_requested, crashed or blocked.
+     sessions of the card's runs (all models, Claude, GLM), and the share of
+     cards with at least one run whose outcome is changes_requested, crashed or
+     blocked. Then the Claude tokens saved by the easy and medium routes:
+       - GLM-routed card: a card with a route record (event route) whose route
+         is easy or medium and whose applied is true. Its route is the route of
+         its last such record.
+       - control card: a card with a route record whose route is easy or
+         medium, applied false and not_applied_reason control_group, and no
+         applied easy or medium route record. Its route is the route of its
+         last such record.
+       - only cards whose status in the board database is done are counted,
+         and only cards with at least one linked session (the number of done
+         cards without a linked session is printed).
+       - saved = (mean Claude tokens per control card - mean Claude tokens per
+         GLM-routed card) x number of GLM-routed cards, per board and route and
+         per route over all boards. A GLM-routed card that an escalate record
+         (applied true) moved to a Claude worker stays a GLM-routed card; the
+         number of such cards is printed.
+       - rule line: per route over all boards, the line "route <route>: disable
+         this route: owner permission required" is printed when saved is zero
+         or negative, with at least 10 GLM-routed cards and at least 3 control
+         cards. The report changes no setting; only the owner permits turning
+         off a route.
   2. Peak-hours holds: hold, release and toggle records.
   3. Tool result filter: results per tool and action, characters removed per
      tool and per profile, and the share of saved files read later.
@@ -56,6 +95,12 @@ COST_PER_MILLION_INPUT = 0.042
 RUN_OUTCOMES = ("changes_requested", "crashed", "blocked")
 SESSION_START_SLACK_SECONDS = 60
 NO_RECORDS = "  no records"
+TOKEN_KEYS = ("input_tokens", "output_tokens", "cache_read_tokens", "cache_write_tokens")
+MODEL_FAMILIES = ("claude", "glm", "other")
+SAVINGS_ROUTES = ("easy", "medium")
+RULE_MIN_GLM_CARDS = 10
+RULE_MIN_CONTROL_CARDS = 3
+RULE_TEXT = "disable this route: owner permission required"
 
 
 def default_kanban_dbs():
@@ -82,8 +127,9 @@ def parse_ts(value):
     return parsed.timestamp()
 
 
-def read_log(log_dir, stream, cutoff):
-    """Records of <log_dir>/<stream>.jsonl with a valid ts at or after cutoff."""
+def read_log(log_dir, stream, cutoff, after=None):
+    """Records of <log_dir>/<stream>.jsonl with a valid ts at or after cutoff
+    and, when after is given, later than after (all values in epoch seconds)."""
     path = os.path.join(log_dir, f"{stream}.jsonl")
     records = []
     try:
@@ -98,8 +144,11 @@ def read_log(log_dir, stream, cutoff):
                 if not isinstance(record, dict):
                     continue
                 ts = parse_ts(record.get("ts"))
-                if ts is not None and ts >= cutoff:
-                    records.append(record)
+                if ts is None or ts < cutoff:
+                    continue
+                if after is not None and ts <= after:
+                    continue
+                records.append(record)
     except OSError:
         return []
     return records
@@ -115,11 +164,16 @@ def columns(conn, table):
 
 
 def load_runs(kanban_dbs, task_ids):
-    """{task_id: {"workspace_path": str|None, "runs": [(profile, started, ended, outcome)]}}"""
+    """{task_id: {"workspace_path": str|None, "status": str|None,
+    "runs": [(profile, started, ended, outcome)]}}"""
     cards = {}
     if not task_ids:
         return cards
     wanted = sorted(task_ids)
+
+    def card(task_id):
+        return cards.setdefault(task_id, {"workspace_path": None, "status": None, "runs": []})
+
     for path in kanban_dbs:
         try:
             conn = connect_ro(path)
@@ -130,21 +184,23 @@ def load_runs(kanban_dbs, task_ids):
             if not {"task_id", "started_at", "outcome"} <= run_cols:
                 continue
             task_cols = columns(conn, "tasks")
+            workspace_col = "workspace_path" if "workspace_path" in task_cols else "NULL"
+            status_col = "status" if "status" in task_cols else "NULL"
             for start in range(0, len(wanted), 500):
                 batch = wanted[start:start + 500]
                 marks = ",".join("?" * len(batch))
-                if "workspace_path" in task_cols:
-                    for task_id, workspace in conn.execute(
-                            f"SELECT id, workspace_path FROM tasks WHERE id IN ({marks})", batch):
-                        cards.setdefault(task_id, {"workspace_path": None, "runs": []})
-                        cards[task_id]["workspace_path"] = workspace
+                if "id" in task_cols:
+                    for task_id, workspace, status in conn.execute(
+                            f"SELECT id, {workspace_col}, {status_col} FROM tasks "
+                            f"WHERE id IN ({marks})", batch):
+                        card(task_id)["workspace_path"] = workspace
+                        card(task_id)["status"] = status
                 profile_col = "profile" if "profile" in run_cols else "NULL"
                 ended_col = "ended_at" if "ended_at" in run_cols else "NULL"
                 for task_id, profile, started, ended, outcome in conn.execute(
                         f"SELECT task_id, {profile_col}, started_at, {ended_col}, outcome "
                         f"FROM task_runs WHERE task_id IN ({marks})", batch):
-                    cards.setdefault(task_id, {"workspace_path": None, "runs": []})
-                    cards[task_id]["runs"].append((profile, started, ended, outcome))
+                    card(task_id)["runs"].append((profile, started, ended, outcome))
         except sqlite3.Error:
             continue
         finally:
@@ -152,9 +208,35 @@ def load_runs(kanban_dbs, task_ids):
     return cards
 
 
+def model_family(model):
+    name = (model or "").lower()
+    if "claude" in name:
+        return "claude"
+    if "glm" in name:
+        return "glm"
+    return "other"
+
+
+def empty_tokens():
+    return {family: dict.fromkeys(TOKEN_KEYS, 0) for family in MODEL_FAMILIES}
+
+
+def add_tokens(target, family, values):
+    for name, value in zip(TOKEN_KEYS, values):
+        target[family][name] += int(value or 0)
+
+
 def load_sessions(state_dbs):
-    """[(key, started_at, profile_name, cwd, tokens dict)] for kanban worker sessions."""
-    sessions = []
+    """Sessions of every given database.
+
+    Returns {"kanban": [(key, started_at, profile_name, cwd)], "children":
+    {key: [child key]}, "tokens": {key: {family: {token name: count}}}}. A key
+    is "<database path>:<session id>", so sessions of different profiles never
+    collide. Only identifiers, times, paths and token numbers are read.
+    """
+    kanban = []
+    children = defaultdict(list)
+    tokens = {}
     for path in state_dbs:
         try:
             conn = connect_ro(path)
@@ -166,31 +248,36 @@ def load_sessions(state_dbs):
                 continue
             profile_col = "profile_name" if "profile_name" in session_cols else "NULL"
             cwd_col = "cwd" if "cwd" in session_cols else "NULL"
+            parent_col = "parent_session_id" if "parent_session_id" in session_cols else "NULL"
+            model_col = "model" if "model" in session_cols else "NULL"
+            token_cols = ", ".join(name if name in session_cols else "0" for name in TOKEN_KEYS)
             rows = conn.execute(
-                f"SELECT id, started_at, {profile_col}, {cwd_col} FROM sessions "
-                "WHERE source = 'kanban'").fetchall()
+                f"SELECT id, source, started_at, {profile_col}, {cwd_col}, {parent_col}, "
+                f"{model_col}, {token_cols} FROM sessions").fetchall()
             usage = {}
             usage_cols = columns(conn, "session_model_usage")
-            token_cols = ("input_tokens", "output_tokens", "cache_read_tokens", "cache_write_tokens")
-            if {"session_id", *token_cols} <= usage_cols:
-                for row in conn.execute(
-                        "SELECT session_id, SUM(input_tokens), SUM(output_tokens), "
-                        "SUM(cache_read_tokens), SUM(cache_write_tokens) "
-                        "FROM session_model_usage GROUP BY session_id"):
-                    usage[row[0]] = dict(zip(token_cols, (int(v or 0) for v in row[1:])))
-            elif set(token_cols) <= session_cols:
-                for row in conn.execute(
-                        "SELECT id, input_tokens, output_tokens, cache_read_tokens, "
-                        "cache_write_tokens FROM sessions WHERE source = 'kanban'"):
-                    usage[row[0]] = dict(zip(token_cols, (int(v or 0) for v in row[1:])))
-            for session_id, started, profile, cwd in rows:
-                tokens = usage.get(session_id, dict.fromkeys(token_cols, 0))
-                sessions.append((f"{path}:{session_id}", started, profile, cwd, tokens))
+            if {"session_id", "model", *TOKEN_KEYS} <= usage_cols:
+                for session_id, model, *values in conn.execute(
+                        "SELECT session_id, model, input_tokens, output_tokens, "
+                        "cache_read_tokens, cache_write_tokens FROM session_model_usage"):
+                    usage.setdefault(session_id, empty_tokens())
+                    add_tokens(usage[session_id], model_family(model), values)
+            for session_id, source, started, profile, cwd, parent, model, *values in rows:
+                key = f"{path}:{session_id}"
+                if session_id in usage:
+                    tokens[key] = usage[session_id]
+                else:
+                    tokens[key] = empty_tokens()
+                    add_tokens(tokens[key], model_family(model), values)
+                if parent:
+                    children[f"{path}:{parent}"].append(key)
+                if source == "kanban":
+                    kanban.append((key, started, profile, cwd))
         except sqlite3.Error:
             continue
         finally:
             conn.close()
-    return sessions
+    return {"kanban": kanban, "children": dict(children), "tokens": tokens}
 
 
 def under(cwd, workspace):
@@ -201,27 +288,39 @@ def under(cwd, workspace):
 
 
 def card_tokens(card, sessions, now):
-    """Token totals of the sessions that belong to the card's runs, or None if none match."""
-    matched = {}
+    """{family: {token name: count}} over the sessions of the card's runs and
+    their subagent sessions, or None if no session matches."""
+    matched = set()
     for profile, started, ended, _outcome in card["runs"]:
         if started is None:
             continue
         end = ended if ended is not None else now
-        for key, s_started, s_profile, s_cwd, tokens in sessions:
+        for key, s_started, s_profile, s_cwd in sessions["kanban"]:
             if s_started is None or not started - SESSION_START_SLACK_SECONDS <= s_started <= end:
                 continue
             if s_profile and profile and s_profile != profile:
                 continue
             if not under(s_cwd, card["workspace_path"]):
                 continue
-            matched[key] = tokens
+            matched.add(key)
     if not matched:
         return None
-    total = defaultdict(int)
-    for tokens in matched.values():
-        for name, value in tokens.items():
-            total[name] += value
+    pending = list(matched)
+    while pending:
+        for child in sessions["children"].get(pending.pop(), ()):
+            if child not in matched:
+                matched.add(child)
+                pending.append(child)
+    total = empty_tokens()
+    for key in matched:
+        for family, values in sessions["tokens"].get(key, {}).items():
+            for name, value in values.items():
+                total[family][name] += value
     return total
+
+
+def token_sum(tokens, family):
+    return sum(tokens[family].values())
 
 
 def pct(part, whole):
@@ -232,9 +331,154 @@ def number(value):
     return value if isinstance(value, (int, float)) and not isinstance(value, bool) else 0
 
 
+def average_line(label, totals, family):
+    """One line with the mean tokens per card of one model family."""
+    averages = {k: sum(t[family][k] for t in totals) / len(totals) for k in TOKEN_KEYS}
+    return (f"    {label} per card (average over {len(totals)} cards with sessions): "
+            f"total {sum(averages.values()):.0f}, input {averages['input_tokens']:.0f}, "
+            f"output {averages['output_tokens']:.0f}, "
+            f"cache read {averages['cache_read_tokens']:.0f}, "
+            f"cache write {averages['cache_write_tokens']:.0f}")
+
+
+def savings_groups(decisions):
+    """{task_id: (group, board, route)} with group "glm" or "control".
+
+    A card with an applied easy or medium route record is a GLM-routed card
+    (route of its last such record). Otherwise a card with an easy or medium
+    control_group record is a control card (route of its last such record).
+    """
+    applied, control = {}, {}
+    for record in decisions:
+        if record.get("event") != "route" or record.get("route") not in SAVINGS_ROUTES:
+            continue
+        task_id = record.get("task_id")
+        if not isinstance(task_id, str) or not task_id:
+            continue
+        board = record.get("board") if isinstance(record.get("board"), str) else "unknown"
+        if record.get("applied") is True:
+            applied[task_id] = (board, record["route"])
+        elif record.get("applied") is False and record.get("not_applied_reason") == "control_group":
+            control[task_id] = (board, record["route"])
+    groups = {task_id: ("glm", *value) for task_id, value in applied.items()}
+    for task_id, value in control.items():
+        groups.setdefault(task_id, ("control", *value))
+    return groups
+
+
+def escalated_cards(decisions):
+    return {r["task_id"] for r in decisions
+            if r.get("event") == "escalate" and r.get("applied") is True
+            and isinstance(r.get("task_id"), str)}
+
+
+def summarize_group(card_totals):
+    """Counts and mean tokens of one group of done cards with sessions."""
+    count = len(card_totals)
+    if not count:
+        return {"cards": 0, "mean_claude": None, "mean_glm": None, "mean_claude_parts": None}
+    return {
+        "cards": count,
+        "mean_claude": sum(token_sum(t, "claude") for t in card_totals) / count,
+        "mean_glm": sum(token_sum(t, "glm") for t in card_totals) / count,
+        "mean_claude_parts": {k: sum(t["claude"][k] for t in card_totals) / count
+                              for k in TOKEN_KEYS},
+    }
+
+
+def compute_savings(decisions, cards, sessions, now):
+    """Saved Claude tokens per board and route and per route over all boards.
+
+    Returns a list of dicts with keys scope ("board" or "all"), board (None for
+    "all"), route, glm and control (summaries of summarize_group), glm_done,
+    control_done (done cards, with or without sessions), escalated (done
+    GLM-routed cards with an applied escalate record), saved (None when a group
+    has no card with sessions) and rule (True when the rule line applies; only
+    for scope "all").
+    """
+    groups = savings_groups(decisions)
+    escalated = escalated_cards(decisions)
+    buckets = defaultdict(lambda: {"glm": [], "control": [], "glm_done": 0, "control_done": 0,
+                                   "escalated": 0})
+    for task_id, (group, board, route_name) in groups.items():
+        card = cards.get(task_id)
+        if card is None or card.get("status") != "done":
+            continue
+        tokens = card_tokens(card, sessions, now) if card["runs"] else None
+        for key in ((board, route_name), (None, route_name)):
+            bucket = buckets[key]
+            bucket[f"{group}_done"] += 1
+            if group == "glm" and task_id in escalated:
+                bucket["escalated"] += 1
+            if tokens is not None:
+                bucket[group].append(tokens)
+    rows = []
+    keys = sorted((k for k in buckets if k[0] is not None), key=lambda k: (k[0], k[1]))
+    keys += [(None, r) for r in SAVINGS_ROUTES if (None, r) in buckets]
+    for board, route_name in keys:
+        bucket = buckets[(board, route_name)]
+        glm, control = summarize_group(bucket["glm"]), summarize_group(bucket["control"])
+        saved = None
+        if glm["cards"] and control["cards"]:
+            saved = (control["mean_claude"] - glm["mean_claude"]) * glm["cards"]
+        rule = (board is None and saved is not None and saved <= 0
+                and glm["cards"] >= RULE_MIN_GLM_CARDS
+                and control["cards"] >= RULE_MIN_CONTROL_CARDS)
+        rows.append({"scope": "all" if board is None else "board", "board": board,
+                     "route": route_name, "glm": glm, "control": control,
+                     "glm_done": bucket["glm_done"], "control_done": bucket["control_done"],
+                     "escalated": bucket["escalated"], "saved": saved, "rule": rule})
+    return rows
+
+
+def fmt(value):
+    return "none" if value is None else f"{value:.0f}"
+
+
+def savings_lines(rows):
+    out = ["  Claude tokens saved by GLM routing (done cards; mean Claude tokens = input + output "
+           "+ cache read + cache write of Claude models):"]
+    if not rows:
+        out.append("    no done GLM-routed or control cards")
+        return out
+    for row in rows:
+        where = f"board {row['board']}" if row["scope"] == "board" else "all boards"
+        glm, control = row["glm"], row["control"]
+        out.append(f"  {where} route {row['route']}: GLM-routed cards {glm['cards']}, "
+                   f"control cards {control['cards']}, saved {fmt(row['saved'])}")
+        out.append(f"    mean Claude tokens per GLM-routed card {fmt(glm['mean_claude'])}, "
+                   f"per control card {fmt(control['mean_claude'])}")
+        out.append(f"    mean GLM tokens per GLM-routed card {fmt(glm['mean_glm'])}, "
+                   f"per control card {fmt(control['mean_glm'])}")
+        for label, summary in (("GLM-routed card", glm), ("control card", control)):
+            parts = summary["mean_claude_parts"]
+            if parts:
+                out.append(f"    mean Claude tokens per {label}: input {parts['input_tokens']:.0f}, "
+                           f"output {parts['output_tokens']:.0f}, "
+                           f"cache read {parts['cache_read_tokens']:.0f}, "
+                           f"cache write {parts['cache_write_tokens']:.0f}")
+        out.append(f"    done cards without a linked session: GLM-routed "
+                   f"{row['glm_done'] - glm['cards']}, control {row['control_done'] - control['cards']}; "
+                   f"done GLM-routed cards moved to a Claude worker by an escalate record: "
+                   f"{row['escalated']}")
+        if row["rule"]:
+            out.append(f"  route {row['route']}: {RULE_TEXT}")
+    return out
+
+
+def load_routing_inputs(decisions, kanban_dbs, state_dbs):
+    """(route records, cards, sessions) for section 1 and compute_savings."""
+    routes = [r for r in decisions if r.get("event") == "route"]
+    task_ids = {r.get("task_id") for r in routes
+                if isinstance(r.get("task_id"), str) and r.get("task_id")}
+    cards = load_runs(kanban_dbs, task_ids)
+    sessions = load_sessions(state_dbs) if cards else {"kanban": [], "children": {}, "tokens": {}}
+    return routes, cards, sessions
+
+
 def section_routing(out, decisions, kanban_dbs, state_dbs, now):
     out.append("== Card model routing (decisions.jsonl event route) ==")
-    routes = [r for r in decisions if r.get("event") == "route"]
+    routes, cards, sessions = load_routing_inputs(decisions, kanban_dbs, state_dbs)
     if not routes:
         out.append(NO_RECORDS)
         return
@@ -248,12 +492,9 @@ def section_routing(out, decisions, kanban_dbs, state_dbs, now):
         label = f"{record.get('route') or 'none'} applied={'yes' if record.get('applied') else 'no'}"
         groups[label].add(task_id)
     out.append(f"  route records: {len(routes)}; without task_id: {without_task}")
-    all_ids = set().union(*groups.values()) if groups else set()
-    cards = load_runs(kanban_dbs, all_ids)
-    sessions = load_sessions(state_dbs) if cards else []
     if not cards:
         out.append("  task_runs: no records")
-    if cards and not sessions:
+    if cards and not sessions["kanban"]:
         out.append("  worker sessions: no records")
     for label in sorted(groups):
         ids = sorted(groups[label])
@@ -268,16 +509,14 @@ def section_routing(out, decisions, kanban_dbs, state_dbs, now):
         totals = [card_tokens(c, sessions, now) for c in with_runs]
         totals = [t for t in totals if t is not None]
         if totals:
-            keys = ("input_tokens", "output_tokens", "cache_read_tokens", "cache_write_tokens")
-            averages = {k: sum(t[k] for t in totals) / len(totals) for k in keys}
-            all_tokens = sum(averages.values())
-            out.append(f"    tokens per card (average over {len(totals)} cards with sessions): "
-                       f"total {all_tokens:.0f}, input {averages['input_tokens']:.0f}, "
-                       f"output {averages['output_tokens']:.0f}, "
-                       f"cache read {averages['cache_read_tokens']:.0f}, "
-                       f"cache write {averages['cache_write_tokens']:.0f}")
+            all_models = [{"all": {k: sum(t[f][k] for f in MODEL_FAMILIES) for k in TOKEN_KEYS}}
+                          for t in totals]
+            out.append(average_line("tokens", all_models, "all"))
+            out.append(average_line("Claude tokens", totals, "claude"))
+            out.append(average_line("GLM tokens", totals, "glm"))
         else:
             out.append("    tokens per card: no records")
+    out.extend(savings_lines(compute_savings(decisions, cards, sessions, now)))
 
 
 def section_peak_hold(out, decisions):
@@ -377,13 +616,29 @@ def section_jev(out, decisions, tool_results):
     out.append(f"  Jev cost: {cost:.6f} US dollars (0.042 US dollars per million input tokens)")
 
 
-def build_report(log_dir, since_days, kanban_dbs, state_dbs, now=None):
+def read_window(since_days, after, now):
+    """(cutoff, after) in epoch seconds; since_days None means no day limit."""
+    cutoff = float("-inf") if since_days is None else now - since_days * 86400
+    return cutoff, after
+
+
+def window_text(since_days, after):
+    parts = []
+    if since_days is not None:
+        parts.append(f"last {since_days:g} days")
+    if after is not None:
+        parts.append("records after " + datetime.datetime.fromtimestamp(
+            after, datetime.timezone.utc).isoformat(timespec="seconds"))
+    return ", ".join(parts) or "all records"
+
+
+def build_report(log_dir, since_days, kanban_dbs, state_dbs, now=None, after=None):
     now = time.time() if now is None else now
-    cutoff = now - since_days * 86400
-    decisions = read_log(log_dir, "decisions", cutoff)
-    tool_results = read_log(log_dir, "tool_results", cutoff)
-    auxiliary = read_log(log_dir, "auxiliary", cutoff)
-    out = [f"jev report: log directory {log_dir}, last {since_days} days"]
+    cutoff, after = read_window(since_days, after, now)
+    decisions = read_log(log_dir, "decisions", cutoff, after)
+    tool_results = read_log(log_dir, "tool_results", cutoff, after)
+    auxiliary = read_log(log_dir, "auxiliary", cutoff, after)
+    out = [f"jev report: log directory {log_dir}, {window_text(since_days, after)}"]
     section_routing(out, decisions, kanban_dbs, state_dbs, now)
     section_peak_hold(out, decisions)
     section_tool_results(out, tool_results)
@@ -392,16 +647,56 @@ def build_report(log_dir, since_days, kanban_dbs, state_dbs, now=None):
     return "\n".join(out) + "\n"
 
 
-def main(argv=None):
-    parser = argparse.ArgumentParser(description="Read-only report on the jev plugin logs.")
+def route_savings(log_dir, since_days, kanban_dbs, state_dbs, now=None, after=None):
+    """The rows of compute_savings for the same inputs as build_report.
+
+    Used by scripts/jev-route-notice, so that the notice and the report use the
+    same calculation. Reads only; writes nothing.
+    """
+    now = time.time() if now is None else now
+    cutoff, after = read_window(since_days, after, now)
+    decisions = read_log(log_dir, "decisions", cutoff, after)
+    _routes, cards, sessions = load_routing_inputs(decisions, kanban_dbs, state_dbs)
+    return compute_savings(decisions, cards, sessions, now)
+
+
+def parse_after(text):
+    """Epoch seconds of an ISO 8601 date and time with a UTC offset."""
+    value = parse_ts(text)
+    if value is None:
+        raise argparse.ArgumentTypeError(
+            f"not an ISO 8601 date and time with a UTC offset: {text!r} "
+            "(example: 2026-11-14T09:00:00+09:00)")
+    return value
+
+
+def build_parser(description="Read-only report on the jev plugin logs."):
+    parser = argparse.ArgumentParser(description=description)
     parser.add_argument("--log-dir", default=os.environ.get("HERMES_JEV_LOG_DIR") or DEFAULT_LOG_DIR)
-    parser.add_argument("--since", type=float, default=30, metavar="DAYS")
+    parser.add_argument("--since", type=float, default=None, metavar="DAYS",
+                        help="only log records within this many days (default 30; "
+                             "no day limit when --after is given and --since is not)")
+    parser.add_argument("--after", type=parse_after, default=None, metavar="DATETIME",
+                        help="only log records later than this ISO 8601 date and time with a "
+                             "UTC offset, for example 2026-11-14T09:00:00+09:00 "
+                             "(the deployment time)")
     parser.add_argument("--kanban-db", action="append", metavar="PATH")
     parser.add_argument("--state-db", action="append", metavar="PATH")
-    args = parser.parse_args(argv)
+    return parser
+
+
+def resolve_args(args):
+    """(log_dir, since_days, after, kanban_dbs, state_dbs) from parsed arguments."""
+    since = args.since if args.since is not None else (None if args.after is not None else 30)
     kanban_dbs = args.kanban_db if args.kanban_db is not None else default_kanban_dbs()
     state_dbs = args.state_db if args.state_db is not None else default_state_dbs()
-    sys.stdout.write(build_report(args.log_dir, args.since, kanban_dbs, state_dbs))
+    return args.log_dir, since, args.after, kanban_dbs, state_dbs
+
+
+def main(argv=None):
+    args = build_parser().parse_args(argv)
+    log_dir, since, after, kanban_dbs, state_dbs = resolve_args(args)
+    sys.stdout.write(build_report(log_dir, since, kanban_dbs, state_dbs, after=after))
     return 0
 
 
