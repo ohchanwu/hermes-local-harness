@@ -617,5 +617,151 @@ class UnblockHoldTests(_BoardCase):
         self.assertEqual(self.decisions("hold")[-1]["error_class"], "DatabaseError")
 
 
+class EscalatedCardHoldTests(_BoardCase):
+    """Part 4.6, plugin side (card t_df87b851): a card that the reassignment after change requests
+    reassigned to a Claude worker is never held by the peak-hours hold."""
+
+    ESCALATED = "t_e5c0a1a7"
+
+    def setUp(self):
+        super().setUp()
+        conn = sqlite3.connect(self.db)
+        conn.execute("INSERT INTO tasks (id, title, status, assignee) VALUES (?, ?, 'ready', 'harness-worker-glm-1')",
+                     (self.ESCALATED, "synthetic card"))
+        conn.commit()
+        conn.close()
+        env = {"HERMES_PROFILE": "harness-reviewer", "HERMES_KANBAN_TASK": self.ESCALATED,
+               "HERMES_KANBAN_BOARD": "harness"}
+        patcher = mock.patch.dict(os.environ, env)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def add_change_requests(self, task_id, count=5):
+        conn = sqlite3.connect(self.db)
+        for _ in range(count):
+            conn.execute("INSERT INTO task_events (task_id, kind, payload, created_at) VALUES (?, 'changes_requested', "
+                         "'{}', 0)", (task_id,))
+        conn.commit()
+        conn.close()
+
+    def assignee(self, task_id):
+        conn = sqlite3.connect(self.db)
+        try:
+            return conn.execute("SELECT assignee FROM tasks WHERE id=?", (task_id,)).fetchone()[0]
+        finally:
+            conn.close()
+
+    def escalate(self, task_id):
+        routing.handle_request_changes({"task_id": task_id, "reason": "again"}, lambda payload=None: '{"ok": true}',
+                                       config=self.config, command=self.hermes, state_dir=self.log_dir)
+
+    def schedule_calls(self, task_id):
+        return [c for c in fake_hermes_calls(self.calls_log) if "schedule" in c and task_id in c]
+
+    def test_escalated_card_is_not_held_inside_the_window(self):
+        self.add_change_requests(self.ESCALATED)
+        self.escalate(self.ESCALATED)
+        self.assertEqual(self.assignee(self.ESCALATED), "harness-worker")
+        out = self.script("--apply")
+        self.assertNotIn(self.ESCALATED, out)
+        self.assertEqual(self.statuses()[self.ESCALATED], "ready")
+        self.assertEqual(self.schedule_calls(self.ESCALATED), [])
+        self.assertEqual(self.statuses()["t_glm_ready"], "scheduled")  # GLM cards are still held
+        self.assertNotIn(self.ESCALATED, [r["task_id"] for r in self.decisions("hold")])
+
+    def test_card_reassigned_after_the_plan_is_skipped(self):
+        now = datetime.fromisoformat(WEDNESDAY_16)
+        boards = {"harness": self.db}
+        actions, _switch, _errors = peak_hold.plan(self.config, now, boards)
+        self.assertIn(self.ESCALATED, [a["task_id"] for a in actions if a["action"] == "hold"])
+        self.add_change_requests(self.ESCALATED)
+        self.escalate(self.ESCALATED)  # between the read of the board and the hold
+        results = peak_hold.apply(self.config, actions, self.hermes, boards)
+        skipped = [r for r in results if r.get("skipped")]
+        self.assertEqual([r["task_id"] for r in skipped], [self.ESCALATED])
+        self.assertEqual(self.statuses()[self.ESCALATED], "ready")
+        self.assertEqual(self.schedule_calls(self.ESCALATED), [])
+        self.assertEqual(self.statuses()["t_glm_ready"], "scheduled")
+        self.assertNotIn(self.ESCALATED, [r["task_id"] for r in self.decisions("hold")])
+
+    def test_script_prints_skipped_hold_and_returns_zero(self):
+        import contextlib
+        import importlib.machinery
+        import importlib.util
+        import io
+        loader = importlib.machinery.SourceFileLoader("jev_peak_hold_script", str(SCRIPT))
+        spec = importlib.util.spec_from_loader(loader.name, loader)
+        script = importlib.util.module_from_spec(spec)
+        loader.exec_module(script)
+        boards = {"harness": self.db}
+        actions, _switch, _errors = peak_hold.plan(self.config, datetime.fromisoformat(WEDNESDAY_16), boards)
+        conn = sqlite3.connect(self.db)
+        conn.execute("UPDATE tasks SET assignee='harness-worker-2' WHERE id='t_glm_todo'")
+        conn.commit()
+        conn.close()
+        results = peak_hold.apply(self.config, actions, self.hermes, boards)
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            status = script._print_results(results)
+        self.assertEqual(status, 0)  # a skipped hold is not a failure
+        self.assertIn("skipped hold harness t_glm_todo: no longer a ready or todo card of a GLM worker",
+                      out.getvalue())
+        self.assertIn("held harness t_glm_ready", out.getvalue())
+        self.assertEqual(self.statuses()["t_glm_todo"], "todo")
+
+    def test_read_error_before_the_hold_is_skipped_with_its_error_class(self):
+        import contextlib
+        import importlib.machinery
+        import importlib.util
+        import io
+        loader = importlib.machinery.SourceFileLoader("jev_peak_hold_script", str(SCRIPT))
+        spec = importlib.util.spec_from_loader(loader.name, loader)
+        script = importlib.util.module_from_spec(spec)
+        loader.exec_module(script)
+        boards = {"harness": self.db}
+        actions, _switch, _errors = peak_hold.plan(self.config, datetime.fromisoformat(WEDNESDAY_16), boards)
+        holds = [a for a in actions if a["action"] == "hold"]
+        self.assertTrue(holds)
+        with mock.patch.object(peak_hold, "connect_readonly", side_effect=sqlite3.OperationalError("locked")):
+            results = peak_hold.apply(self.config, holds, self.hermes, boards)
+        self.assertTrue(all(r["skipped"] and r["error_class"] == "OperationalError" for r in results))
+        self.assertEqual(self.schedule_calls(holds[0]["task_id"]), [])
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            status = script._print_results(results)
+        self.assertEqual(status, 0)
+        self.assertIn(f"skipped hold harness {holds[0]['task_id']}: the card could not be read again "
+                      "(error_class=OperationalError); the next run tries again", out.getvalue())
+        self.assertNotIn("no longer a ready or todo card", out.getvalue())
+
+    def test_held_card_that_is_escalated_is_released(self):
+        # The hold script held the card in the seconds between the change request and the escalation.
+        self.script("--apply")
+        self.assertEqual(self.statuses()[self.ESCALATED], "scheduled")
+        self.add_change_requests(self.ESCALATED)
+        self.escalate(self.ESCALATED)
+        self.assertEqual(self.assignee(self.ESCALATED), "harness-worker")
+        self.script("--apply")
+        self.assertEqual(self.statuses()[self.ESCALATED], "ready")
+        self.assertEqual(self.decisions("release")[-1]["task_id"], self.ESCALATED)
+        self.assertEqual(self.statuses()["t_glm_ready"], "scheduled")  # still a GLM card, still held
+
+    def test_unblock_middleware_does_not_hold_escalated_card(self):
+        self.add_change_requests(self.ESCALATED)
+        self.escalate(self.ESCALATED)
+        conn = sqlite3.connect(self.db)
+        conn.execute("UPDATE tasks SET status='blocked' WHERE id=?", (self.ESCALATED,))
+        conn.commit()
+        conn.close()
+        calls = []
+        with mock.patch.dict(os.environ, {"HERMES_KANBAN_TASK": ""}):
+            routing.handle_unblock({"task_id": self.ESCALATED, "board": "harness"},
+                                   lambda payload=None: calls.append(payload) or '{"ok": true}',
+                                   config=self.config, now=datetime.fromisoformat(WEDNESDAY_16),
+                                   command=self.hermes)
+        self.assertEqual(calls, [None])  # the unblock ran unchanged
+        self.assertEqual(self.schedule_calls(self.ESCALATED), [])
+
+
 if __name__ == "__main__":
     unittest.main()

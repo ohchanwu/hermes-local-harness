@@ -439,5 +439,58 @@ class SavedReadTests(FilterTestCase):
         self.assertEqual(self.records(), [])
 
 
+CONFIGURED = json.loads((ROOT / "plugins/jev/config.json").read_text(encoding="utf-8"))["tool_results"]
+
+
+class ConfiguredSettingsTests(FilterTestCase):
+    """Part 7 of the GLM routing request (card t_df87b851): the settings in config.json
+    and the chunk_probabilities field of every result that Jev examines."""
+
+    def test_configured_values(self):
+        self.assertEqual({k: CONFIGURED[k] for k in ("min_chars", "chunk_lines", "chunk_chars", "keep_threshold",
+                                                      "max_kept_ratio")},
+                         {"min_chars": 2000, "chunk_lines": 10, "chunk_chars": 500, "keep_threshold": 0.6,
+                          "max_kept_ratio": 0.9})
+        for key, value in CONFIGURED.items():
+            if key in tool_filter.DEFAULTS:
+                self.assertEqual(tool_filter.DEFAULTS[key], value, key)
+
+    def test_result_just_over_min_chars_is_filtered_and_probabilities_logged(self):
+        text = make_text(lines=50)  # 2,050 characters: five chunks of 10 lines
+        self.assertEqual(len(text), 2050)
+        values = {1: 0.9, 2: 0.1, 3: 0.7, 4: 0.2, 5: 0.95}
+        ask = FakeAsk(lambda n, total: values[n])
+        new = self.run_transform("terminal", json.dumps({"output": text, "exit_code": 0}), ask,
+                                 settings=CONFIGURED)
+        self.assertIsInstance(new, str)
+        self.assertEqual(len(ask.calls[0][1]), 5)
+        (record,) = self.records()
+        self.assertEqual((record["action"], record["chunks_total"], record["chunks_kept"]), ("filtered", 5, 3))
+        self.assertEqual(record["chunk_probabilities"], [0.9, 0.1, 0.7, 0.2, 0.95])
+        self.assertEqual(list(record)[-1], "chunk_probabilities")
+
+    def test_probabilities_logged_when_result_stays_unchanged(self):
+        text = make_text(lines=60)
+        ask = FakeAsk(lambda n, total: 0.61)  # every chunk at or above keep_threshold 0.6
+        self.assertIsNone(self.run_transform("execute_code", json.dumps({"output": text}), ask,
+                                             settings=CONFIGURED))
+        (record,) = self.records()
+        self.assertEqual(record["reason"], "kept_ratio_at_or_above_max")
+        self.assertEqual(record["chunk_probabilities"], [0.61] * 6)
+
+    def test_no_probabilities_without_an_answer(self):
+        text = make_text(lines=60)
+        self.assertIsNone(self.run_transform("terminal", json.dumps({"output": text}),
+                                             FakeAsk(raise_exc=FakeJevError()), settings=CONFIGURED))
+        self.assertIsNone(self.run_transform("terminal", json.dumps({"output": text}),
+                                             FakeAsk(answers={"chunk_1": {"noul": 0.5}}), settings=CONFIGURED))
+        self.assertEqual([r["chunk_probabilities"] for r in self.records()], [None, None])
+        # A result of exactly min_chars characters is not examined.
+        self.assertIsNone(self.run_transform("terminal", json.dumps({"output": "x" * 2000}), FakeAsk(),
+                                             settings=CONFIGURED))
+        self.assertEqual(self.records()[-1]["reason"], "below_min_chars")
+        self.assertIsNone(self.records()[-1]["chunk_probabilities"])
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -1,4 +1,5 @@
-"""Offline tests for card model routing (Part A) in the jev plugin.
+"""Offline tests for card model routing (Part A) in the jev plugin, the control
+group and the reassignment after change requests (card t_df87b851).
 
 Jev is the local fake TypeSafe endpoint from tests/test_jev_client.py. The
 time is a Saturday so the peak-hours hold never applies here (see
@@ -24,7 +25,8 @@ sys.path.insert(0, str(ROOT / "plugins" / "jev"))
 sys.path.insert(0, str(ROOT / "plugins"))
 
 from test_jev_client import (  # noqa: E402
-    TEST_KEY, FakeTypeSafe, all_text_under, fake_hermes_calls, isolated_env, read_records, write_fake_hermes,
+    TEST_KEY, FakeTypeSafe, all_text_under, build_board_db, fake_hermes_calls, isolated_env, read_records,
+    write_fake_hermes,
 )
 
 import jev_client  # noqa: E402
@@ -268,6 +270,112 @@ class RoutingTests(unittest.TestCase):
         self.assertIsNone(record["task_id"])
         self.assertEqual(record["not_applied_reason"], "create_failed")
 
+    # --- Part 2 criteria (card t_df87b851) --------------------------------------------
+
+    def test_route_criteria_are_the_part_2_texts_on_every_board(self):
+        expected = {
+            "easy": ("The card names the exact files to change and the exact command that checks the result, "
+                     "and the worker has no behaviour to work out. The topic of the card does not matter."),
+            "medium": ("A fully specified change across several files with no design decision. This includes "
+                       "tests, fixtures, user-facing text and wiring inside security, migration or deployment "
+                       "features."),
+            "hard": ("Everything else: a design decision, a fault with an unknown cause, logic for authentication, "
+                     "secrets or payment, writing a database migration, or commands that will be run against "
+                     "production, including deployment guides."),
+        }
+        for board, entry in CONFIG["routing"]["boards"].items():
+            with self.subTest(board=board):
+                self.assertEqual({r["name"]: r["criterion"] for r in entry["routes"]}, expected)
+        procedure = (ROOT / "procedures" / "jev-plugin.md").read_text(encoding="utf-8")
+        for text in expected.values():
+            self.assertIn(text, procedure)
+        self.fake.choice("hard", probs(hard=1.0))
+        self.create(self.card())
+        self.assertEqual(self.fake.requests[-1][1]["questions"]["route"]["criteria"], expected)
+
+    # --- control group (Part 3, card t_df87b851) -------------------------------------------
+
+    def control_state(self):
+        return json.loads((self.log_dir / "routing-state.json").read_text(encoding="utf-8"))
+
+    def test_fifth_qualifying_card_is_the_control_group(self):
+        self.fake.choice("easy", probs(easy=0.9, medium=0.05, hard=0.05))
+        sent = [self.create(self.card())[0].calls[0] for _ in range(5)]
+        self.assertEqual([s["assignee"] for s in sent[:4]],
+                         ["harness-worker-glm-1", "harness-worker-glm-2", "harness-worker-glm-1",
+                          "harness-worker-glm-2"])
+        self.assertIsNone(sent[4])  # the fifth card is created exactly as the orchestrator asked
+        record = self.last_decision()
+        self.assertEqual((record["event"], record["applied"], record["not_applied_reason"], record["route"]),
+                         ("route", False, "control_group", "easy"))
+        self.assertAlmostEqual(record["probabilities"]["easy"], 0.9)
+        self.assertEqual((record["original_assignee"], record["new_assignee"]), ("harness-worker", "harness-worker"))
+        self.assertEqual(record["task_id"], "t_0a1b2c3d")
+        # The alternation counter did not advance for the control card: the sixth card gets glm-1.
+        self.assertEqual(self.control_state()["counters"], {"harness": 0})
+        self.assertEqual(self.create(self.card())[0].calls[0]["assignee"], "harness-worker-glm-1")
+        decisions = read_records(self.log_dir, "decisions")
+        self.assertEqual([r["not_applied_reason"] for r in decisions], [None] * 4 + ["control_group", None])
+
+    def test_control_group_counter_is_per_board_and_route(self):
+        self.fake.choice("easy", probs(easy=0.9))
+        for _ in range(4):
+            self.create(self.card())
+        self.fake.choice("medium", probs(medium=0.9))
+        self.assertIsNotNone(self.create(self.card())[0].calls[0])  # first medium card on harness
+        self.fake.choice("easy", probs(easy=0.9))
+        for _ in range(4):
+            self.assertIsNotNone(self.create(self.card(board="cha-pt", assignee="chapt-worker"))[0].calls[0])
+        self.assertIsNone(self.create(self.card())[0].calls[0])  # fifth easy card on harness
+        self.assertEqual(self.control_state()["control_group_counters"],
+                         {"harness": {"easy": 0, "medium": 1}, "cha-pt": {"easy": 4}})
+
+    def test_cards_that_do_not_qualify_do_not_count(self):
+        self.fake.choice("easy", probs(easy=0.9))
+        for _ in range(4):
+            self.create(self.card())
+        self.create(self.card(model="glm-5.3"))                  # model_set
+        self.create(self.card(assignee="harness-reviewer"))      # assignee_not_listed
+        self.fake.choice("easy", probs(easy=0.55, hard=0.45))
+        self.create(self.card())                                 # below_threshold
+        self.fake.choice("hard", probs(hard=0.9))
+        self.create(self.card())                                 # hard: applied, not counted
+        self.fake.choice("easy", probs(easy=0.9))
+        self.assertIsNone(self.create(self.card())[0].calls[0])
+        self.assertEqual(self.last_decision()["not_applied_reason"], "control_group")
+
+    def test_control_group_every_zero_or_invalid_turns_it_off(self):
+        for value in (0, None, "5", -5, True):
+            with self.subTest(value=value):
+                config = json.loads(json.dumps(self.config))
+                if value is None:
+                    del config["routing"]["control_group_every"]
+                else:
+                    config["routing"]["control_group_every"] = value
+                self.fake.choice("easy", probs(easy=0.9))
+                sent = [self.create(self.card(), config=config)[0].calls[0] for _ in range(6)]
+                self.assertTrue(all(s is not None for s in sent))
+                self.assertNotIn("control_group",
+                                 [r["not_applied_reason"] for r in read_records(self.log_dir, "decisions")])
+
+    def test_control_group_every_two(self):
+        self.config["routing"]["control_group_every"] = 2
+        self.fake.choice("medium", probs(medium=0.9))
+        sent = [self.create(self.card())[0].calls[0] for _ in range(4)]
+        self.assertEqual([s is None for s in sent], [False, True, False, True])
+
+    def test_control_group_state_error_leaves_card_unchanged(self):
+        self.fake.choice("easy", probs(easy=0.9))
+        with mock.patch.object(routing, "control_group_turn", side_effect=OSError("state file")):
+            create, _ = self.create(self.card())
+        self.assertEqual(self.assert_unchanged(create, "plugin_error")["error_class"], "OSError")
+
+    def test_control_group_jev_error_leaves_card_unchanged(self):
+        self.fake.mode = "http_error"
+        create, _ = self.create(self.card())
+        self.assert_unchanged(create, "jev_error")
+        self.assertFalse((self.log_dir / "routing-state.json").exists())
+
     # --- alternation and body rewrite -----------------------------------------------
 
     def test_alternation_between_glm_workers(self):
@@ -277,7 +385,8 @@ class RoutingTests(unittest.TestCase):
         other = self.create(self.card(board="cha-pt", assignee="chapt-worker"))[0].calls[0]["assignee"]
         self.assertEqual(other, "chapt-worker-glm-1")
         state = json.loads((self.log_dir / "routing-state.json").read_text(encoding="utf-8"))
-        self.assertEqual(state, {"counters": {"harness": 1, "cha-pt": 1}})
+        self.assertEqual(state["counters"], {"harness": 1, "cha-pt": 1})
+        self.assertEqual(state["control_group_counters"], {"harness": {"easy": 3}, "cha-pt": {"easy": 1}})
 
     def test_assigned_worker_line_rewrite(self):
         self.fake.choice("medium", probs(medium=0.8))
@@ -400,6 +509,323 @@ class ReviewHandoffTests(unittest.TestCase):
         self.assertEqual(calls, [None])
         record = read_records(self.dir / "logs", "decisions")[-1]
         self.assertEqual((record["applied"], record["error_class"]), (False, "CommandFailed"))
+
+
+GLM_CARD = "t_5a1e0001"
+CLAUDE_CARD = "t_c1a0de01"
+
+
+class RequestChangesTests(unittest.TestCase):
+    """Part 4 (card t_df87b851): after the fifth change request a GLM card goes to a Claude worker.
+
+    The board database is synthetic and every board change goes through the fake
+    ``hermes`` command, which applies ``set-model`` and ``reassign`` to it.
+    """
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.dir = Path(self.tmp.name)
+        env = isolated_env(self.dir)
+        self.db = Path(env["HERMES_KANBAN_HOME"]) / "kanban" / "boards" / "harness" / "kanban.db"
+        build_board_db(self.db, [(GLM_CARD, "ready", "harness-worker-glm-1"),
+                                 ("t_5a1e0002", "ready", "harness-worker-glm-2"),
+                                 (CLAUDE_CARD, "ready", "harness-worker")])
+        self.hermes = write_fake_hermes(self.dir)
+        self.calls_log = self.dir / "hermes-calls.jsonl"
+        self.log_dir = self.dir / "logs"
+        env.update({"FAKE_HERMES_LOG": str(self.calls_log), "FAKE_KANBAN_DB": str(self.db),
+                    "HERMES_PROFILE": "harness-reviewer", "HERMES_KANBAN_TASK": GLM_CARD,
+                    "HERMES_KANBAN_BOARD": "harness"})
+        patcher = mock.patch.dict(os.environ, env)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        self.config = json.loads(json.dumps(CONFIG))
+
+    def add_change_requests(self, task_id, count):
+        import sqlite3
+        conn = sqlite3.connect(self.db)
+        for _ in range(count):
+            conn.execute("INSERT INTO task_events (task_id, kind, payload, created_at) VALUES (?, ?, ?, 0)",
+                         (task_id, "changes_requested", json.dumps({"implementer": "x"})))
+        conn.commit()
+        conn.close()
+
+    def card(self, task_id):
+        import sqlite3
+        conn = sqlite3.connect(self.db)
+        try:
+            return conn.execute("SELECT status, assignee, model_override FROM tasks WHERE id=?",
+                                (task_id,)).fetchone()
+        finally:
+            conn.close()
+
+    def set_card(self, task_id, **columns):
+        import sqlite3
+        conn = sqlite3.connect(self.db)
+        for column, value in columns.items():
+            conn.execute(f"UPDATE tasks SET {column}=? WHERE id=?", (value, task_id))
+        conn.commit()
+        conn.close()
+
+    def request_changes(self, args=None, result='{"ok": true, "task_id": "t_5a1e0001", "status": "ready"}',
+                        config=None):
+        calls = []
+
+        def next_call(payload=None):
+            calls.append(payload)
+            return result
+
+        out = routing.handle_request_changes(args if args is not None else {"reason": "fix the test"}, next_call,
+                                             config=config or self.config, command=self.hermes,
+                                             state_dir=self.log_dir)
+        self.assertEqual(calls, [None])  # the call runs once, with its own arguments
+        self.assertEqual(out, result)    # and its result is returned unchanged
+        return out
+
+    def escalations(self):
+        return [r for r in read_records(self.log_dir, "decisions") if r["event"] == "escalate"]
+
+    def test_fifth_change_request_clears_override_and_reassigns(self):
+        self.set_card(GLM_CARD, model_override="glm-5.3-flash")
+        self.add_change_requests(GLM_CARD, 5)
+        self.request_changes()
+        self.assertEqual(fake_hermes_calls(self.calls_log), [
+            ["kanban", "--board", "harness", "set-model", GLM_CARD, "none"],
+            ["kanban", "--board", "harness", "reassign", GLM_CARD, "harness-worker", "--reclaim"],
+        ])
+        self.assertEqual(tuple(self.card(GLM_CARD)), ("ready", "harness-worker", None))
+        [record] = self.escalations()
+        self.assertEqual({k: record[k] for k in ("board", "task_id", "original_assignee", "new_assignee",
+                                                  "change_requests", "applied", "error_class")},
+                         {"board": "harness", "task_id": GLM_CARD, "original_assignee": "harness-worker-glm-1",
+                          "new_assignee": "harness-worker", "change_requests": 5, "applied": True,
+                          "error_class": None})
+
+    def test_fourth_change_request_changes_nothing(self):
+        self.add_change_requests(GLM_CARD, 4)
+        self.request_changes()
+        self.assertEqual(fake_hermes_calls(self.calls_log), [])
+        self.assertEqual(self.card(GLM_CARD)[1], "harness-worker-glm-1")
+        self.assertEqual(self.escalations(), [])
+
+    def test_claude_implemented_card_is_never_reassigned(self):
+        self.add_change_requests(CLAUDE_CARD, 7)
+        self.request_changes({"task_id": CLAUDE_CARD, "reason": "again"})
+        self.assertEqual(fake_hermes_calls(self.calls_log), [])
+        self.assertEqual(self.card(CLAUDE_CARD)[1], "harness-worker")
+        self.assertEqual(self.escalations(), [])
+
+    def test_sixth_change_request_after_escalation_changes_nothing(self):
+        self.add_change_requests(GLM_CARD, 5)
+        self.request_changes()
+        self.add_change_requests(GLM_CARD, 1)
+        self.request_changes()
+        self.assertEqual(len(fake_hermes_calls(self.calls_log)), 2)
+        self.assertEqual(len(self.escalations()), 1)
+
+    def test_max_glm_change_requests_zero_or_invalid_turns_it_off(self):
+        self.add_change_requests(GLM_CARD, 9)
+        for value in (0, None, "5", -1, False):
+            with self.subTest(value=value):
+                config = json.loads(json.dumps(self.config))
+                if value is None:
+                    del config["routing"]["max_glm_change_requests"]
+                else:
+                    config["routing"]["max_glm_change_requests"] = value
+                self.request_changes(config=config)
+        self.config["routing"]["enabled"] = False
+        self.request_changes()
+        self.assertEqual(fake_hermes_calls(self.calls_log), [])
+        self.assertEqual(self.escalations(), [])
+
+    def test_claude_worker_from_the_route_record(self):
+        routing.jev_log.write("decisions", {"event": "route", "board": "harness", "task_id": GLM_CARD,
+                                            "original_assignee": "harness-worker-2",
+                                            "new_assignee": "harness-worker-glm-1", "applied": True})
+        self.add_change_requests(GLM_CARD, 5)
+        self.request_changes()
+        self.assertEqual(self.card(GLM_CARD)[1], "harness-worker-2")
+        self.assertEqual(self.escalations()[0]["new_assignee"], "harness-worker-2")
+
+    def test_claude_workers_alternate_without_a_route_record(self):
+        self.add_change_requests(GLM_CARD, 5)
+        self.add_change_requests("t_5a1e0002", 5)
+        self.request_changes()
+        self.request_changes({"task_id": "t_5a1e0002", "reason": "x"})
+        self.assertEqual((self.card(GLM_CARD)[1], self.card("t_5a1e0002")[1]),
+                         ("harness-worker", "harness-worker-2"))
+        state = json.loads((self.log_dir / "routing-state.json").read_text(encoding="utf-8"))
+        self.assertEqual(state["escalation_counters"], {"harness": 0})
+        self.assertNotIn("counters", state)  # the GLM worker alternation is a separate section
+
+    def test_card_claimed_by_the_dispatcher_in_between_is_reclaimed(self):
+        self.set_card(GLM_CARD, status="running")
+        self.add_change_requests(GLM_CARD, 5)
+        self.request_changes()
+        self.assertEqual(tuple(self.card(GLM_CARD))[:2], ("ready", "harness-worker"))
+
+    def test_failed_set_model_leaves_card_unchanged(self):
+        self.add_change_requests(GLM_CARD, 5)
+        with mock.patch.dict(os.environ, {"FAKE_HERMES_EXIT": "3"}):
+            self.request_changes()
+        self.assertEqual([c[3] for c in fake_hermes_calls(self.calls_log)], ["set-model"])  # no reassign
+        self.assertEqual(self.card(GLM_CARD)[1], "harness-worker-glm-1")
+        [record] = self.escalations()
+        self.assertEqual((record["applied"], record["error_class"], record["new_assignee"]),
+                         (False, "CommandFailed", "harness-worker-glm-1"))
+
+    def test_failed_reassign_is_logged_and_result_unchanged(self):
+        self.add_change_requests(GLM_CARD, 5)
+        with mock.patch.object(routing.peak_hold, "run_kanban",
+                               side_effect=[(True, None), (False, "CommandTimeout")]) as run:
+            self.request_changes()
+        self.assertEqual(run.call_count, 2)
+        [record] = self.escalations()
+        self.assertEqual((record["applied"], record["error_class"]), (False, "CommandTimeout"))
+
+    def test_missing_hermes_command_is_logged(self):
+        self.add_change_requests(GLM_CARD, 5)
+        routing.handle_request_changes({}, lambda payload=None: '{"ok": true}', config=self.config,
+                                       command=str(self.dir / "no-such-hermes"), state_dir=self.log_dir)
+        self.assertEqual(self.escalations()[0]["error_class"], "CommandNotFound")
+        self.assertEqual(self.card(GLM_CARD)[1], "harness-worker-glm-1")
+
+    def test_failed_call_changes_nothing(self):
+        self.add_change_requests(GLM_CARD, 5)
+        self.request_changes(result='{"error": "could not request changes"}')
+        self.assertEqual(fake_hermes_calls(self.calls_log), [])
+        self.assertEqual(self.escalations(), [])
+
+    def test_board_database_error_leaves_result_unchanged(self):
+        self.add_change_requests(GLM_CARD, 5)
+        self.db.unlink()
+        self.request_changes()
+        self.assertEqual(fake_hermes_calls(self.calls_log), [])
+        [record] = self.escalations()
+        self.assertEqual((record["applied"], record["not_applied_reason"], record["error_class"]),
+                         (False, "plugin_error", "FileNotFoundError"))
+
+    def test_exception_in_next_call_propagates_without_escalation(self):
+        self.add_change_requests(GLM_CARD, 5)
+
+        def next_call(payload=None):
+            raise RuntimeError("tool failed")
+
+        with self.assertRaises(RuntimeError):
+            routing.handle_request_changes({}, next_call, config=self.config, command=self.hermes,
+                                           state_dir=self.log_dir)
+        self.assertEqual(fake_hermes_calls(self.calls_log), [])
+
+    # --- step 3: the "Assigned worker EXACT" body line (review round 1 of t_df87b851) ---
+
+    def body(self, task_id):
+        import sqlite3
+        conn = sqlite3.connect(self.db)
+        try:
+            return conn.execute("SELECT body FROM tasks WHERE id=?", (task_id,)).fetchone()[0]
+        finally:
+            conn.close()
+
+    def test_fifth_change_request_names_the_claude_worker_on_the_assigned_worker_line(self):
+        self.set_card(GLM_CARD, model_override="glm-5.3-flash",
+                      body="Repository /tmp/x ONLY.\nAssigned worker EXACT harness-worker-glm-1.\n"
+                           "Reviewer EXACT harness-reviewer.\n")
+        self.add_change_requests(GLM_CARD, 5)
+        self.request_changes()
+        calls = fake_hermes_calls(self.calls_log)
+        self.assertEqual([c[3] for c in calls], ["set-model", "reassign", "edit"])
+        self.assertEqual(calls[2][:5], ["kanban", "--board", "harness", "edit", GLM_CARD])
+        self.assertEqual(self.body(GLM_CARD), "Repository /tmp/x ONLY.\nAssigned worker EXACT harness-worker.\n"
+                                              "Reviewer EXACT harness-reviewer.\n")
+        self.assertEqual(tuple(self.card(GLM_CARD)), ("ready", "harness-worker", None))
+        [record] = self.escalations()
+        self.assertEqual((record["applied"], record["assigned_worker_line"],
+                          record["assigned_worker_line_error_class"]), (True, "rewritten", None))
+
+    def test_mention_inside_another_line_and_other_profiles_are_unchanged(self):
+        body = ("Note: the plugin wrote Assigned worker EXACT harness-worker-glm-1 at creation.\n"
+                "Assigned worker EXACT harness-worker-glm-1.\n"
+                "Assigned worker EXACT harness-worker-glm-10 (other card).\n"
+                "  Assigned worker EXACT harness-worker-glm-1 (indented).\n")
+        self.set_card(GLM_CARD, body=body)
+        self.add_change_requests(GLM_CARD, 5)
+        self.request_changes()
+        self.assertEqual(self.body(GLM_CARD), body.replace(
+            "\nAssigned worker EXACT harness-worker-glm-1.\n", "\nAssigned worker EXACT harness-worker.\n"))
+
+    def test_card_without_the_line_gets_no_edit_command(self):
+        for body in (None, "Repository /tmp/x ONLY.\nAssigned worker EXACT harness-worker-2.\n"):
+            with self.subTest(body=body):
+                self.calls_log.unlink(missing_ok=True)
+                (self.log_dir / "decisions.jsonl").unlink(missing_ok=True)
+                self.set_card(GLM_CARD, assignee="harness-worker-glm-1", body=body)
+                self.add_change_requests(GLM_CARD, 5)
+                self.request_changes()
+                self.assertEqual([c[3] for c in fake_hermes_calls(self.calls_log)], ["set-model", "reassign"])
+                self.assertEqual(self.body(GLM_CARD), body)
+                [record] = self.escalations()
+                self.assertEqual((record["applied"], record["assigned_worker_line"]), (True, "no_line"))
+
+    def test_failed_edit_is_logged_and_result_and_card_unchanged(self):
+        body = f"{SENTINEL}\nAssigned worker EXACT harness-worker-glm-1.\n"
+        self.set_card(GLM_CARD, body=body)
+        self.add_change_requests(GLM_CARD, 5)
+        real_run = routing.peak_hold.run_kanban
+
+        def run_kanban(config, board, args, command=None):
+            if args[0] == "edit":
+                return False, "CommandFailed"
+            return real_run(config, board, args, command)
+
+        with mock.patch.object(routing.peak_hold, "run_kanban", side_effect=run_kanban):
+            self.request_changes()  # asserts the result is unchanged
+        self.assertEqual(self.body(GLM_CARD), body)
+        self.assertEqual(tuple(self.card(GLM_CARD))[:2], ("ready", "harness-worker"))  # reassignment kept
+        [record] = self.escalations()
+        self.assertEqual((record["applied"], record["error_class"], record["assigned_worker_line"],
+                          record["assigned_worker_line_error_class"]), (True, None, "failed", "CommandFailed"))
+        self.assertNotIn(SENTINEL, all_text_under(self.log_dir))
+
+    def test_body_too_long_for_one_argument_is_not_sent(self):
+        body = "Assigned worker EXACT harness-worker-glm-1.\n" + "x" * routing.MAX_BODY_ARGUMENT_BYTES
+        self.set_card(GLM_CARD, body=body)
+        self.add_change_requests(GLM_CARD, 5)
+        self.request_changes()
+        self.assertEqual([c[3] for c in fake_hermes_calls(self.calls_log)], ["set-model", "reassign"])
+        self.assertEqual(self.body(GLM_CARD), body)
+        [record] = self.escalations()
+        self.assertEqual((record["applied"], record["assigned_worker_line"],
+                          record["assigned_worker_line_error_class"]), (True, "failed", "BodyTooLong"))
+
+    def test_read_error_and_exception_return_failed_without_raising(self):
+        with mock.patch.object(routing.peak_hold, "kanban_db_path", side_effect=OSError("unreadable")):
+            out = routing.rewrite_body_after_escalation(self.config, "harness", GLM_CARD, "harness-worker-glm-1",
+                                                        "harness-worker", self.hermes)
+        self.assertEqual(out, {"assigned_worker_line": "failed", "assigned_worker_line_error_class": "OSError"})
+        with mock.patch.object(routing, "rewrite_assigned_worker", side_effect=RuntimeError("x")):
+            out = routing.rewrite_body_after_escalation(self.config, "harness", GLM_CARD, "harness-worker-glm-1",
+                                                        "harness-worker", self.hermes)
+        self.assertEqual(out["assigned_worker_line_error_class"], "RuntimeError")
+        self.assertEqual(fake_hermes_calls(self.calls_log), [])
+
+    def test_body_with_sentinel_never_reaches_a_log_file(self):
+        self.set_card(GLM_CARD, body=f"{SENTINEL} intro\n-{SENTINEL}\nAssigned worker EXACT harness-worker-glm-1.\n")
+        self.add_change_requests(GLM_CARD, 5)
+        self.request_changes()
+        self.assertEqual(self.body(GLM_CARD),
+                         f"{SENTINEL} intro\n-{SENTINEL}\nAssigned worker EXACT harness-worker.\n")
+        self.assertNotIn(SENTINEL, all_text_under(self.log_dir))
+
+    def test_unrecognized_arguments_are_not_used_or_logged(self):
+        self.add_change_requests(GLM_CARD, 5)
+        for args in ({"task_id": SENTINEL, "reason": SENTINEL}, {"board": SENTINEL, "reason": SENTINEL},
+                     {"task_id": "t_ffff0000", "reason": SENTINEL}):  # well formed, no such card
+            self.request_changes(args)
+        self.assertEqual(fake_hermes_calls(self.calls_log), [])
+        self.request_changes({"task_id": GLM_CARD, "reason": SENTINEL})
+        self.assertEqual(len(self.escalations()), 1)
+        self.assertNotIn(SENTINEL, all_text_under(self.log_dir))
 
 
 if __name__ == "__main__":

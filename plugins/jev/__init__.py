@@ -3,10 +3,12 @@
 Registered callbacks:
 - ``tool_execution`` middleware: ``kanban_create`` (routing and peak-hours hold,
   ``routing.handle_create``), ``kanban_unblock`` (peak-hours hold instead of
-  ``ready`` inside the window, ``routing.handle_unblock``) and
+  ``ready`` inside the window, ``routing.handle_unblock``),
   ``kanban_request_review`` (model override cleared before the review
-  handoff, ``routing.handle_request_review``). Every other tool passes
-  through unchanged.
+  handoff, ``routing.handle_request_review``) and ``kanban_request_changes``
+  (after the call, a GLM card with ``routing.max_glm_change_requests`` change
+  requests goes to a Claude worker, ``routing.handle_request_changes``). Every
+  other tool passes through unchanged.
 - ``transform_tool_result`` hook: calls ``tool_filter.transform`` (imported
   lazily); a missing module or any exception leaves the result unchanged.
 - ``post_auxiliary_call`` hook: one ``auxiliary`` log record per call.
@@ -55,7 +57,7 @@ def hermes_home() -> Path:
 def _tool_execution(**kwargs: Any) -> Any:
     next_call = kwargs["next_call"]
     tool_name = kwargs.get("tool_name")
-    if tool_name not in ("kanban_create", "kanban_unblock", "kanban_request_review"):
+    if tool_name not in ("kanban_create", "kanban_unblock", "kanban_request_review", "kanban_request_changes"):
         return next_call()
     args = kwargs.get("args")
     if not isinstance(args, dict):
@@ -65,6 +67,8 @@ def _tool_execution(**kwargs: Any) -> Any:
         return routing.handle_create(args, next_call, config=config, ask=_bound_ask(config))
     if tool_name == "kanban_unblock":
         return routing.handle_unblock(args, next_call, config=config)
+    if tool_name == "kanban_request_changes":
+        return routing.handle_request_changes(args, next_call, config=config)
     return routing.handle_request_review(args, next_call, config=config)
 
 

@@ -28,6 +28,7 @@ STREAM_FIELDS = {
     "tool_results": (
         "event", "session_id", "tool", "chars_before", "chars_after", "chunks_kept", "chunks_total",
         "jev_latency_ms", "jev_input_tokens", "action", "reason", "error_class", "saved_file",
+        "chunk_probabilities",
     ),
     "auxiliary": ("aux_task", "provider", "model", "input_tokens", "output_tokens", "status"),
 }

@@ -16,6 +16,8 @@
     "state_max_chars": 60000,
     "question_instructions": "Which route fits the work this Kanban card asks for?",
     "clear_override_at_review": true,
+    "control_group_every": 5,
+    "max_glm_change_requests": 5,
     "known_models": ["claude-opus-5-5", "claude-haiku-5-5", "claude-fable-5-2", "gpt-6.1-sol", "gpt-6-astra",
                      "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna", "glm-5.3", "glm-5.3-flash"],
     "boards": {
@@ -24,11 +26,11 @@
         "glm_workers": ["jobcron-worker-glm-1", "jobcron-worker-glm-2"],
         "routes": [
           {"name": "easy", "enabled": true, "assignee_from": "glm_workers", "model": "glm-5.3-flash", "provider": "zai",
-           "criterion": "Very easy to easy work: a small, well-specified change in one or two files, a documentation or wording edit, or a mechanical change with an exact test."},
+           "criterion": "The card names the exact files to change and the exact command that checks the result, and the worker has no behaviour to work out. The topic of the card does not matter."},
           {"name": "medium", "enabled": true, "assignee_from": "glm_workers", "model": "glm-5.3", "provider": "zai",
-           "criterion": "A well-specified change across several files, or a change that needs reading surrounding code but no design decision."},
+           "criterion": "A fully specified change across several files with no design decision. This includes tests, fixtures, user-facing text and wiring inside security, migration or deployment features."},
           {"name": "hard", "enabled": true,
-           "criterion": "Everything else, including design decisions, debugging without a known cause, security, payment, migration or deployment work."}
+           "criterion": "Everything else: a design decision, a fault with an unknown cause, logic for authentication, secrets or payment, writing a database migration, or commands that will be run against production, including deployment guides."}
         ]
       },
       "cha-pt": {
@@ -36,11 +38,11 @@
         "glm_workers": ["chapt-worker-glm-1", "chapt-worker-glm-2"],
         "routes": [
           {"name": "easy", "enabled": true, "assignee_from": "glm_workers", "model": "glm-5.3-flash", "provider": "zai",
-           "criterion": "Very easy to easy work: a small, well-specified change in one or two files, a documentation or wording edit, or a mechanical change with an exact test."},
+           "criterion": "The card names the exact files to change and the exact command that checks the result, and the worker has no behaviour to work out. The topic of the card does not matter."},
           {"name": "medium", "enabled": true, "assignee_from": "glm_workers", "model": "glm-5.3", "provider": "zai",
-           "criterion": "A well-specified change across several files, or a change that needs reading surrounding code but no design decision."},
+           "criterion": "A fully specified change across several files with no design decision. This includes tests, fixtures, user-facing text and wiring inside security, migration or deployment features."},
           {"name": "hard", "enabled": true,
-           "criterion": "Everything else, including design decisions, debugging without a known cause, security, payment, migration or deployment work."}
+           "criterion": "Everything else: a design decision, a fault with an unknown cause, logic for authentication, secrets or payment, writing a database migration, or commands that will be run against production, including deployment guides."}
         ]
       },
       "harness": {
@@ -48,11 +50,11 @@
         "glm_workers": ["harness-worker-glm-1", "harness-worker-glm-2"],
         "routes": [
           {"name": "easy", "enabled": true, "assignee_from": "glm_workers", "model": "glm-5.3-flash", "provider": "zai",
-           "criterion": "Very easy to easy work: a small, well-specified change in one or two files, a documentation or wording edit, or a mechanical change with an exact test."},
+           "criterion": "The card names the exact files to change and the exact command that checks the result, and the worker has no behaviour to work out. The topic of the card does not matter."},
           {"name": "medium", "enabled": true, "assignee_from": "glm_workers", "model": "glm-5.3", "provider": "zai",
-           "criterion": "A well-specified change across several files, or a change that needs reading surrounding code but no design decision."},
+           "criterion": "A fully specified change across several files with no design decision. This includes tests, fixtures, user-facing text and wiring inside security, migration or deployment features."},
           {"name": "hard", "enabled": true,
-           "criterion": "Everything else, including design decisions, debugging without a known cause, security, payment, migration or deployment work."}
+           "criterion": "Everything else: a design decision, a fault with an unknown cause, logic for authentication, secrets or payment, writing a database migration, or commands that will be run against production, including deployment guides."}
         ]
       },
       "jss-genr": {
@@ -60,11 +62,11 @@
         "glm_workers": ["jss-worker-glm-1", "jss-worker-glm-2"],
         "routes": [
           {"name": "easy", "enabled": true, "assignee_from": "glm_workers", "model": "glm-5.3-flash", "provider": "zai",
-           "criterion": "Very easy to easy work: a small, well-specified change in one or two files, a documentation or wording edit, or a mechanical change with an exact test."},
+           "criterion": "The card names the exact files to change and the exact command that checks the result, and the worker has no behaviour to work out. The topic of the card does not matter."},
           {"name": "medium", "enabled": true, "assignee_from": "glm_workers", "model": "glm-5.3", "provider": "zai",
-           "criterion": "A well-specified change across several files, or a change that needs reading surrounding code but no design decision."},
+           "criterion": "A fully specified change across several files with no design decision. This includes tests, fixtures, user-facing text and wiring inside security, migration or deployment features."},
           {"name": "hard", "enabled": true,
-           "criterion": "Everything else, including design decisions, debugging without a known cause, security, payment, migration or deployment work."}
+           "criterion": "Everything else: a design decision, a fault with an unknown cause, logic for authentication, secrets or payment, writing a database migration, or commands that will be run against production, including deployment guides."}
         ]
       },
       "anki": {
@@ -72,11 +74,11 @@
         "glm_workers": ["anki-worker-glm-1", "anki-worker-glm-2"],
         "routes": [
           {"name": "easy", "enabled": true, "assignee_from": "glm_workers", "model": "glm-5.3-flash", "provider": "zai",
-           "criterion": "Very easy to easy work: a small, well-specified change in one or two files, a documentation or wording edit, or a mechanical change with an exact test."},
+           "criterion": "The card names the exact files to change and the exact command that checks the result, and the worker has no behaviour to work out. The topic of the card does not matter."},
           {"name": "medium", "enabled": true, "assignee_from": "glm_workers", "model": "glm-5.3", "provider": "zai",
-           "criterion": "A well-specified change across several files, or a change that needs reading surrounding code but no design decision."},
+           "criterion": "A fully specified change across several files with no design decision. This includes tests, fixtures, user-facing text and wiring inside security, migration or deployment features."},
           {"name": "hard", "enabled": true,
-           "criterion": "Everything else, including design decisions, debugging without a known cause, security, payment, migration or deployment work."}
+           "criterion": "Everything else: a design decision, a fault with an unknown cause, logic for authentication, secrets or payment, writing a database migration, or commands that will be run against production, including deployment guides."}
         ]
       }
     }
@@ -92,13 +94,13 @@
   "tool_results": {
     "enabled": true,
     "tools": ["terminal", "execute_code", "search_files", "browser_exec"],
-    "min_chars": 8000,
+    "min_chars": 2000,
     "max_chars": 100000,
-    "chunk_lines": 40,
-    "chunk_chars": 2000,
+    "chunk_lines": 10,
+    "chunk_chars": 500,
     "args_chars": 2000,
-    "keep_threshold": 0.3,
-    "max_kept_ratio": 0.8
+    "keep_threshold": 0.6,
+    "max_kept_ratio": 0.9
   },
   "auxiliary_log": {
     "enabled": true

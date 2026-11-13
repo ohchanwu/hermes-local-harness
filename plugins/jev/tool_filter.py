@@ -22,7 +22,9 @@ Only the text field is changed. The replacement is done on the serialized
 string itself, so every other field keeps its exact bytes and its position.
 
 Log records (stream ``tool_results``) hold identifiers, sizes, probabilities,
-timings and token counts only, never tool output or tool arguments.
+timings and token counts only, never tool output or tool arguments. Every
+result that Jev answered for has ``chunk_probabilities``: the probability of
+each chunk, in chunk order.
 """
 import datetime
 import json
@@ -50,19 +52,19 @@ REMOVAL_LINE = ("[jev: {lines} lines removed here; the full output is saved in {
 
 DEFAULTS = {
     "tools": ["terminal", "execute_code", "search_files", "browser_exec"],
-    "min_chars": 8000,
+    "min_chars": 2000,
     "max_chars": 100000,
-    "chunk_lines": 40,
-    "chunk_chars": 2000,
+    "chunk_lines": 10,
+    "chunk_chars": 500,
     "args_chars": 2000,
-    "keep_threshold": 0.3,
-    "max_kept_ratio": 0.8,
+    "keep_threshold": 0.6,
+    "max_kept_ratio": 0.9,
 }
 
 RECORD_FIELDS = (
     "ts", "profile", "event", "session_id", "tool", "chars_before", "chars_after",
     "chunks_kept", "chunks_total", "jev_latency_ms", "jev_input_tokens", "action",
-    "reason", "error_class", "saved_file",
+    "reason", "error_class", "saved_file", "chunk_probabilities",
 )
 
 
@@ -318,6 +320,7 @@ def _filter(*, tool_name, args, result, session_id, profile, settings, ask, log,
         record["jev_latency_ms"] = getattr(answer, "latency_ms", None)
         record["jev_input_tokens"] = getattr(answer, "input_tokens", None)
         probabilities = _probabilities(getattr(answer, "answers", None), len(chunks))
+        record["chunk_probabilities"] = probabilities
         threshold = float(_setting(settings, "keep_threshold"))
         last = len(chunks) - 1
         keep = [i in (0, last) or p >= threshold for i, p in enumerate(probabilities)]
