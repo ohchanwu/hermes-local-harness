@@ -29,10 +29,8 @@ For every proposed gate, approval request, hold, review layer, cap/ceiling/count
 - Real cost/rate limits, including live model calls and repair budgets.
 - Network/subprocess timeouts and watchdogs.
 - Product decisions, money or billing, genuine capability limits.
-- Required tests, exact-candidate independent review, candidate drift.
+- Tests that the card's acceptance criteria or test contract require, exact-candidate independent review, candidate drift.
 - User stop or resume.
-
-Removing overgating must never weaken those controls.
 
 ## Verdict
 

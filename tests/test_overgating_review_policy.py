@@ -39,7 +39,6 @@ DO_NOT_FLAG = (
     "Live profile, skill, policy, board, or gateway changes", "Production/cloud mutation",
     "non-idempotent migration", "nonempty/clinical data", "Ambiguous provider/transaction outcomes",
     "Real cost/rate limits", "Network/subprocess timeouts and watchdogs", "User stop",
-    "Removing overgating must never weaken those controls.",
 )
 # Existing rules each SOUL must keep verbatim.
 PRESERVED = {

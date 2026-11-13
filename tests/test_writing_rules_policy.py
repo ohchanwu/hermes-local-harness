@@ -23,6 +23,7 @@ from test_verify_state_derived_expectations import TempTree, TreeReads, load, re
 from test_jobcron_app_only_deploy_authorization import reverse_app_only_deploy_edits
 from test_jss_fleet_policy import reverse_read_only_exception_edits
 from test_jev_policy_sources import reverse_jev_policy_edits
+from test_stale_test_rule_policy import reverse_stale_test_rule_edits
 
 BASELINE = "b7093717054754283c6f9ac671a227f695fec9b5"
 POLICY = "policies/writing-rules.md"
@@ -72,7 +73,8 @@ class TrackedText(unittest.TestCase):
         self.assertEqual({path.parent.name for path in later}, set(LATER_SOULS))
         for path in sorted(later):
             with self.subTest(profile=path.parent.name):
-                text = path.read_bytes()
+                # The later append of card t_46b5e63e is reversed first.
+                text = reverse_stale_test_rule_edits(path.relative_to(ROOT).as_posix(), path.read_bytes())
                 self.assertTrue(text.endswith(b"\n\n" + block))
                 self.assertEqual(text.count(block), 1)
                 self.assertEqual(text.count(REVIEWER_SENTENCE), 1 if path.parent.name == "anki-reviewer" else 0)
@@ -124,7 +126,10 @@ class VerifierCheck(unittest.TestCase):
     def test_soul_missing_the_block_fails(self):
         code, fails, output = self.tracked_change(
             "chapt-worker", lambda _: baseline_bytes("policies/profile-souls/chapt-worker/SOUL.md"))
-        self.assertEqual((code, fails), (1, {"writing rules missing from tracked SOUL chapt-worker"}), output)
+        # The SOUL at BASELINE also lacks policies/stale-test-rule.md (card t_46b5e63e).
+        self.assertEqual((code, fails), (1, {"writing rules missing from tracked SOUL chapt-worker",
+                                             "policy block policies/stale-test-rule.md missing from tracked SOUL "
+                                             "chapt-worker"}), output)
 
     # (b)
     def test_block_with_one_changed_word_fails(self):
@@ -164,7 +169,11 @@ class VerifierCheck(unittest.TestCase):
             with patch.dict(self.verifier.PROFILE_SOUL_PATHS, paths), redirect_stdout(io.StringIO()):
                 self.verifier.check_writing_rules(errors, live=True)
         self.assertIn(block, tracked["harness-worker"])
+        # jss-worker (bytes at BASELINE) and jss-reviewer (removed) also lack
+        # policies/stale-test-rule.md (card t_46b5e63e).
         self.assertEqual(sorted(errors), [
+            "policy block policies/stale-test-rule.md missing from live SOUL jss-reviewer",
+            "policy block policies/stale-test-rule.md missing from live SOUL jss-worker",
             "writing rules missing from live SOUL chapt-worker",
             "writing rules missing from live SOUL jss-reviewer",
             "writing rules missing from live SOUL jss-worker",

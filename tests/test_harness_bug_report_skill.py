@@ -15,6 +15,8 @@ import unittest
 from contextlib import redirect_stdout
 from pathlib import Path
 
+from test_stale_test_rule_policy import reverse_stale_test_rule_edits
+
 ROOT = Path(__file__).resolve().parents[1]
 SKILL = ROOT / "skills/harness-bug-report/SKILL.md"
 SNAPSHOT = ROOT / "snapshots/sanitized-current-state.yaml"
@@ -25,7 +27,7 @@ DESCRIPTION = ("Use when a Hermes or harness defect is suspected. File a harness
 ORCHESTRATORS = ["jobcron-orchestrator", "chapt-orchestrator", "harness-orchestrator",
                  "jss-orchestrator", "anki-orchestrator"]
 DEPLOY_PROFILES = ORCHESTRATORS + ["advisor"]
-VERSION = "1.2.0"
+VERSION = "1.2.1"  # raised by t_46b5e63e
 # SHA-256 of sections 1 to 7 (from "## 1." up to "## 8.", trailing newlines removed) as they were
 # in version 1.0.0. Version 1.1.0 adds section 8 and leaves sections 1 to 7 unchanged.
 SECTIONS_1_TO_7_SHA256 = "0894ba1525519ad6cac21fa6c2e34cd0f139914605fb7f5f46224399e420bc99"
@@ -78,7 +80,7 @@ HEADER_LINES = [
     "Assigned worker EXACT harness-worker.",
     "Reviewer EXACT harness-reviewer.",
     "Runtime cap 3600s per run.",
-    "Skill policy: minimal-implementation disabled; requirements and risk outrank simplification.",
+    "Skill policy: minimal-implementation disabled.",
 ]
 HEADINGS = ["## Evidence", "## Suspected location", "## Proposed change", "## Tests", "## Deployment",
             "## Prohibited without separate human authorization"]
@@ -340,7 +342,8 @@ class HarnessBugReportSkill(unittest.TestCase):
 
     # (9)
     def test_version_1_2_0_changes_only_the_listed_text(self):
-        previous = reverse_1_2_0_edits(self.text)
+        # The later edits of card t_46b5e63e (version 1.2.1) are reversed first.
+        previous = reverse_1_2_0_edits(reverse_stale_test_rule_edits("skills/harness-bug-report/SKILL.md", self.text))
         self.assertEqual(hashlib.sha256(previous.encode("utf-8")).hexdigest(), SKILL_1_1_0_SHA256)
         _, previous_body = parse_frontmatter(previous)
         match = re.search(r"^## 1\. .*?(?=^## 8\. )", previous_body, re.M | re.S)

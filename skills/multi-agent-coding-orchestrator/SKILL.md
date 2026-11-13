@@ -1,7 +1,7 @@
 ---
 name: multi-agent-coding-orchestrator
 description: "Use when orchestrating multi-agent coding with Hermes."
-version: 0.6.13
+version: 0.6.14
 author: chanbla11mit, Hermes Agent
 license: MIT
 platforms: [macos]
@@ -83,10 +83,6 @@ Legacy/default-board lanes are retired and inert: the GLM Flash and GLM-full wor
 
 - `advisor`: read/analyze advisor; not a Kanban implementation lane.
 
-Keep `worker-terra-2` installed but dormant as a rollback/spare lane. It is outside the active legacy roster unless the human changes the policy.
-
-The escalation ladder and terminal-retry rules below apply only to cards that explicitly use the legacy/default-board roster. Project-isolated Jobcron, Cha PT, and harness cards use their five-profile fleets and never fall through to a legacy profile.
-
 Ponytail never runs as a plugin on Hermes profiles. Implementation profiles keep the pinned package installed but `disabled`; the minimalism behavior lives in the per-card `minimal-implementation` skill instead (see Skills). The orchestrator, reviewer, and advisor neither load it nor the simplification skill.
 
 ## Skills
@@ -94,103 +90,14 @@ Ponytail never runs as a plugin on Hermes profiles. Implementation profiles keep
 `minimal-implementation` is the task-triggered minimalism skill. The orchestrator attaches it per card (via `skills: ["minimal-implementation"]` on the card) using this policy:
 
 - Attach for: native/platform-alternative questions, dependency or library choice, open-ended UI/component work, suspected overengineering, refactoring or simplification, and shared-function or root-cause repair.
-- Attach for diagnostic design, including infrastructure diagnostics; separate any production/mutation implementation slice. Verification and safety requirements still take precedence.
+- Attach for diagnostic design, including infrastructure diagnostics; separate any production/mutation implementation slice.
 - Leave off for ordinary implementation of acceptance-heavy, security or trust-boundary, migration or data-loss, concurrency or distributed-systems, infrastructure or production, and compliance-sensitive tasks.
-- Override: even for an attach-category task, the orchestrator may leave the skill off whenever verification or safety requirements outrank simplification. That is the direction of the override — verification and safety outrank minimalism, never the reverse.
+- Override: the orchestrator may leave the skill off for any attach-category task.
 - `simplification-review` is a separate, optional post-implementation review skill; it recommends reductions only and never edits or weakens tests. It is never a substitute for required verification.
 
-Record the decision in card metadata: `skill_policy_version`, `minimal_implementation: enabled|disabled`, the reason, and that verification precedence applies (`verification_precedence: requirements-and-risk-outrank-simplification`). Reviewer and advisor lanes never load the implementation skill.
+Record the decision in card metadata: `skill_policy_version`, `minimal_implementation: enabled|disabled`, the reason. Reviewer and advisor lanes never load the implementation skill.
 
-## Routing Rubric
-
-Flash is the default entry rung. The Sol orchestrator may start directly at:
-
-- Terra for substantial ambiguity, diagnosis, architecture, concurrency or security reasoning, risky migrations, unfamiliar subsystems, or complex multi-file work.
-- GLM-full for large-context, repo-wide, long-horizon, multimodal or visual work, or broad but sufficiently specified execution.
-
-Luna, Sol, and Astra are escalation rungs, not normal direct-entry rungs. A task that enters at Terra or GLM-full continues forward from that rung and never moves backward.
-
-Before dispatch, record in the task body or an initial structured comment:
-
-- `ladder_version: glm-review-v1` for bounded compatibility, or `glm-review-v2` only for an explicitly authorized terminal-retry campaign.
-- `entry_rung`
-- `current_rung`
-- protected baseline commit/checkpoint
-- rung attempt count and same-rung revision count
-- routing rationale
-
-## Reviewer-Directed Failure Contract
-
-The independent reviewer defines semantic task failure. Provider errors and process failures are infrastructure outcomes, not reviewer judgments.
-
-The reviewer must issue exactly one verdict:
-
-- `APPROVE`: acceptance criteria and required checks pass.
-- `REVISE_SAME_RUNG`: localized correction at the current rung.
-- `ESCALATE_CONTINUE`: advance one rung and preserve/continue the current artifact.
-- `ESCALATE_RESTART`: preserve the rejected artifact for evidence, then restart from the recorded baseline at the next rung.
-- `HUMAN_BLOCK`: stop automated execution and request human intervention.
-- `RETRY_TERMINAL`: only at Astra, for a fenced, remediable semantic rejection in an explicitly opted-in v2 campaign.
-
-Use `kanban_request_changes` only for `REVISE_SAME_RUNG` and an eligible `RETRY_TERMINAL` continue transition. For either escalation verdict, use `kanban_block` with a structured verdict so the task cannot race back to the previous implementer. The orchestrator reads the durable verdict, updates task history, safely reassigns the card, and explicitly promotes it to `ready`. Do not use `kanban_unblock` for this transition: a card blocked from review returns to the review lane when unblocked. Use `kanban_complete` only for `APPROVE`.
-
-### Same-rung revision allowance
-
-Allow one same-rung revision by default. The reviewer may grant one additional and final revision only when:
-
-1. The prior substantive feedback substantially converged and remaining work is localized, mechanical, and unambiguous; or
-2. The failed retry was caused primarily by incorrect, contradictory, incomplete, or materially ambiguous reviewer guidance.
-
-Every revision consumes the allowance, including reviewer-caused retries. No rung may receive more than two `REVISE_SAME_RUNG` verdicts. Reviewer-caused failure must record what guidance was wrong, how it caused the retry failure, corrected actionable guidance, and whether independent worker error also occurred. Preserve attribution in task history and metrics; attribution never resets the allowance.
-
-After the second revision, issue `APPROVE`, `ESCALATE_CONTINUE`, `ESCALATE_RESTART`, or `HUMAN_BLOCK`. Repeated worker failure, failure to resolve a substantive defect, newly discovered substantive inadequacy, or mixed responsibility containing material worker error ordinarily escalates instead of receiving the conditional second revision.
-
-At Astra, any outcome that would advance beyond Astra, including exhausted revisions or repeated infrastructure failure, becomes `HUMAN_BLOCK` and notifies the human unless the exact v2 terminal-retry contract below is satisfied. Provider, quota, crash, timeout, unavailable-model, and context-exhaustion are infrastructure outcomes and always remain on the bounded human-block path at Astra.
-
-### Infrastructure failure
-
-Retry one infrastructure failure at the same rung. Before retrying a timed-out run, increase its per-run runtime cap; never blindly requeue it under the cap that already proved insufficient. A second consecutive provider, quota, crash, timeout, unavailable-model, or context-exhaustion failure advances one rung with attribution `infrastructure`, not `worker_capability`. At Astra, block for human intervention. Never use provider fallback to silently traverse the semantic ladder inside one worker run.
-
-## Escalation Mechanics
-
-### Astra terminal retry (glm-review-v2 opt-in only)
-
-`RETRY_TERMINAL` is never inferred. It is valid only when the same root card durably records all of:
-
-```yaml
-ladder_version: glm-review-v2
-authorization_mode: autonomous
-terminal_retry_policy: astra-until-approve-v1
-verdict: RETRY_TERMINAL
-rung: astra
-strategy: continue | restart
-```
-
-The structured verdict must fence the root task, campaign generation, repository, protected baseline, worktree/branch, rejected candidate SHA, reviewer run ID, attribution, concrete findings, and strategy. Reject a stale or duplicate callback, a mismatched candidate/worktree/generation/root, or an identical SHA without explicit reviewer-guidance invalidation; no duplicate Astra run may be created. Event history is authoritative for cycle count, and every individual Astra run remains bounded.
-
-For `continue`, preserve branch, commit, test evidence, and findings; return through `kanban_request_changes`, retain Astra ownership, and require a new commit plus fresh independent `reviewer-sol` review. For `restart`, durably block the fenced verdict first, preserve rejected evidence, create a fresh worktree from the protected baseline, retain the same root/generation lineage and Astra rung, then reassign `worker-astra` and promote to `ready`. In either case read the card and run history within two normal dispatcher ticks and require a new claimed run receipt. This paragraph is legacy/default-board policy only.
-
-Never use terminal retry for user stop/pause/revocation, missing product decisions, credentials/MFA/prohibited writes, unsafe repository state, capability boundaries, or policy/legal/security decisions. Those conditions are `HUMAN_BLOCK`. Default, malformed, side-by-side, and v1 metadata stay bounded and human-block after Astra exhaustion.
-
-GOOD: an exact v2, autonomous, card-scoped `astra-until-approve-v1` verdict finds a remediable semantic defect at Astra and returns the same fenced card for a new bounded Astra run. BAD: a side-by-side or v1 card, a provider timeout, or prose merely mentioning “retry” automatically requeues Astra.
-
-For `ESCALATE_CONTINUE`:
-
-1. Preserve the current branch, commits, worktree, comments, test evidence, and reviewer findings.
-2. Advance `current_rung` exactly once.
-3. Activate the destination profile through the five-lane pool procedure if necessary.
-4. Reassign the same card to the destination profile and use `hermes kanban promote <task>` (or the equivalent orchestrator action) to move the blocked review-origin card to `ready`.
-
-For `ESCALATE_RESTART`:
-
-1. Preserve the rejected attempt's branch and commit/checkpoint.
-2. Create a fresh branch/worktree from the recorded baseline.
-3. Point the same card at the clean worktree while retaining all prior comments and events.
-4. Advance `current_rung`, assign the destination profile, and explicitly promote the card to `ready`.
-
-Never delete rejected work merely because the next model starts clean. The same card remains the audit trail across all rungs.
-
-### Routing validation and dispatch receipt
+## Routing validation and dispatch receipt
 
 Before creating or reassigning a card, resolve the destination from the Fixed Roster and verify the exact profile id against live `hermes profile list` output. Also verify the active board maps to that profile's project; profile existence alone does not authorize cross-project assignment. Never invent an id from a naming pattern. Do not use `hermes kanban assignees` as proof that a profile exists: it also includes names retained on cards, including stale or invalid assignees. If the exact profile is absent or belongs to another project, stop and correct the route before mutating the card.
 
@@ -208,37 +115,13 @@ After activating a lane and assigning or promoting a card intended to run immedi
 
 Do not force a manual dispatcher pass while the gateway dispatcher is active; observe its normal ticks.
 
-## Legacy Five-Lane Implementation Pool
-
-Installed profiles are capacity, not running work. Enforce a maximum of five simultaneous implementation runs with native per-profile capacity and a five-profile active allowlist:
-
-- Leave `kanban.max_in_progress` unset because Hermes counts reviewer runs in that global number.
-- Set `kanban.max_in_progress_per_profile` to `1`.
-- Keep `reviewer-sol` in `kanban.dispatch_profiles` while legacy/default-board work remains enabled.
-- Keep no more than five implementation profiles in `kanban.dispatch_profiles` at once.
-- Keep both projects' workers and reviewers dispatchable independently of the legacy five-lane budget; each is already capped at one run by `kanban.max_in_progress_per_profile: 1`. Project orchestrators run as board-pinned interactive sessions outside the dispatcher.
-- Initially activate the three Flash lanes and two Luna lanes.
-- Use `scripts/set-active-lanes.py` to change the active implementation profiles. It refuses to remove a running implementation profile, preventing a swap from temporarily creating a sixth implementation run.
-
-A dormant profile may own a queued card, but it cannot run until the orchestrator safely activates it. When all five implementation slots are occupied, an escalation continuation waits rather than exceeding the cap. When capacity opens, activate the escalation profile before starting new low-rung work. Reviews remain independently dispatchable because `reviewer-sol` is outside the five-profile implementation pool and no shared global cap is set.
-
-Priority order:
-
-1. Review work.
-2. Escalation continuation or restart.
-3. Existing higher-rung work.
-4. New low-rung work.
-
-Do not remove a running profile from the active allowlist to make room; wait for an idle profile and then swap. Raise the implementation pool to seven and later nine only after sustained measurements of utilization, queueing, reviewer latency, provider limits, cost, and repository contention justify each increase and the human approves the policy change.
-
 ## Operating Principles
 
 1. **KISS.** Use profiles, Kanban, worktrees, checkpoints, skills, and the gateway before custom plugins or daemons.
 2. **Upgrade safety.** Never modify the installed Hermes source. Use documented configuration commands and user-local extension points.
-3. **Orchestrate, do not implement.** The Sol orchestrator plans, decomposes, routes, unblocks, verifies, and integrates. It does not normally edit implementation code.
+3. **Orchestrate, do not implement.** The orchestrator plans, decomposes, routes, unblocks, verifies, and integrates. It does not normally edit implementation code.
 4. **Evidence over summaries.** Verify repository state, diffs, tests, task events, and review verdicts directly.
 5. **One source for each concern.** Repository specs/status hold repository-specific intent and progress; Git holds code state; Kanban holds execution and handoffs; this skill holds shared fleet policy.
-6. **No invisible ladder fallback.** Provider fallback may handle a transient retry within one profile, but it must not change the task's model rung without a durable reviewer or infrastructure escalation event.
 
 ## Authorization Modes
 
@@ -253,7 +136,7 @@ Begin only when both conditions are true:
 1. The specification and acceptance criteria are approved.
 2. The user explicitly says `run autonomously` or an unambiguous equivalent for that specification.
 
-For work expected to last hours or days, send the approved specification through the board-designated independent reviewer (`jobcron-reviewer`, `chapt-reviewer`, `harness-reviewer`, or legacy `reviewer-sol`) before dispatching implementation.
+For work expected to last hours or days, send the approved specification through the board-designated independent reviewer (`jobcron-reviewer`, `chapt-reviewer`, `harness-reviewer`) before dispatching implementation.
 
 Authorization covers local branches, worktrees, commits, tests, and recoverable local destructive operations. It never covers pushes, PR creation, deployments, production mutations, messages beyond the configured progress protocol, purchases, credential changes, or other external writes.
 
@@ -342,9 +225,9 @@ For `work_kind: diagnostic`, require `decision_to_unlock`, one falsifiable `hypo
 
 Reject likely-INDETERMINATE probes that do not change the next action. Follow the probe ladder: trusted direct command → local synthetic repro → one-off bounded script → sealed reusable controller. Ascend only with reasons simpler rungs cannot answer the decision; a sealed reusable controller requires written justification of decision value, reuse, and concrete threat.
 
-Allow at most two design generations per hypothesis across cards and model rungs. After the first material review correction, reassess the approach before editing. After a second material failure or exhausted budget, require a strategy pivot or abandon the probe, not further default refinement. Record the failed design, spent budget, preserved evidence, and changed evidence path/decision framing; renaming a hypothesis or changing cards/models does not reset its budget. No viable authorized pivot means HUMAN_BLOCK.
+Allow at most two design generations per hypothesis across cards. After the first material review correction, reassess the approach before editing. After a second material failure or exhausted budget, require a strategy pivot or abandon the probe, not further default refinement. Record the failed design, spent budget, preserved evidence, and changed evidence path/decision framing; renaming a hypothesis or changing cards/models does not reset its budget. No viable authorized pivot means HUMAN_BLOCK.
 
-Unlimited terminal retries mean campaign-level problem solving, not unlimited refinement of one diagnostic design. An exhausted diagnostic design requires a recorded strategy pivot before another eligible `RETRY_TERMINAL`; all existing v2 authorization, fencing, bounded runs, independent review, and human/infrastructure exclusions remain intact. Review proportionality and decision utility before implementation minutiae; direct simplify/pivot/abandon rather than serial micro-fixes of an overbuilt or low-value approach.
+Review proportionality and decision utility before implementation minutiae; direct simplify/pivot/abandon rather than serial micro-fixes of an overbuilt or low-value approach.
 
 Accept one-time diagnostics with representative positive, negative, and indeterminate/error checks, risk-required verification, stated coverage/limitations, and an observed outcome selecting the next action; synthetic tests are not live proof. Do not require generalized automation. Accepted platform/system tools need proportional identity/target/permission/output checks, not recursive toolchain attestation absent a concrete threat.
 
@@ -358,7 +241,6 @@ Each implementation card must include:
 - Required repository-owned worktree/branch isolation.
 - Acceptance criteria and test commands.
 - An explicit per-run runtime cap and its rationale.
-- Ladder metadata and routing rationale.
 - Skill policy metadata (`minimal_implementation` enabled/disabled and reason; see Skills).
 - Required local commit and structured handoff.
 - The exact board-designated reviewer as same-card reviewer for code changes.
@@ -389,7 +271,7 @@ Estimate the whole worker attempt, not just editing time: repository discovery, 
 3. Implement only the assigned slice in the pinned worktree.
 4. Run focused tests, then required broader gates.
 5. Commit successful work locally.
-6. Request review with the exact reviewer named by the project contract (`jobcron-reviewer`, `chapt-reviewer`, `harness-reviewer`, or legacy `reviewer-sol`) and concise evidence.
+6. Request review with the exact reviewer named by the project contract (`jobcron-reviewer`, `chapt-reviewer`, `harness-reviewer`) and concise evidence.
 7. Block for a genuine decision, prohibited action, credential need, unsafe state, or infrastructure outcome that the orchestrator must classify.
 8. Never push, open a PR, deploy, mutate production, or bypass review.
 
@@ -397,7 +279,7 @@ Estimate the whole worker attempt, not just editing time: repository discovery, 
 
 Every code change requires independent board-designated review before local integration. Project boards use their board's designated reviewer (`jobcron-reviewer`, `chapt-reviewer`, `harness-reviewer`); the legacy reviewer `reviewer-sol` was retired on 2026-10-18. Inspect the specification, actual diff and commit, repository context, prior rung history, and test evidence. Do not edit implementation code.
 
-Approve only when acceptance criteria pass and no material correctness, security, regression, or scope defect remains. Every non-approval must name the verdict, attribution, rung, revision count, findings, evidence, required next action, and whether continuation or a clean restart is safer.
+Approve only when acceptance criteria pass and no material correctness, security, regression, or scope defect remains. Every non-approval must name the verdict, attribution, revision count, findings, evidence, required next action, and whether continuation or a clean restart is safer.
 
 ## Integration
 
@@ -412,7 +294,7 @@ If integration is blocked, report the exact blocker immediately. Pushing, openin
 
 ## Orchestrator Escape Hatch
 
-The orchestrator may edit implementation code only after repeated delegation failures and only for a tiny surgical unblock. Record why delegation failed, keep the change minimal, run normal checks, commit locally, and require independent Sol review.
+The orchestrator may edit implementation code only after repeated delegation failures and only for a tiny surgical unblock. Record why delegation failed, keep the change minimal, run normal checks, commit locally, and require independent review.
 
 ## Telegram Protocol
 
@@ -424,8 +306,6 @@ Send only milestone completions, genuine blockers, and approval requests. Do not
 - When the user says stop, terminate every owned background worker, reviewer, preview server, and watcher before replying, then verify they stopped. Do not resume because a delayed completion notification arrives.
 - Run every Git command with an explicit repository `workdir` or `git -C`; printing a repository path inside a loop does not change the command's working repository.
 - For Hermes plugin or service specifications, validate every required hook and payload against the installed source or current official documentation on each emitting surface. CLI, TUI, gateway, and automatic lifecycle paths can expose different identifiers and ordering.
-- Standard `kanban_request_changes` immediately routes back to the original implementer; use a structured block for tier escalation to prevent a reassignment race. A normal unblock preserves review provenance and returns to review, so escalation must reassign and then explicitly promote the card to `ready`.
-- Hermes's global `kanban.max_in_progress` counts review tasks. Do not use it for the implementation-only cap; enforce the active profile pool instead.
 - Profile isolation does not isolate files. Every code-changing card needs its own worktree.
 - A skill installed only under `default` cannot be force-loaded by a worker profile. Put the minimum role contract in each worker's `SOUL.md` and card.
 - Never copy OpenAI Codex OAuth stores between profiles. Complete separate authorization when a profile needs an independent grant.
@@ -438,13 +318,9 @@ Before declaring the harness or an autonomous workstream complete, verify:
 
 - The Hermes source checkout is clean and updateable.
 - Every active profile returns its configured model identity on a fresh inference probe.
-- The dispatch allowlist contains each project's workers and reviewer plus the intended legacy lanes, excludes project orchestrators, and has no project card assigned outside its project tuple.
+- The dispatch allowlist contains each project's workers and reviewer, excludes project orchestrators, and has no project card assigned outside its project tuple.
 - Boards `jobcron`, `cha-pt`, and `harness` resolve only their declared repository/workspace allowlists.
 - Fresh project profile sessions have separate state homes and return `claude-fable-5-2` for orchestrator, `claude-opus-5-5` for worker and `claude-opus-5-5` for reviewer.
-- No running implementation profile was removed during a lane swap.
-- Reviews can start while five implementation profiles are running.
 - Every code change reaches independent review before integration.
-- Every escalation has a durable verdict and advances exactly one rung.
-- Rejected artifacts and clean-restart baselines remain recoverable.
 - Git and Kanban contain no unexplained state.
 - No push, PR, deployment, purchase, credential change, or other external write occurred without approval.

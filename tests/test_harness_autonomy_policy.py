@@ -43,7 +43,7 @@ class HarnessAutonomyPolicy(unittest.TestCase):
 
     def test_version_and_bounded_growth(self):
         # Raised by the jev plugin policy change (t_b722c617).
-        self.assertRegex(self.raw, r"(?m)^version: 0\.6\.7-harness\.8$")  # raised by t_ac454595
+        self.assertRegex(self.raw, r"(?m)^version: 0\.6\.7-harness\.9$")  # raised by t_ac454595 and t_46b5e63e
         # Plus the 9 lines of repair_history candidate rules and example (t_6436ac1c)
         # and the 6 lines of the Skill Changes section (t_0a8674fe), and the 5 lines of the card
         # splitting rule (with its blank line) and the 3 jev routing bullets in Worker Selection (t_ac454595).
@@ -79,7 +79,7 @@ class HarnessAutonomyPolicy(unittest.TestCase):
             "`repair_history`, ledger, receipt, or handoff formatting",
             "appending a valid successor that preserves the original",
             "never a completion or integration prerequisite and never an owner question",
-            "Semantic gates are unchanged and still block: required tests, exact-candidate independent review, candidate drift, real budgets, and authority/external-write limits.",
+            "Semantic gates are unchanged and still block: tests that the card's acceptance criteria or test contract require, exact-candidate independent review, candidate drift, real budgets, and authority/external-write limits.",
         ):
             self.assertIn(marker, autonomy)
         gate = section(self.raw, "Completion Gate")
@@ -139,11 +139,6 @@ class HarnessAutonomyPolicy(unittest.TestCase):
         self.assertIn("At most one infrastructure retry per pending attempt.", repair)
 
     def test_rule7_legacy_policies_named_and_bannered(self):
-        autonomy = section(self.raw, "Autonomy")
-        for path in LEGACY:
-            self.assertIn(f"`{path}`", autonomy)
-        self.assertIn("retired GPT-era fleet (Flash/Luna/Terra/Sol/Astra)", autonomy)
-        self.assertIn("do not govern Harness board routing", autonomy)
         for path in LEGACY:
             first = (ROOT / path).read_text().splitlines()[0]
             with self.subTest(path=path):

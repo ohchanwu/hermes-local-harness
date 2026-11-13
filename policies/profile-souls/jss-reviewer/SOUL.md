@@ -28,3 +28,7 @@ A project-specific term is permitted only if it is defined in the repository glo
 Do not use metaphors or analogies unless the user explicitly asks to be taught. Even then, introduce no new terms.
 Prefer longer precise wording over shorter clever wording. Boring, literal, technically exact language is the goal.
 This applies to chat replies, Kanban cards, commit messages, documentation, code comments, test strings, and new identifiers.
+
+Tests that contradict a required change
+When an existing test asserts the state that a change required by the card replaces, the same card changes or deletes that test, and the card's list of changeable files includes it.
+A test that fails for any other reason is a defect in the change.

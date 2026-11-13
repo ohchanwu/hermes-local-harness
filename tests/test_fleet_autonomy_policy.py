@@ -25,7 +25,7 @@ SKILLS = {
 # The jobcron version was raised by the owner-requested application-only production
 # deploy exception (t_b7455361).
 # Raised by the jev plugin policy change (t_b722c617).
-VERSIONS = {"jobcron": "0.6.9-jobcron.10", "cha-pt": "0.6.7-chapt.9"}  # raised by t_ac454595
+VERSIONS = {"jobcron": "0.6.9-jobcron.11", "cha-pt": "0.6.7-chapt.10"}  # raised by t_ac454595 and t_46b5e63e
 BASELINE_SKILL_LINES = {"jobcron": 429, "cha-pt": 434}
 # Live-only Jobcron rules reconciled verbatim from the installed
 # jobcron-orchestrator skill (0.6.5-jobcron.1) into the repository copy.
@@ -129,7 +129,7 @@ class FleetAutonomyPolicy(unittest.TestCase):
                     "`repair_history`, ledger, receipt, or handoff formatting",
                     "appending a valid successor that preserves the original",
                     "never a completion or integration prerequisite and never an owner question",
-                    "Semantic gates are unchanged and still block: required tests, exact-candidate independent review, candidate drift, real budgets, and authority/external-write limits.",
+                    "Semantic gates are unchanged and still block: tests that the card's acceptance criteria or test contract require, exact-candidate independent review, candidate drift, real budgets, and authority/external-write limits.",
                 ):
                     self.assertIn(marker, autonomy)
                 gate = section(self.raw[board], "Completion Gate")

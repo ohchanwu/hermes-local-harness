@@ -1,7 +1,7 @@
 ---
 name: harness-bug-report
 description: "Use when a Hermes or harness defect is suspected. File a harness-board card with evidence; never write outside your own repository."
-version: 1.2.0
+version: 1.2.1
 author: chanbla11mit, Hermes Agent
 license: MIT
 platforms: [macos, linux, windows]
@@ -89,7 +89,7 @@ Baseline EXACT <40-hex>.
 Assigned worker EXACT harness-worker.
 Reviewer EXACT harness-reviewer.
 Runtime cap 3600s per run.
-Skill policy: minimal-implementation disabled; requirements and risk outrank simplification.
+Skill policy: minimal-implementation disabled.
 
 ## Evidence
 <the items of section 3>

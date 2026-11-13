@@ -45,11 +45,11 @@ PROFILES = {HARNESS: "harness-orchestrator", JOBCRON: "jobcron-orchestrator", CH
 # policy change raised the Harness, Jobcron and Cha PT versions (t_b722c617) and
 # the jss-genr and anki versions (t_71b4ef4a).
 VERSIONS = {
-    HARNESS: "0.6.7-harness.8",  # raised by t_ac454595
-    JOBCRON: "0.6.9-jobcron.10",  # raised by t_ac454595
-    CHAPT: "0.6.7-chapt.9",  # raised by t_ac454595
-    JSS: "0.6.7-jss.10",  # raised by t_ac454595
-    ANKI: "0.6.10-anki.6",  # raised by t_ac454595
+    HARNESS: "0.6.7-harness.9",  # raised by t_ac454595 and t_46b5e63e
+    JOBCRON: "0.6.9-jobcron.11",  # raised by t_ac454595 and t_46b5e63e
+    CHAPT: "0.6.7-chapt.10",  # raised by t_ac454595 and t_46b5e63e
+    JSS: "0.6.7-jss.11",  # raised by t_ac454595 and t_46b5e63e
+    ANKI: "0.6.10-anki.7",  # raised by t_ac454595 and t_46b5e63e
 }
 
 # Bytes of each file at baseline a391e38a1d20ac14022a20189363931440cf22c9,
@@ -143,7 +143,11 @@ class SkillChangesSection(unittest.TestCase):
                 headings = re.findall(r"^## .*$", self.text[path], re.M)
                 index = headings.index("## Skill Changes")
                 self.assertEqual(headings[index - 1], "## Skills")
-                self.assertEqual(headings[index + 1] + "\n", NEXT_HEADING[path])
+                # Card t_46b5e63e deleted the sections from "## Routing Rubric" to the end of
+                # "## Escalation Mechanics" in the Jobcron and Cha PT copies.
+                following = {**NEXT_HEADING, JOBCRON: "## Routing validation and dispatch receipt\n",
+                             CHAPT: "## Routing validation and dispatch receipt\n"}
+                self.assertEqual(headings[index + 1] + "\n", following[path])
 
     def test_project_orchestrators_file_under_harness_bug_report(self):
         for path in (JOBCRON, CHAPT, JSS, ANKI):

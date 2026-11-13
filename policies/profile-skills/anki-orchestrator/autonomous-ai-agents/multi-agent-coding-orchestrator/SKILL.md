@@ -1,7 +1,7 @@
 ---
 name: multi-agent-coding-orchestrator
 description: "Use when orchestrating anki add-on, tooling, and deck change work."
-version: 0.6.10-anki.6
+version: 0.6.10-anki.7
 author: chanbla11mit, Hermes Agent
 license: MIT
 platforms: [macos]
@@ -94,7 +94,7 @@ Every card must contain:
 10. A per-run runtime cap with rationale. Estimate the whole attempt, including discovery, tests, commit, and the review handoff; use an explicit `max_runtime_seconds` when it may exceed one hour, and raise the cap before retrying a timed-out attempt.
 11. The required handoff: the local commit; for deck change cards, also the change set path and its entry counts.
 12. The collection access rules and explicit prohibitions on remotes, push, PR, AnkiWeb sync or publication, installs, live policy changes, credentials, and other external writes without separate owner authorization.
-13. Skill-policy metadata stating whether `minimal-implementation` is enabled and that requirements and risk outrank simplification.
+13. Skill-policy metadata stating whether `minimal-implementation` is enabled.
 
 Item 1 writes the repository line in exactly the form `Repository <exact repository path> ONLY.` `scripts/verify-state` accepts no other repository wording; a repository line that uses `EXACT` instead of `ONLY` fails the card contract check.
 
@@ -142,7 +142,7 @@ A shared checkout, foreign path, second repository, missing baseline, mismatched
 
 ## Skills
 
-Attach `minimal-implementation` only for dependency choice, suspected overengineering, refactoring, simplification, or shared-function repair where simplification does not weaken required evidence. Leave it off for deck change cards and for collection-access or add-on install tooling, where exact boundaries outrank brevity. Verification and safety always outrank minimalism. Record the decision and reason on the card.
+Attach `minimal-implementation` only for dependency choice, suspected overengineering, refactoring, simplification, or shared-function repair where simplification does not weaken required evidence. Leave it off for deck change cards and for collection-access or add-on install tooling, where exact boundaries outrank brevity. Record the decision and reason on the card.
 
 Before forcing a skill, run:
 
@@ -197,7 +197,7 @@ User stop, product decisions, credentials or MFA, prohibited writes, unsafe stat
 
 ## Autonomy
 
-Bookkeeping never gates. Fix malformed `repair_history`, ledger, receipt, or handoff formatting by appending a valid successor that preserves the original. Such a correction is never a completion or integration prerequisite and never an owner question. Semantic gates are unchanged and still block: required tests, exact-candidate independent review, candidate drift, the collection access rules, real budgets, and authority/external-write limits.
+Bookkeeping never gates. Fix malformed `repair_history`, ledger, receipt, or handoff formatting by appending a valid successor that preserves the original. Such a correction is never a completion or integration prerequisite and never an owner question. Semantic gates are unchanged and still block: tests that the card's acceptance criteria or test contract require, exact-candidate independent review, candidate drift, the collection access rules, real budgets, and authority/external-write limits.
 
 Never ask the owner about:
 
