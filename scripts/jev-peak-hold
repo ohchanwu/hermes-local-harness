@@ -10,7 +10,8 @@ Commands:
           the planned holds and releases are printed. Idempotent. Just before
           each hold the card is read again; a card that is no longer ready or
           todo for a GLM worker (for example one reassigned to a Claude worker)
-          is skipped ("skipped hold <board> <id>").
+          is skipped ("skipped hold <board> <id>"); a card that cannot be read
+          again is also skipped, with its error class, and the next run tries again.
   off     Turn the hold off (switch file enabled: false), then release every
           card held with the marker at once.
   on      Turn the hold on (switch file enabled: true). Cards are held again
@@ -87,7 +88,10 @@ def _print_results(results: list) -> int:
     failures = 0
     for item in results:
         verb = "held" if item["action"] == "hold" else "released"
-        if item.get("skipped"):
+        if item.get("skipped") and item.get("error_class"):
+            print(f"skipped hold {item['board']} {item['task_id']}: the card could not be read again "
+                  f"(error_class={item['error_class']}); the next run tries again")
+        elif item.get("skipped"):
             print(f"skipped hold {item['board']} {item['task_id']}: no longer a ready or todo card of a GLM worker")
         elif item["applied"]:
             print(f"{verb} {item['board']} {item['task_id']}")

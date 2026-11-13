@@ -412,13 +412,16 @@ def plan(config: Mapping[str, Any], now: datetime, boards: Mapping[str, Path],
     return actions, switch_error, errors
 
 
-def still_holdable(config: Mapping[str, Any], board: str, task_id: str, path: Path) -> bool:
-    """True when the card is still ``ready`` or ``todo`` and assigned to a GLM worker of ``board``.
+def still_holdable(config: Mapping[str, Any], board: str, task_id: str,
+                   path: Path) -> Tuple[bool, Optional[str]]:
+    """``(holdable, read error class)``: holdable when the card is still ``ready``
+    or ``todo`` and assigned to a GLM worker of ``board``.
 
     ``apply`` reads the card again just before each hold, so a card that was
     reassigned to a Claude worker after ``plan`` read the board (for example by
     the reassignment after change requests of ``routing.handle_request_changes``) is not
-    held. A read error also returns False, so the card stays unchanged.
+    held. A read error returns ``(False, <error class>)``, so the card stays
+    unchanged until the next run.
     """
     try:
         conn = connect_readonly(path)
@@ -426,10 +429,10 @@ def still_holdable(config: Mapping[str, Any], board: str, task_id: str, path: Pa
             row = conn.execute("SELECT status, assignee FROM tasks WHERE id = ?", (task_id,)).fetchone()
         finally:
             conn.close()
-    except Exception:
-        return False
+    except Exception as exc:
+        return False, type(exc).__name__
     return (row is not None and row["status"] in ("ready", "todo")
-            and row["assignee"] in glm_workers_by_board(config).get(board, []))
+            and row["assignee"] in glm_workers_by_board(config).get(board, [])), None
 
 
 def apply(config: Mapping[str, Any], actions: List[Dict[str, Any]],
@@ -437,15 +440,17 @@ def apply(config: Mapping[str, Any], actions: List[Dict[str, Any]],
     """Perform ``actions`` with ``hermes kanban`` commands; one decisions record each.
 
     With ``boards`` (board name to database path) each planned hold is checked
-    again with ``still_holdable`` first; a card that no longer qualifies is
-    skipped (``skipped`` true, no command, no record).
+    again with ``still_holdable`` first; a card that no longer qualifies, or
+    that cannot be read again, is skipped (``skipped`` true, no command, no
+    record; ``error_class`` is the read error class or None).
     """
     results = []
     for item in actions:
-        if (item["action"] == "hold" and boards is not None and item["board"] in boards
-                and not still_holdable(config, item["board"], item["task_id"], boards[item["board"]])):
-            results.append({**item, "applied": False, "skipped": True, "error_class": None})
-            continue
+        if item["action"] == "hold" and boards is not None and item["board"] in boards:
+            holdable, read_error = still_holdable(config, item["board"], item["task_id"], boards[item["board"]])
+            if not holdable:
+                results.append({**item, "applied": False, "skipped": True, "error_class": read_error})
+                continue
         if item["action"] == "hold":
             ok, error_class = hold_card(config, item["board"], item["task_id"], item["held_until"], command)
             log_hold(item["board"], item["task_id"], item["assignee"], item["held_until"], ok, error_class)

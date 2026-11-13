@@ -709,6 +709,31 @@ class EscalatedCardHoldTests(_BoardCase):
         self.assertIn("held harness t_glm_ready", out.getvalue())
         self.assertEqual(self.statuses()["t_glm_todo"], "todo")
 
+    def test_read_error_before_the_hold_is_skipped_with_its_error_class(self):
+        import contextlib
+        import importlib.machinery
+        import importlib.util
+        import io
+        loader = importlib.machinery.SourceFileLoader("jev_peak_hold_script", str(SCRIPT))
+        spec = importlib.util.spec_from_loader(loader.name, loader)
+        script = importlib.util.module_from_spec(spec)
+        loader.exec_module(script)
+        boards = {"harness": self.db}
+        actions, _switch, _errors = peak_hold.plan(self.config, datetime.fromisoformat(WEDNESDAY_16), boards)
+        holds = [a for a in actions if a["action"] == "hold"]
+        self.assertTrue(holds)
+        with mock.patch.object(peak_hold, "connect_readonly", side_effect=sqlite3.OperationalError("locked")):
+            results = peak_hold.apply(self.config, holds, self.hermes, boards)
+        self.assertTrue(all(r["skipped"] and r["error_class"] == "OperationalError" for r in results))
+        self.assertEqual(self.schedule_calls(holds[0]["task_id"]), [])
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            status = script._print_results(results)
+        self.assertEqual(status, 0)
+        self.assertIn(f"skipped hold harness {holds[0]['task_id']}: the card could not be read again "
+                      "(error_class=OperationalError); the next run tries again", out.getvalue())
+        self.assertNotIn("no longer a ready or todo card", out.getvalue())
+
     def test_held_card_that_is_escalated_is_released(self):
         # The hold script held the card in the seconds between the change request and the escalation.
         self.script("--apply")

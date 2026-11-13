@@ -35,7 +35,8 @@ because the dispatcher passes a card's override to the reviewer run too.
 
 ``handle_request_changes`` runs for ``kanban_request_changes`` (reviewer
 sessions): after the call, a card of a GLM worker with at least
-``routing.max_glm_change_requests`` change requests goes to a Claude worker.
+``routing.max_glm_change_requests`` change requests goes to a Claude worker,
+and the ``Assigned worker EXACT`` body line is changed to name that worker.
 """
 from __future__ import annotations
 
@@ -191,10 +192,18 @@ def route_question(routes: Sequence[Mapping[str, Any]], instructions: str) -> Di
     }}
 
 
-def rewrite_assigned_worker(body: Any, new_assignee: str) -> Any:
+def rewrite_assigned_worker(body: Any, new_assignee: str, only_from: Optional[str] = None) -> Any:
+    """Replace the profile name on every body line that starts with
+    ``Assigned worker EXACT ``; with ``only_from``, only on lines that name that
+    profile. Text inside a line is never changed."""
     if not isinstance(body, str):
         return body
-    return ASSIGNED_WORKER_LINE.sub(lambda m: m.group(1) + new_assignee, body)
+
+    def replace(match: "re.Match[str]") -> str:
+        if only_from is not None and match.group(2) != only_from:
+            return match.group(0)
+        return match.group(1) + new_assignee
+    return ASSIGNED_WORKER_LINE.sub(replace, body)
 
 
 def _parse_answer(answers: Mapping[str, Any], names: List[str]) -> Tuple[str, Dict[str, float], Optional[float]]:
@@ -583,6 +592,47 @@ def routed_claude_worker(board: str, task_id: str, workers: Sequence[str],
     return found
 
 
+# The body travels as one command-line argument of ``hermes kanban edit`` (it has
+# no ``--body-file`` option). Linux limits one argument to 131072 bytes
+# (MAX_ARG_STRLEN) and macOS all arguments and the environment together to
+# 1048576 bytes (ARG_MAX); a longer body is not sent.
+MAX_BODY_ARGUMENT_BYTES = 100_000
+
+
+def rewrite_body_after_escalation(config: Mapping[str, Any], board: str, task_id: str, glm_worker: str,
+                                  claude_worker: str, command: Optional[str] = None) -> Dict[str, Any]:
+    """Step 3 of ``handle_request_changes``: name the Claude worker on the body
+    line ``Assigned worker EXACT <GLM worker>`` (written by ``decide`` at creation).
+
+    Reads the stored body again and runs ``hermes kanban --board <board> edit
+    <task id> --body=<body>`` only when a line that starts with ``Assigned
+    worker EXACT `` names ``glm_worker``. The ``--body=`` form keeps a body that
+    starts with ``-`` one argument value. Returns the fields for the ``escalate``
+    record: ``assigned_worker_line`` is ``rewritten``, ``no_line`` (no command
+    runs) or ``failed``, and ``assigned_worker_line_error_class`` the error class.
+    Never raises; a failure leaves the card as the reassignment left it. No
+    body text is returned or logged.
+    """
+    try:
+        conn = peak_hold.connect_readonly(peak_hold.kanban_db_path(config, board))
+        try:
+            row = conn.execute("SELECT body FROM tasks WHERE id = ?", (task_id,)).fetchone()
+        finally:
+            conn.close()
+        body = row["body"] if row is not None else None
+        new_body = rewrite_assigned_worker(body, claude_worker, only_from=glm_worker)
+        if not isinstance(body, str) or new_body == body:
+            return {"assigned_worker_line": "no_line", "assigned_worker_line_error_class": None}
+        if len(new_body.encode("utf-8")) > MAX_BODY_ARGUMENT_BYTES:
+            ok, error_class = False, "BodyTooLong"
+        else:
+            ok, error_class = peak_hold.run_kanban(config, board, ["edit", task_id, "--body=" + new_body], command)
+    except Exception as exc:
+        ok, error_class = False, type(exc).__name__
+    return {"assigned_worker_line": "rewritten" if ok else "failed",
+            "assigned_worker_line_error_class": error_class}
+
+
 def handle_request_changes(args: Mapping[str, Any], next_call: Callable[..., Any], *,
                            config: Mapping[str, Any], command: Optional[str] = None,
                            state_dir: Optional[Path] = None) -> Any:
@@ -598,12 +648,18 @@ def handle_request_changes(args: Mapping[str, Any], next_call: Callable[..., Any
        <Claude worker> --reclaim``. ``--reclaim`` ends a GLM run that a
        dispatcher tick started between the change request and this command;
        for a card that is not running it changes nothing.
+    3. only when the reassignment worked and the stored body has a line that
+       starts with ``Assigned worker EXACT <GLM worker>``,
+       ``hermes kanban --board <board> edit <task id> --body=<body>`` with the
+       Claude worker named on that line (``rewrite_assigned_worker``), so that the
+       Claude worker does not find another profile named as the assigned worker.
+       See ``rewrite_body_after_escalation``.
     The Claude worker is the ``original_assignee`` of the card's ``route``
     record, else the next of the board's ``implementation_workers`` (alternating).
-    Hermes runs both commands inside the reviewer process: neither checks
-    ``HERMES_KANBAN_TASK`` (``hermes_cli/kanban.py`` ``_cmd_set_model`` and
-    ``_cmd_reassign``). One ``escalate`` record is written per escalation.
-    Every failure leaves the card as Hermes left it.
+    Hermes runs these commands inside the reviewer process: none checks
+    ``HERMES_KANBAN_TASK`` (``hermes_cli/kanban.py`` ``_cmd_set_model``,
+    ``_cmd_reassign`` and ``_cmd_edit``). One ``escalate`` record is written per
+    escalation. Every failure leaves the card as the earlier commands left it.
     """
     result = next_call()
     record: Optional[Dict[str, Any]] = None
@@ -644,6 +700,8 @@ def handle_request_changes(args: Mapping[str, Any], next_call: Callable[..., Any
             record.update(applied=ok, error_class=error_class)
             if not ok:
                 record["new_assignee"] = assignee
+            else:
+                record.update(rewrite_body_after_escalation(config, board, task_id, assignee, new_assignee, command))
         jev_log.write("decisions", record)
     except Exception as exc:
         failed: Dict[str, Any] = dict(record or {"event": "escalate"})

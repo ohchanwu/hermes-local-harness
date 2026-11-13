@@ -159,6 +159,20 @@ if code == 0 and db and argv[:1] == ["kanban"]:
             conn.execute("UPDATE tasks SET assignee=? WHERE id=?", (rest[2], task_id))
             conn.execute("INSERT INTO task_events (task_id, kind, payload, created_at) VALUES (?,?,?,?)",
                          (task_id, "assigned", json.dumps({"assignee": rest[2]}), now))
+    elif verb == "edit":
+        # Like Hermes argparse: "--body=<text>" or "--body" "<text>".
+        body = None
+        for index, item in enumerate(rest[2:], start=2):
+            if item.startswith("--body="):
+                body = item[len("--body="):]
+            elif item == "--body" and index + 1 < len(rest):
+                body = rest[index + 1]
+        cur = conn.execute("UPDATE tasks SET body=? WHERE id=?", (body, task_id)) if body is not None else None
+        if cur is None or cur.rowcount != 1:
+            code = 1
+        else:
+            conn.execute("INSERT INTO task_events (task_id, kind, payload, created_at) VALUES (?,?,?,?)",
+                         (task_id, "edited", json.dumps({"fields": ["body"]}), now))
     conn.commit()
     conn.close()
 sys.exit(code)
@@ -169,8 +183,8 @@ def write_fake_hermes(directory: Path) -> str:
     """Write the fake ``hermes`` command; return the command string for ``--hermes``.
 
     It appends its arguments to ``$FAKE_HERMES_LOG`` and, when ``$FAKE_KANBAN_DB``
-    is set, applies ``schedule``, ``unblock``, ``set-model`` and ``reassign``
-    (``--reclaim`` needed for a running card) to that database.
+    is set, applies ``schedule``, ``unblock``, ``set-model``, ``reassign``
+    (``--reclaim`` needed for a running card) and ``edit --body`` to that database.
     ``$FAKE_HERMES_EXIT`` sets a non-zero exit code (the change is then not applied).
     """
     script = directory / "fake_hermes.py"
@@ -194,7 +208,7 @@ def build_board_db(path: Path, tasks) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(path)
     conn.execute("PRAGMA journal_mode=wal")
-    conn.execute("CREATE TABLE tasks (id TEXT PRIMARY KEY, title TEXT, status TEXT, assignee TEXT,"
+    conn.execute("CREATE TABLE tasks (id TEXT PRIMARY KEY, title TEXT, body TEXT, status TEXT, assignee TEXT,"
                  " model_override TEXT, provider_override TEXT)")
     conn.execute("CREATE TABLE task_events (id INTEGER PRIMARY KEY AUTOINCREMENT, task_id TEXT, run_id INTEGER,"
                  " kind TEXT, payload TEXT, created_at INTEGER)")

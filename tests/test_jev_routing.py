@@ -717,6 +717,106 @@ class RequestChangesTests(unittest.TestCase):
                                            state_dir=self.log_dir)
         self.assertEqual(fake_hermes_calls(self.calls_log), [])
 
+    # --- step 3: the "Assigned worker EXACT" body line (review round 1 of t_df87b851) ---
+
+    def body(self, task_id):
+        import sqlite3
+        conn = sqlite3.connect(self.db)
+        try:
+            return conn.execute("SELECT body FROM tasks WHERE id=?", (task_id,)).fetchone()[0]
+        finally:
+            conn.close()
+
+    def test_fifth_change_request_names_the_claude_worker_on_the_assigned_worker_line(self):
+        self.set_card(GLM_CARD, model_override="glm-5.3-flash",
+                      body="Repository /tmp/x ONLY.\nAssigned worker EXACT harness-worker-glm-1.\n"
+                           "Reviewer EXACT harness-reviewer.\n")
+        self.add_change_requests(GLM_CARD, 5)
+        self.request_changes()
+        calls = fake_hermes_calls(self.calls_log)
+        self.assertEqual([c[3] for c in calls], ["set-model", "reassign", "edit"])
+        self.assertEqual(calls[2][:5], ["kanban", "--board", "harness", "edit", GLM_CARD])
+        self.assertEqual(self.body(GLM_CARD), "Repository /tmp/x ONLY.\nAssigned worker EXACT harness-worker.\n"
+                                              "Reviewer EXACT harness-reviewer.\n")
+        self.assertEqual(tuple(self.card(GLM_CARD)), ("ready", "harness-worker", None))
+        [record] = self.escalations()
+        self.assertEqual((record["applied"], record["assigned_worker_line"],
+                          record["assigned_worker_line_error_class"]), (True, "rewritten", None))
+
+    def test_mention_inside_another_line_and_other_profiles_are_unchanged(self):
+        body = ("Note: the plugin wrote Assigned worker EXACT harness-worker-glm-1 at creation.\n"
+                "Assigned worker EXACT harness-worker-glm-1.\n"
+                "Assigned worker EXACT harness-worker-glm-10 (other card).\n"
+                "  Assigned worker EXACT harness-worker-glm-1 (indented).\n")
+        self.set_card(GLM_CARD, body=body)
+        self.add_change_requests(GLM_CARD, 5)
+        self.request_changes()
+        self.assertEqual(self.body(GLM_CARD), body.replace(
+            "\nAssigned worker EXACT harness-worker-glm-1.\n", "\nAssigned worker EXACT harness-worker.\n"))
+
+    def test_card_without_the_line_gets_no_edit_command(self):
+        for body in (None, "Repository /tmp/x ONLY.\nAssigned worker EXACT harness-worker-2.\n"):
+            with self.subTest(body=body):
+                self.calls_log.unlink(missing_ok=True)
+                (self.log_dir / "decisions.jsonl").unlink(missing_ok=True)
+                self.set_card(GLM_CARD, assignee="harness-worker-glm-1", body=body)
+                self.add_change_requests(GLM_CARD, 5)
+                self.request_changes()
+                self.assertEqual([c[3] for c in fake_hermes_calls(self.calls_log)], ["set-model", "reassign"])
+                self.assertEqual(self.body(GLM_CARD), body)
+                [record] = self.escalations()
+                self.assertEqual((record["applied"], record["assigned_worker_line"]), (True, "no_line"))
+
+    def test_failed_edit_is_logged_and_result_and_card_unchanged(self):
+        body = f"{SENTINEL}\nAssigned worker EXACT harness-worker-glm-1.\n"
+        self.set_card(GLM_CARD, body=body)
+        self.add_change_requests(GLM_CARD, 5)
+        real_run = routing.peak_hold.run_kanban
+
+        def run_kanban(config, board, args, command=None):
+            if args[0] == "edit":
+                return False, "CommandFailed"
+            return real_run(config, board, args, command)
+
+        with mock.patch.object(routing.peak_hold, "run_kanban", side_effect=run_kanban):
+            self.request_changes()  # asserts the result is unchanged
+        self.assertEqual(self.body(GLM_CARD), body)
+        self.assertEqual(tuple(self.card(GLM_CARD))[:2], ("ready", "harness-worker"))  # reassignment kept
+        [record] = self.escalations()
+        self.assertEqual((record["applied"], record["error_class"], record["assigned_worker_line"],
+                          record["assigned_worker_line_error_class"]), (True, None, "failed", "CommandFailed"))
+        self.assertNotIn(SENTINEL, all_text_under(self.log_dir))
+
+    def test_body_too_long_for_one_argument_is_not_sent(self):
+        body = "Assigned worker EXACT harness-worker-glm-1.\n" + "x" * routing.MAX_BODY_ARGUMENT_BYTES
+        self.set_card(GLM_CARD, body=body)
+        self.add_change_requests(GLM_CARD, 5)
+        self.request_changes()
+        self.assertEqual([c[3] for c in fake_hermes_calls(self.calls_log)], ["set-model", "reassign"])
+        self.assertEqual(self.body(GLM_CARD), body)
+        [record] = self.escalations()
+        self.assertEqual((record["applied"], record["assigned_worker_line"],
+                          record["assigned_worker_line_error_class"]), (True, "failed", "BodyTooLong"))
+
+    def test_read_error_and_exception_return_failed_without_raising(self):
+        with mock.patch.object(routing.peak_hold, "kanban_db_path", side_effect=OSError("unreadable")):
+            out = routing.rewrite_body_after_escalation(self.config, "harness", GLM_CARD, "harness-worker-glm-1",
+                                                        "harness-worker", self.hermes)
+        self.assertEqual(out, {"assigned_worker_line": "failed", "assigned_worker_line_error_class": "OSError"})
+        with mock.patch.object(routing, "rewrite_assigned_worker", side_effect=RuntimeError("x")):
+            out = routing.rewrite_body_after_escalation(self.config, "harness", GLM_CARD, "harness-worker-glm-1",
+                                                        "harness-worker", self.hermes)
+        self.assertEqual(out["assigned_worker_line_error_class"], "RuntimeError")
+        self.assertEqual(fake_hermes_calls(self.calls_log), [])
+
+    def test_body_with_sentinel_never_reaches_a_log_file(self):
+        self.set_card(GLM_CARD, body=f"{SENTINEL} intro\n-{SENTINEL}\nAssigned worker EXACT harness-worker-glm-1.\n")
+        self.add_change_requests(GLM_CARD, 5)
+        self.request_changes()
+        self.assertEqual(self.body(GLM_CARD),
+                         f"{SENTINEL} intro\n-{SENTINEL}\nAssigned worker EXACT harness-worker.\n")
+        self.assertNotIn(SENTINEL, all_text_under(self.log_dir))
+
     def test_unrecognized_arguments_are_not_used_or_logged(self):
         self.add_change_requests(GLM_CARD, 5)
         for args in ({"task_id": SENTINEL, "reason": SENTINEL}, {"board": SENTINEL, "reason": SENTINEL},
