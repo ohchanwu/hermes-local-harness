@@ -161,6 +161,9 @@ def attachment_procedure(board, profile):
     return (
         f"Attach a file to the card with the terminal command `hermes kanban --board {board} attach <task id> "
         "<absolute path of the file> --name <file name>`; it reads the file itself and accepts files up to 25 MB. "
+        "This command is an exception to the rule \"Do not shell out to `hermes kanban <verb>` for board "
+        "operations\" of the Hermes Kanban worker protocol: the exception covers only `attach` on your own card, "
+        "the card named in `HERMES_KANBAN_TASK`, and every other board operation still uses the `kanban_*` tools. "
         "Use the `kanban_attach` tool only for a file of at most 1,000 bytes: pass the file's bytes as Base64 text "
         "on one line without line breaks in `content_base64` (print it with `base64 -i <absolute path of the "
         f"file>`; on macOS `base64` writes one line), for example {attach_example(board)}, which attaches a file "
