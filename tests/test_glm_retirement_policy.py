@@ -22,6 +22,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
+from hard_route_policy_edits import reverse_hard_route_policy_edits
 from incident_recovery_verify_fixture import LocalReads, ROOT, load_verifier, resolved_fixture
 from jss_download_install_edits import reverse_download_install_edits
 from rule_text import assert_rule
@@ -68,10 +69,10 @@ JOBCRON_PRODUCTION_DEPLOYMENT = ("devops/production-deployment/SKILL.md",
                                  "devops/production-deployment/references/release-ci-portability.md")
 SHARED_SKILL = ROOT / "skills/multi-agent-coding-orchestrator/SKILL.md"
 VERSIONS = {
-    PROFILE_SKILLS["jobcron-orchestrator"]: "0.6.9-jobcron.13",  # raised by t_b7455361, t_b722c617, t_ac454595, t_46b5e63e, t_f4ce916d and t_c7cc3830
-    PROFILE_SKILLS["chapt-orchestrator"]: "0.6.7-chapt.12",  # raised by t_b722c617, t_ac454595, t_46b5e63e, t_f4ce916d and t_c7cc3830
-    PROFILE_SKILLS["harness-orchestrator"]: "0.6.7-harness.11",  # raised by t_b722c617, t_ac454595, t_46b5e63e, t_f4ce916d and t_c7cc3830
-    PROFILE_SKILLS["jss-orchestrator"]: "0.6.7-jss.15",  # raised by t_71b4ef4a, t_ac454595, t_46b5e63e, t_89838618, t_f4ce916d, t_c7cc3830 and t_a8884510
+    PROFILE_SKILLS["jobcron-orchestrator"]: "0.6.9-jobcron.14",  # raised by t_b7455361, t_b722c617, t_ac454595, t_46b5e63e, t_f4ce916d, t_c7cc3830 and t_e14a6d6a
+    PROFILE_SKILLS["chapt-orchestrator"]: "0.6.7-chapt.13",  # raised by t_b722c617, t_ac454595, t_46b5e63e, t_f4ce916d, t_c7cc3830 and t_e14a6d6a
+    PROFILE_SKILLS["harness-orchestrator"]: "0.6.7-harness.12",  # raised by t_b722c617, t_ac454595, t_46b5e63e, t_f4ce916d, t_c7cc3830 and t_e14a6d6a
+    PROFILE_SKILLS["jss-orchestrator"]: "0.6.7-jss.16",  # raised by t_71b4ef4a, t_ac454595, t_46b5e63e, t_89838618, t_f4ce916d, t_c7cc3830, t_a8884510 and t_e14a6d6a
     SHARED_SKILL: "0.6.14",  # raised by t_46b5e63e
 }
 PROCEDURE = ROOT / "procedures/switching-hermes-models.md"
@@ -392,7 +393,10 @@ class PolicyText(unittest.TestCase):
                 # with the profile name and the worker number replaced (tests/test_third_glm_worker_policy.py),
                 # so it is checked as that SOUL.
                 first = name[:-1] + "1"
-                raw = path.read_text().replace(name, first).replace("GLM implementation worker 3",
+                # Card t_e14a6d6a later changed the route of the cards that reach the Harness and jss-genr
+                # third GLM workers; that change is reversed first.
+                raw = reverse_hard_route_policy_edits(f"policies/profile-souls/{name}/SOUL.md", path.read_text())
+                raw = raw.replace(name, first).replace("GLM implementation worker 3",
                                                                    "GLM implementation worker 1", 1)
                 relative = f"policies/profile-souls/{first}/SOUL.md"
                 text = reverse_jev_policy_edits(relative, reverse_download_install_edits(relative, raw))

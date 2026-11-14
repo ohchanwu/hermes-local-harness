@@ -17,7 +17,8 @@ that another caller already reversed. jss_download_install_edits.py and
 test_stale_test_rule_policy.py call it first, so the reversal functions of the earlier
 cards receive the bytes from before this card. This module imports only
 test_card_split_rule_policy (the later card split rule change, t_c7cc3830, reversed
-first), which imports no other test module, so any test module can import it.
+first) and hard_route_policy_edits (the later change of card t_e14a6d6a), which import no
+module that imports this one, so any test module can import it.
 """
 import copy
 import hashlib
@@ -27,6 +28,7 @@ from pathlib import Path
 import subprocess
 import unittest
 
+from hard_route_policy_edits import reverse_hard_route_policy_edits
 from test_card_split_rule_policy import reverse_card_split_rule_edits
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -47,10 +49,11 @@ REVIEWER_LIST_LEAD = {
 VERSIONS = {"harness": ("0.6.7-harness.9", "0.6.7-harness.10"), "chapt": ("0.6.7-chapt.10", "0.6.7-chapt.11"),
             "jobcron": ("0.6.9-jobcron.11", "0.6.9-jobcron.12"), "jss": ("0.6.7-jss.12", "0.6.7-jss.13"),
             "anki": ("0.6.10-anki.7", "0.6.10-anki.8")}
-# The current skill versions: card t_c7cc3830 raised each last number by one more step, and card
-# t_a8884510 raised the jss version by one more step.
-CURRENT_VERSIONS = {"harness": "0.6.7-harness.11", "chapt": "0.6.7-chapt.12",
-                    "jobcron": "0.6.9-jobcron.13", "jss": "0.6.7-jss.15", "anki": "0.6.10-anki.9"}
+# The current skill versions: card t_c7cc3830 raised each last number by one more step, card
+# t_a8884510 raised the jss version by one more step, and card t_e14a6d6a raised each version by one
+# more step.
+CURRENT_VERSIONS = {"harness": "0.6.7-harness.12", "chapt": "0.6.7-chapt.13",
+                    "jobcron": "0.6.9-jobcron.14", "jss": "0.6.7-jss.16", "anki": "0.6.10-anki.10"}
 
 
 def soul(profile):
@@ -233,15 +236,20 @@ class PolicySources(unittest.TestCase):
                 self.assertNotIn(two_or(prefix), orchestrator)
                 # Card t_c7cc3830 raised each version by one step after this card.
                 self.assertRegex(text, rf"(?m)^version: {re.escape(CURRENT_VERSIONS[prefix])}$")
-                self.assertEqual(text.count(f"`{prefix}-worker-2` to {three_or(prefix)}, taking the three in turn,"), 1)
+                # Card t_e14a6d6a later replaced the worker selection sentence and the change request
+                # sentence; the two sentences of this card are checked after that change is reversed.
+                original = reverse_hard_route_policy_edits(skill(prefix), text)
+                self.assertEqual(original.count(f"`{prefix}-worker-2` to {three_or(prefix)}, taking the three in turn,"),
+                                 1)
                 self.assertNotIn("alternating between the two", text)
                 self.assertEqual(text.count(f"the `jev` plugin moves a card that is assigned to {three_or(prefix)} "
                                             "to `scheduled`"), 1)
-                self.assertEqual(text.count(f"After the fifth change request on a card that {three_or(prefix)} "
-                                            "implements"), 1)
+                self.assertEqual(original.count(f"After the fifth change request on a card that {three_or(prefix)} "
+                                                "implements"), 1)
                 # The two Claude workers still alternate after the fifth change request.
                 self.assertEqual(text.count("otherwise the two alternate"), 1)
-                self.assertNotIn(two_or(prefix), text)
+                # The worker selection sentence of card t_e14a6d6a names the first two GLM workers as a pair.
+                self.assertNotIn(two_or(prefix), original)
                 self.assertNotIn(two_and(prefix), text)
                 if prefix in ("harness", "jss", "anki"):
                     self.assertEqual(text.count(f"move a new card to the GLM workers {three_and(prefix)} "
@@ -256,7 +264,9 @@ class PolicySources(unittest.TestCase):
             want = "\n".join(lines)
             third = (ROOT / soul(f"{prefix}-worker-glm-3")).read_text()
             with self.subTest(prefix=prefix):
-                self.assertEqual(third, want)
+                # Card t_e14a6d6a later changed the route of the cards that reach the Harness and jss-genr
+                # third GLM workers; that change is reversed first.
+                self.assertEqual(reverse_hard_route_policy_edits(soul(f"{prefix}-worker-glm-3"), third), want)
                 self.assertNotIn(f"{prefix}-worker-glm-1", third)
                 self.assertIn(f"/Users/chanbla11mit/.hermes/profiles/{prefix}-worker-glm-3/cache/scratch", third)
                 self.assertIn(f"board: {BOARD_OF[prefix]})`", third)
