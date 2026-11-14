@@ -294,6 +294,12 @@ class DesiredState(unittest.TestCase):
         # No GLM worker SOUL is listed in profile_souls, as at the baseline.
         self.assertFalse([name for name in roster["profile_souls"] if "-glm-" in name])
 
+    # The two dispatch lists hold the third GLM workers at the end, in the order in which the
+    # switch script added them to the live list (card t_55432326); every other list names each
+    # third GLM worker directly after the second GLM worker of its board.
+    DISPATCH_LISTS = ("roster.yaml/project_dispatch_allowlist",
+                      "snapshots/sanitized-current-state.yaml/kanban/dispatch_profiles")
+
     def test_every_list_that_names_a_second_glm_worker_names_the_third(self):
         for path in ("roster.yaml", "snapshots/sanitized-current-state.yaml"):
             data = json.loads((ROOT / path).read_text())
@@ -307,9 +313,21 @@ class DesiredState(unittest.TestCase):
                     for prefix in PREFIXES:
                         if f"{prefix}-worker-glm-2" in names:
                             with self.subTest(where=where, prefix=prefix):
+                                if where in self.DISPATCH_LISTS:
+                                    self.assertIn(f"{prefix}-worker-glm-3", names)
+                                    continue
                                 index = names.index(f"{prefix}-worker-glm-2")
                                 self.assertEqual(names[index + 1], f"{prefix}-worker-glm-3")
                     stack.extend((item, f"{where}[]") for item in node if not isinstance(item, str))
+
+    def test_dispatch_lists_end_with_the_third_glm_workers_in_the_order_they_were_added(self):
+        snapshot = json.loads((ROOT / "snapshots/sanitized-current-state.yaml").read_text())
+        roster = json.loads((ROOT / "roster.yaml").read_text())
+        dispatch = snapshot["kanban"]["dispatch_profiles"]
+        self.assertEqual(dispatch[-5:], ["harness-worker-glm-3", "chapt-worker-glm-3", "jobcron-worker-glm-3",
+                                         "jss-worker-glm-3", "anki-worker-glm-3"])
+        self.assertEqual(len(dispatch), 30)
+        self.assertEqual(roster["project_dispatch_allowlist"], dispatch)
 
     def test_verifier_pools_have_three_glm_workers_per_board(self):
         text = (ROOT / "scripts/verify-state").read_text()
@@ -407,7 +425,7 @@ class Procedures(unittest.TestCase):
     def test_switching_procedure_counts_fifteen_glm_workers(self):
         text = (ROOT / "procedures/switching-hermes-models.md").read_text()
         self.assertIn("Card `t_f4ce916d` added a third GLM worker to every board on 2026-11-14", text)
-        self.assertIn("a later deployment card creates these five profiles", text)
+        self.assertIn("card `t_55432326` created these five profiles on 2026-11-14", text)
         self.assertIn("declares each of the fifteen with", text)
         self.assertIn("for the fifteen GLM workers in service", text)
         self.assertNotIn("each of the ten", text)
