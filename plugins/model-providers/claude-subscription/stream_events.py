@@ -10,6 +10,40 @@ _ESCAPE = re.compile(r"\x5cu([dD][89abAB][0-9a-fA-F]{2})\x5cu([dD][c-fC-F][0-9a-
 BACKSLASH = chr(92)
 # What _decode() does with each _ESCAPE match; every outcome but DECODED keeps the sequence as written.
 DECODED, KEPT_ODD_BACKSLASHES, KEPT_SURROGATE, KEPT_CONTROL = "decoded", "odd_backslashes", "surrogate", "control"
+IDENTIFIER = re.compile(r"[A-Za-z0-9_.:-]+")
+SUPPORTED_STOPS = ("end_turn", "max_tokens", "tool_use")
+
+
+def label(value, limit=120):
+    """An identifier-like runtime string as is, otherwise a placeholder; never free text.
+
+    stream_audit uses this same function for every value it records.
+    """
+    if value is None:
+        return None
+    if isinstance(value, str) and len(value) <= limit and IDENTIFIER.fullmatch(value):
+        return value
+    return "<other>"
+
+
+def stop_error_text(stop, calls):
+    """The error text for a message_stop whose stop reason `stop` is not accepted with `calls` tool calls.
+
+    Only for the inputs that Message rejects: `stop` outside SUPPORTED_STOPS, or tool calls present
+    exactly when `stop` is not tool_use. The first condition that applies gives the text. Hermes chooses
+    its reaction to a provider error from the error text, so each text is fixed; none contains max_tokens.
+    """
+    if stop is None:
+        return "runtime message ended without a stop reason"
+    if stop == "refusal":
+        return "runtime stop reason refusal"
+    if stop not in SUPPORTED_STOPS:
+        return f"runtime stop reason not supported: {label(stop, 40)}"
+    if stop == "end_turn":
+        return f"runtime stop reason end_turn inconsistent with {calls} tool calls"
+    if stop == "max_tokens":
+        return f"runtime message stopped at the output limit with {calls} tool calls"
+    return "runtime stop reason tool_use without a tool call"
 
 
 def _decode(text):
@@ -258,8 +292,8 @@ class Message:
         elif event == "message_stop":
             if any(not b["closed"] for b in self.blocks.values()) or not self.snapshot:
                 raise ProviderError("incomplete assistant message")
-            if self.stop not in ("end_turn", "max_tokens", "tool_use") or bool(self.calls) != (self.stop == "tool_use"):
-                raise ProviderError("runtime refusal or unsupported stop reason")
+            if self.stop not in SUPPORTED_STOPS or bool(self.calls) != (self.stop == "tool_use"):
+                raise ProviderError(stop_error_text(self.stop, len(self.calls)))
             if [b.get("type") for b in self.snapshot] != [b["kind"] for _, b in sorted(self.blocks.items())]:
                 raise ProviderError("stream/snapshot block mismatch")
             text = "".join(b.get("text", "") for b in self.snapshot if b.get("type") == "text")
