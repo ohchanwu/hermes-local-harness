@@ -14,7 +14,8 @@ The card states in the policy sources of the five boards:
   scripts/jev-peak-hold does not hold a card of a Claude worker;
 - Part 5: the rule for splitting a card that needs a design decision, and the
   reworded passages of the Jobcron and Cha PT skills that discouraged
-  splitting;
+  splitting; card t_c7cc3830 later replaced the rule text and the two passages
+  (tests/test_card_split_rule_policy.py holds the current text);
 - Part 6.3: the attachment and diff procedure of the GLM workers (the eight GLM
   worker SOULs in this repository; the two Jobcron GLM worker SOULs have no
   repository source, so procedures/jev-plugin.md holds their exact text);
@@ -38,6 +39,7 @@ from pathlib import Path
 import unittest
 
 from jss_download_install_edits import reverse_download_install_edits
+from test_card_split_rule_policy import NEW_RULE, PASSAGE_EDITS
 from test_stale_test_rule_policy import reverse_stale_test_rule_edits
 from test_third_glm_worker_policy import with_third_glm_worker
 
@@ -337,11 +339,14 @@ class RoutingPolicyText(unittest.TestCase):
             text = self.text[skill(prefix)]
             with self.subTest(board=board):
                 # Card t_46b5e63e raised each version by one step after this card; card t_89838618 raised
-                # the jss version by one more step, and card t_f4ce916d each version by one more step.
-                current = {"harness": "0.6.7-harness.10", "chapt": "0.6.7-chapt.11", "jobcron": "0.6.9-jobcron.12",
-                           "jss": "0.6.7-jss.13", "anki": "0.6.10-anki.8"}[prefix]
+                # the jss version by one more step, card t_f4ce916d each version by one more step, and
+                # card t_c7cc3830 each version by one more step.
+                current = {"harness": "0.6.7-harness.11", "chapt": "0.6.7-chapt.12", "jobcron": "0.6.9-jobcron.13",
+                           "jss": "0.6.7-jss.14", "anki": "0.6.10-anki.9"}[prefix]
                 self.assertRegex(text, rf"(?m)^version: {re.escape(current)}$")
-                self.assertEqual(text.count(SPLIT_RULE), 1)
+                # Card t_c7cc3830 replaced the Part 5 rule text with the card split rule.
+                self.assertEqual(text.count(NEW_RULE), 1)
+                self.assertNotIn(SPLIT_RULE, text)
                 # Card t_f4ce916d: the sentence names the three GLM workers of the board.
                 escalation = with_third_glm_worker(escalation_skill_text(key))
                 self.assertEqual(text.count(escalation), 1)
@@ -367,8 +372,12 @@ class RoutingPolicyText(unittest.TestCase):
         for prefix in ("jobcron", "chapt"):
             text = self.text[skill(prefix)]
             with self.subTest(prefix=prefix):
-                for new, old in SPLIT_PASSAGES:
+                # Card t_c7cc3830 shortened the two passages; PASSAGE_EDITS holds the current
+                # text and the text it replaced.
+                for new, old in PASSAGE_EDITS:
                     self.assertEqual(text.count(new), 1)
+                    self.assertNotIn(old, text)
+                for _new, old in SPLIT_PASSAGES:
                     self.assertNotIn(old, text)
                 self.assertNotIn("Do not decompose merely", text)
                 self.assertNotIn("Split into dependent cards only when", text)

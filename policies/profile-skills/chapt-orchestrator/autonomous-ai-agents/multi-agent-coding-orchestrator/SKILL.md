@@ -1,7 +1,7 @@
 ---
 name: multi-agent-coding-orchestrator
 description: "Use when orchestrating multi-agent coding with Hermes."
-version: 0.6.7-chapt.11
+version: 0.6.7-chapt.12
 author: chanbla11mit, Hermes Agent
 license: MIT
 platforms: [macos]
@@ -271,7 +271,7 @@ Write the repository line on the card body in exactly the form `Repository <exac
 
 - Cha PT, exactly one per card: `Repository /Users/chanbla11mit/projects/cha-pt ONLY.`, `Repository /Users/chanbla11mit/projects/cha-pt-frontend ONLY.`, or `Repository /Users/chanbla11mit/projects/cha-webpt-website-sync ONLY.`
 
-Use parent-child links for real dependencies. Keep independent slices parallel. When a card needs a design decision, split off every part that has its own acceptance check and needs no design decision into a separate card that depends on the design card. Name the exact files and the exact check command in that card. Do not split a card only to keep every lane busy.
+Use parent-child links for real dependencies. Keep independent slices parallel. By default, when the work for a card has several parts that each have their own acceptance check, create one card for each part, and link two cards only where one part needs the result of the other or both change the same files. A part that needs a design decision gets its own card, and the parts that wait for that decision depend on that card. A part that has no acceptance check of its own stays in the card of the part it belongs to. Name the exact files and the exact check command in each card. Reason: a card that names its files and its check command can run on a GLM worker, and a card that covers several parts usually stays with a Claude worker. Do not split a card only to keep every lane busy.
 
 ### Runtime budgeting
 
@@ -280,7 +280,7 @@ Estimate the whole worker attempt, not just editing time: repository discovery, 
 - Keep the one-hour default only when the complete attempt is reasonably expected to finish within it.
 - If the orchestrator suspects the attempt may exceed one hour, set `max_runtime_seconds` explicitly when creating the card. Use at least two to three hours for substantial implementation, security, infrastructure, migration, large-context, or broad-verification work, and use a longer evidence-based cap when the test matrix or prior measurements justify it.
 - If any prior attempt timed out, increase the cap before the next attempt. Choose a value comfortably above the observed elapsed time and remaining work; do not merely add a few minutes.
-- Prefer a larger bounded cap over splitting work solely to evade the timer. Split into dependent cards when the stages have their own acceptance criteria or handoffs, including the parts that Task Construction requires to be split off a card that needs a design decision.
+- Prefer a larger bounded cap over splitting work solely to evade the timer.
 - Preserve committed progress and timeout evidence. If the installed Hermes version cannot update an existing card's cap through a supported interface, do not edit the Kanban database directly; create an explicitly linked continuation card with the higher cap and durable handoff, then retire or block the superseded card without losing its audit trail.
 
 ## Autonomy
@@ -376,7 +376,7 @@ Send only milestone completions, genuine blockers, and approval requests. Do not
 - Do not manually force `hermes kanban dispatch` while the gateway-embedded dispatcher is already active merely to accelerate a handoff. Let the next gateway tick claim it; overlapping immediate ticks can produce a short-lived duplicate/protocol-violation retry even though the board lock preserves correctness.
 - Pause the owned supervisor before taking interactive integration/release ownership, then re-read exact Git/card/events: pausing future fires does not cancel an already-in-flight wake. Reuse its valid approved integration, evidence and existing dependent cards; supersede ownership durably and do not create duplicates, repeat completed gates or reset artifacts. If a newer hold causes a worker to stop, classify it as intentional controller steering, not semantic or infrastructure failure; resume through one exact release and verify a new run receipt.
 - Treat a native `crashed` / PID-not-alive receipt as claim history, not proof that the old worker exited. Before a retry shares its worktree or SQL/fault resource, verify the original PID, exact profile/task command, cwd and descendants directly. Capture recorded and fresh process fingerprints before termination when safely available; otherwise a later strict-comparison or clock-drift explanation remains a hypothesis, not a proved cause. Fence and terminate only a proven stale owned process tree, verify non-execution/exit, and leave the genuine current owner, committed artifacts and evidence untouched; otherwise a falsely reclaimed worker can resume alongside its replacement. If the actual card is already blocked/gave_up, respect that state instead of a notification promising retry, pause the owned supervisor, and preserve unfinished independent RED probes as well as passing broad-suite evidence; no final semantic verdict means no approval or integration.
-- Do not enable automatic decomposition until observed use shows manual decomposition is the bottleneck. This does not limit the manual split that Task Construction requires for a card that needs a design decision.
+- Do not enable automatic decomposition until observed use shows manual decomposition is the bottleneck. This does not limit the manual split that Task Construction describes.
 
 ## Completion Gate
 

@@ -25,7 +25,7 @@ SKILLS = {
 # The jobcron version was raised by the owner-requested application-only production
 # deploy exception (t_b7455361).
 # Raised by the jev plugin policy change (t_b722c617).
-VERSIONS = {"jobcron": "0.6.9-jobcron.12", "cha-pt": "0.6.7-chapt.11"}  # raised by t_ac454595, t_46b5e63e and t_f4ce916d
+VERSIONS = {"jobcron": "0.6.9-jobcron.13", "cha-pt": "0.6.7-chapt.12"}  # raised by t_ac454595, t_46b5e63e, t_f4ce916d and t_c7cc3830
 BASELINE_SKILL_LINES = {"jobcron": 429, "cha-pt": 434}
 # Live-only Jobcron rules reconciled verbatim from the installed
 # jobcron-orchestrator skill (0.6.5-jobcron.1) into the repository copy.

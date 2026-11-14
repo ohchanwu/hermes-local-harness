@@ -1,7 +1,7 @@
 ---
 name: multi-agent-coding-orchestrator
 description: "Use when orchestrating anki add-on, tooling, and deck change work."
-version: 0.6.10-anki.8
+version: 0.6.10-anki.9
 author: chanbla11mit, Hermes Agent
 license: MIT
 platforms: [macos]
@@ -98,7 +98,7 @@ Every card must contain:
 
 Item 1 writes the repository line in exactly the form `Repository <exact repository path> ONLY.` `scripts/verify-state` accepts no other repository wording; a repository line that uses `EXACT` instead of `ONLY` fails the card contract check.
 
-When a card needs a design decision, split off every part that has its own acceptance check and needs no design decision into a separate card that depends on the design card. Name the exact files and the exact check command in that card.
+By default, when the work for a card has several parts that each have their own acceptance check, create one card for each part, and link two cards only where one part needs the result of the other or both change the same files. A part that needs a design decision gets its own card, and the parts that wait for that decision depend on that card. A part that has no acceptance check of its own stays in the card of the part it belongs to. Name the exact files and the exact check command in each card. Reason: a card that names its files and its check command can run on a GLM worker, and a card that covers several parts usually stays with a Claude worker.
 
 `scripts/verify-state` fails closed on items 1–4 and 7–9 for every open card. Use `kanban_create(..., board: anki)` only after validating the complete contract, then read the card with `kanban_show(..., board: anki)` and verify the stored fields before dispatch.
 
