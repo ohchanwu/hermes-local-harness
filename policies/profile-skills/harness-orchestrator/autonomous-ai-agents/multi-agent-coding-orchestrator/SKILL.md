@@ -1,7 +1,7 @@
 ---
 name: multi-agent-coding-orchestrator
 description: "Use when orchestrating Harness repository work."
-version: 0.6.7-harness.10
+version: 0.6.7-harness.11
 author: chanbla11mit, Hermes Agent
 license: MIT
 platforms: [macos]
@@ -58,7 +58,7 @@ Every implementation card must contain:
 
 Item 1 writes the repository line in exactly the form `Repository <exact repository path> ONLY.` `scripts/verify-state` accepts no other repository wording; a repository line that uses `EXACT` instead of `ONLY` fails the card contract check.
 
-When a card needs a design decision, split off every part that has its own acceptance check and needs no design decision into a separate card that depends on the design card. Name the exact files and the exact check command in that card.
+By default, when the work for a card has several parts that each have their own acceptance check, create one card for each part, and link two cards only where one part needs the result of the other or both change the same files. A part that needs a design decision gets its own card, and the parts that wait for that decision depend on that card. A part that has no acceptance check of its own stays in the card of the part it belongs to. Name the exact files and the exact check command in each card. Reason: a card that names its files and its check command can run on a GLM worker, and a card that covers several parts usually stays with a Claude worker.
 
 Use `kanban_create(..., board: harness)` only after validating the complete contract. Immediately read the card with `kanban_show(..., board: harness)` and verify the stored fields before allowing dispatch. Fields that depend on the new ID are completed under Card Setup while the card is still blocked.
 

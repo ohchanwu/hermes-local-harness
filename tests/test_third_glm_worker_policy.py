@@ -15,8 +15,9 @@ each existing policy source. reverse_third_glm_worker_edits() reverses the chang
 leaves a text that has none of the new texts unchanged, so a caller may apply it to a text
 that another caller already reversed. jss_download_install_edits.py and
 test_stale_test_rule_policy.py call it first, so the reversal functions of the earlier
-cards receive the bytes from before this card. This module imports no other test module,
-so any test module can import it.
+cards receive the bytes from before this card. This module imports only
+test_card_split_rule_policy (the later card split rule change, t_c7cc3830, reversed
+first), which imports no other test module, so any test module can import it.
 """
 import copy
 import hashlib
@@ -25,6 +26,8 @@ import re
 from pathlib import Path
 import subprocess
 import unittest
+
+from test_card_split_rule_policy import reverse_card_split_rule_edits
 
 ROOT = Path(__file__).resolve().parents[1]
 BASELINE = "aec198aad4abba35209eaf95f715c2622105d471"
@@ -44,6 +47,9 @@ REVIEWER_LIST_LEAD = {
 VERSIONS = {"harness": ("0.6.7-harness.9", "0.6.7-harness.10"), "chapt": ("0.6.7-chapt.10", "0.6.7-chapt.11"),
             "jobcron": ("0.6.9-jobcron.11", "0.6.9-jobcron.12"), "jss": ("0.6.7-jss.12", "0.6.7-jss.13"),
             "anki": ("0.6.10-anki.7", "0.6.10-anki.8")}
+# The current skill versions: card t_c7cc3830 raised each last number by one more step.
+CURRENT_VERSIONS = {"harness": "0.6.7-harness.11", "chapt": "0.6.7-chapt.12",
+                    "jobcron": "0.6.9-jobcron.13", "jss": "0.6.7-jss.14", "anki": "0.6.10-anki.9"}
 
 
 def soul(profile):
@@ -127,7 +133,8 @@ BASELINE_SHA256 = {
 def reverse_third_glm_worker_edits(relative_path, text):
     """Return text with the t_f4ce916d edits reversed; text may be str or bytes. A path that
     the card did not change, and a text that contains none of the new texts, is returned as
-    the same object."""
+    the same object. The later card split rule change (t_c7cc3830) is reversed first."""
+    text = reverse_card_split_rule_edits(relative_path, text)
     edits = THIRD_GLM_WORKER_EDITS.get(relative_path)
     if not edits:
         return text
@@ -190,7 +197,10 @@ class PolicySources(unittest.TestCase):
                 self.assertEqual(reverse_third_glm_worker_edits(path, data.decode()), original.decode())
                 # A second reversal changes nothing.
                 self.assertIs(reverse_third_glm_worker_edits(path, original), original)
-                self.assertEqual(apply_third_glm_worker_edits(path, original.decode()), data.decode())
+                # The re-applied edits equal the bytes before the later card split rule change
+                # (t_c7cc3830), which reverse_third_glm_worker_edits reversed first.
+                self.assertEqual(apply_third_glm_worker_edits(path, original.decode()),
+                                 reverse_card_split_rule_edits(path, data).decode())
 
     def test_other_paths_are_returned_unchanged(self):
         for path in (soul("harness-worker"), soul("anki-worker-glm-1"), "procedures/jev-plugin.md"):
@@ -220,7 +230,8 @@ class PolicySources(unittest.TestCase):
                     f"`{prefix}-worker-2` to {three_or(prefix)}, and set the card's model and provider, inside "
                     "`kanban_create`;"), 1)
                 self.assertNotIn(two_or(prefix), orchestrator)
-                self.assertRegex(text, rf"(?m)^version: {re.escape(VERSIONS[prefix][1])}$")
+                # Card t_c7cc3830 raised each version by one step after this card.
+                self.assertRegex(text, rf"(?m)^version: {re.escape(CURRENT_VERSIONS[prefix])}$")
                 self.assertEqual(text.count(f"`{prefix}-worker-2` to {three_or(prefix)}, taking the three in turn,"), 1)
                 self.assertNotIn("alternating between the two", text)
                 self.assertEqual(text.count(f"the `jev` plugin moves a card that is assigned to {three_or(prefix)} "

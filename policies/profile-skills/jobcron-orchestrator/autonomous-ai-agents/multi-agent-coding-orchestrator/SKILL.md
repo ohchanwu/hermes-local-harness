@@ -1,7 +1,7 @@
 ---
 name: multi-agent-coding-orchestrator
 description: "Use when orchestrating multi-agent coding with Hermes."
-version: 0.6.9-jobcron.12
+version: 0.6.9-jobcron.13
 author: chanbla11mit, Hermes Agent
 license: MIT
 platforms: [macos]
@@ -278,7 +278,7 @@ Write the repository line on the card body in exactly the form `Repository <exac
 
 - Jobcron: `Repository /Users/chanbla11mit/projects/jobcron ONLY.`
 
-Use parent-child links for real dependencies. Keep independent slices parallel. When a card needs a design decision, split off every part that has its own acceptance check and needs no design decision into a separate card that depends on the design card. Name the exact files and the exact check command in that card. Do not split a card only to keep every lane busy.
+Use parent-child links for real dependencies. Keep independent slices parallel. By default, when the work for a card has several parts that each have their own acceptance check, create one card for each part, and link two cards only where one part needs the result of the other or both change the same files. A part that needs a design decision gets its own card, and the parts that wait for that decision depend on that card. A part that has no acceptance check of its own stays in the card of the part it belongs to. Name the exact files and the exact check command in each card. Reason: a card that names its files and its check command can run on a GLM worker, and a card that covers several parts usually stays with a Claude worker. Do not split a card only to keep every lane busy.
 
 ### Runtime budgeting
 
@@ -287,7 +287,7 @@ Estimate the whole worker attempt, not just editing time: repository discovery, 
 - Keep the one-hour default only when the complete attempt is reasonably expected to finish within it.
 - If the orchestrator suspects the attempt may exceed one hour, set `max_runtime_seconds` explicitly when creating the card. Use at least two to three hours for substantial implementation, security, infrastructure, migration, large-context, or broad-verification work, and use a longer evidence-based cap when the test matrix or prior measurements justify it.
 - If any prior attempt timed out, increase the cap before the next attempt. Choose a value comfortably above the observed elapsed time and remaining work; do not merely add a few minutes.
-- Prefer a larger bounded cap over splitting work solely to evade the timer. Split into dependent cards when the stages have their own acceptance criteria or handoffs, including the parts that Task Construction requires to be split off a card that needs a design decision.
+- Prefer a larger bounded cap over splitting work solely to evade the timer.
 - Preserve committed progress and timeout evidence. If the installed Hermes version cannot update an existing card's cap through a supported interface, do not edit the Kanban database directly; create an explicitly linked continuation card with the higher cap and durable handoff, then retire or block the superseded card without losing its audit trail.
 
 ## Autonomy
@@ -391,7 +391,7 @@ Send only milestone completions, genuine blockers, and approval requests. Do not
 - Do not manually force `hermes kanban dispatch` while the gateway-embedded dispatcher is already active merely to accelerate a handoff. Let the next gateway tick claim it; overlapping immediate ticks can produce a short-lived duplicate/protocol-violation retry even though the board lock preserves correctness.
 - Inspect the actual persisted/CLI JSON schema rather than assuming tool-view fields are stored verbatim. CLI `show --json` can wrap the card under `task`; a reviewer-owned closed card can retain the reviewer as assignee. A completed native run can be stored as `status: done` plus `outcome: completed`, rather than `status: completed`. Match the actual board/profile/workspace and durable outcome before accepting a receipt. `hermes kanban --board <project> show <id> --json` may omit tool-added `unsatisfied_parents` and comment `id`; verify dependencies from listed parents' current states and comment writes by exact author/body. Native cron may render `continuity: true` from persisted `context_from`, without a stored `continuity` key; self-continuity can be stored literally as `["self"]`, not as the job ID. Verify the actual context source and exact owner-profile job/script/workdir; a local verifier's missing-field error is not a task, scheduler, or product failure.
 - Treat `tmux capture-pane` text as rendered terminal data: trailing prompt spaces may be trimmed. Match a fixed masked-input label without its trailing space and confirm it is the last nonempty line, with no anchored exit or consumption marker. Trace the actual prompt call into its delegated helper before deriving labels; an entrypoint can delegate to a module's `prompt()` rather than contain any `getpass()` calls. If a post-launch presence assertion fails, inspect the exact pane and phase without recording any input values before any retry; preserve the original receipt and record the verifier correction separately instead of relaunching a healthy waiting process.
-- Do not enable automatic decomposition until observed use shows manual decomposition is the bottleneck. This does not limit the manual split that Task Construction requires for a card that needs a design decision.
+- Do not enable automatic decomposition until observed use shows manual decomposition is the bottleneck. This does not limit the manual split that Task Construction describes.
 
 ## Completion Gate
 
