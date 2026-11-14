@@ -1255,6 +1255,21 @@
     },
     "anki-worker-2": {
       "compression.threshold_tokens": 300000
+    },
+    "jobcron-worker-glm-3": {
+      "agent.reasoning_effort": "max"
+    },
+    "chapt-worker-glm-3": {
+      "agent.reasoning_effort": "max"
+    },
+    "harness-worker-glm-3": {
+      "agent.reasoning_effort": "max"
+    },
+    "jss-worker-glm-3": {
+      "agent.reasoning_effort": "max"
+    },
+    "anki-worker-glm-3": {
+      "agent.reasoning_effort": "max"
     }
   },
   "profile_fallback_settings": {
