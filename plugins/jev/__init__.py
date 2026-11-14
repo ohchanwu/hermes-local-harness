@@ -6,9 +6,10 @@ Registered callbacks:
   ``ready`` inside the window, ``routing.handle_unblock``),
   ``kanban_request_review`` (model override cleared before the review
   handoff, ``routing.handle_request_review``) and ``kanban_request_changes``
-  (after the call, a GLM card with ``routing.max_glm_change_requests`` change
-  requests goes to a Claude worker, ``routing.handle_request_changes``). Every
-  other tool passes through unchanged.
+  (after the call, a GLM card with at least its change request limit change
+  requests goes to a Claude worker; a route can carry its own limit,
+  ``routing.handle_request_changes``). Every other tool passes through
+  unchanged.
 - ``transform_tool_result`` hook: calls ``tool_filter.transform`` (imported
   lazily); a missing module or any exception leaves the result unchanged.
 - ``post_auxiliary_call`` hook: one ``auxiliary`` log record per call.

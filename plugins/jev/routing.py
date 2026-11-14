@@ -14,16 +14,19 @@
    route is the GLM route with the highest probability (on a tie the one listed
    last in the board's ``routes``), whichever route Jev chose. Otherwise the
    applied route is the route that Jev chose only when its probability is at
-   least ``threshold`` and it is not a GLM route. ``easy`` and ``medium`` move
-   the card to the next GLM worker of the board (alternating), set ``model``
-   and ``provider``, and rewrite the profile name on a body line that starts
-   with ``Assigned worker EXACT ``. ``hard`` changes nothing. The ``route``
+   least ``threshold`` and it is not a GLM route. ``easy``, ``medium`` and
+   ``hard`` are GLM routes: ``easy`` and ``medium`` move the card to the next
+   GLM worker of the list ``glm_workers`` (alternating), ``hard`` to the one
+   worker of ``glm_max_workers``; each sets ``model`` and ``provider`` and
+   rewrites the profile name on a body line that starts with
+   ``Assigned worker EXACT ``. ``very_hard`` changes nothing. The ``route``
    record keeps the route that Jev chose in ``route`` and names the applied
    route in ``applied_route``; ``glm_probability_sum`` holds the GLM sum.
    Control group: when ``routing.control_group_every`` is n > 0, every n-th
-   card of a board and applied route that would get ``easy`` or ``medium``
-   stays unchanged (``not_applied_reason`` ``control_group``), and the GLM
-   worker alternation does not advance for it.
+   card of a board and applied route that would get ``easy``, ``medium`` or
+   ``hard`` (the three GLM routes) stays unchanged
+   (``not_applied_reason`` ``control_group``), and the GLM worker alternation
+   does not advance for it.
 3. Inside the peak-hours window it creates a card assigned to a GLM worker
    as ``blocked`` and then moves it to ``scheduled`` with the
    ``jev-peak-hold`` marker (see ``peak_hold``), but only where both Kanban
@@ -42,9 +45,12 @@ session and clears the card's model override before the review handoff,
 because the dispatcher passes a card's override to the reviewer run too.
 
 ``handle_request_changes`` runs for ``kanban_request_changes`` (reviewer
-sessions): after the call, a card of a GLM worker with at least
-``routing.max_glm_change_requests`` change requests goes to a Claude worker,
-and the ``Assigned worker EXACT`` body line is changed to name that worker.
+sessions): after the call, a card of a GLM worker with at least the card's
+change request limit change requests goes to a Claude worker, and the
+``Assigned worker EXACT`` body line is changed to name that worker. The limit
+of a card comes from its route (a route can carry its own
+``max_glm_change_requests``), else from the worker list of the assignee, else
+from the general value ``routing.max_glm_change_requests``.
 """
 from __future__ import annotations
 
@@ -380,7 +386,7 @@ def decide(args: Mapping[str, Any], config: Mapping[str, Any], ask: Callable[...
     # on a tie it is the tied GLM route that is listed last in the board's
     # ``routes``. Otherwise the card is unchanged when the probability of the
     # route that Jev chose is at least ``threshold`` and that route is not a
-    # GLM route (``hard``); in every other case ``below_threshold``.
+    # GLM route (``very_hard``); in every other case ``below_threshold``.
     glm_routes = [r for r in routes if r.get("assignee_from") or r.get("model")]
     glm_sum = record["glm_probability_sum"] if glm_routes else None
     chosen_by_jev = next(r for r in routes if str(r["name"]) == route)
@@ -398,7 +404,7 @@ def decide(args: Mapping[str, Any], config: Mapping[str, Any], ask: Callable[...
 
     chosen = next(r for r in routes if str(r["name"]) == applied_route)
     if not chosen.get("assignee_from") and not chosen.get("model"):
-        record["applied"] = True  # hard: the orchestrator's Claude worker keeps the card unchanged
+        record["applied"] = True  # very_hard: the orchestrator's Claude worker keeps the card unchanged
         record["applied_route"] = applied_route
         return None, record
     pool: List[str] = []
@@ -621,6 +627,14 @@ def handle_request_review(args: Mapping[str, Any], next_call: Callable[..., Any]
 _ESCALATION_STATUSES = ("ready", "todo", "running", "scheduled")
 
 
+def change_request_limit(route: Mapping[str, Any], routing: Mapping[str, Any]) -> int:
+    """The change request limit of one route (card t_52be75ab): the route's own
+    ``max_glm_change_requests`` when ``setting_count`` of it is positive, else
+    the general value ``routing.max_glm_change_requests``."""
+    own = setting_count(route, "max_glm_change_requests")
+    return own if own else setting_count(routing, "max_glm_change_requests")
+
+
 def change_request_state(conn: Any, task_id: str) -> Optional[Tuple[str, Optional[str], int]]:
     """``(status, assignee, number of changes_requested events)`` of one card, or None."""
     row = conn.execute("SELECT status, assignee FROM tasks WHERE id = ?", (task_id,)).fetchone()
@@ -652,6 +666,46 @@ def routed_claude_worker(board: str, task_id: str, workers: Sequence[str],
     except OSError:
         return None
     return found
+
+
+def routed_applied_route(board: str, task_id: str, board_cfg: Mapping[str, Any],
+                         directory: Optional[Path] = None) -> Optional[str]:
+    """The applied route name of the latest ``route`` record of ``task_id`` on
+    ``board`` in ``<log dir>/decisions.jsonl`` when the board's ``routes`` has
+    an entry with that name (enabled or not), else None (card t_52be75ab).
+
+    The record is read as ``routed_claude_worker`` reads it. The applied route
+    name of the record is ``applied_route`` when that is a non-empty string,
+    otherwise ``route`` when that is a non-empty string (records written before
+    card ``t_92e29d10`` have no ``applied_route``). A file that cannot be read
+    gives None. Only the returned name is written onwards; no other text from
+    the log file is written.
+    """
+    path = (directory or jev_log.log_dir()) / "decisions.jsonl"
+    found: Optional[str] = None
+    try:
+        with open(path, encoding="utf-8") as handle:
+            for line in handle:
+                if task_id not in line:
+                    continue
+                try:
+                    record = json.loads(line)
+                except Exception:
+                    continue
+                if (isinstance(record, dict) and record.get("event") == "route" and record.get("task_id") == task_id
+                        and record.get("board") == board and record.get("applied") is True):
+                    name = record.get("applied_route")
+                    if not isinstance(name, str) or not name:
+                        name = record.get("route")
+                    found = name if isinstance(name, str) and name else None
+    except OSError:
+        return None
+    if found is None:
+        return None
+    for route in board_cfg.get("routes") or []:
+        if isinstance(route, dict) and route.get("name") == found:
+            return found
+    return None
 
 
 # The body travels as one command-line argument of ``hermes kanban edit`` (it has
@@ -695,6 +749,43 @@ def rewrite_body_after_escalation(config: Mapping[str, Any], board: str, task_id
             "assigned_worker_line_error_class": error_class}
 
 
+def _card_limit(board_cfg: Mapping[str, Any], assignee: str, routing: Mapping[str, Any],
+                board: str, task_id: str, state_dir: Optional[Path]) -> Tuple[int, Optional[str]]:
+    """``(limit, applied route name)`` of one card (card t_52be75ab), the route
+    name None unless the card's ``route`` record gave the limit.
+
+    First rule, the card's ``route`` record: when the last record in
+    ``<log dir>/decisions.jsonl`` with ``event`` ``route``, this ``task_id``,
+    this ``board`` and ``applied`` exactly true names an applied route that the
+    board's ``routes`` has (enabled or not; ``routed_applied_route``), the limit
+    is the limit of that route (``change_request_limit``).
+
+    Second rule, the worker list: every route of the board, enabled or not,
+    whose ``assignee_from`` names a list of the board that contains the
+    assignee. When the limits of these routes are all the same number, that
+    number is the limit; when there is no such route or the limits differ, the
+    general value ``routing.max_glm_change_requests`` is the limit.
+    """
+    general = setting_count(routing, "max_glm_change_requests")
+    name = routed_applied_route(board, task_id, board_cfg, state_dir)
+    if name is not None:
+        for route in board_cfg.get("routes") or []:
+            if isinstance(route, dict) and route.get("name") == name:
+                return change_request_limit(route, routing), name
+    limits: List[int] = []
+    for route in board_cfg.get("routes") or []:
+        if not isinstance(route, dict):
+            continue
+        list_name = route.get("assignee_from")
+        if not isinstance(list_name, str) or not list_name:
+            continue
+        if assignee in [str(w) for w in board_cfg.get(list_name) or []]:
+            limits.append(change_request_limit(route, routing))
+    if limits and len(set(limits)) == 1:
+        return limits[0], None
+    return general, None
+
+
 def handle_request_changes(args: Mapping[str, Any], next_call: Callable[..., Any], *,
                            config: Mapping[str, Any], command: Optional[str] = None,
                            state_dir: Optional[Path] = None) -> Any:
@@ -705,8 +796,8 @@ def handle_request_changes(args: Mapping[str, Any], next_call: Callable[..., Any
     card back to) is one of the board's GLM workers (the list ``glm_workers``
     and every other worker list that a route of the board names in
     ``assignee_from``; see ``peak_hold.glm_workers_by_board``) and the card has
-    at least ``routing.max_glm_change_requests`` ``changes_requested`` events,
-    the card goes to a Claude worker of the board:
+    at least the card's change request limit ``changes_requested`` events, the
+    card goes to a Claude worker of the board:
     1. ``hermes kanban --board <board> set-model <task id> none``;
     2. only when that worked, ``hermes kanban --board <board> reassign <task id>
        <Claude worker> --reclaim``. ``--reclaim`` ends a GLM run that a
@@ -723,14 +814,29 @@ def handle_request_changes(args: Mapping[str, Any], next_call: Callable[..., Any
     Hermes runs these commands inside the reviewer process: none checks
     ``HERMES_KANBAN_TASK`` (``hermes_cli/kanban.py`` ``_cmd_set_model``,
     ``_cmd_reassign`` and ``_cmd_edit``). One ``escalate`` record is written per
-    escalation. Every failure leaves the card as the earlier commands left it.
+    escalation; it names the route that gave the limit in ``applied_route`` and
+    the limit used in ``max_glm_change_requests``. Every failure leaves the card
+    as the earlier commands left it.
+
+    The limit of a card is decided only here and by two rules in order (card
+    t_52be75ab; ``_card_limit``). First the card's ``route`` record: the limit
+    of the route that the record names as the applied route, when the board's
+    ``routes`` has that route (a route can carry its own
+    ``max_glm_change_requests``; ``change_request_limit``). Otherwise the worker
+    list of the assignee: when every route of the board whose ``assignee_from``
+    names a list that contains the assignee has the same limit, that limit;
+    otherwise the general value ``routing.max_glm_change_requests``. A card
+    created before this change that has a ``route`` record for ``easy`` or
+    ``medium`` keeps the general value through the first rule. The log file is
+    not read for a card whose assignee is not a GLM worker of the board. When
+    the general value is 0 the reassignment stays off for every route.
     """
     result = next_call()
     record: Optional[Dict[str, Any]] = None
     try:
         routing = config.get("routing") or {}
-        limit = setting_count(routing, "max_glm_change_requests")
-        if not routing.get("enabled", False) or not limit or _tool_error(result):
+        general = setting_count(routing, "max_glm_change_requests")
+        if not routing.get("enabled", False) or not general or _tool_error(result):
             return result
         task_id = _arg_task_id(args.get("task_id") or os.environ.get("HERMES_KANBAN_TASK", "").strip() or None)
         board = _configured_board(resolve_board(args, config), config)
@@ -747,10 +853,14 @@ def handle_request_changes(args: Mapping[str, Any], next_call: Callable[..., Any
         if state is None:
             return result
         status, assignee, count = state
-        if assignee not in glm or count < limit or status not in _ESCALATION_STATUSES:
+        if assignee not in glm or status not in _ESCALATION_STATUSES:
+            return result
+        limit, applied_route = _card_limit(board_cfg, assignee, routing, board, task_id, state_dir)
+        if count < limit:
             return result
         record = {"event": "escalate", "board": board, "task_id": task_id, "original_assignee": assignee,
-                  "new_assignee": assignee, "change_requests": count, "applied": False}
+                  "new_assignee": assignee, "change_requests": count, "applied": False,
+                  "applied_route": applied_route, "max_glm_change_requests": limit}
         if not claude:
             record["not_applied_reason"] = "no_claude_workers"
         else:
