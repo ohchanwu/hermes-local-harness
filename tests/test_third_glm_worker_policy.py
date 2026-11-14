@@ -271,20 +271,39 @@ class PolicySources(unittest.TestCase):
 
 
 class DesiredState(unittest.TestCase):
-    def test_jev_config_has_three_glm_workers_on_every_board_and_no_other_change(self):
+    def test_jev_config_matches_the_card_t_3c7a581d_configuration_and_no_other_change(self):
+        # Card t_3c7a581d: on every board `glm_workers` keeps the two names of
+        # the baseline, the new key `glm_max_workers` holds the third name, the
+        # route `hard` is replaced by the entry that names `glm_max_workers`
+        # with model `glm-5.3` and provider `zai`, and the route `very_hard`
+        # with no `assignee_from`, no `model` and no `provider` is appended.
         config = json.loads((ROOT / "plugins/jev/config.json").read_text())
         before = json.loads(baseline_bytes("plugins/jev/config.json"))
         boards = config["routing"]["boards"]
         self.assertEqual(set(boards), set(BOARD_OF.values()))
-        for prefix, board in BOARD_OF.items():
-            with self.subTest(board=board):
-                self.assertEqual(boards[board]["glm_workers"],
-                                 [f"{prefix}-worker-glm-1", f"{prefix}-worker-glm-2", f"{prefix}-worker-glm-3"])
-                self.assertEqual(before["routing"]["boards"][board]["glm_workers"],
-                                 [f"{prefix}-worker-glm-1", f"{prefix}-worker-glm-2"])
+        HARD_CRITERION = ("Everything that is not easy, medium or very hard: a design decision, a fault with an "
+                          "unknown cause, or logic for authentication, secrets, payment, a database migration or "
+                          "deployment when the card states the required behaviour. The topic alone does not make a "
+                          "card very hard.")
+        VERY_HARD_CRITERION = ("Work on authentication, secrets, payment, a database migration or production "
+                               "systems, and in addition either the card leaves the required behaviour or the "
+                               "approach undecided, or the problem is very complex: many parts that depend on "
+                               "each other and must be worked out together. Also any card whose worker itself "
+                               "runs commands against production or against the live Hermes installation.")
         expected = copy.deepcopy(before)
         for prefix, board in BOARD_OF.items():
-            expected["routing"]["boards"][board]["glm_workers"].append(f"{prefix}-worker-glm-3")
+            with self.subTest(board=board):
+                entry = expected["routing"]["boards"][board]
+                self.assertEqual(before["routing"]["boards"][board]["glm_workers"],
+                                 [f"{prefix}-worker-glm-1", f"{prefix}-worker-glm-2"])
+                entry["glm_max_workers"] = [f"{prefix}-worker-glm-3"]
+                entry["routes"] = [route for route in entry["routes"] if route["name"] != "hard"]
+                hard_index = 2
+                entry["routes"][hard_index:hard_index] = [
+                    {"name": "hard", "enabled": True, "assignee_from": "glm_max_workers", "model": "glm-5.3",
+                     "provider": "zai", "criterion": HARD_CRITERION},
+                    {"name": "very_hard", "enabled": True, "criterion": VERY_HARD_CRITERION},
+                ]
         # Card t_a40f99ed changed control_group_every from 5 to 10 (owner's instruction).
         expected["routing"]["control_group_every"] = 10
         self.assertEqual(config, expected)
@@ -366,9 +385,10 @@ class Procedures(unittest.TestCase):
                 self.assertIn(f"`{prefix}-worker-glm-{number}`", install)
         for prefix, board in BOARD_OF.items():
             row = (f"| `{board}` | `{prefix}-worker`, `{prefix}-worker-2` | `{prefix}-worker-glm-1`, "
-                   f"`{prefix}-worker-glm-2`, `{prefix}-worker-glm-3` | `easy`, `medium`, `hard` |")
+                   f"`{prefix}-worker-glm-2` | `{prefix}-worker-glm-3` | `easy`, `medium`, `hard`, `very_hard` |")
             self.assertEqual(self.text.count(row), 1)
-        self.assertIn("(the three take turns;", self.text)
+        self.assertIn("(the two workers of `glm_workers` take turns;", self.text)
+        self.assertNotIn("(the three take turns;", self.text)
         self.assertNotIn("(the two alternate;", self.text)
         # Statements about earlier cards stay as history.
         self.assertIn("on the same 31 profiles on 2026-11-13", self.text)

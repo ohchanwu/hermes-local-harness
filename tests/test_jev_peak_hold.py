@@ -77,8 +77,14 @@ class GlmWorkerListsTests(unittest.TestCase):
     worker lists (the second list that a route names in ``assignee_from``)."""
 
     def test_shipped_configuration_returns_the_glm_workers_of_every_board(self):
-        self.assertEqual(peak_hold.glm_workers_by_board(CONFIG),
-                         {board: entry["glm_workers"] for board, entry in CONFIG["routing"]["boards"].items()})
+        # Card t_3c7a581d: every board has the two names of `glm_workers` and the
+        # one name of `glm_max_workers` (named by the route `hard`); the result
+        # is the same set of fifteen names as before the change.
+        expected = {board: entry["glm_workers"] + entry["glm_max_workers"]
+                    for board, entry in CONFIG["routing"]["boards"].items()}
+        self.assertEqual(peak_hold.glm_workers_by_board(CONFIG), expected)
+        self.assertEqual(expected["jss-genr"],
+                         ["jss-worker-glm-1", "jss-worker-glm-2", "jss-worker-glm-3"])
 
     def test_two_list_configuration_adds_the_second_list_after_the_first(self):
         result = peak_hold.glm_workers_by_board(two_list_config())
@@ -532,7 +538,7 @@ class CreationHoldTests(_BoardCase):
         return next_call, calls
 
     def create(self, route, now, assignee="harness-worker", existing=None, **extra):
-        self.fake.choice(route, {"easy": 0.0, "medium": 0.0, "hard": 0.0, route: 0.9})
+        self.fake.choice(route, {"easy": 0.0, "medium": 0.0, "hard": 0.0, "very_hard": 0.0, route: 0.9})
         next_call, calls = self.next_call_factory(existing)
         ask = functools.partial(jev_client.ask, settings=self.config["jev"])
         args = {"title": "t", "body": "b", "assignee": assignee, "board": "harness", **extra}
@@ -556,8 +562,19 @@ class CreationHoldTests(_BoardCase):
             self.assertNotIn("initial_status", sent)
         self.assertEqual(self.decisions("hold"), [])
 
-    def test_hard_route_claude_card_never_held(self):
+    def test_hard_card_of_glm_max_workers_held_at_creation_inside_window(self):
+        # Card t_3c7a581d: a `hard` card goes to the `glm_max_workers` profile
+        # and is held at creation like the other GLM cards.
         sent = self.create("hard", WEDNESDAY_16)
+        self.assertEqual(sent["initial_status"], "blocked")
+        self.assertEqual(sent["assignee"], "harness-worker-glm-3")
+        self.assertEqual((sent["model"], sent["provider"]), ("glm-5.3", "zai"))
+        self.assertEqual(self.statuses()["t_new1"], "scheduled")
+
+    def test_very_hard_route_claude_card_never_held(self):
+        # Card t_3c7a581d: a `very_hard` card stays with the Claude worker the
+        # orchestrator named and is never held.
+        sent = self.create("very_hard", WEDNESDAY_16)
         self.assertIsNone(sent)
         self.assertEqual(self.statuses()["t_new1"], "ready")
         self.assertEqual(self.decisions("hold"), [])

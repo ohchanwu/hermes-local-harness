@@ -23,62 +23,77 @@
     "boards": {
       "jobcron": {
         "implementation_workers": ["jobcron-worker", "jobcron-worker-2"],
-        "glm_workers": ["jobcron-worker-glm-1", "jobcron-worker-glm-2", "jobcron-worker-glm-3"],
+        "glm_workers": ["jobcron-worker-glm-1", "jobcron-worker-glm-2"],
+        "glm_max_workers": ["jobcron-worker-glm-3"],
         "routes": [
           {"name": "easy", "enabled": true, "assignee_from": "glm_workers", "model": "glm-5.3-flash", "provider": "zai",
            "criterion": "The card names the exact files to change and the exact command that checks the result, and the worker has no behaviour to work out. The topic of the card does not matter."},
           {"name": "medium", "enabled": true, "assignee_from": "glm_workers", "model": "glm-5.3", "provider": "zai",
            "criterion": "A fully specified change across several files with no design decision. This includes tests, fixtures, user-facing text and wiring inside security, migration or deployment features."},
-          {"name": "hard", "enabled": true,
-           "criterion": "Everything else: a design decision, a fault with an unknown cause, logic for authentication, secrets or payment, writing a database migration, or commands that will be run against production, including deployment guides."}
+          {"name": "hard", "enabled": true, "assignee_from": "glm_max_workers", "model": "glm-5.3", "provider": "zai",
+           "criterion": "Everything that is not easy, medium or very hard: a design decision, a fault with an unknown cause, or logic for authentication, secrets, payment, a database migration or deployment when the card states the required behaviour. The topic alone does not make a card very hard."},
+          {"name": "very_hard", "enabled": true,
+           "criterion": "Work on authentication, secrets, payment, a database migration or production systems, and in addition either the card leaves the required behaviour or the approach undecided, or the problem is very complex: many parts that depend on each other and must be worked out together. Also any card whose worker itself runs commands against production or against the live Hermes installation."}
         ]
       },
       "cha-pt": {
         "implementation_workers": ["chapt-worker", "chapt-worker-2"],
-        "glm_workers": ["chapt-worker-glm-1", "chapt-worker-glm-2", "chapt-worker-glm-3"],
+        "glm_workers": ["chapt-worker-glm-1", "chapt-worker-glm-2"],
+        "glm_max_workers": ["chapt-worker-glm-3"],
         "routes": [
           {"name": "easy", "enabled": true, "assignee_from": "glm_workers", "model": "glm-5.3-flash", "provider": "zai",
            "criterion": "The card names the exact files to change and the exact command that checks the result, and the worker has no behaviour to work out. The topic of the card does not matter."},
           {"name": "medium", "enabled": true, "assignee_from": "glm_workers", "model": "glm-5.3", "provider": "zai",
            "criterion": "A fully specified change across several files with no design decision. This includes tests, fixtures, user-facing text and wiring inside security, migration or deployment features."},
-          {"name": "hard", "enabled": true,
-           "criterion": "Everything else: a design decision, a fault with an unknown cause, logic for authentication, secrets or payment, writing a database migration, or commands that will be run against production, including deployment guides."}
+          {"name": "hard", "enabled": true, "assignee_from": "glm_max_workers", "model": "glm-5.3", "provider": "zai",
+           "criterion": "Everything that is not easy, medium or very hard: a design decision, a fault with an unknown cause, or logic for authentication, secrets, payment, a database migration or deployment when the card states the required behaviour. The topic alone does not make a card very hard."},
+          {"name": "very_hard", "enabled": true,
+           "criterion": "Work on authentication, secrets, payment, a database migration or production systems, and in addition either the card leaves the required behaviour or the approach undecided, or the problem is very complex: many parts that depend on each other and must be worked out together. Also any card whose worker itself runs commands against production or against the live Hermes installation."}
         ]
       },
       "harness": {
         "implementation_workers": ["harness-worker", "harness-worker-2"],
-        "glm_workers": ["harness-worker-glm-1", "harness-worker-glm-2", "harness-worker-glm-3"],
+        "glm_workers": ["harness-worker-glm-1", "harness-worker-glm-2"],
+        "glm_max_workers": ["harness-worker-glm-3"],
         "routes": [
           {"name": "easy", "enabled": true, "assignee_from": "glm_workers", "model": "glm-5.3-flash", "provider": "zai",
            "criterion": "The card names the exact files to change and the exact command that checks the result, and the worker has no behaviour to work out. The topic of the card does not matter."},
           {"name": "medium", "enabled": true, "assignee_from": "glm_workers", "model": "glm-5.3", "provider": "zai",
            "criterion": "A fully specified change across several files with no design decision. This includes tests, fixtures, user-facing text and wiring inside security, migration or deployment features."},
-          {"name": "hard", "enabled": true,
-           "criterion": "Everything else: a design decision, a fault with an unknown cause, logic for authentication, secrets or payment, writing a database migration, or commands that will be run against production, including deployment guides."}
+          {"name": "hard", "enabled": true, "assignee_from": "glm_max_workers", "model": "glm-5.3", "provider": "zai",
+           "criterion": "Everything that is not easy, medium or very hard: a design decision, a fault with an unknown cause, or logic for authentication, secrets, payment, a database migration or deployment when the card states the required behaviour. The topic alone does not make a card very hard."},
+          {"name": "very_hard", "enabled": true,
+           "criterion": "Work on authentication, secrets, payment, a database migration or production systems, and in addition either the card leaves the required behaviour or the approach undecided, or the problem is very complex: many parts that depend on each other and must be worked out together. Also any card whose worker itself runs commands against production or against the live Hermes installation."}
         ]
       },
       "jss-genr": {
         "implementation_workers": ["jss-worker", "jss-worker-2"],
-        "glm_workers": ["jss-worker-glm-1", "jss-worker-glm-2", "jss-worker-glm-3"],
+        "glm_workers": ["jss-worker-glm-1", "jss-worker-glm-2"],
+        "glm_max_workers": ["jss-worker-glm-3"],
         "routes": [
           {"name": "easy", "enabled": true, "assignee_from": "glm_workers", "model": "glm-5.3-flash", "provider": "zai",
            "criterion": "The card names the exact files to change and the exact command that checks the result, and the worker has no behaviour to work out. The topic of the card does not matter."},
           {"name": "medium", "enabled": true, "assignee_from": "glm_workers", "model": "glm-5.3", "provider": "zai",
            "criterion": "A fully specified change across several files with no design decision. This includes tests, fixtures, user-facing text and wiring inside security, migration or deployment features."},
-          {"name": "hard", "enabled": true,
-           "criterion": "Everything else: a design decision, a fault with an unknown cause, logic for authentication, secrets or payment, writing a database migration, or commands that will be run against production, including deployment guides."}
+          {"name": "hard", "enabled": true, "assignee_from": "glm_max_workers", "model": "glm-5.3", "provider": "zai",
+           "criterion": "Everything that is not easy, medium or very hard: a design decision, a fault with an unknown cause, or logic for authentication, secrets, payment, a database migration or deployment when the card states the required behaviour. The topic alone does not make a card very hard."},
+          {"name": "very_hard", "enabled": true,
+           "criterion": "Work on authentication, secrets, payment, a database migration or production systems, and in addition either the card leaves the required behaviour or the approach undecided, or the problem is very complex: many parts that depend on each other and must be worked out together. Also any card whose worker itself runs commands against production or against the live Hermes installation."}
         ]
       },
       "anki": {
         "implementation_workers": ["anki-worker", "anki-worker-2"],
-        "glm_workers": ["anki-worker-glm-1", "anki-worker-glm-2", "anki-worker-glm-3"],
+        "glm_workers": ["anki-worker-glm-1", "anki-worker-glm-2"],
+        "glm_max_workers": ["anki-worker-glm-3"],
         "routes": [
           {"name": "easy", "enabled": true, "assignee_from": "glm_workers", "model": "glm-5.3-flash", "provider": "zai",
            "criterion": "The card names the exact files to change and the exact command that checks the result, and the worker has no behaviour to work out. The topic of the card does not matter."},
           {"name": "medium", "enabled": true, "assignee_from": "glm_workers", "model": "glm-5.3", "provider": "zai",
            "criterion": "A fully specified change across several files with no design decision. This includes tests, fixtures, user-facing text and wiring inside security, migration or deployment features."},
-          {"name": "hard", "enabled": true,
-           "criterion": "Everything else: a design decision, a fault with an unknown cause, logic for authentication, secrets or payment, writing a database migration, or commands that will be run against production, including deployment guides."}
+          {"name": "hard", "enabled": true, "assignee_from": "glm_max_workers", "model": "glm-5.3", "provider": "zai",
+           "criterion": "Everything that is not easy, medium or very hard: a design decision, a fault with an unknown cause, or logic for authentication, secrets, payment, a database migration or deployment when the card states the required behaviour. The topic alone does not make a card very hard."},
+          {"name": "very_hard", "enabled": true,
+           "criterion": "Work on authentication, secrets, payment, a database migration or production systems, and in addition either the card leaves the required behaviour or the approach undecided, or the problem is very complex: many parts that depend on each other and must be worked out together. Also any card whose worker itself runs commands against production or against the live Hermes installation."}
         ]
       }
     }

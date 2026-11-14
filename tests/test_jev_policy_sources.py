@@ -552,7 +552,8 @@ class JevPolicySources(unittest.TestCase):
         for key, (board, prefix, claude_workers, glm_workers, _reviewer) in BOARDS.items():
             with self.subTest(board=board):
                 row = (f"| `{board}` | `{claude_workers[0]}`, `{claude_workers[1]}` | "
-                       f"`{glm_workers[0]}`, `{glm_workers[1]}`, `{prefix}-worker-glm-3` | `easy`, `medium`, `hard` |")
+                       f"`{glm_workers[0]}`, `{glm_workers[1]}` | `{prefix}-worker-glm-3` | "
+                       "`easy`, `medium`, `hard`, `very_hard` |")
                 self.assertEqual(text.count(row), 1)
         self.assertNotIn("have no GLM worker profile", text)
         section = text.split("## Creating the Anki GLM worker profiles\n", 1)[1].split("\n## ", 1)[0]
