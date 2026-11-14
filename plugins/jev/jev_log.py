@@ -22,8 +22,8 @@ LOG_DIR_ENV = "HERMES_JEV_LOG_DIR"
 STREAM_FIELDS = {
     "decisions": (
         "event", "board", "task_id", "original_assignee", "new_assignee", "orchestrator_model",
-        "route", "probabilities", "confidence", "applied", "not_applied_reason", "jev_latency_ms",
-        "jev_input_tokens", "error_class", "held_until",
+        "route", "probabilities", "confidence", "applied", "applied_route", "glm_probability_sum",
+        "not_applied_reason", "jev_latency_ms", "jev_input_tokens", "error_class", "held_until",
     ),
     "tool_results": (
         "event", "session_id", "tool", "chars_before", "chars_after", "chunks_kept", "chunks_total",
