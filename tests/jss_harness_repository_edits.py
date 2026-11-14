@@ -1,18 +1,27 @@
 #!/usr/bin/env python3
 """Reversal of the source edits of card t_a8884510 (owner decision, 2026-11-15).
 
-The owner added the Harness repository `/Users/chanbla11mit/hermes-local-harness` as the
-fifth repository of the read-only repository exception of `jss-orchestrator` and
-`jss-reviewer` (card t_3af6293c, owner decision 2026-11-11). The card changed the one
+The read-only repository exception of `jss-orchestrator` and `jss-reviewer` itself comes
+from card t_3af6293c (owner decision 2026-11-11). Card t_a8884510 added the Harness
+repository `/Users/chanbla11mit/hermes-local-harness` to that exception as its fifth
+repository on 2026-11-15 (owner decision of the same date). The card changed the one
 exception line of three sources and the version line of the jss-orchestrator skill.
 
 HARNESS_REPOSITORY_EDITS lists the exact (new text, old text) pairs of each source, in the
 order in which the card applied them. reverse_harness_repository_edits() reverses them byte
 for byte. test_card_split_rule_policy.reverse_card_split_rule_edits calls it first, so every
 test that recovers the bytes of an earlier commit reverses this card's edits before the
-edits of the earlier cards. This module imports no other test module, so any test module
-can import it without a circular import.
+edits of the earlier cards.
+
+Card t_e14a6d6a later changed the version line of the jss-orchestrator skill again and, in
+the sentence NAMED_REVIEWER, replaced "that the paragraph above names" with "that an earlier
+paragraph of this file names". reverse_harness_repository_edits() therefore first calls
+hard_route_policy_edits.reverse_hard_route_policy_edits, which reverses the edits of that
+card. This module imports only hard_route_policy_edits, which imports no other test module,
+so any test module can import it without a circular import.
 """
+from hard_route_policy_edits import reverse_hard_route_policy_edits
+
 
 HARNESS = "/Users/chanbla11mit/hermes-local-harness"
 ORCH_SOUL = "policies/profile-souls/jss-orchestrator/SOUL.md"
@@ -49,6 +58,8 @@ NAMED_SKILL = (f"The files and the command of the Harness repository that this s
 ONLY_COMMAND = ("The sentence of the `harness-bug-report` skill that calls that command \"the only command that "
                 "you run in that repository\" describes filing a report and does not prohibit the reads of this "
                 "exception.")
+# The sentence as card t_a8884510 added it; card t_e14a6d6a later replaced "that the paragraph
+# above names" with "that an earlier paragraph of this file names" (see the module docstring).
 NAMED_REVIEWER = ("The overgating checklist of the Harness repository that the paragraph above names stays "
                   f"permitted as that paragraph states; {ADDS_AND_REMOVES_NOTHING}")
 MERGED_NOT_INSTALLED = ("For the Harness repository, a commit on `main` shows what is merged, not what is "
@@ -96,10 +107,12 @@ HARNESS_REPOSITORY_EDITS = {
 
 
 def reverse_harness_repository_edits(relative_path, text):
-    """Return text with the t_a8884510 edits reversed; text may be str or bytes. A path that
-    the card did not change, and a text that contains none of the new texts, is returned as
-    the same object, so a caller may apply it to a text that another caller already reversed.
-    A text that contains only some of the new texts raises AssertionError."""
+    """Return text with the t_a8884510 edits reversed; text may be str or bytes. The later
+    edits of card t_e14a6d6a are reversed first. A path that neither card changed, and a text
+    that contains none of the new texts of either card, is returned as the same object, so a
+    caller may apply it to a text that another caller already reversed. A text that contains
+    only some of the new texts of a card raises AssertionError."""
+    text = reverse_hard_route_policy_edits(relative_path, text)
     edits = HARNESS_REPOSITORY_EDITS.get(relative_path)
     if not edits:
         return text

@@ -40,6 +40,7 @@ import re
 from pathlib import Path
 import unittest
 
+from hard_route_policy_edits import reverse_hard_route_policy_edits
 from jss_download_install_edits import reverse_download_install_edits
 from test_jev_routing_policy_text import reverse_jev_routing_policy_edits
 from test_stale_test_rule_policy import reverse_stale_test_rule_edits
@@ -406,9 +407,9 @@ BASELINE_SHA256 = {
     skill("jss"): "bd9fdea67d1ce063d4e99dd2ce29591c58f664c2da6d9a4282a141f344be6c21",
     skill("anki"): "c9c682d4c3333f23237de50f3a44d0f3eacd3c42b24039663a8ba1e1104baefd",
 }
-# Raised again by cards t_ac454595, t_46b5e63e and t_f4ce916d, and for jss by t_89838618 and t_a8884510.
-VERSIONS = {skill("harness"): "0.6.7-harness.11", skill("chapt"): "0.6.7-chapt.12",
-            skill("jobcron"): "0.6.9-jobcron.13", skill("jss"): "0.6.7-jss.15", skill("anki"): "0.6.10-anki.9"}
+# Raised again by cards t_ac454595, t_46b5e63e, t_f4ce916d and t_e14a6d6a, and for jss by t_89838618 and t_a8884510.
+VERSIONS = {skill("harness"): "0.6.7-harness.12", skill("chapt"): "0.6.7-chapt.13",
+            skill("jobcron"): "0.6.9-jobcron.14", skill("jss"): "0.6.7-jss.16", skill("anki"): "0.6.10-anki.10"}
 # The GLM worker SOULs in this repository (the jobcron GLM workers have none).
 GLM_WORKER_SOUL_BOARDS = ("harness", "chapt", "jss", "anki")
 ANKI_GLM_SOULS = (soul("anki-worker-glm-1"), soul("anki-worker-glm-2"))
@@ -504,9 +505,12 @@ class JevPolicySources(unittest.TestCase):
             text = self.text[skill(prefix)]
             with self.subTest(key=key):
                 self.assertRegex(text, rf"(?m)^version: {re.escape(VERSIONS[skill(prefix)])}$")
-                self.assertEqual(text.count(with_third_glm_worker(worker_selection_text(key))), 1)
+                # Card t_e14a6d6a later replaced the GLM worker names and the route of the worker selection
+                # sentence; the sentence of this card is checked after that change is reversed.
+                original = reverse_hard_route_policy_edits(skill(prefix), text)
+                self.assertEqual(original.count(with_third_glm_worker(worker_selection_text(key))), 1)
                 self.assertIn(f"to `{prefix}-worker-glm-1`, `{prefix}-worker-glm-2` or `{prefix}-worker-glm-3`, "
-                              "taking the three in turn, and set the card's `model` and `provider`", text)
+                              "taking the three in turn, and set the card's `model` and `provider`", original)
                 setup = text.split("## Card Setup\n", 1)[1].split("\n## ", 1)[0]
                 steps = {line[:2]: line for line in setup.splitlines() if re.match(r"^[1-5]\. ", line)}
                 self.assertEqual(steps["2."] + "\n", setup_step_two(key))

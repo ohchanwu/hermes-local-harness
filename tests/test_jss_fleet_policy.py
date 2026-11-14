@@ -18,6 +18,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
+from hard_route_policy_edits import reverse_hard_route_policy_edits
 from incident_recovery_verify_fixture import LocalReads, ROOT, load_verifier, resolved_fixture
 from jss_download_install_edits import reverse_download_install_edits
 import jss_harness_repository_edits as harness_edits
@@ -108,9 +109,11 @@ EXCEPTION_NAMED_HARNESS_FILES = {
         "`/Users/chanbla11mit/hermes-local-harness/scripts/check-forced-skills`, and the command "
         f"`{HARNESS_BUG_REPORT_COMMAND}` of the `harness-bug-report` skill; this exception adds the reads above "
         "and removes nothing."),
+    # Card t_e14a6d6a replaced "that the paragraph above names" with "that an earlier paragraph of this
+    # file names": the paragraph directly above the exception line does not name the checklist.
     "reviewer SOUL": (
-        "The overgating checklist of the Harness repository that the paragraph above names stays permitted as "
-        "that paragraph states; this exception adds the reads above and removes nothing."),
+        "The overgating checklist of the Harness repository that an earlier paragraph of this file names stays "
+        "permitted as that paragraph states; this exception adds the reads above and removes nothing."),
     "skill": (
         "The files and the command of the Harness repository that this skill and the `harness-bug-report` skill "
         "already name stay permitted as they are: `/Users/chanbla11mit/hermes-local-harness/scripts/jev-peak-hold`, "
@@ -528,7 +531,7 @@ class RoleContracts(unittest.TestCase):
 
     def test_skill_version_size_and_sections(self):
         # Raised by the jev plugin policy change (t_71b4ef4a).
-        self.assertRegex(self.skill_raw, r"(?m)^version: 0\.6\.7-jss\.15$")  # raised by t_ac454595, t_46b5e63e, t_89838618, t_f4ce916d, t_c7cc3830 and t_a8884510
+        self.assertRegex(self.skill_raw, r"(?m)^version: 0\.6\.7-jss\.16$")  # raised by t_ac454595, t_46b5e63e, t_89838618, t_f4ce916d, t_c7cc3830, t_a8884510 and t_e14a6d6a
         # 260 lines plus the 4-line Pitfalls section (t_bd860536), the 9 lines of
         # repair_history candidate rules and example (t_6436ac1c), the 6-line
         # Skill Changes section (t_0a8674fe) and the one-line Hard Scope read-only
@@ -1148,7 +1151,9 @@ class HarnessRepositoryInReadOnlyException(unittest.TestCase):
             data = (ROOT / relative).read_bytes()
             text = data.decode()
             with self.subTest(profile=profile):
-                self.assertEqual(data, baseline_bytes(relative, self.BASELINE))
+                # Card t_e14a6d6a later changed the route of the cards that reach `jss-worker-glm-3`;
+                # that change is reversed first.
+                self.assertEqual(reverse_hard_route_policy_edits(relative, data), baseline_bytes(relative, self.BASELINE))
                 self.assertNotIn(EXCEPTION_LEAD, text)
                 self.assertNotIn("read-only repository exception", text.lower())
                 self.assertNotIn("hermes-local-harness", text)
@@ -1163,10 +1168,11 @@ class HarnessRepositoryInReadOnlyException(unittest.TestCase):
                 self.assertEqual(hashlib.sha256(original).hexdigest(), want)
                 self.assertEqual(original, baseline_bytes(path, self.BASELINE))
                 self.assertEqual(reverse_harness_repository_edits(path, data.decode()), original.decode())
-                # A second reversal changes nothing, and re-applying the edits gives the current bytes.
+                # A second reversal changes nothing, and re-applying the edits gives the bytes before the
+                # later edits of card t_e14a6d6a, which reverse_harness_repository_edits reversed first.
                 self.assertIs(reverse_harness_repository_edits(path, original), original)
                 self.assertEqual(harness_edits.apply_harness_repository_edits(path, original.decode()),
-                                 data.decode())
+                                 reverse_hard_route_policy_edits(path, data).decode())
         for path in (soul_path(WORKER), ROOT / "policies/profile-souls/anki-orchestrator/SOUL.md"):
             data = path.read_bytes()
             self.assertIs(reverse_harness_repository_edits(str(path.relative_to(ROOT)), data), data)
@@ -1297,9 +1303,9 @@ class DownloadAndInstallOwnerDecision(unittest.TestCase):
         self.assertIn(self.SKILL_COMPLETION_LINE, section(self.skill_raw, "Completion Gate"))
 
     def test_skill_version_line(self):
-        # Card t_f4ce916d raised the version by one more step, card t_c7cc3830 by one more, and card
-        # t_a8884510 by one more.
-        self.assertEqual(re.findall(r"(?m)^version: (.+)$", self.skill_raw), ["0.6.7-jss.15"])
+        # Card t_f4ce916d raised the version by one more step, card t_c7cc3830 by one more, card
+        # t_a8884510 by one more, and card t_e14a6d6a by one more.
+        self.assertEqual(re.findall(r"(?m)^version: (.+)$", self.skill_raw), ["0.6.7-jss.16"])
 
     def test_no_source_keeps_the_removed_wording(self):
         for path, text in self.raw.items():

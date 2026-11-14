@@ -27,17 +27,26 @@ the change byte for byte with reverse_jev_routing_policy_edits().
 test_jev_policy_sources.reverse_jev_policy_edits() calls it first. Card t_f4ce916d
 (owner request of 2026-11-14) added a third GLM worker to every board; the sentences
 of this card name it after that card (with_third_glm_worker() of
-tests/test_third_glm_worker_policy.py). This module imports only
-jss_download_install_edits, test_stale_test_rule_policy and
-test_third_glm_worker_policy, which import no module that imports this one, so any
-test module can import it.
+tests/test_third_glm_worker_policy.py). Card t_e14a6d6a (specification
+docs/specs/261114-claude-worker-compression-hard-route-and-glm-reviewer.md, Part 5
+step 2) later changed the list of routes, the change request sentence, the route
+disabling list and the worker selection sentence; the current texts are built by
+the functions named current_* below, and tests/hard_route_policy_edits.py reverses
+that change. This module imports only hard_route_policy_edits,
+jss_download_install_edits, test_card_split_rule_policy, test_stale_test_rule_policy
+and test_third_glm_worker_policy, which import no module that imports this one, so
+any test module can import it.
 """
 import hashlib
 import json
 import re
 from pathlib import Path
+import subprocess
 import unittest
 
+from hard_route_policy_edits import (HARD_ROUTE_POLICY_EDITS, apply_hard_route_policy_edits,
+                                     reverse_hard_route_policy_edits)
+import hard_route_policy_edits
 from jss_download_install_edits import reverse_download_install_edits
 from test_card_split_rule_policy import NEW_RULE, PASSAGE_EDITS
 from test_stale_test_rule_policy import reverse_stale_test_rule_edits
@@ -158,6 +167,99 @@ def escalation_reviewer_text(key):
         "worker on the card are all runs of implementation profiles of this board. The peak-hours hold of the "
         "`jev` plugin, also its script `jev-peak-hold`, does not hold a card that is assigned to a Claude worker."
     )
+
+
+# Card t_e14a6d6a, items a.1 to a.5 of the card, in the five orchestrator skills: (new text, old text).
+HARD_ROUTE_BASELINE = "a0761ff0fb29cf3c2cbc7f27b79d5cab86278448"
+ROUTES_TEXT = ("chooses the route `easy`, `medium`, `hard` or `very_hard` of a card",
+               "chooses the route `easy`, `medium` or `hard` of a card")
+REMOVED_SETTING_SENTENCE = " The setting is `routing.max_glm_change_requests` in the same `config.json`."
+ROUTE_DISABLING_TEXT = ("or a board's `glm_workers` or `glm_max_workers` emptied)",
+                        "or a board's `glm_workers` emptied)")
+CURRENT_ROUTE_DISABLING_RULE = ROUTE_DISABLING_RULE.replace(ROUTE_DISABLING_TEXT[1], ROUTE_DISABLING_TEXT[0])
+
+
+def _glm_names(key):
+    prefix = BOARDS[key][1]
+    return tuple(f"`{prefix}-worker-glm-{number}`" for number in (1, 2, 3))
+
+
+def hard_route_worker_selection_text(key):
+    """Item a.1: (new text, old text)."""
+    first, second, third = _glm_names(key)
+    return (
+        f"to {first} or {second}, taking the two in turn, for work that the plugin classifies as `easy` or "
+        f"`medium`, or to {third} for work that it classifies as `hard`, and set the card's `model` and `provider` "
+        "(`glm-5.3-flash` or `glm-5.3` on provider `zai`).",
+        f"to {first}, {second} or {third}, taking the three in turn, and set the card's `model` and `provider` "
+        "(`glm-5.3-flash` or `glm-5.3` on provider `zai`) for work that the plugin classifies as `easy` or `medium`.",
+    )
+
+
+def change_request_text(key):
+    """Item a.3: (new text, old text), the start of the sentence in a skill and in a reviewer SOUL."""
+    first, second, third = _glm_names(key)
+    return (
+        f"On a card that {first}, {second} or {third} implements, after the third change request when the `jev` "
+        "plugin routed the card as `hard`, and after the fifth change request on any other card,",
+        f"After the fifth change request on a card that {first}, {second} or {third} implements,",
+    )
+
+
+def current_route_reference(key):
+    """route_reference() after item a.2 of card t_e14a6d6a."""
+    return route_reference(key).replace(ROUTES_TEXT[1], ROUTES_TEXT[0])
+
+
+def current_escalation_skill_text(key):
+    """escalation_skill_text() after cards t_f4ce916d and t_e14a6d6a (items a.3 and a.4)."""
+    new, old = change_request_text(key)
+    text = with_third_glm_worker(escalation_skill_text(key))
+    return text.replace(old, new).replace(REMOVED_SETTING_SENTENCE, "")
+
+
+def current_escalation_reviewer_text(key):
+    """escalation_reviewer_text() after cards t_f4ce916d and t_e14a6d6a (item a.3)."""
+    new, old = change_request_text(key)
+    return with_third_glm_worker(escalation_reviewer_text(key)).replace(old, new)
+
+
+def current_route_disabling_text(key):
+    """route_disabling_text() after item a.5 of card t_e14a6d6a."""
+    return route_disabling_text(key).replace(ROUTE_DISABLING_TEXT[1], ROUTE_DISABLING_TEXT[0])
+
+
+def hard_route_skill_texts(key):
+    """Items a.1 to a.5 in the skill of the board: (new text, old text); the new text of item a.4 is empty."""
+    return (hard_route_worker_selection_text(key), ROUTES_TEXT, change_request_text(key), ("", REMOVED_SETTING_SENTENCE),
+            ROUTE_DISABLING_TEXT)
+
+
+# Item a.6: the route of the cards that reach the third GLM worker of the Harness and jss-genr boards.
+THIRD_GLM_WORKER_ROUTE = {
+    "harness-worker-glm-3": ("Cards reach this profile when the `jev` plugin routes a `hard` Harness card to it, "
+                             "or when the owner asks for it.",
+                             "routes an `easy` or `medium` Harness card to it"),
+    "jss-worker-glm-3": ("Cards reach this profile when the `jev` plugin routes a `hard` jss-genr card to it, "
+                         "or when the owner asks for it.",
+                         "routes an `easy` or `medium` jss-genr card to it"),
+}
+# SHA-256 of the twelve policy files of card t_e14a6d6a at HARD_ROUTE_BASELINE, computed with
+# `git show a0761ff0fb29cf3c2cbc7f27b79d5cab86278448:<path>`.
+HARD_ROUTE_BASELINE_SHA256 = {
+    skill("harness"): "623f596d8fa9df94790f40ae0029caf78cd552a4d071ac48721f03cf1d493bda",
+    skill("jobcron"): "e8734eecad69db2cba1da5568ab09457a8d1186a15c1d57917cbccb2052e5256",
+    skill("chapt"): "9b7e16c17ab179e6374fc773fd504c40a124cf76b07e56a39dd5c43645e5d138",
+    skill("jss"): "1e31cb83660de46128b534afa59bbf8a0d0f6fb671fccc83a1d6df66b0a364d7",
+    skill("anki"): "1a0ad2da331956dd4a195b3b5085c35d6bbd133a28765a0b17b53cc43f32ad82",
+    soul("harness-reviewer"): "ebaf6c00608be327f9deb8b168f103375e7b423ce2b60201320ea36703d9236d",
+    soul("jobcron-reviewer"): "c2eb0cdabe3706807b8e329f8127cb23a8695b0b44156b5adb90b52b27ea869f",
+    soul("chapt-reviewer"): "3060518f8a5f8eeac5d4952f943ee2a2dc6b1bbfde56752aeb26a257112e4571",
+    soul("jss-reviewer"): "c3d51ac7b5de228fa7712aa082e10397b73b9e2e0373d712959f92765d5076a8",
+    soul("anki-reviewer"): "7d9eafff2d91f0c071e8074d0fd8f0d2846c5c5ac8606e091ed6094ef10498f2",
+    soul("harness-worker-glm-3"): "51dd9a805dc20ff399f2cc1adcd84cfa9fae870b2f50a2ddf95151ee0836821e",
+    soul("jss-worker-glm-3"): "ebc9a246fcf02d2c425d412ab5905d6add57e805f96a116399dcf1d84b54650b",
+}
 
 
 def attach_example(board):
@@ -340,34 +442,44 @@ class RoutingPolicyText(unittest.TestCase):
             with self.subTest(board=board):
                 # Card t_46b5e63e raised each version by one step after this card; card t_89838618 raised
                 # the jss version by one more step, card t_f4ce916d each version by one more step, card
-                # t_c7cc3830 each version by one more step, and card t_a8884510 the jss version by one more
-                # step.
-                current = {"harness": "0.6.7-harness.11", "chapt": "0.6.7-chapt.12", "jobcron": "0.6.9-jobcron.13",
-                           "jss": "0.6.7-jss.15", "anki": "0.6.10-anki.9"}[prefix]
+                # t_c7cc3830 each version by one more step, card t_a8884510 the jss version by one more
+                # step, and card t_e14a6d6a each version by one more step.
+                current = {"harness": "0.6.7-harness.12", "chapt": "0.6.7-chapt.13", "jobcron": "0.6.9-jobcron.14",
+                           "jss": "0.6.7-jss.16", "anki": "0.6.10-anki.10"}[prefix]
                 self.assertRegex(text, rf"(?m)^version: {re.escape(current)}$")
                 # Card t_c7cc3830 replaced the Part 5 rule text with the card split rule.
                 self.assertEqual(text.count(NEW_RULE), 1)
                 self.assertNotIn(SPLIT_RULE, text)
-                # Card t_f4ce916d: the sentence names the three GLM workers of the board.
-                escalation = with_third_glm_worker(escalation_skill_text(key))
+                # Card t_e14a6d6a, items a.1 to a.5: each new text once, no old text.
+                for new, old in hard_route_skill_texts(key):
+                    if new:
+                        self.assertEqual(text.count(new), 1)
+                    self.assertNotIn(old, text)
+                self.assertNotIn("taking the three in turn", text)
+                self.assertNotIn("routing.max_glm_change_requests", text)
+                # Cards t_f4ce916d and t_e14a6d6a: the sentence names the three GLM workers of the board and
+                # the two change request limits.
+                escalation = current_escalation_skill_text(key)
                 self.assertEqual(text.count(escalation), 1)
                 self.assertTrue(escalation.startswith(
-                    f"After the fifth change request on a card that `{prefix}-worker-glm-1`, `{prefix}-worker-glm-2` "
-                    f"or `{prefix}-worker-glm-3` implements, the `jev` plugin clears"))
-                self.assertEqual(text.count(ROUTE_DISABLING_RULE), 1)
-                self.assertEqual(text.count(route_disabling_text(key)), 1)
+                    f"On a card that `{prefix}-worker-glm-1`, `{prefix}-worker-glm-2` or `{prefix}-worker-glm-3` "
+                    "implements, after the third change request when the `jev` plugin routed the card as `hard`, "
+                    "and after the fifth change request on any other card, the `jev` plugin clears"))
+                self.assertEqual(text.count(CURRENT_ROUTE_DISABLING_RULE), 1)
+                self.assertEqual(text.count(current_route_disabling_text(key)), 1)
                 # Only the Harness copy names the profile that turns off a route after the owner's statement.
                 if key == "harness":
                     self.assertIn("`harness-orchestrator` (this profile) sets that route's `enabled` to false", text)
                 else:
                     self.assertNotIn("harness-orchestrator", route_disabling_text(key))
                     self.assertNotIn("hermes-local-harness", route_disabling_text(key))
-                self.assertEqual(text.count(route_reference(key)), 1)
+                self.assertEqual(text.count(current_route_reference(key)), 1)
                 # The rules follow the jev worker selection text and precede the next section.
                 selection = text.index(GLM_LINE_END)
-                self.assertLess(selection, text.index(route_reference(key)))
-                self.assertLess(text.index(route_reference(key)), text.index(escalation))
-                self.assertLess(text.index(escalation), text.index(ROUTE_DISABLING_RULE))
+                self.assertLess(text.index(hard_route_worker_selection_text(key)[0]), selection)
+                self.assertLess(selection, text.index(current_route_reference(key)))
+                self.assertLess(text.index(current_route_reference(key)), text.index(escalation))
+                self.assertLess(text.index(escalation), text.index(CURRENT_ROUTE_DISABLING_RULE))
 
     def test_jobcron_and_chapt_passages_no_longer_discourage_splitting(self):
         for prefix in ("jobcron", "chapt"):
@@ -398,13 +510,64 @@ class RoutingPolicyText(unittest.TestCase):
         for key, (board, prefix, _claude, _glm) in BOARDS.items():
             text = self.text[soul(f"{prefix}-reviewer")]
             with self.subTest(board=board):
-                # Card t_f4ce916d: the sentence names the three GLM workers of the board.
-                escalation = with_third_glm_worker(escalation_reviewer_text(key))
+                # Cards t_f4ce916d and t_e14a6d6a: the sentence names the three GLM workers of the board and
+                # the two change request limits.
+                escalation = current_escalation_reviewer_text(key)
                 self.assertEqual(text.count(escalation), 1)
                 self.assertTrue(escalation.startswith(
-                    f"After the fifth change request on a card that `{prefix}-worker-glm-1`, `{prefix}-worker-glm-2` "
-                    f"or `{prefix}-worker-glm-3` implements, the `jev` plugin clears"))
+                    f"On a card that `{prefix}-worker-glm-1`, `{prefix}-worker-glm-2` or `{prefix}-worker-glm-3` "
+                    "implements, after the third change request when the `jev` plugin routed the card as `hard`, "
+                    "and after the fifth change request on any other card, the `jev` plugin clears"))
+                new, _old = change_request_text(key)
+                self.assertEqual(text.count(new), 1)
+                for _new, old_text in hard_route_skill_texts(key):
+                    self.assertNotIn(old_text, text)
+                self.assertNotIn("After the fifth change request", text)
                 self.assertTrue(text.endswith(block))
+
+    def test_harness_and_jss_third_glm_worker_souls_name_the_hard_route(self):
+        # Card t_e14a6d6a, item a.6.
+        for profile, (new, old) in THIRD_GLM_WORKER_ROUTE.items():
+            text = (ROOT / soul(profile)).read_text()
+            with self.subTest(profile=profile):
+                self.assertEqual(text.count(new), 1)
+                self.assertNotIn(old, text)
+                self.assertNotIn("`easy`", text)
+                self.assertNotIn("`medium`", text)
+        # The SOUL files of the Cha PT and anki third GLM workers name no route.
+        for profile in ("chapt-worker-glm-3", "anki-worker-glm-3"):
+            text = (ROOT / soul(profile)).read_text()
+            with self.subTest(profile=profile):
+                for word in ("easy", "medium", "`hard`", "very_hard"):
+                    self.assertNotIn(word, text)
+
+    def test_reversing_the_hard_route_edits_recovers_the_baseline_bytes(self):
+        # Card t_e14a6d6a changed twelve policy files; reversing its edits gives the bytes at its baseline.
+        self.assertEqual(hard_route_policy_edits.BASELINE, HARD_ROUTE_BASELINE)
+        self.assertEqual(hard_route_policy_edits.BASELINE_SHA256, HARD_ROUTE_BASELINE_SHA256)
+        self.assertEqual(set(HARD_ROUTE_POLICY_EDITS), set(HARD_ROUTE_BASELINE_SHA256))
+        self.assertEqual(len(HARD_ROUTE_BASELINE_SHA256), 12)
+        for path, want in HARD_ROUTE_BASELINE_SHA256.items():
+            data = (ROOT / path).read_bytes()
+            with self.subTest(path=path):
+                baseline = subprocess.run(["git", "-C", str(ROOT), "show", f"{HARD_ROUTE_BASELINE}:{path}"],
+                                          stdout=subprocess.PIPE, check=True).stdout
+                self.assertEqual(hashlib.sha256(baseline).hexdigest(), want)
+                original = reverse_hard_route_policy_edits(path, data)
+                self.assertEqual(original, baseline)
+                self.assertNotEqual(data, baseline)
+                self.assertEqual(reverse_hard_route_policy_edits(path, data.decode()), baseline.decode())
+                # A second reversal changes nothing, and re-applying the edits gives the current bytes.
+                self.assertIs(reverse_hard_route_policy_edits(path, original), original)
+                self.assertEqual(apply_hard_route_policy_edits(path, baseline.decode()), data.decode())
+                # A text that holds some of the new texts but not each of them exactly once fails.
+                new, _old = HARD_ROUTE_POLICY_EDITS[path][0]
+                with self.assertRaises(AssertionError):
+                    reverse_hard_route_policy_edits(path, data.decode() + new)
+        # A file that the card did not change is returned unchanged.
+        for path in (soul("harness-worker"), soul("chapt-worker-glm-3"), "procedures/jev-plugin.md"):
+            data = (ROOT / path).read_bytes()
+            self.assertIs(reverse_hard_route_policy_edits(path, data), data)
 
     def test_every_glm_worker_soul_has_the_attachment_procedure(self):
         block = (ROOT / "policies/writing-rules.md").read_text()
@@ -484,7 +647,9 @@ class RoutingPolicyText(unittest.TestCase):
                     for match in re.finditer(re.escape(start), text):
                         self.assertEqual(text[match.start():match.start() + len(criterion)], criterion)
         for key, (_board, prefix, _claude, _glm) in BOARDS.items():
-            self.assertIn(route_reference(key), self.text[skill(prefix)])
+            # Card t_e14a6d6a added the route `very_hard` to the reference.
+            self.assertIn(current_route_reference(key), self.text[skill(prefix)])
+            self.assertNotIn(route_reference(key), self.text[skill(prefix)])
 
     def test_jev_named_only_as_a_plugin(self):
         for path, text in self.text.items():
