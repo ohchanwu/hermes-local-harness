@@ -12,6 +12,7 @@ import json
 import os
 from pathlib import Path
 import re
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -19,6 +20,8 @@ from unittest.mock import patch
 
 from incident_recovery_verify_fixture import LocalReads, ROOT, load_verifier, resolved_fixture
 from jss_download_install_edits import reverse_download_install_edits
+import jss_harness_repository_edits as harness_edits
+from jss_harness_repository_edits import reverse_harness_repository_edits
 from rule_text import assert_rule
 from test_jev_policy_sources import reverse_jev_policy_edits
 
@@ -50,23 +53,32 @@ PRIVACY_FORBID = {
 }
 
 # Owner decision, 2026-11-11 (t_3af6293c): jss-orchestrator and jss-reviewer may read the
-# committed content of four other repositories. Each changed source states the exception
-# on exactly one line that starts with (or, in the skill, follows "- ") this lead.
+# committed content of four other repositories; owner decision, 2026-11-15 (t_a8884510): the
+# Harness repository is the fifth. Each changed source states the exception on exactly one line
+# that starts with (or, in the skill, follows "- ") this lead.
 EXCEPTION_LEAD = "Read-only repository exception (owner decision, 2026-11-11)"
+HARNESS_REPO = "/Users/chanbla11mit/hermes-local-harness"
 FOREIGN_REPOS = (
     "/Users/chanbla11mit/projects/jobcron",
     "/Users/chanbla11mit/projects/cha-pt",
     "/Users/chanbla11mit/projects/cha-pt-frontend",
     "/Users/chanbla11mit/projects/cha-webpt-website-sync",
+    HARNESS_REPO,
 )
 PERMITTED_COMMANDS = ("git log", "git show", "git grep", "git ls-tree", "git diff", "git rev-parse",
                       "git merge-base")
 PROHIBITED_COMMANDS = ("git fetch", "git pull", "git checkout", "git switch", "git worktree", "git stash",
                        "git commit", "git push")
 EXCEPTION_REPOSITORIES = (
-    "read the committed content of these four repositories: `/Users/chanbla11mit/projects/jobcron`, "
-    "`/Users/chanbla11mit/projects/cha-pt`, `/Users/chanbla11mit/projects/cha-pt-frontend`, and "
-    "`/Users/chanbla11mit/projects/cha-webpt-website-sync`.")
+    "read the committed content of these five repositories: `/Users/chanbla11mit/projects/jobcron`, "
+    "`/Users/chanbla11mit/projects/cha-pt`, `/Users/chanbla11mit/projects/cha-pt-frontend`, "
+    "`/Users/chanbla11mit/projects/cha-webpt-website-sync`, and `/Users/chanbla11mit/hermes-local-harness`.")
+# Card t_a8884510: the sentence that records the owner's addition of the Harness repository
+# directly follows the repository list.
+EXCEPTION_HARNESS_ADDED = (
+    "The owner added the Harness repository `/Users/chanbla11mit/hermes-local-harness` to this list on "
+    "2026-11-15 (card t_a8884510); the refs, the permitted Git commands, and the prohibited Git commands below "
+    "apply to it as they apply to the other repositories of this list.")
 EXCEPTION_PERMITTED = (
     "Read from the refs `main` and `origin/main` only, never from the working tree, and only with these "
     "Git commands, which do not write: `git log`, `git show`, `git grep`, `git ls-tree`, `git diff` "
@@ -76,22 +88,58 @@ EXCEPTION_PROHIBITED = (
     "`git worktree`, `git stash`, `git commit`, or `git push` in them; never read `.worktrees/`, local task "
     "branches, untracked files, `.env` files, files ignored by Git (this includes the per-release deployment "
     "guides and the saved WebPT sign-in state in the `cha-webpt-website-sync` working directory), or anything "
-    "under `/Users/chanbla11mit/cha-pt-pipeline/`; never access boards `jobcron` or `cha-pt`, the Jobcron or "
-    "Cha PT profiles or their sessions, credentials, or production or cloud state; and never create a card "
-    "on board `jss-genr` pinned to any of those repositories.")
+    "under `/Users/chanbla11mit/cha-pt-pipeline/`; never access boards `jobcron` or `cha-pt`, the Jobcron, "
+    "Cha PT, or Harness profiles or their sessions, credentials, or production or cloud state; and never create "
+    "a card on board `jss-genr` pinned to any of those repositories.")
+# Card t_a8884510: no access to board `harness`; in the two orchestrator sources, filing a card
+# under the `harness-bug-report` skill stays as that skill states.
+EXCEPTION_NO_HARNESS_BOARD_ORCH = (
+    "This exception adds no access to board `harness`: filing a card on that board under the "
+    "`harness-bug-report` skill stays as that skill states.")
+EXCEPTION_NO_HARNESS_BOARD_REVIEWER = "This exception adds no access to board `harness`."
+# Card t_a8884510: the Harness files and the command that the skills and SOULs already name stay
+# permitted, and the exception removes nothing.
+HARNESS_BUG_REPORT_COMMAND = "git -C /Users/chanbla11mit/hermes-local-harness rev-parse main"
+HARNESS_ONLY_COMMAND = "the only command that you run in that repository"
+EXCEPTION_NAMED_HARNESS_FILES = {
+    "orchestrator SOUL": (
+        "The files and the command of the Harness repository that your skills already name stay permitted as "
+        "they are: `/Users/chanbla11mit/hermes-local-harness/scripts/jev-peak-hold`, "
+        "`/Users/chanbla11mit/hermes-local-harness/scripts/check-forced-skills`, and the command "
+        f"`{HARNESS_BUG_REPORT_COMMAND}` of the `harness-bug-report` skill; this exception adds the reads above "
+        "and removes nothing."),
+    "reviewer SOUL": (
+        "The overgating checklist of the Harness repository that the paragraph above names stays permitted as "
+        "that paragraph states; this exception adds the reads above and removes nothing."),
+    "skill": (
+        "The files and the command of the Harness repository that this skill and the `harness-bug-report` skill "
+        "already name stay permitted as they are: `/Users/chanbla11mit/hermes-local-harness/scripts/jev-peak-hold`, "
+        "`/Users/chanbla11mit/hermes-local-harness/scripts/check-forced-skills`, and the command "
+        f"`{HARNESS_BUG_REPORT_COMMAND}` of the `harness-bug-report` skill; this exception adds the reads above "
+        "and removes nothing."),
+}
+EXCEPTION_ONLY_COMMAND = (
+    f"The sentence of the `harness-bug-report` skill that calls that command \"{HARNESS_ONLY_COMMAND}\" "
+    "describes filing a report and does not prohibit the reads of this exception.")
 EXCEPTION_MERGED_NOT_DEPLOYED = (
     "These repositories show what is merged, not what is deployed: a deploy date or a statement that a "
     "feature is live still needs an owner statement or a deployment record.")
+# Card t_a8884510: directly follows EXCEPTION_MERGED_NOT_DEPLOYED, which stays for all five.
+EXCEPTION_MERGED_NOT_INSTALLED = (
+    "For the Harness repository, a commit on `main` shows what is merged, not what is installed on a live "
+    "profile; a statement that a change is installed still needs an owner statement or a deployment record.")
 EXCEPTION_SHA_AND_DATE = (
     "Because `git fetch` is prohibited, `origin/main` can be older than GitHub; record the commit SHA and its "
     "commit date with every fact taken from these repositories.")
 EXCEPTION_PRIVACY = (
     "The privacy gate applies unchanged to everything read from them: the Jobcron repository is private and "
-    "carries an all-rights-reserved notice, and the Cha PT repositories, including the WebPT exporter, "
-    "contain clinic operations documents. Nothing read from them is copied into tracked files or commits of "
-    "the jss-genr repository")
-EXCEPTION_RULES = (EXCEPTION_REPOSITORIES, EXCEPTION_PERMITTED, EXCEPTION_PROHIBITED,
-                   EXCEPTION_MERGED_NOT_DEPLOYED, EXCEPTION_SHA_AND_DATE, EXCEPTION_PRIVACY)
+    "carries an all-rights-reserved notice, the Cha PT repositories, including the WebPT exporter, contain "
+    "clinic operations documents, and the Harness repository contains the policy and operations documents of "
+    "the owner's Hermes profiles. Nothing read from them is copied into tracked files or commits of the "
+    "jss-genr repository")
+EXCEPTION_RULES = (EXCEPTION_REPOSITORIES, EXCEPTION_HARNESS_ADDED, EXCEPTION_PERMITTED, EXCEPTION_PROHIBITED,
+                   EXCEPTION_MERGED_NOT_DEPLOYED, EXCEPTION_MERGED_NOT_INSTALLED, EXCEPTION_SHA_AND_DATE,
+                   EXCEPTION_PRIVACY)
 # The jev plugin policy change (t_71b4ef4a) named the four jss-genr implementation profiles; card
 # t_f4ce916d added the third GLM worker.
 REVIEWER_FIRST_LINE = (
@@ -154,10 +202,13 @@ PERMITS = "the reads that the read-only repository exception below permits"
 
 
 def _read_only_exception_edits():
-    """File -> ((new text, old text), ...) for the t_3af6293c edits. Each new text occurs once."""
-    orch = exception_line(soul_path(ORCH).read_text())
-    reviewer = exception_line(soul_path(REVIEWER).read_text())
-    skill = exception_line(SKILL.read_text())
+    """File -> ((new text, old text), ...) for the t_3af6293c edits. Each new text occurs once.
+    The exception lines are taken after the later Harness repository change (t_a8884510) is
+    reversed, because every caller reverses that change first."""
+    orch = exception_line(reverse_harness_repository_edits(ORCH_SOUL_RELATIVE, soul_path(ORCH).read_text()))
+    reviewer = exception_line(reverse_harness_repository_edits(REVIEWER_SOUL_RELATIVE,
+                                                               soul_path(REVIEWER).read_text()))
+    skill = exception_line(reverse_harness_repository_edits(SKILL_RELATIVE, SKILL.read_text()))
     return {
         ORCH_SOUL_RELATIVE: (
             (f", apart from {PERMITS}. Load", ". Load"),
@@ -477,7 +528,7 @@ class RoleContracts(unittest.TestCase):
 
     def test_skill_version_size_and_sections(self):
         # Raised by the jev plugin policy change (t_71b4ef4a).
-        self.assertRegex(self.skill_raw, r"(?m)^version: 0\.6\.7-jss\.14$")  # raised by t_ac454595, t_46b5e63e, t_89838618, t_f4ce916d and t_c7cc3830
+        self.assertRegex(self.skill_raw, r"(?m)^version: 0\.6\.7-jss\.15$")  # raised by t_ac454595, t_46b5e63e, t_89838618, t_f4ce916d, t_c7cc3830 and t_a8884510
         # 260 lines plus the 4-line Pitfalls section (t_bd860536), the 9 lines of
         # repair_history candidate rules and example (t_6436ac1c), the 6-line
         # Skill Changes section (t_0a8674fe) and the one-line Hard Scope read-only
@@ -499,8 +550,9 @@ class RoleContracts(unittest.TestCase):
         history = "This caused the 2026-10-20 stalls of the JSS and Jobcron orchestrators."
         self.assertEqual(self.skill_raw.count(history), 1)
         # The one Hard Scope line of the read-only repository exception (owner decision,
-        # 2026-11-11) names the four repositories it may read and the boards it may not
-        # access; ReadOnlyRepositoryException pins that line. It routes no work to them.
+        # 2026-11-11; Harness repository added 2026-11-15) names the five repositories it may read
+        # and the boards it may not access; ReadOnlyRepositoryException and
+        # HarnessRepositoryInReadOnlyException pin that line. It routes no work to them.
         self.assertTrue(exception_line(self.skill_raw).startswith(f"- {EXCEPTION_LEAD}: "))
         lower = without_exception(self.skill_raw).replace(history, "").lower()
         for foreign in ("jobcron", "cha-pt", "chapt-", "harness-orchestrator", "harness-worker",
@@ -811,7 +863,8 @@ class CardContract(unittest.TestCase):
 class ReadOnlyRepositoryException(unittest.TestCase):
     """Owner decision, 2026-11-11 (t_3af6293c): jss-orchestrator and jss-reviewer may read the
     committed `main` and `origin/main` content of four other repositories with Git commands
-    that do not write. The workers get no such access, and the jss-genr card repository
+    that do not write; owner decision, 2026-11-15 (t_a8884510): the Harness repository is the
+    fifth, on the same terms. The workers get no such access, and the jss-genr card repository
     allowlist is unchanged."""
 
     @classmethod
@@ -832,7 +885,7 @@ class ReadOnlyRepositoryException(unittest.TestCase):
                     self.assertIn(f"`{repo}`", line)
                 for rule in EXCEPTION_RULES:
                     self.assertIn(rule, line)
-                # Outside its own line, no source names the four repository paths.
+                # Outside its own line, no source names the five repository paths.
                 rest = without_exception(raw)
                 for repo in FOREIGN_REPOS:
                     self.assertNotIn(f"`{repo}`", rest)
@@ -871,7 +924,7 @@ class ReadOnlyRepositoryException(unittest.TestCase):
             f"{EXCEPTION_LEAD}: only to check citations in the card under review, you may read "))
         self.assertIn("reject any commit or tracked file that copies it.", line)
         self.assertTrue(line.endswith(
-            "This exception adds no review authority over those four repositories: accept review only for a card "
+            "This exception adds no review authority over those five repositories: accept review only for a card "
             f"pinned to repository `{REPO}`, as the first paragraph of this file states."))
         self.assertEqual(raw.count(f"pinned to repository `{REPO}`"), 2)
         skill = exception_line(self.raw[SKILL_RELATIVE])
@@ -957,6 +1010,168 @@ class ReadOnlyRepositoryException(unittest.TestCase):
                 self.assertIn("jss-genr card contract drift t_jss: isolated worktree mismatch", errors)
 
 
+def baseline_bytes(relative_path, commit):
+    return subprocess.run(["git", "-C", str(ROOT), "show", f"{commit}:{relative_path}"],
+                          stdout=subprocess.PIPE, check=True).stdout
+
+
+class HarnessRepositoryInReadOnlyException(unittest.TestCase):
+    """Owner decision, 2026-11-15 (t_a8884510): the read-only repository exception of
+    jss-orchestrator and jss-reviewer names the Harness repository as its fifth repository, on
+    the same terms as the other four. It adds no access to the sessions of any profile and no
+    access to board `harness`, and the workers get no access."""
+
+    SOURCES = {ORCH_SOUL_RELATIVE: "orchestrator SOUL", REVIEWER_SOUL_RELATIVE: "reviewer SOUL",
+               SKILL_RELATIVE: "skill"}
+    ORCHESTRATOR_SOURCES = (ORCH_SOUL_RELATIVE, SKILL_RELATIVE)
+    # SHA-256 of the three sources at baseline 13854da8098d92dde6fccc1843c421d7c4b269f0.
+    BASELINE_SHA256 = {
+        ORCH_SOUL_RELATIVE: "79ac395679cca0fda1a95bd3372bdeaba100eec87bc72cbc8a7142c5f98f0544",
+        REVIEWER_SOUL_RELATIVE: "699d0c0b108bd5554980f0ff84cd98255979499ea2cb2e1f58420eaf45455d3b",
+        SKILL_RELATIVE: "33259158416885045d4aece8213bb7dbfe2aa1dd783c540fe2153627f5482038",
+    }
+    BASELINE = "13854da8098d92dde6fccc1843c421d7c4b269f0"
+
+    @classmethod
+    def setUpClass(cls):
+        cls.raw = {path: (ROOT / path).read_text() for path in cls.SOURCES}
+        cls.line = {path: exception_line(raw) for path, raw in cls.raw.items()}
+
+    def test_harness_path_is_the_last_of_five_repositories_in_each_exception_line(self):
+        for path, line in self.line.items():
+            with self.subTest(path=path):
+                self.assertIn(f"`{HARNESS_REPO}`", line)
+                listed = line.split("these five repositories: ", 1)[1].split("`. ", 1)[0] + "`"
+                self.assertEqual(tuple(re.findall(r"`(/Users/[^`]+)`", listed)), FOREIGN_REPOS)
+                self.assertTrue(listed.endswith(f", and `{HARNESS_REPO}`"))
+                self.assertNotIn("four repositories", self.raw[path])
+                self.assertEqual(self.raw[path].count("five repositories"),
+                                 2 if path == REVIEWER_SOUL_RELATIVE else 1)
+
+    def test_owner_addition_follows_the_list_and_names_the_card_once(self):
+        for path, line in self.line.items():
+            with self.subTest(path=path):
+                self.assertIn(f"{EXCEPTION_REPOSITORIES} {EXCEPTION_HARNESS_ADDED} Read from the refs", line)
+                self.assertEqual(line.count("t_a8884510"), 1)
+                self.assertEqual(self.raw[path].count("t_a8884510"), 1)
+
+    def test_refs_and_command_lists_are_the_baseline_ones(self):
+        for path, line in self.line.items():
+            before = exception_line(reverse_harness_repository_edits(path, self.raw[path]))
+            with self.subTest(path=path):
+                for rule in (EXCEPTION_PERMITTED, EXCEPTION_SHA_AND_DATE):
+                    self.assertIn(rule, before)
+                    self.assertIn(rule, line)
+                self.assertEqual(re.findall(r"`(git [a-z-]+)`", line), re.findall(r"`(git [a-z-]+)`", before))
+                # The sentence about merged and installed changes names `main` once more; the set of
+                # refs is unchanged.
+                self.assertEqual(set(re.findall(r"`((?:origin/)?main)`", line)),
+                                 set(re.findall(r"`((?:origin/)?main)`", before)))
+                self.assertEqual(set(re.findall(r"`((?:origin/)?main)`", line)), {"main", "origin/main"})
+                self.assertIn("never from the working tree", line)
+
+    def test_harness_profiles_and_sessions_are_prohibited_and_board_harness_gets_no_access(self):
+        for path, line in self.line.items():
+            board = (EXCEPTION_NO_HARNESS_BOARD_REVIEWER if path == REVIEWER_SOUL_RELATIVE
+                     else EXCEPTION_NO_HARNESS_BOARD_ORCH)
+            with self.subTest(path=path):
+                self.assertIn("the Jobcron, Cha PT, or Harness profiles or their sessions,", line)
+                self.assertNotIn("the Jobcron or Cha PT profiles", line)
+                self.assertIn(f"{EXCEPTION_PROHIBITED} {board} ", line)
+                self.assertEqual(line.count("board `harness`"), 1)
+        self.assertNotIn("harness-bug-report", self.raw[REVIEWER_SOUL_RELATIVE])
+
+    def test_files_and_command_already_named_stay_permitted(self):
+        for path, line in self.line.items():
+            named = EXCEPTION_NAMED_HARNESS_FILES[self.SOURCES[path]]
+            with self.subTest(path=path):
+                self.assertIn(named, line)
+                if path in self.ORCHESTRATOR_SOURCES:
+                    self.assertIn(f"{named} {EXCEPTION_ONLY_COMMAND} {EXCEPTION_MERGED_NOT_DEPLOYED}", line)
+                else:
+                    self.assertIn(f"{named} {EXCEPTION_MERGED_NOT_DEPLOYED}", line)
+                    self.assertNotIn(EXCEPTION_ONLY_COMMAND, line)
+        # The named files and the command are the ones that the sources already name outside the line.
+        skill_rest = without_exception(self.raw[SKILL_RELATIVE])
+        for script in ("scripts/jev-peak-hold", "scripts/check-forced-skills"):
+            self.assertIn(f"{HARNESS_REPO}/{script}", skill_rest)
+        reviewer_rest = without_exception(self.raw[REVIEWER_SOUL_RELATIVE])
+        self.assertIn(f"overgating checklist at `{CHECKLIST_ABS}` (read-only reference)", reviewer_rest)
+        bug_report = flat((ROOT / "skills/harness-bug-report/SKILL.md").read_text())
+        self.assertIn(f"`{HARNESS_BUG_REPORT_COMMAND}`. This command only reads the repository, and it is "
+                      f"{HARNESS_ONLY_COMMAND}.", bug_report)
+
+    def test_merged_not_installed_follows_merged_not_deployed(self):
+        for path, line in self.line.items():
+            with self.subTest(path=path):
+                self.assertIn(f"{EXCEPTION_MERGED_NOT_DEPLOYED} {EXCEPTION_MERGED_NOT_INSTALLED} "
+                              f"{EXCEPTION_SHA_AND_DATE}", line)
+
+    def test_privacy_sentence_names_the_harness_repository(self):
+        for path, line in self.line.items():
+            with self.subTest(path=path):
+                self.assertIn(EXCEPTION_PRIVACY, line)
+                self.assertEqual(line.count("the Harness repository contains the policy and operations documents "
+                                            "of the owner's Hermes profiles"), 1)
+
+    def test_unchanged_scope_of_the_exception(self):
+        orch, skill = self.line[ORCH_SOUL_RELATIVE], self.line[SKILL_RELATIVE]
+        self.assertTrue(orch.endswith("This exception covers only you and `jss-reviewer`; `jss-worker` and "
+                                      "`jss-worker-2` have no access to these repositories."))
+        self.assertTrue(skill.endswith("`jss-reviewer` has the same read access only to check citations in the card "
+                                       "under review, and it gives the reviewer no review authority over those "
+                                       "repositories. `jss-worker` and `jss-worker-2` have no access to these "
+                                       "repositories."))
+        self.assertTrue(self.line[REVIEWER_SOUL_RELATIVE].endswith(
+            "This exception adds no review authority over those five repositories: accept review only for a card "
+            f"pinned to repository `{REPO}`, as the first paragraph of this file states."))
+        for line in self.line.values():
+            self.assertIn("and never create a card on board `jss-genr` pinned to any of those repositories.", line)
+        # Only the three sources carry the exception.
+        carriers = sorted(str(path.relative_to(ROOT)) for path in (ROOT / "policies").rglob("*")
+                          if path.is_file() and EXCEPTION_LEAD in path.read_text(errors="replace"))
+        self.assertEqual(carriers, sorted(self.SOURCES))
+
+    def test_jss_genr_card_pinned_to_the_harness_repository_is_rejected(self):
+        verifier = load_verifier()
+        body = REPOSITORY_BODY.replace(f"Repository {REPO} ONLY.", f"Repository {HARNESS_REPO} ONLY.")
+        task = card(body, workspace_path=f"{HARNESS_REPO}/.worktrees/t_jss")
+        errors = []
+        with redirect_stdout(io.StringIO()):
+            verifier.check_jss_card_contract(errors, [task])
+        self.assertIn("jss-genr card contract drift t_jss: expected exact repository", errors)
+        self.assertIn("jss-genr card contract drift t_jss: isolated worktree mismatch", errors)
+
+    def test_five_worker_souls_carry_no_exception_and_no_harness_path(self):
+        for profile in (*WORKERS, *GLM_WORKERS):
+            relative = f"policies/profile-souls/{profile}/SOUL.md"
+            data = (ROOT / relative).read_bytes()
+            text = data.decode()
+            with self.subTest(profile=profile):
+                self.assertEqual(data, baseline_bytes(relative, self.BASELINE))
+                self.assertNotIn(EXCEPTION_LEAD, text)
+                self.assertNotIn("read-only repository exception", text.lower())
+                self.assertNotIn("hermes-local-harness", text)
+
+    def test_reversing_this_cards_edits_gives_the_baseline_bytes(self):
+        self.assertEqual(harness_edits.BASELINE, self.BASELINE)
+        self.assertEqual(harness_edits.BASELINE_SHA256, self.BASELINE_SHA256)
+        for path, want in self.BASELINE_SHA256.items():
+            data = (ROOT / path).read_bytes()
+            original = reverse_harness_repository_edits(path, data)
+            with self.subTest(path=path):
+                self.assertEqual(hashlib.sha256(original).hexdigest(), want)
+                self.assertEqual(original, baseline_bytes(path, self.BASELINE))
+                self.assertEqual(reverse_harness_repository_edits(path, data.decode()), original.decode())
+                # A second reversal changes nothing, and re-applying the edits gives the current bytes.
+                self.assertIs(reverse_harness_repository_edits(path, original), original)
+                self.assertEqual(harness_edits.apply_harness_repository_edits(path, original.decode()),
+                                 data.decode())
+        for path in (soul_path(WORKER), ROOT / "policies/profile-souls/anki-orchestrator/SOUL.md"):
+            data = path.read_bytes()
+            self.assertIs(reverse_harness_repository_edits(str(path.relative_to(ROOT)), data), data)
+
+
 class DownloadAndInstallOwnerDecision(unittest.TestCase):
     """Owner decision, 2026-11-13 (t_89838618): the rule that a download needs explicit owner
     approval is removed, and an install from a reputable source needs no owner approval
@@ -1025,6 +1240,10 @@ class DownloadAndInstallOwnerDecision(unittest.TestCase):
         "the plugin is installed by the normal procedure",
         "Never modify the installed Hermes source.",
         "job-site login, install, policy rollout, credential operation, or external write occurred.",
+        # The two parts of the read-only repository exception sentence of card t_a8884510 about a
+        # change that is installed on a live profile; they name no package install.
+        "not what is installed on a live profile;",
+        "a statement that a change is installed still needs an owner statement or a deployment record.",
     )
 
     @classmethod
@@ -1078,8 +1297,9 @@ class DownloadAndInstallOwnerDecision(unittest.TestCase):
         self.assertIn(self.SKILL_COMPLETION_LINE, section(self.skill_raw, "Completion Gate"))
 
     def test_skill_version_line(self):
-        # Card t_f4ce916d raised the version by one more step, and card t_c7cc3830 by one more.
-        self.assertEqual(re.findall(r"(?m)^version: (.+)$", self.skill_raw), ["0.6.7-jss.14"])
+        # Card t_f4ce916d raised the version by one more step, card t_c7cc3830 by one more, and card
+        # t_a8884510 by one more.
+        self.assertEqual(re.findall(r"(?m)^version: (.+)$", self.skill_raw), ["0.6.7-jss.15"])
 
     def test_no_source_keeps_the_removed_wording(self):
         for path, text in self.raw.items():

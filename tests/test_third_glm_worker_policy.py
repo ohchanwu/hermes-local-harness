@@ -47,9 +47,10 @@ REVIEWER_LIST_LEAD = {
 VERSIONS = {"harness": ("0.6.7-harness.9", "0.6.7-harness.10"), "chapt": ("0.6.7-chapt.10", "0.6.7-chapt.11"),
             "jobcron": ("0.6.9-jobcron.11", "0.6.9-jobcron.12"), "jss": ("0.6.7-jss.12", "0.6.7-jss.13"),
             "anki": ("0.6.10-anki.7", "0.6.10-anki.8")}
-# The current skill versions: card t_c7cc3830 raised each last number by one more step.
+# The current skill versions: card t_c7cc3830 raised each last number by one more step, and card
+# t_a8884510 raised the jss version by one more step.
 CURRENT_VERSIONS = {"harness": "0.6.7-harness.11", "chapt": "0.6.7-chapt.12",
-                    "jobcron": "0.6.9-jobcron.13", "jss": "0.6.7-jss.14", "anki": "0.6.10-anki.9"}
+                    "jobcron": "0.6.9-jobcron.13", "jss": "0.6.7-jss.15", "anki": "0.6.10-anki.9"}
 
 
 def soul(profile):
