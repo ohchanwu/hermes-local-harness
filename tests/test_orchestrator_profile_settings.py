@@ -7,7 +7,9 @@ skills.write_approval: true, security.protected_instruction_files: true and
 security.protected_instruction_extra_patterns: ["SKILL.md"]. The
 managed_profile_settings group (compression settings, which covers the advisor,
 the default profile and the five project orchestrators since card t_b906fda1)
-shares no key with it; check_managed_setting_groups checks both groups
+shares no key with it; the claude_worker_profile_settings group (compression
+threshold of the ten Claude worker profiles, card t_2d357ca0) shares no profile
+and no key with it; check_managed_setting_groups checks every group
 with one reader in fixture mode and in live mode.
 
 Fixture runs go through the real verifier main() under the fixture-isolation guard;
@@ -188,7 +190,9 @@ class CheckFunctionTests(unittest.TestCase):
         self.roster_profiles = {profile["name"]: profile for profile in self.roster["profiles"]}
 
     def read_desired(self, profile, key):
-        for group in (self.roster["managed_profile_settings"], self.roster["orchestrator_profile_settings"]):
+        for group in (self.roster["managed_profile_settings"],
+                      self.roster["orchestrator_profile_settings"],
+                      self.roster["claude_worker_profile_settings"]):
             if profile in group["profiles"] and key in group["settings"]:
                 return copy.deepcopy(group["settings"][key])
         return self.verifier.UNREADABLE
@@ -210,7 +214,7 @@ class CheckFunctionTests(unittest.TestCase):
         self.assertEqual(self.run_groups(self.roster, read), [])
         for profile in ("advisor", "default"):
             self.assertFalse([key for read_profile, key in reads if read_profile == profile and key in SETTINGS])
-        self.assertEqual(len(reads), len(COMPRESSION_PROFILES) * 4 + len(ORCHESTRATORS) * len(SETTINGS))
+        self.assertEqual(len(reads), len(COMPRESSION_PROFILES) * 4 + len(ORCHESTRATORS) * len(SETTINGS) + 10)
 
     def test_malformed_group_fails(self):
         for group in (None, {}, [], {"profiles": [], "settings": SETTINGS},
@@ -228,6 +232,19 @@ class CheckFunctionTests(unittest.TestCase):
         del roster["orchestrator_profile_settings"]
         self.assertEqual(self.run_groups(roster), [
             "orchestrator profile settings malformed: expected unique profiles and non-empty settings"])
+
+    def test_missing_worker_group_fails(self):
+        roster = copy.deepcopy(self.roster)
+        del roster["claude_worker_profile_settings"]
+        self.assertEqual(self.run_groups(roster), [
+            "Claude worker profile settings malformed: expected unique profiles and non-empty settings"])
+
+    def test_worker_profile_declared_by_both_groups_fails(self):
+        roster = copy.deepcopy(self.roster)
+        roster["managed_profile_settings"]["profiles"].append("harness-worker")
+        errors = self.run_groups(roster)
+        self.assertIn("Claude worker profile settings and managed profile settings both declare "
+                      "harness-worker compression.threshold_tokens", errors)
 
     def test_group_must_name_every_project_orchestrator(self):
         roster = copy.deepcopy(self.roster)
@@ -247,7 +264,10 @@ class CheckFunctionTests(unittest.TestCase):
         roster["orchestrator_profile_settings"]["settings"]["compression.threshold_tokens"] = 200000
 
         def read(profile, key):
-            return 200000 if key == "compression.threshold_tokens" else self.read_desired(profile, key)
+            if (key == "compression.threshold_tokens"
+                    and profile in roster["orchestrator_profile_settings"]["profiles"]):
+                return 200000
+            return self.read_desired(profile, key)
 
         errors = self.run_groups(roster, read)
         self.assertEqual(sorted(errors), sorted(
@@ -289,7 +309,8 @@ class CheckFunctionTests(unittest.TestCase):
             errors = self.run_groups(self.roster, self.verifier.json_config)
         expected_calls = [("hermes", "-p", profile, "config", "get", "--json", key)
                           for group in (self.roster["managed_profile_settings"],
-                                        self.roster["orchestrator_profile_settings"])
+                                        self.roster["orchestrator_profile_settings"],
+                                        self.roster["claude_worker_profile_settings"])
                           for profile in group["profiles"] for key in group["settings"]]
         self.assertEqual(calls, expected_calls)
         self.assertEqual(errors, [
