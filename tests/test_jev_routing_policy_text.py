@@ -339,10 +339,11 @@ class RoutingPolicyText(unittest.TestCase):
             text = self.text[skill(prefix)]
             with self.subTest(board=board):
                 # Card t_46b5e63e raised each version by one step after this card; card t_89838618 raised
-                # the jss version by one more step, card t_f4ce916d each version by one more step, and
-                # card t_c7cc3830 each version by one more step.
+                # the jss version by one more step, card t_f4ce916d each version by one more step, card
+                # t_c7cc3830 each version by one more step, and card t_a8884510 the jss version by one more
+                # step.
                 current = {"harness": "0.6.7-harness.11", "chapt": "0.6.7-chapt.12", "jobcron": "0.6.9-jobcron.13",
-                           "jss": "0.6.7-jss.14", "anki": "0.6.10-anki.9"}[prefix]
+                           "jss": "0.6.7-jss.15", "anki": "0.6.10-anki.9"}[prefix]
                 self.assertRegex(text, rf"(?m)^version: {re.escape(current)}$")
                 # Card t_c7cc3830 replaced the Part 5 rule text with the card split rule.
                 self.assertEqual(text.count(NEW_RULE), 1)

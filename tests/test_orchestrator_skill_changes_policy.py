@@ -49,7 +49,7 @@ VERSIONS = {
     HARNESS: "0.6.7-harness.11",  # raised by t_ac454595, t_46b5e63e, t_f4ce916d and t_c7cc3830
     JOBCRON: "0.6.9-jobcron.13",  # raised by t_ac454595, t_46b5e63e, t_f4ce916d and t_c7cc3830
     CHAPT: "0.6.7-chapt.12",  # raised by t_ac454595, t_46b5e63e, t_f4ce916d and t_c7cc3830
-    JSS: "0.6.7-jss.14",  # raised by t_ac454595, t_46b5e63e, t_89838618, t_f4ce916d and t_c7cc3830
+    JSS: "0.6.7-jss.15",  # raised by t_ac454595, t_46b5e63e, t_89838618, t_f4ce916d, t_c7cc3830 and t_a8884510
     ANKI: "0.6.10-anki.9",  # raised by t_ac454595, t_46b5e63e, t_f4ce916d and t_c7cc3830
 }
 

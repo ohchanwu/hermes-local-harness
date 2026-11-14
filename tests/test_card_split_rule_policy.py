@@ -17,13 +17,16 @@ for a file that this card changed, when the given bytes are the bytes of that fi
 after this card, it returns the bytes of the file at this card's baseline commit.
 test_third_glm_worker_policy.reverse_third_glm_worker_edits calls it first, so every
 test that recovers the bytes of an earlier commit reverses this card's edits before
-the earlier edits. This module imports no other test module, so any test module can
-import it.
+the earlier edits. This module imports only jss_harness_repository_edits (the later
+change of card t_a8884510, reversed first), which imports no other test module, so any
+test module can import it.
 """
 import hashlib
 from pathlib import Path
 import subprocess
 import unittest
+
+from jss_harness_repository_edits import reverse_harness_repository_edits
 
 ROOT = Path(__file__).resolve().parents[1]
 BASELINE = "43f9e2c2d51fd3ce8df11db341ed76e04a832fee"
@@ -31,6 +34,8 @@ RELATIVE = "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md"
 PREFIXES = ("harness", "anki", "jss", "chapt", "jobcron")
 VERSIONS = {"harness": "0.6.7-harness.11", "anki": "0.6.10-anki.9", "jss": "0.6.7-jss.14",
             "chapt": "0.6.7-chapt.12", "jobcron": "0.6.9-jobcron.13"}
+# The current skill versions: card t_a8884510 raised the jss version by one more step.
+CURRENT_VERSIONS = dict(VERSIONS, jss="0.6.7-jss.15")
 
 NEW_RULE = (
     "By default, when the work for a card has several parts that each have their own acceptance check, "
@@ -98,7 +103,9 @@ def baseline_bytes(relative_path):
 
 def reverse_card_split_rule_edits(relative_path, text):
     """Return the bytes of relative_path at BASELINE when text is that file after card
-    t_c7cc3830, else text unchanged; text may be str or bytes."""
+    t_c7cc3830, else text unchanged; text may be str or bytes. The later Harness repository
+    change of the read-only repository exception (t_a8884510) is reversed first."""
+    text = reverse_harness_repository_edits(relative_path, text)
     want = AFTER_SHA256.get(relative_path)
     if want is None:
         return text
@@ -123,7 +130,8 @@ class Helper(unittest.TestCase):
         self.assertTrue(AFTER_SHA256)
         for relative_path, want in AFTER_SHA256.items():
             with self.subTest(path=relative_path):
-                current = (ROOT / relative_path).read_bytes()
+                # The later Harness repository change (t_a8884510) is reversed first.
+                current = reverse_harness_repository_edits(relative_path, (ROOT / relative_path).read_bytes())
                 self.assertEqual(hashlib.sha256(current).hexdigest(), want)
                 self.assertEqual(reverse_card_split_rule_edits(relative_path, current),
                                  baseline_bytes(relative_path))
@@ -162,7 +170,7 @@ class PolicySources(unittest.TestCase):
         for prefix in PREFIXES:
             text = self.text[skill(prefix)]
             with self.subTest(prefix=prefix):
-                self.assertRegex(text, rf"(?m)^version: {re.escape(VERSIONS[prefix])}$")
+                self.assertRegex(text, rf"(?m)^version: {re.escape(CURRENT_VERSIONS[prefix])}$")
 
     def test_the_lane_sentence_is_only_in_the_jobcron_and_chapt_skills(self):
         sentence = "Do not split a card only to keep every lane busy."
