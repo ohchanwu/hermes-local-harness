@@ -469,7 +469,7 @@ class RoutingPolicyText(unittest.TestCase):
     def test_no_policy_file_restates_a_different_criterion(self):
         config = json.loads((ROOT / "plugins/jev/config.json").read_text())
         criteria = {route["criterion"] for board in config["routing"]["boards"].values() for route in board["routes"]}
-        self.assertEqual(len(criteria), 3)
+        self.assertEqual(len(criteria), 4)
         files = policy_files()
         self.assertTrue(files)
         for path in files:

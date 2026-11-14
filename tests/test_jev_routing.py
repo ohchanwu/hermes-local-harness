@@ -36,7 +36,7 @@ KST = ZoneInfo("Asia/Seoul")
 SATURDAY = datetime(2026, 11, 14, 16, 0, tzinfo=KST)
 SENTINEL = "JEVSENTINEL7c41d"
 CONFIG = json.loads((ROOT / "plugins" / "jev" / "config.json").read_text(encoding="utf-8"))
-ALL_ROUTES = {"easy": 0.0, "medium": 0.0, "hard": 0.0}
+ALL_ROUTES = {"easy": 0.0, "medium": 0.0, "hard": 0.0, "very_hard": 0.0}
 
 
 def probs(**values):
@@ -115,7 +115,7 @@ class RoutingTests(unittest.TestCase):
     # --- routes applied -----------------------------------------------------------
 
     def test_easy_route_applied(self):
-        self.fake.choice("easy", probs(easy=0.9, medium=0.08, hard=0.02))
+        self.fake.choice("easy", probs(easy=0.9, medium=0.08, hard=0.01, very_hard=0.01))
         create, _ = self.create(self.card())
         sent = create.calls[0]
         self.assertEqual(sent["assignee"], "harness-worker-glm-1")
@@ -130,7 +130,7 @@ class RoutingTests(unittest.TestCase):
         self.assertAlmostEqual(record["probabilities"]["easy"], 0.9)
         question = self.fake.requests[-1][1]["questions"]["route"]
         self.assertEqual(question["type"], "choice")
-        self.assertEqual(sorted(question["criteria"]), ["easy", "hard", "medium"])
+        self.assertEqual(sorted(question["criteria"]), ["easy", "hard", "medium", "very_hard"])
 
     def test_medium_route_applied(self):
         self.fake.choice("medium", probs(medium=0.7, hard=0.3))
@@ -140,13 +140,32 @@ class RoutingTests(unittest.TestCase):
         self.assertEqual((sent["model"], sent["provider"]), ("glm-5.3", "zai"))
         self.assertTrue(self.last_decision()["applied"])
 
-    def test_hard_route_applied_changes_nothing(self):
+    def test_hard_route_applies_the_worker_of_glm_max_workers(self):
+        # Card t_3c7a581d: a `hard` card goes to the one profile of the board's
+        # `glm_max_workers` list, with model `glm-5.3` and provider `zai`.
         self.fake.choice("hard", probs(hard=0.95, medium=0.05))
+        args = self.card(board="cha-pt", assignee="chapt-worker")
+        create, _ = self.create(args)
+        sent = create.calls[0]
+        self.assertEqual(sent["assignee"], "chapt-worker-glm-3")
+        self.assertEqual((sent["model"], sent["provider"]), ("glm-5.3", "zai"))
+        record = self.last_decision()
+        self.assertEqual((record["route"], record["applied"], record["applied_route"], record["new_assignee"]),
+                         ("hard", True, "hard", "chapt-worker-glm-3"))
+        state = json.loads((self.log_dir / "routing-state.json").read_text(encoding="utf-8"))
+        self.assertEqual(state["counters"], {"cha-pt:glm_max_workers": 0})
+
+    def test_very_hard_route_changes_nothing(self):
+        # A `very_hard` card is created exactly as the orchestrator asked: the
+        # Claude worker the orchestrator named, with that profile's own model.
+        self.fake.choice("very_hard", probs(very_hard=0.95, medium=0.05))
         args = self.card(board="cha-pt", assignee="chapt-worker")
         create, _ = self.create(args)
         self.assertEqual(create.calls, [None])
         record = self.last_decision()
-        self.assertEqual((record["route"], record["applied"], record["new_assignee"]), ("hard", True, "chapt-worker"))
+        self.assertEqual((record["route"], record["applied"], record["applied_route"], record["new_assignee"],
+                          record["glm_probability_sum"], record["not_applied_reason"]),
+                         ("very_hard", True, "very_hard", "chapt-worker", 0.05, None))
 
     # --- two worker lists: the second list that a route names in assignee_from ----------
 
@@ -197,9 +216,10 @@ class RoutingTests(unittest.TestCase):
     # --- the GLM sum rule (card t_92e29d10) ----------------------------------------
 
     def test_glm_sum_at_threshold_applies_the_highest_glm_route(self):
-        # a: easy 0.2, medium 0.4, hard 0.4, Jev chose medium; no single route
-        # reaches 0.6, the GLM sum 0.6 does, and medium is the highest GLM route.
-        self.fake.choice("medium", probs(easy=0.2, medium=0.4, hard=0.4))
+        # a: easy 0.2, medium 0.3, hard 0.1, very_hard 0.4, Jev chose medium;
+        # no single GLM route reaches 0.6, the GLM sum 0.6 does, and medium is
+        # the highest GLM route.
+        self.fake.choice("medium", probs(easy=0.2, medium=0.3, hard=0.1, very_hard=0.4))
         create, _ = self.create(self.card())
         sent = create.calls[0]
         self.assertEqual(sent["assignee"], "harness-worker-glm-1")
@@ -210,35 +230,49 @@ class RoutingTests(unittest.TestCase):
         self.assertEqual(record["applied_route"], "medium")
         self.assertEqual(record["glm_probability_sum"], 0.6)
 
-    def test_glm_sum_below_threshold_chosen_hard_is_unchanged(self):
-        # b: easy 0.3, medium 0.29, hard 0.41, Jev chose hard; the GLM sum 0.59
-        # is below 0.6 and the chosen hard 0.41 too.
-        self.fake.choice("hard", probs(easy=0.3, medium=0.29, hard=0.41))
+    def test_glm_sum_below_threshold_and_very_hard_below_threshold_is_unchanged(self):
+        # b: easy 0.3, medium 0.2, hard 0.09, very_hard 0.41, Jev chose
+        # very_hard; the GLM sum 0.59 is below 0.6 and the chosen very_hard
+        # 0.41 too, so the card is unchanged.
+        self.fake.choice("very_hard", probs(easy=0.3, medium=0.2, hard=0.09, very_hard=0.41))
         create, _ = self.create(self.card())
         record = self.assert_unchanged(create, "below_threshold")
-        self.assertEqual(record["route"], "hard")
+        self.assertEqual(record["route"], "very_hard")
         self.assertIsNone(record["applied_route"])
         self.assertEqual(record["glm_probability_sum"], 0.59)
 
-    def test_glm_sum_carries_a_chosen_hard_card_and_the_tie_goes_to_medium(self):
-        # c: easy 0.31, medium 0.31, hard 0.38, Jev chose hard; the GLM sum 0.62
-        # is at the threshold, hard is the single most probable route, and the
-        # tie between the GLM routes goes to the route listed last (`medium`).
-        self.fake.choice("hard", probs(easy=0.31, medium=0.31, hard=0.38))
+    def test_glm_sum_carries_a_chosen_very_hard_card_and_the_tie_goes_to_hard(self):
+        # c: medium 0.31, hard 0.31, very_hard 0.38, Jev chose very_hard; the
+        # GLM sum 0.62 is at the threshold, and the tie between the GLM routes
+        # goes to the route listed last (`hard`).
+        self.fake.choice("very_hard", probs(medium=0.31, hard=0.31, very_hard=0.38))
         create, _ = self.create(self.card())
         sent = create.calls[0]
-        self.assertEqual(sent["assignee"], "harness-worker-glm-1")
+        self.assertEqual(sent["assignee"], "harness-worker-glm-3")
         self.assertEqual((sent["model"], sent["provider"]), ("glm-5.3", "zai"))
-        self.assertIn("\nAssigned worker EXACT harness-worker-glm-1.\n", sent["body"])
+        self.assertIn("\nAssigned worker EXACT harness-worker-glm-3.\n", sent["body"])
         record = self.last_decision()
         self.assertEqual((record["route"], record["applied"], record["not_applied_reason"]),
-                         ("hard", True, None))
-        self.assertEqual(record["applied_route"], "medium")
+                         ("very_hard", True, None))
+        self.assertEqual(record["applied_route"], "hard")
         self.assertEqual(record["glm_probability_sum"], 0.62)
 
+    def test_the_specification_example_applies_hard(self):
+        # The example of the specification (card t_3c7a581d): medium 0.25,
+        # hard 0.36, very_hard 0.39, Jev chose very_hard; the GLM sum 0.61 is
+        # at the threshold, so `hard` is applied although very_hard is the
+        # single most probable route.
+        self.fake.choice("very_hard", probs(medium=0.25, hard=0.36, very_hard=0.39))
+        create, _ = self.create(self.card())
+        sent = create.calls[0]
+        self.assertEqual(sent["assignee"], "harness-worker-glm-3")
+        record = self.last_decision()
+        self.assertEqual(record["applied_route"], "hard")
+        self.assertEqual(record["glm_probability_sum"], 0.61)
+
     def test_glm_sum_with_easy_higher_applies_easy(self):
-        # d: easy 0.45, medium 0.2, hard 0.35, Jev chose easy.
-        self.fake.choice("easy", probs(easy=0.45, medium=0.2, hard=0.35))
+        # d: easy 0.45, medium 0.2, very_hard 0.35, Jev chose easy.
+        self.fake.choice("easy", probs(easy=0.45, medium=0.2, very_hard=0.35))
         create, _ = self.create(self.card())
         sent = create.calls[0]
         self.assertEqual(sent["assignee"], "harness-worker-glm-1")
@@ -248,45 +282,46 @@ class RoutingTests(unittest.TestCase):
                          ("easy", True, "easy"))
         self.assertEqual(record["glm_probability_sum"], 0.65)
 
-    def test_hard_at_threshold_is_applied_as_the_chosen_route(self):
-        # e: hard 0.95, medium 0.05; the GLM sum 0.05 is below 0.6 and the
-        # chosen hard is at the threshold, so the card is unchanged.
-        self.fake.choice("hard", probs(hard=0.95, medium=0.05))
+    def test_very_hard_at_threshold_is_applied_as_the_chosen_route(self):
+        # e: very_hard 0.95, medium 0.05; the GLM sum 0.05 is below 0.6 and the
+        # chosen very_hard is at the threshold, so the card is unchanged.
+        self.fake.choice("very_hard", probs(very_hard=0.95, medium=0.05))
         create, _ = self.create(self.card())
         self.assertEqual(create.calls, [None])
         record = self.last_decision()
         self.assertEqual((record["route"], record["applied"], record["applied_route"],
-                          record["not_applied_reason"]), ("hard", True, "hard", None))
+                          record["not_applied_reason"]), ("very_hard", True, "very_hard", None))
         self.assertEqual(record["new_assignee"], "harness-worker")
         self.assertEqual(record["glm_probability_sum"], 0.05)
 
     def test_control_group_counts_the_applied_route_and_not_the_chosen_one(self):
-        # f: two cards as in case c with control_group_every 2; the second is
-        # the control card, and its counter is under the applied route `medium`.
+        # f: two cards with the probabilities of case c and control_group_every
+        # 2; the first goes to the `glm_max_workers` profile, the second is the
+        # control card, and its counter is under the applied route `hard`.
         self.config["routing"]["control_group_every"] = 2
-        self.fake.choice("hard", probs(easy=0.31, medium=0.31, hard=0.38))
+        self.fake.choice("very_hard", probs(medium=0.31, hard=0.31, very_hard=0.38))
         first, _ = self.create(self.card())
         second, _ = self.create(self.card())
-        self.assertEqual(first.calls[0]["assignee"], "harness-worker-glm-1")
+        self.assertEqual(first.calls[0]["assignee"], "harness-worker-glm-3")
         self.assertIsNone(second.calls[0])  # the control card is created exactly as asked
         record = self.last_decision()
         self.assertEqual((record["route"], record["applied"], record["not_applied_reason"]),
-                         ("hard", False, "control_group"))
-        self.assertEqual(record["applied_route"], "medium")
+                         ("very_hard", False, "control_group"))
+        self.assertEqual(record["applied_route"], "hard")
         self.assertEqual(record["glm_probability_sum"], 0.62)
-        self.assertEqual(self.control_state()["control_group_counters"], {"harness": {"medium": 0}})
-        # The GLM worker alternation advanced once (for the first card) only.
-        self.assertEqual(self.control_state()["counters"], {"harness": 1})
+        self.assertEqual(self.control_state()["control_group_counters"], {"harness": {"hard": 0}})
+        # The `glm_max_workers` alternation advanced once (for the first card) only.
+        self.assertEqual(self.control_state()["counters"], {"harness:glm_max_workers": 0})
 
     def test_records_that_do_not_apply_have_the_new_fields(self):
         # g: model_set and assignee_not_listed carry the GLM sum; a jev_error
         # record has both new fields null.
-        self.fake.choice("easy", probs(easy=0.7, medium=0.2, hard=0.1))
+        self.fake.choice("easy", probs(easy=0.7, medium=0.2, very_hard=0.1))
         create, _ = self.create(self.card(model="glm-5.3"))
         record = self.assert_unchanged(create, "model_set")
         self.assertEqual(record["glm_probability_sum"], 0.9)
         self.assertIsNone(record["applied_route"])
-        self.fake.choice("easy", probs(easy=0.7, medium=0.2, hard=0.1))
+        self.fake.choice("easy", probs(easy=0.7, medium=0.2, very_hard=0.1))
         create, _ = self.create(self.card(assignee="harness-reviewer"))
         record = self.assert_unchanged(create, "assignee_not_listed")
         self.assertEqual(record["glm_probability_sum"], 0.9)
@@ -298,29 +333,29 @@ class RoutingTests(unittest.TestCase):
         self.assertIsNone(record["applied_route"])
 
     def test_the_glm_sum_rule_is_checked_before_the_chosen_route_rule(self):
-        # h: threshold 0.4, easy 0.25, medium 0.2, hard 0.55, Jev chose hard;
-        # the GLM sum 0.45 is at the threshold, so easy is applied although the
-        # chosen hard 0.55 is above the threshold too.
+        # h: threshold 0.4, easy 0.25, medium 0.2, very_hard 0.55, Jev chose
+        # very_hard; the GLM sum 0.45 is at the threshold, so easy is applied
+        # although the chosen very_hard 0.55 is above the threshold too.
         config = json.loads(json.dumps(self.config))
         config["routing"]["threshold"] = 0.4
-        self.fake.choice("hard", probs(easy=0.25, medium=0.2, hard=0.55))
+        self.fake.choice("very_hard", probs(easy=0.25, medium=0.2, very_hard=0.55))
         create, _ = self.create(self.card(), config=config)
         sent = create.calls[0]
         self.assertEqual(sent["assignee"], "harness-worker-glm-1")
         self.assertEqual((sent["model"], sent["provider"]), ("glm-5.3-flash", "zai"))
         record = self.last_decision()
         self.assertEqual((record["route"], record["applied"], record["applied_route"]),
-                         ("hard", True, "easy"))
+                         ("very_hard", True, "easy"))
         self.assertEqual(record["glm_probability_sum"], 0.45)
 
     def test_glm_probability_sum_is_rounded_to_six_places(self):
         # i: 0.1 + 0.2 is 0.30000000000000004 as a float; the record holds 0.3.
-        self.fake.choice("hard", probs(easy=0.1, medium=0.2, hard=0.7))
+        self.fake.choice("very_hard", probs(easy=0.1, medium=0.2, very_hard=0.7))
         create, _ = self.create(self.card())
         record = self.last_decision()
         self.assertEqual(record["glm_probability_sum"], 0.3)
         self.assertEqual((record["route"], record["applied"], record["applied_route"]),
-                         ("hard", True, "hard"))
+                         ("very_hard", True, "very_hard"))
 
 
     # --- routes not applied --------------------------------------------------------
@@ -352,8 +387,8 @@ class RoutingTests(unittest.TestCase):
 
     def test_not_applied_below_threshold(self):
         # Card t_92e29d10: below_threshold needs a GLM sum below 0.6 (and no
-        # chosen `hard` at 0.6 or more), not only a chosen route below 0.6.
-        self.fake.choice("easy", probs(easy=0.3, medium=0.29, hard=0.41))
+        # chosen non-GLM route at 0.6 or more), not only a chosen route below 0.6.
+        self.fake.choice("easy", probs(easy=0.3, medium=0.29, very_hard=0.41))
         create, _ = self.create(self.card())
         record = self.assert_unchanged(create, "below_threshold")
         self.assertEqual(record["route"], "easy")
@@ -367,23 +402,29 @@ class RoutingTests(unittest.TestCase):
         self.assertEqual(self.fake.requests, [])
 
     def test_every_board_has_glm_routing(self):
-        # Card t_71b4ef4a: jss-genr and anki have GLM workers and the easy and medium
-        # routes like the other three boards. Card t_f4ce916d: the shipped config.json names
-        # exactly three GLM workers on every board.
+        # Card t_71b4ef4a: jss-genr and anki have GLM workers and the same routes
+        # as the other three boards. Card t_f4ce916d named three GLM worker
+        # profiles per board; card t_3c7a581d moved the third of each board into
+        # the new list `glm_max_workers` and gave `hard` that list in
+        # `assignee_from` with model `glm-5.3` and provider `zai`.
         boards = self.config["routing"]["boards"]
         self.assertEqual(sorted(boards), ["anki", "cha-pt", "harness", "jobcron", "jss-genr"])
-        glm_workers = {"jobcron": ["jobcron-worker-glm-1", "jobcron-worker-glm-2", "jobcron-worker-glm-3"],
-                       "cha-pt": ["chapt-worker-glm-1", "chapt-worker-glm-2", "chapt-worker-glm-3"],
-                       "harness": ["harness-worker-glm-1", "harness-worker-glm-2", "harness-worker-glm-3"],
-                       "jss-genr": ["jss-worker-glm-1", "jss-worker-glm-2", "jss-worker-glm-3"],
-                       "anki": ["anki-worker-glm-1", "anki-worker-glm-2", "anki-worker-glm-3"]}
+        glm_workers = {"jobcron": ["jobcron-worker-glm-1", "jobcron-worker-glm-2"],
+                       "cha-pt": ["chapt-worker-glm-1", "chapt-worker-glm-2"],
+                       "harness": ["harness-worker-glm-1", "harness-worker-glm-2"],
+                       "jss-genr": ["jss-worker-glm-1", "jss-worker-glm-2"],
+                       "anki": ["anki-worker-glm-1", "anki-worker-glm-2"]}
+        glm_max_workers = {"jobcron": ["jobcron-worker-glm-3"], "cha-pt": ["chapt-worker-glm-3"],
+                           "harness": ["harness-worker-glm-3"], "jss-genr": ["jss-worker-glm-3"],
+                           "anki": ["anki-worker-glm-3"]}
         reference = boards["harness"]["routes"]
         for board, entry in boards.items():
             with self.subTest(board=board):
                 self.assertEqual(entry["glm_workers"], glm_workers[board])
+                self.assertEqual(entry["glm_max_workers"], glm_max_workers[board])
                 self.assertEqual(entry["routes"], reference)
                 self.assertEqual({r["name"]: r["enabled"] for r in entry["routes"]},
-                                 {"easy": True, "medium": True, "hard": True})
+                                 {"easy": True, "medium": True, "hard": True, "very_hard": True})
 
     def test_jss_and_anki_routes_applied(self):
         cases = (("jss-genr", "jss-worker", "easy", "jss-worker-glm-1", "glm-5.3-flash"),
@@ -460,7 +501,7 @@ class RoutingTests(unittest.TestCase):
         self.assertIsNone(record["task_id"])
         self.assertEqual(record["not_applied_reason"], "create_failed")
 
-    # --- Part 2 criteria (card t_df87b851) --------------------------------------------
+    # --- route criteria (card t_df87b851, card t_3c7a581d) ----------------------------
 
     def test_route_criteria_are_the_part_2_texts_on_every_board(self):
         expected = {
@@ -469,9 +510,15 @@ class RoutingTests(unittest.TestCase):
             "medium": ("A fully specified change across several files with no design decision. This includes "
                        "tests, fixtures, user-facing text and wiring inside security, migration or deployment "
                        "features."),
-            "hard": ("Everything else: a design decision, a fault with an unknown cause, logic for authentication, "
-                     "secrets or payment, writing a database migration, or commands that will be run against "
-                     "production, including deployment guides."),
+            "hard": ("Everything that is not easy, medium or very hard: a design decision, a fault with an "
+                     "unknown cause, or logic for authentication, secrets, payment, a database migration or "
+                     "deployment when the card states the required behaviour. The topic alone does not make "
+                     "a card very hard."),
+            "very_hard": ("Work on authentication, secrets, payment, a database migration or production "
+                          "systems, and in addition either the card leaves the required behaviour or the "
+                          "approach undecided, or the problem is very complex: many parts that depend on "
+                          "each other and must be worked out together. Also any card whose worker itself "
+                          "runs commands against production or against the live Hermes installation."),
         }
         for board, entry in CONFIG["routing"]["boards"].items():
             with self.subTest(board=board):
@@ -489,12 +536,14 @@ class RoutingTests(unittest.TestCase):
         return json.loads((self.log_dir / "routing-state.json").read_text(encoding="utf-8"))
 
     def test_tenth_qualifying_card_is_the_control_group(self):
+        # Card t_3c7a581d: the two workers of `glm_workers` take turns for the
+        # `easy` cards of the board.
         self.fake.choice("easy", probs(easy=0.9, medium=0.05, hard=0.05))
         sent = [self.create(self.card())[0].calls[0] for _ in range(10)]
         self.assertEqual([s["assignee"] for s in sent[:9]],
-                         ["harness-worker-glm-1", "harness-worker-glm-2", "harness-worker-glm-3",
-                          "harness-worker-glm-1", "harness-worker-glm-2", "harness-worker-glm-3",
-                          "harness-worker-glm-1", "harness-worker-glm-2", "harness-worker-glm-3"])
+                         ["harness-worker-glm-1", "harness-worker-glm-2", "harness-worker-glm-1",
+                          "harness-worker-glm-2", "harness-worker-glm-1", "harness-worker-glm-2",
+                          "harness-worker-glm-1", "harness-worker-glm-2", "harness-worker-glm-1"])
         self.assertIsNone(sent[9])  # the tenth card is created exactly as the orchestrator asked
         record = self.last_decision()
         self.assertEqual((record["event"], record["applied"], record["not_applied_reason"], record["route"]),
@@ -502,9 +551,9 @@ class RoutingTests(unittest.TestCase):
         self.assertAlmostEqual(record["probabilities"]["easy"], 0.9)
         self.assertEqual((record["original_assignee"], record["new_assignee"]), ("harness-worker", "harness-worker"))
         self.assertEqual(record["task_id"], "t_0a1b2c3d")
-        # The alternation counter did not advance for the control card: the eleventh card gets glm-1.
-        self.assertEqual(self.control_state()["counters"], {"harness": 0})
-        self.assertEqual(self.create(self.card())[0].calls[0]["assignee"], "harness-worker-glm-1")
+        # The alternation counter did not advance for the control card: the eleventh card gets glm-2.
+        self.assertEqual(self.control_state()["counters"], {"harness": 1})
+        self.assertEqual(self.create(self.card())[0].calls[0]["assignee"], "harness-worker-glm-2")
         decisions = read_records(self.log_dir, "decisions")
         self.assertEqual([r["not_applied_reason"] for r in decisions], [None] * 9 + ["control_group", None])
 
@@ -572,23 +621,38 @@ class RoutingTests(unittest.TestCase):
     def test_alternation_between_glm_workers(self):
         self.fake.choice("easy", probs(easy=0.9))
         chosen = [self.create(self.card())[0].calls[0]["assignee"] for _ in range(3)]
-        # The three GLM workers of the board take turns (card t_f4ce916d).
-        self.assertEqual(chosen, ["harness-worker-glm-1", "harness-worker-glm-2", "harness-worker-glm-3"])
+        # The two workers of `glm_workers` take turns (card t_3c7a581d; the third
+        # profile of each board is in `glm_max_workers`).
+        self.assertEqual(chosen, ["harness-worker-glm-1", "harness-worker-glm-2", "harness-worker-glm-1"])
         other = self.create(self.card(board="cha-pt", assignee="chapt-worker"))[0].calls[0]["assignee"]
         self.assertEqual(other, "chapt-worker-glm-1")
         state = json.loads((self.log_dir / "routing-state.json").read_text(encoding="utf-8"))
-        self.assertEqual(state["counters"], {"harness": 0, "cha-pt": 1})
+        self.assertEqual(state["counters"], {"harness": 1, "cha-pt": 1})
         self.assertEqual(state["control_group_counters"], {"harness": {"easy": 3}, "cha-pt": {"easy": 1}})
 
-    def test_next_glm_worker_returns_each_of_the_three_workers_once_in_three_calls(self):
+    def test_next_glm_worker_returns_each_worker_once_per_list_in_order(self):
+        # Card t_3c7a581d: every board has the list `glm_workers` with two names
+        # and the list `glm_max_workers` with one name; each list has its own
+        # counter under the section `counters` of routing-state.json.
         for board, entry in CONFIG["routing"]["boards"].items():
-            workers = entry["glm_workers"]
             with self.subTest(board=board), tempfile.TemporaryDirectory(prefix="jev-rotation-") as directory:
-                chosen = [routing.next_glm_worker(board, workers, Path(directory)) for _ in range(3)]
-                self.assertEqual(len(workers), 3)
+                workers = entry["glm_workers"]
+                max_workers = entry["glm_max_workers"]
+                self.assertEqual(len(workers), 2)
+                self.assertEqual(len(max_workers), 1)
+                chosen = [routing.next_glm_worker(board, workers, Path(directory)) for _ in range(2)]
                 self.assertEqual(chosen, workers)
-                # The fourth call starts the next turn with the first worker.
+                # The third call with `glm_workers` starts the next turn with the first worker.
                 self.assertEqual(routing.next_glm_worker(board, workers, Path(directory)), workers[0])
+                # The one-worker list returns its single name every time, under its own counter.
+                self.assertEqual(routing.next_glm_worker(board, max_workers, Path(directory), "glm_max_workers"),
+                                 max_workers[0])
+                self.assertEqual(routing.next_glm_worker(board, max_workers, Path(directory), "glm_max_workers"),
+                                 max_workers[0])
+                # The `glm_workers` turn continued where it was.
+                self.assertEqual(routing.next_glm_worker(board, workers, Path(directory)), workers[1])
+                state = json.loads((Path(directory) / "routing-state.json").read_text(encoding="utf-8"))
+                self.assertEqual(state["counters"], {board: 0, f"{board}:glm_max_workers": 0})
 
     def test_next_glm_worker_with_three_arguments_uses_the_key_of_the_board_name(self):
         # Three positional arguments keep the counter under the board name alone,
