@@ -146,10 +146,42 @@ def log_switch_error(error_class: Optional[str]) -> None:
 # --- configuration lookups --------------------------------------------------
 
 def glm_workers_by_board(config: Mapping[str, Any]) -> Dict[str, List[str]]:
+    """The GLM worker names of each board, in order and with no name twice.
+
+    For each board of ``routing.boards`` the returned list holds the non-empty
+    entries of the board's list ``glm_workers``, then, for each entry of the
+    board's ``routes`` in the order of the list, the non-empty entries of the
+    board's list that the route names in ``assignee_from``, when that value is
+    a non-empty string other than ``glm_workers`` and other than
+    ``implementation_workers``. A route counts whether its ``enabled`` is true
+    or false: a card that is already assigned to such a worker must still be
+    held, cleared at review and moved to a Claude worker after the route is
+    turned off. ``implementation_workers`` is excluded so that a configuration
+    error never makes a Claude worker count as a GLM worker. A board whose
+    result is empty is left out. Nothing is raised when ``routes`` is absent
+    or is not a list, when a route entry is not a mapping, or when the named
+    list is absent.
+    """
     boards = ((config.get("routing") or {}).get("boards") or {})
     out: Dict[str, List[str]] = {}
     for board, entry in boards.items():
-        workers = [str(w) for w in (entry or {}).get("glm_workers") or [] if w]
+        entry = entry or {}
+        lists: List[Any] = [entry.get("glm_workers")]
+        routes = entry.get("routes")
+        if isinstance(routes, list):
+            for route in routes:
+                if not isinstance(route, Mapping):
+                    continue
+                list_name = route.get("assignee_from")
+                if (not isinstance(list_name, str) or not list_name
+                        or list_name in ("glm_workers", "implementation_workers")):
+                    continue
+                lists.append(entry.get(list_name))
+        workers: List[str] = []
+        for names in lists:
+            for name in names or []:
+                if name and str(name) not in workers:
+                    workers.append(str(name))
         if workers:
             out[str(board)] = workers
     return out
