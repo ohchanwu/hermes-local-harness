@@ -33,6 +33,17 @@ Findings, one line each, `<KIND> <card id> <status> <assignee or -> <title>`:
                            has the commit, ` (commit not found)`
   STALE-BLOCKED            blocked card with no activity for stale_after_seconds
   STALE-REVIEW             review card with no activity for stale_after_seconds
+  RESPAWN-GUARDED          ready or review card whose tasks.last_failure_error
+                           is neither NULL nor the empty string and that has at
+                           least RESPAWN_GUARDED_MIN_EVENTS (3) events of kind
+                           respawn_guarded whose payload is a JSON object with
+                           the value blocker_auth for reason, with an event id
+                           greater than the id of the card's newest claimed
+                           event (every event of the card when it has no
+                           claimed event); a payload that is NULL, is not valid
+                           JSON, is not a JSON object or has another reason is
+                           not counted; the line ends with
+                           ` reason blocker_auth events <count>`
 
 Branch reference of a repository: the value for that repository in the
 optional settings key repository_branches (a JSON object that maps a path in
@@ -51,7 +62,10 @@ A settings, database, state file or Git error prints one line starting with
 starts the agent. Exit is nonzero only on an unexpected exception.
 
 The output never contains card bodies, comment text, run summaries or run
-metadata other than the candidate commit.
+metadata other than the candidate commit. It never contains the text of
+tasks.last_failure_error, which is read only in the SQL condition that tests
+whether it is empty, and never contains event payload text other than the fixed
+word blocker_auth.
 
 Provider of each watched profile (optional settings key provider_watch, a list
 of objects with the keys profile, home and primary_provider; home is the
@@ -134,6 +148,27 @@ WAITING_CARDS_SQL = (
 )
 
 STALE_KINDS = {"blocked": "STALE-BLOCKED", "review": "STALE-REVIEW"}
+
+# The Hermes dispatcher writes one respawn_guarded event on each dispatcher tick
+# on which its respawn guard skips the card. Three counted events mean that the
+# card was skipped on three ticks since its newest claim.
+RESPAWN_GUARDED_MIN_EVENTS = 3
+RESPAWN_GUARDED_REASON = "blocker_auth"
+
+# respawn_guarded events of ready and review cards with a stored failure text,
+# for which no claimed event of the same card has a greater id. The failure text
+# itself is not selected; it is tested only for being empty. The payloads are
+# checked in Python (count_blocker_auth_events).
+RESPAWN_GUARDED_SQL = (
+    "SELECT t.id, t.status, t.assignee, t.title, e.payload"
+    " FROM tasks t JOIN task_events e ON e.task_id = t.id"
+    " WHERE t.status IN ('ready', 'review')"
+    " AND COALESCE(t.last_failure_error, '') <> ''"
+    " AND e.kind = 'respawn_guarded'"
+    " AND NOT EXISTS (SELECT 1 FROM task_events c"
+    "                 WHERE c.task_id = t.id AND c.kind = 'claimed' AND c.id > e.id)"
+    " ORDER BY t.created_at, t.id, e.id"
+)
 
 PROVIDER_WATCH_KEYS = ("profile", "home", "primary_provider")
 ROTATED_LOG_LIMIT = 20
@@ -242,7 +277,11 @@ def connect_read_only(db_path):
 
 
 def read_board(db_path, reviewer_profile):
-    """Return the rows the three checks need; raises CheckError on any database failure."""
+    """Return the rows the four checks need; raises CheckError on any database failure.
+
+    A database without a column that a query names, such as
+    tasks.last_failure_error, is such a failure.
+    """
     if not Path(db_path).is_file():
         raise CheckError(f"database file not found: {db_path}")
     try:
@@ -252,11 +291,35 @@ def read_board(db_path, reviewer_profile):
             waking_ids = {row[0] for row in conn.execute(WAKING_CARDS_SQL)}
             reviewed = conn.execute(LATEST_REVIEWER_RUNS_SQL, (reviewer_profile,)).fetchall()
             waiting = conn.execute(WAITING_CARDS_SQL).fetchall()
+            guarded = conn.execute(RESPAWN_GUARDED_SQL).fetchall()
         finally:
             conn.close()
     except sqlite3.Error as exc:
         raise CheckError(f"cannot read database {db_path}: {one_line(exc)}")
-    return open_cards, waking_ids, reviewed, waiting
+    return open_cards, waking_ids, reviewed, waiting, guarded
+
+
+def is_blocker_auth_payload(payload_text):
+    """Return True when the payload is a JSON object whose reason is the string blocker_auth.
+
+    A NULL payload, text that is not valid JSON and JSON that is not an object
+    return False; none of them is an error.
+    """
+    try:
+        payload = json.loads(payload_text) if payload_text is not None else None
+    except (TypeError, ValueError):
+        return False
+    return isinstance(payload, dict) and payload.get("reason") == RESPAWN_GUARDED_REASON
+
+
+def count_blocker_auth_events(guarded):
+    """Return [(card, count)] in the order of guarded rows, for each card with at least one counted event."""
+    counts = {}
+    for task_id, status, assignee, title, payload in guarded:
+        if is_blocker_auth_payload(payload):
+            card = (task_id, status, assignee, title)
+            counts[card] = counts.get(card, 0) + 1
+    return list(counts.items())
 
 
 def run_git(repository, *args):
@@ -483,7 +546,8 @@ def status_lines(settings):
 
 def collect_findings(settings, now):
     """Return a list of (key, line) in output order."""
-    open_cards, waking_ids, reviewed, waiting = read_board(settings["db"], settings["reviewer_profile"])
+    open_cards, waking_ids, reviewed, waiting, guarded = read_board(settings["db"],
+                                                                    settings["reviewer_profile"])
     findings = []
     for card in open_cards:
         if card[0] not in waking_ids:
@@ -510,6 +574,11 @@ def collect_findings(settings, now):
         if now - (newest or 0) > settings["stale_after_seconds"]:
             kind = STALE_KINDS[status]
             findings.append((f"{kind}:{task_id}", finding_line(kind, (task_id, status, assignee, title))))
+
+    for card, count in count_blocker_auth_events(guarded):
+        if count >= RESPAWN_GUARDED_MIN_EVENTS:
+            suffix = f" reason {RESPAWN_GUARDED_REASON} events {count}"
+            findings.append((f"RESPAWN-GUARDED:{card[0]}", finding_line("RESPAWN-GUARDED", card, suffix)))
     return findings + provider_findings(settings)
 
 
