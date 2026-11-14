@@ -288,6 +288,38 @@ reason text contains `max_tokens`, and the closed-client error contains neither
 the error text of the failed request nor the class name of the exception that
 closed the client.
 
+Hermes keeps the clients of helper jobs in its auxiliary client cache and
+returns a cached client without checking whether it is closed. A closed client
+therefore asks Hermes to remove it from that cache, with the Hermes function
+`_evict_cached_client_instance` of module `agent.auxiliary_client`; the next
+helper request with the same cache key makes Hermes build a new client. The
+closed client stays closed and refuses every later request. The plugin calls
+that function only if Hermes has already loaded the module, never imports it,
+and ignores an absent function or an exception from it; the error of the
+request is the same either way. The client of the main conversation is not in
+that cache, so for it the call removes nothing. The removal is asked for:
+
+- when a closed client refuses a request (the closed-client error above);
+- when a request fails and closes the client, if the request ended with an
+  exception that is an `Exception` (not `GeneratorExit`, `KeyboardInterrupt`
+  or `SystemExit`);
+- when a failed session reset closes the client.
+
+`close()`, `cancel()`, the `close()` of a streaming iterator and the cleanup
+after a request never ask for the removal. Hermes holds the lock of its cache
+(not reentrant) while it calls `close()` on a cached client, and the removal
+acquires that lock, so a removal there would wait for that lock forever. For
+the same reason a refusal inside the client's own lifecycle lock does not ask
+for it; that refusal reaches the request's error handler, which asks for it.
+`GeneratorExit` is excluded because garbage collection can deliver it to an
+abandoned request in a thread that holds the lock of the cache.
+
+One case remains: a client that Hermes closes with `close()` or `cancel()`
+while no request is in progress stays in the cache until it refuses one
+request. That request fails with the closed-client error, as before, and the
+request after it runs on a new client. The cause in the warning line above
+(`close() called` or `cancel() called`) shows how often this case occurs.
+
 There is no session-level cap on user inputs, assistant messages, tool steps
 or session duration; the subscription's own rate limits are the usage bound,
 and a rejected rate limit still terminates the client. Hang protection remains:

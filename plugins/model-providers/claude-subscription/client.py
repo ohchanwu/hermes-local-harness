@@ -206,8 +206,41 @@ class ClaudeSubscriptionClient:
                     at, cause, "" if detail is None else ": " + detail)
         return ProviderError(f"client closed or cancelled; no retry/resume (closed at {at} by: {cause})")
 
+    def _remove_from_hermes_cache(self):
+        """Ask Hermes to remove this client from its auxiliary client cache.
+
+        The next auxiliary request with the same cache key then makes Hermes build a new client; this
+        client stays closed. The Hermes function is agent.auxiliary_client._evict_cached_client_instance,
+        used only if Hermes has already loaded that module: the module is never imported here, because
+        a cache that Hermes has not loaded holds no client. If the module or the function is absent, or
+        the function raises an Exception, nothing happens; this method never raises and never changes
+        the error that its caller raises.
+
+        The Hermes function acquires the Hermes cache lock, which is not reentrant, and Hermes holds
+        that lock while it calls close() on a cached client. For this reason close(), cancel(), _cancel(),
+        Stream.close(), _dispose_if_closed() and __exit__ never call this method, and the request error
+        handlers call it only for an Exception (GeneratorExit can be delivered by garbage collection in a
+        thread that holds the Hermes cache lock).
+        """
+        try:
+            module = sys.modules.get("agent.auxiliary_client")
+            if module is None:
+                return
+            evict = getattr(module, "_evict_cached_client_instance", None)
+            if callable(evict):
+                evict(self)
+        except Exception:
+            pass
+
     def _check_active(self):
         if self.is_closed():
+            # Not while this thread holds _lifecycle: close() from a Hermes thread that holds the Hermes
+            # cache lock waits for _lifecycle. Every caller is inside _drive, whose error handler asks
+            # for the removal after _lifecycle is released. _is_owned is the RLock method that
+            # threading.Condition uses; without it the removal is left to that handler.
+            owned = getattr(self._lifecycle, "_is_owned", None)
+            if owned is not None and not owned():
+                self._remove_from_hermes_cache()
             raise self._closed_error()
         if self._scope is None or self._current_scope(self._scope[-1]) != self._scope:
             raise ProviderError("session/worktree/profile changed during execution; use a separate client")
@@ -278,6 +311,7 @@ class ClaudeSubscriptionClient:
         self._busy_owner = threading.get_ident()
         try:
             if self.is_closed():
+                self._remove_from_hermes_cache()
                 raise self._closed_error()
             model, scope, tools, max_output, effort = self._validate(kwargs)
             # Never fall back to the interactive `claude` on PATH: it updates itself.
@@ -665,6 +699,7 @@ class ClaudeSubscriptionClient:
         except (ValueError, TypeError, KeyError, OSError, subprocess.SubprocessError) as exc:
             error = protocol_error(exc)
             self._cancel(CLOSED_BY_REQUEST_ERROR, str(error)[:200])
+            self._remove_from_hermes_cache()
             raise error from None
         except BaseException as exc:
             if isinstance(exc, ProviderError):
@@ -672,6 +707,9 @@ class ClaudeSubscriptionClient:
             else:
                 # The class name only: the message of such an exception is never recorded.
                 self._cancel(CLOSED_BY_OTHER_EXCEPTION, type(exc).__name__)
+            # Not for GeneratorExit, KeyboardInterrupt or SystemExit: see _remove_from_hermes_cache.
+            if isinstance(exc, Exception):
+                self._remove_from_hermes_cache()
             raise
 
     def _flush(self, message):
@@ -860,6 +898,7 @@ class ClaudeSubscriptionClient:
                 self._cancel(CLOSED_BY_RESET_FAILURE, type(exc).__name__)
             except BaseException:
                 pass
+            self._remove_from_hermes_cache()
             raise ProviderError(f"session reset failed ({type(exc).__name__}); client closed") from None
 
     def cancel(self):
