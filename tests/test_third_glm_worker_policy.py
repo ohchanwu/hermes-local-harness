@@ -274,6 +274,8 @@ class DesiredState(unittest.TestCase):
         expected = copy.deepcopy(before)
         for prefix, board in BOARD_OF.items():
             expected["routing"]["boards"][board]["glm_workers"].append(f"{prefix}-worker-glm-3")
+        # Card t_a40f99ed changed control_group_every from 5 to 10 (owner's instruction).
+        expected["routing"]["control_group_every"] = 10
         self.assertEqual(config, expected)
 
     def test_roster_entries_of_the_third_glm_workers_equal_the_second(self):

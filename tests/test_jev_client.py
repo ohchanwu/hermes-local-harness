@@ -408,9 +408,10 @@ class PluginFrameTests(unittest.TestCase):
         for key, value in (("min_chars", 2000), ("max_chars", 100000), ("chunk_lines", 10), ("chunk_chars", 500),
                            ("args_chars", 2000), ("keep_threshold", 0.6), ("max_kept_ratio", 0.9)):
             self.assertEqual(config["tool_results"][key], value, key)
-        # Card t_df87b851 (Parts 3 and 4): both new routing settings are 5; 0 turns each off.
+        # Card t_df87b851 (Parts 3 and 4) set both routing settings to 5; 0 turns each off.
+        # Card t_a40f99ed changed control_group_every from 5 to 10 (owner's instruction).
         self.assertEqual((config["routing"]["control_group_every"], config["routing"]["max_glm_change_requests"]),
-                         (5, 5))
+                         (10, 5))
         self.assertEqual(config["jev"]["timeout_seconds"], 5)
 
     def test_auxiliary_record(self):
