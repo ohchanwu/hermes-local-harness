@@ -139,6 +139,135 @@ class RoutingTests(unittest.TestCase):
         self.assertEqual(state["title"], "Fix a typo")
         self.assertEqual(len(state["body"]), 60000)
 
+    # --- the GLM sum rule (card t_92e29d10) ----------------------------------------
+
+    def test_glm_sum_at_threshold_applies_the_highest_glm_route(self):
+        # a: easy 0.2, medium 0.4, hard 0.4, Jev chose medium; no single route
+        # reaches 0.6, the GLM sum 0.6 does, and medium is the highest GLM route.
+        self.fake.choice("medium", probs(easy=0.2, medium=0.4, hard=0.4))
+        create, _ = self.create(self.card())
+        sent = create.calls[0]
+        self.assertEqual(sent["assignee"], "harness-worker-glm-1")
+        self.assertEqual((sent["model"], sent["provider"]), ("glm-5.3", "zai"))
+        record = self.last_decision()
+        self.assertEqual((record["route"], record["applied"], record["not_applied_reason"]),
+                         ("medium", True, None))
+        self.assertEqual(record["applied_route"], "medium")
+        self.assertEqual(record["glm_probability_sum"], 0.6)
+
+    def test_glm_sum_below_threshold_chosen_hard_is_unchanged(self):
+        # b: easy 0.3, medium 0.29, hard 0.41, Jev chose hard; the GLM sum 0.59
+        # is below 0.6 and the chosen hard 0.41 too.
+        self.fake.choice("hard", probs(easy=0.3, medium=0.29, hard=0.41))
+        create, _ = self.create(self.card())
+        record = self.assert_unchanged(create, "below_threshold")
+        self.assertEqual(record["route"], "hard")
+        self.assertIsNone(record["applied_route"])
+        self.assertEqual(record["glm_probability_sum"], 0.59)
+
+    def test_glm_sum_carries_a_chosen_hard_card_and_the_tie_goes_to_medium(self):
+        # c: easy 0.31, medium 0.31, hard 0.38, Jev chose hard; the GLM sum 0.62
+        # is at the threshold, hard is the single most probable route, and the
+        # tie between the GLM routes goes to the route listed last (`medium`).
+        self.fake.choice("hard", probs(easy=0.31, medium=0.31, hard=0.38))
+        create, _ = self.create(self.card())
+        sent = create.calls[0]
+        self.assertEqual(sent["assignee"], "harness-worker-glm-1")
+        self.assertEqual((sent["model"], sent["provider"]), ("glm-5.3", "zai"))
+        self.assertIn("\nAssigned worker EXACT harness-worker-glm-1.\n", sent["body"])
+        record = self.last_decision()
+        self.assertEqual((record["route"], record["applied"], record["not_applied_reason"]),
+                         ("hard", True, None))
+        self.assertEqual(record["applied_route"], "medium")
+        self.assertEqual(record["glm_probability_sum"], 0.62)
+
+    def test_glm_sum_with_easy_higher_applies_easy(self):
+        # d: easy 0.45, medium 0.2, hard 0.35, Jev chose easy.
+        self.fake.choice("easy", probs(easy=0.45, medium=0.2, hard=0.35))
+        create, _ = self.create(self.card())
+        sent = create.calls[0]
+        self.assertEqual(sent["assignee"], "harness-worker-glm-1")
+        self.assertEqual((sent["model"], sent["provider"]), ("glm-5.3-flash", "zai"))
+        record = self.last_decision()
+        self.assertEqual((record["route"], record["applied"], record["applied_route"]),
+                         ("easy", True, "easy"))
+        self.assertEqual(record["glm_probability_sum"], 0.65)
+
+    def test_hard_at_threshold_is_applied_as_the_chosen_route(self):
+        # e: hard 0.95, medium 0.05; the GLM sum 0.05 is below 0.6 and the
+        # chosen hard is at the threshold, so the card is unchanged.
+        self.fake.choice("hard", probs(hard=0.95, medium=0.05))
+        create, _ = self.create(self.card())
+        self.assertEqual(create.calls, [None])
+        record = self.last_decision()
+        self.assertEqual((record["route"], record["applied"], record["applied_route"],
+                          record["not_applied_reason"]), ("hard", True, "hard", None))
+        self.assertEqual(record["new_assignee"], "harness-worker")
+        self.assertEqual(record["glm_probability_sum"], 0.05)
+
+    def test_control_group_counts_the_applied_route_and_not_the_chosen_one(self):
+        # f: two cards as in case c with control_group_every 2; the second is
+        # the control card, and its counter is under the applied route `medium`.
+        self.config["routing"]["control_group_every"] = 2
+        self.fake.choice("hard", probs(easy=0.31, medium=0.31, hard=0.38))
+        first, _ = self.create(self.card())
+        second, _ = self.create(self.card())
+        self.assertEqual(first.calls[0]["assignee"], "harness-worker-glm-1")
+        self.assertIsNone(second.calls[0])  # the control card is created exactly as asked
+        record = self.last_decision()
+        self.assertEqual((record["route"], record["applied"], record["not_applied_reason"]),
+                         ("hard", False, "control_group"))
+        self.assertEqual(record["applied_route"], "medium")
+        self.assertEqual(record["glm_probability_sum"], 0.62)
+        self.assertEqual(self.control_state()["control_group_counters"], {"harness": {"medium": 0}})
+        # The GLM worker alternation advanced once (for the first card) only.
+        self.assertEqual(self.control_state()["counters"], {"harness": 1})
+
+    def test_records_that_do_not_apply_have_the_new_fields(self):
+        # g: model_set and assignee_not_listed carry the GLM sum; a jev_error
+        # record has both new fields null.
+        self.fake.choice("easy", probs(easy=0.7, medium=0.2, hard=0.1))
+        create, _ = self.create(self.card(model="glm-5.3"))
+        record = self.assert_unchanged(create, "model_set")
+        self.assertEqual(record["glm_probability_sum"], 0.9)
+        self.assertIsNone(record["applied_route"])
+        self.fake.choice("easy", probs(easy=0.7, medium=0.2, hard=0.1))
+        create, _ = self.create(self.card(assignee="harness-reviewer"))
+        record = self.assert_unchanged(create, "assignee_not_listed")
+        self.assertEqual(record["glm_probability_sum"], 0.9)
+        self.assertIsNone(record["applied_route"])
+        self.fake.mode = "http_error"
+        create, _ = self.create(self.card())
+        record = self.assert_unchanged(create, "jev_error")
+        self.assertIsNone(record["glm_probability_sum"])
+        self.assertIsNone(record["applied_route"])
+
+    def test_the_glm_sum_rule_is_checked_before_the_chosen_route_rule(self):
+        # h: threshold 0.4, easy 0.25, medium 0.2, hard 0.55, Jev chose hard;
+        # the GLM sum 0.45 is at the threshold, so easy is applied although the
+        # chosen hard 0.55 is above the threshold too.
+        config = json.loads(json.dumps(self.config))
+        config["routing"]["threshold"] = 0.4
+        self.fake.choice("hard", probs(easy=0.25, medium=0.2, hard=0.55))
+        create, _ = self.create(self.card(), config=config)
+        sent = create.calls[0]
+        self.assertEqual(sent["assignee"], "harness-worker-glm-1")
+        self.assertEqual((sent["model"], sent["provider"]), ("glm-5.3-flash", "zai"))
+        record = self.last_decision()
+        self.assertEqual((record["route"], record["applied"], record["applied_route"]),
+                         ("hard", True, "easy"))
+        self.assertEqual(record["glm_probability_sum"], 0.45)
+
+    def test_glm_probability_sum_is_rounded_to_six_places(self):
+        # i: 0.1 + 0.2 is 0.30000000000000004 as a float; the record holds 0.3.
+        self.fake.choice("hard", probs(easy=0.1, medium=0.2, hard=0.7))
+        create, _ = self.create(self.card())
+        record = self.last_decision()
+        self.assertEqual(record["glm_probability_sum"], 0.3)
+        self.assertEqual((record["route"], record["applied"], record["applied_route"]),
+                         ("hard", True, "hard"))
+
+
     # --- routes not applied --------------------------------------------------------
 
     def assert_unchanged(self, create, reason):
@@ -167,9 +296,14 @@ class RoutingTests(unittest.TestCase):
         self.assertIsNone(record["original_assignee"])
 
     def test_not_applied_below_threshold(self):
-        self.fake.choice("easy", probs(easy=0.55, medium=0.45))
+        # Card t_92e29d10: below_threshold needs a GLM sum below 0.6 (and no
+        # chosen `hard` at 0.6 or more), not only a chosen route below 0.6.
+        self.fake.choice("easy", probs(easy=0.3, medium=0.29, hard=0.41))
         create, _ = self.create(self.card())
-        self.assert_unchanged(create, "below_threshold")
+        record = self.assert_unchanged(create, "below_threshold")
+        self.assertEqual(record["route"], "easy")
+        self.assertIsNone(record["applied_route"])
+        self.assertEqual(record["glm_probability_sum"], 0.59)
 
     def test_routing_disabled(self):
         self.config["routing"]["enabled"] = False
@@ -338,7 +472,7 @@ class RoutingTests(unittest.TestCase):
             self.create(self.card())
         self.create(self.card(model="glm-5.3"))                  # model_set
         self.create(self.card(assignee="harness-reviewer"))      # assignee_not_listed
-        self.fake.choice("easy", probs(easy=0.55, hard=0.45))
+        self.fake.choice("easy", probs(easy=0.3, medium=0.29, hard=0.41))
         self.create(self.card())                                 # below_threshold
         self.fake.choice("hard", probs(hard=0.9))
         self.create(self.card())                                 # hard: applied, not counted

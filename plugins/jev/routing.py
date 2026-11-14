@@ -6,16 +6,24 @@
 1. It asks Jev one Choice question whose criteria are the board's enabled
    routes; the state is the card title and the body cut at
    ``state_max_chars`` characters.
-2. It applies the chosen route only when the orchestrator left ``model``
-   empty, the ``assignee`` is one of the board's ``implementation_workers``
-   and the route's probability is at least ``threshold``. ``easy`` and
-   ``medium`` move the card to the next GLM worker of the board (alternating),
-   set ``model`` and ``provider``, and rewrite the profile name on a body
-   line that starts with ``Assigned worker EXACT ``. ``hard`` changes nothing.
+2. It applies a route only when the orchestrator left ``model`` empty and
+   the ``assignee`` is one of the board's ``implementation_workers``.
+   Card ``t_92e29d10`` (owner's instruction of 2026-11-14): when the GLM sum,
+   the sum of the probabilities of the board's GLM routes (an enabled route
+   with ``assignee_from`` or ``model``), is at least ``threshold``, the applied
+   route is the GLM route with the highest probability (on a tie the one listed
+   last in the board's ``routes``), whichever route Jev chose. Otherwise the
+   applied route is the route that Jev chose only when its probability is at
+   least ``threshold`` and it is not a GLM route. ``easy`` and ``medium`` move
+   the card to the next GLM worker of the board (alternating), set ``model``
+   and ``provider``, and rewrite the profile name on a body line that starts
+   with ``Assigned worker EXACT ``. ``hard`` changes nothing. The ``route``
+   record keeps the route that Jev chose in ``route`` and names the applied
+   route in ``applied_route``; ``glm_probability_sum`` holds the GLM sum.
    Control group: when ``routing.control_group_every`` is n > 0, every n-th
-   card of a board and route that would get ``easy`` or ``medium`` stays
-   unchanged (``not_applied_reason`` ``control_group``), and the GLM worker
-   alternation does not advance for it.
+   card of a board and applied route that would get ``easy`` or ``medium``
+   stays unchanged (``not_applied_reason`` ``control_group``), and the GLM
+   worker alternation does not advance for it.
 3. Inside the peak-hours window it creates a card assigned to a GLM worker
    as ``blocked`` and then moves it to ``scheduled`` with the
    ``jev-peak-hold`` marker (see ``peak_hold``), but only where both Kanban
@@ -275,6 +283,19 @@ def setting_count(section: Mapping[str, Any], key: str) -> int:
     return value if isinstance(value, int) and not isinstance(value, bool) and value > 0 else 0
 
 
+def _glm_sum(routes: Sequence[Mapping[str, Any]], probabilities: Mapping[str, float]) -> Optional[float]:
+    """The sum of the probabilities of the GLM routes of the board, rounded to
+    6 decimal places; None when the board has no GLM route.
+
+    A GLM route is an enabled route that has ``assignee_from`` or ``model``. A
+    GLM route without a number in Jev's answer counts as 0 (card t_92e29d10).
+    """
+    glm_routes = [str(r["name"]) for r in routes if r.get("assignee_from") or r.get("model")]
+    if not glm_routes:
+        return None
+    return round(sum(probabilities.get(name, 0.0) for name in glm_routes), 6)
+
+
 # --- decision ---------------------------------------------------------------
 
 def decide(args: Mapping[str, Any], config: Mapping[str, Any], ask: Callable[..., Any],
@@ -289,6 +310,7 @@ def decide(args: Mapping[str, Any], config: Mapping[str, Any], ask: Callable[...
         "event": "route", "board": board if board_cfg is not None else None, "task_id": None,
         "original_assignee": None, "new_assignee": None, "orchestrator_model": _safe_model(args.get("model"), config),
         "route": None, "probabilities": None, "confidence": None, "applied": False,
+        "applied_route": None, "glm_probability_sum": None,
         "not_applied_reason": None, "jev_latency_ms": None, "jev_input_tokens": None, "error_class": None,
     }
     if not routing.get("enabled", False):
@@ -323,7 +345,8 @@ def decide(args: Mapping[str, Any], config: Mapping[str, Any], ask: Callable[...
         record["error_class"] = type(exc).__name__
         record["not_applied_reason"] = "jev_error"
         return None, record
-    record.update(route=route, probabilities=probabilities, confidence=confidence)
+    record.update(route=route, probabilities=probabilities, confidence=confidence,
+                 glm_probability_sum=_glm_sum(routes, probabilities))
 
     try:
         threshold = float(routing.get("threshold", 0.6))
@@ -335,14 +358,33 @@ def decide(args: Mapping[str, Any], config: Mapping[str, Any], ask: Callable[...
     if assignee not in workers:
         record["not_applied_reason"] = "assignee_not_listed"
         return None, record
-    probability = probabilities.get(route)
-    if probability is None or probability < threshold:
+    # Card t_92e29d10: the applied route is decided by the GLM routes together.
+    # When the GLM sum (the sum of the probabilities of the board's GLM routes,
+    # rounded to 6 decimal places) is at least ``threshold``, the applied route
+    # is the GLM route with the highest probability, whichever route Jev chose;
+    # on a tie it is the tied GLM route that is listed last in the board's
+    # ``routes``. Otherwise the card is unchanged when the probability of the
+    # route that Jev chose is at least ``threshold`` and that route is not a
+    # GLM route (``hard``); in every other case ``below_threshold``.
+    glm_routes = [r for r in routes if r.get("assignee_from") or r.get("model")]
+    glm_sum = record["glm_probability_sum"] if glm_routes else None
+    chosen_by_jev = next(r for r in routes if str(r["name"]) == route)
+    applied_route: Optional[str] = None
+    if glm_routes and glm_sum is not None and glm_sum >= threshold:
+        best = max(probabilities.get(str(r["name"]), 0.0) for r in glm_routes)
+        applied_route = str(next(r for r in reversed(glm_routes)
+                                if probabilities.get(str(r["name"]), 0.0) == best)["name"])
+    elif (probabilities.get(route) is not None and probabilities[route] >= threshold
+          and not chosen_by_jev.get("assignee_from") and not chosen_by_jev.get("model")):
+        applied_route = route
+    if applied_route is None:
         record["not_applied_reason"] = "below_threshold"
         return None, record
 
-    chosen = next(r for r in routes if str(r["name"]) == route)
+    chosen = next(r for r in routes if str(r["name"]) == applied_route)
     if not chosen.get("assignee_from") and not chosen.get("model"):
         record["applied"] = True  # hard: the orchestrator's Claude worker keeps the card unchanged
+        record["applied_route"] = applied_route
         return None, record
     pool: List[str] = []
     if chosen.get("assignee_from"):
@@ -352,9 +394,13 @@ def decide(args: Mapping[str, Any], config: Mapping[str, Any], ask: Callable[...
             return None, record
     # Control group: every n-th card that would get this route keeps the
     # orchestrator's Claude worker; the GLM worker alternation does not advance.
+    # Card t_92e29d10: the counter of the applied route; the record names the
+    # route that would have been applied in ``applied_route`` (it differs from
+    # Jev's choice ``route`` whenever the GLM sum carried the card).
     every = setting_count(routing, "control_group_every")
-    if every and control_group_turn(board, route, every, state_dir):
+    if every and control_group_turn(board, applied_route, every, state_dir):
         record["not_applied_reason"] = "control_group"
+        record["applied_route"] = applied_route
         return None, record
     new_args = dict(args)
     if pool:
@@ -367,6 +413,7 @@ def decide(args: Mapping[str, Any], config: Mapping[str, Any], ask: Callable[...
         if chosen.get("provider"):
             new_args["provider"] = str(chosen["provider"])
     record["applied"] = True
+    record["applied_route"] = applied_route
     return new_args, record
 
 
