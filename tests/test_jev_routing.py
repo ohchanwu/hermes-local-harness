@@ -299,41 +299,42 @@ class RoutingTests(unittest.TestCase):
     def control_state(self):
         return json.loads((self.log_dir / "routing-state.json").read_text(encoding="utf-8"))
 
-    def test_fifth_qualifying_card_is_the_control_group(self):
+    def test_tenth_qualifying_card_is_the_control_group(self):
         self.fake.choice("easy", probs(easy=0.9, medium=0.05, hard=0.05))
-        sent = [self.create(self.card())[0].calls[0] for _ in range(5)]
-        self.assertEqual([s["assignee"] for s in sent[:4]],
+        sent = [self.create(self.card())[0].calls[0] for _ in range(10)]
+        self.assertEqual([s["assignee"] for s in sent[:9]],
                          ["harness-worker-glm-1", "harness-worker-glm-2", "harness-worker-glm-3",
-                          "harness-worker-glm-1"])
-        self.assertIsNone(sent[4])  # the fifth card is created exactly as the orchestrator asked
+                          "harness-worker-glm-1", "harness-worker-glm-2", "harness-worker-glm-3",
+                          "harness-worker-glm-1", "harness-worker-glm-2", "harness-worker-glm-3"])
+        self.assertIsNone(sent[9])  # the tenth card is created exactly as the orchestrator asked
         record = self.last_decision()
         self.assertEqual((record["event"], record["applied"], record["not_applied_reason"], record["route"]),
                          ("route", False, "control_group", "easy"))
         self.assertAlmostEqual(record["probabilities"]["easy"], 0.9)
         self.assertEqual((record["original_assignee"], record["new_assignee"]), ("harness-worker", "harness-worker"))
         self.assertEqual(record["task_id"], "t_0a1b2c3d")
-        # The alternation counter did not advance for the control card: the sixth card gets glm-2.
-        self.assertEqual(self.control_state()["counters"], {"harness": 1})
-        self.assertEqual(self.create(self.card())[0].calls[0]["assignee"], "harness-worker-glm-2")
+        # The alternation counter did not advance for the control card: the eleventh card gets glm-1.
+        self.assertEqual(self.control_state()["counters"], {"harness": 0})
+        self.assertEqual(self.create(self.card())[0].calls[0]["assignee"], "harness-worker-glm-1")
         decisions = read_records(self.log_dir, "decisions")
-        self.assertEqual([r["not_applied_reason"] for r in decisions], [None] * 4 + ["control_group", None])
+        self.assertEqual([r["not_applied_reason"] for r in decisions], [None] * 9 + ["control_group", None])
 
     def test_control_group_counter_is_per_board_and_route(self):
         self.fake.choice("easy", probs(easy=0.9))
-        for _ in range(4):
+        for _ in range(9):
             self.create(self.card())
         self.fake.choice("medium", probs(medium=0.9))
         self.assertIsNotNone(self.create(self.card())[0].calls[0])  # first medium card on harness
         self.fake.choice("easy", probs(easy=0.9))
-        for _ in range(4):
+        for _ in range(9):
             self.assertIsNotNone(self.create(self.card(board="cha-pt", assignee="chapt-worker"))[0].calls[0])
-        self.assertIsNone(self.create(self.card())[0].calls[0])  # fifth easy card on harness
+        self.assertIsNone(self.create(self.card())[0].calls[0])  # tenth easy card on harness
         self.assertEqual(self.control_state()["control_group_counters"],
-                         {"harness": {"easy": 0, "medium": 1}, "cha-pt": {"easy": 4}})
+                         {"harness": {"easy": 0, "medium": 1}, "cha-pt": {"easy": 9}})
 
     def test_cards_that_do_not_qualify_do_not_count(self):
         self.fake.choice("easy", probs(easy=0.9))
-        for _ in range(4):
+        for _ in range(9):
             self.create(self.card())
         self.create(self.card(model="glm-5.3"))                  # model_set
         self.create(self.card(assignee="harness-reviewer"))      # assignee_not_listed
