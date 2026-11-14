@@ -141,7 +141,7 @@ For each `<profile>` with its `<source>` from the table:
 
         python3 /Users/chanbla11mit/hermes-local-harness/scripts/switch-profile-model --profile <profile> --to glm --dispatch add --clear-fallbacks
 
-   The script also writes the profile's model and provider into `/Users/chanbla11mit/hermes-local-harness/roster.yaml`; they are already `glm-5.3` and `zai`, so `git -C /Users/chanbla11mit/hermes-local-harness status --porcelain` stays empty.
+   The script also writes the profile's model and provider into `/Users/chanbla11mit/hermes-local-harness/roster.yaml`; they are already `glm-5.3` and `zai`, so `git -C /Users/chanbla11mit/hermes-local-harness status --porcelain` stays empty. The switch script adds the profile at the end of `kanban.dispatch_profiles` (`set_dispatch` in `/Users/chanbla11mit/hermes-local-harness/scripts/switch-profile-model`), and `/Users/chanbla11mit/hermes-local-harness/snapshots/sanitized-current-state.yaml` records the five `-worker-glm-3` entries at the end of that list in the order in which card `t_55432326` added them: `harness-worker-glm-3`, `chapt-worker-glm-3`, `jobcron-worker-glm-3`, `jss-worker-glm-3`, `anki-worker-glm-3`.
 6. The owner adds the Z.ai login of the profile, because the copy has no `auth.json`:
 
         hermes -p <profile> auth add zai
@@ -166,7 +166,7 @@ For each `<profile>` with its `<source>` from the table:
    - `FAIL: fallback drift <profile> fallback_providers: expected [], actual <unreadable>`
    - `FAIL: fallback drift <profile> auxiliary: expected a readable auxiliary mapping, actual <unreadable>`
    - `FAIL: GLM worker missing from kanban.dispatch_profiles: <profile>`
-   - `FAIL: concurrency/dispatch drift kanban.dispatch_profiles: expected [...], actual [...]` (one line for the whole list; it is absent when the list holds every expected profile)
+   - `FAIL: concurrency/dispatch drift kanban.dispatch_profiles: expected [...], actual [...]` (one line for the whole list; `scripts/verify-state` compares the whole list, including the order of its entries, and the line is absent when the live list equals the `kanban.dispatch_profiles` list of `/Users/chanbla11mit/hermes-local-harness/snapshots/sanitized-current-state.yaml` entry for entry)
    - `FAIL: deployed skill copy missing: <skill> <profile>/<file>`, for each file of each shared skill whose `deploy_profiles` in `/Users/chanbla11mit/hermes-local-harness/snapshots/sanitized-current-state.yaml` names the profile (the copy of step 1 brings these skills)
    - `FAIL: plugin drift <profile>: required jev not enabled (actual ...)`
    - `WARN: dormant unexpected plugin <profile>: <plugin>`

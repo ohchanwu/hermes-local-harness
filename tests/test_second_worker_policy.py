@@ -34,13 +34,19 @@ ALL_POOLS = {**POOLS, "anki": ["anki-worker", "anki-worker-2"]}
 GLM_IN_SERVICE = tuple(f"{prefix}-worker-glm-{n}" for prefix in ("jobcron", "chapt", "harness", "jss", "anki")
                        for n in (1, 2, 3))
 GLM_RETIRED = ("worker-flash-1", "worker-flash-2", "worker-flash-3", "worker-glm-full")
+# The GLM workers in service in the order of the dispatch lists: the first and second GLM worker
+# of each board, then the five third GLM workers in the order in which the switch script added
+# them to the live list (card t_55432326).
+GLM_IN_DISPATCH_ORDER = (*(name for name in GLM_IN_SERVICE if not name.endswith("-glm-3")),
+                         "harness-worker-glm-3", "chapt-worker-glm-3", "jobcron-worker-glm-3",
+                         "jss-worker-glm-3", "anki-worker-glm-3")
 # Live default-home kanban.dispatch_profiles order after the controller's 2026-10-18 change,
-# followed by the GLM workers in service (cards t_4f7740d0, t_71b4ef4a and t_f4ce916d).
+# followed by the GLM workers in service (cards t_4f7740d0, t_71b4ef4a, t_f4ce916d and t_55432326).
 PROJECT_DISPATCH = [
     "jobcron-worker", "jobcron-reviewer", "chapt-worker", "chapt-reviewer",
     "harness-worker", "harness-reviewer", "jss-worker", "jss-reviewer",
     "harness-worker-2", "chapt-worker-2", "jobcron-worker-2", "jss-worker-2",
-    "anki-worker", "anki-worker-2", "anki-reviewer", *GLM_IN_SERVICE,
+    "anki-worker", "anki-worker-2", "anki-reviewer", *GLM_IN_DISPATCH_ORDER,
 ]
 GLM = tuple(f"{prefix}-worker-glm-{n}" for prefix in (*FLEETS.values(), "anki") for n in (1, 2, 3))
 GLM_NAME = re.compile(r"\b(?:jobcron|chapt|harness|jss|anki)-worker-glm-\d\b")
@@ -168,7 +174,7 @@ class DesiredState(unittest.TestCase):
             self.assertFalse(self.profiles[name]["in_dispatch_pool"])
         for listing in (self.roster["project_dispatch_allowlist"],
                         self.snapshot["kanban"]["dispatch_profiles"]):
-            self.assertEqual([name for name in listing if name in GLM], list(GLM_IN_SERVICE))
+            self.assertEqual([name for name in listing if name in GLM], list(GLM_IN_DISPATCH_ORDER))
         self.assertEqual([name for name in self.roster["profile_souls"] if name in GLM], [])
         for fleet in self.roster["project_fleets"].values():
             self.assertEqual([name for name in fleet["workers"] if name in GLM], [])

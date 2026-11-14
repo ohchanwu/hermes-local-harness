@@ -39,7 +39,13 @@ GPT_ERA = ("reviewer-sol", "worker-flash-1", "worker-flash-2", "worker-flash-3",
 PROJECT_DISPATCH = ["jobcron-worker", "jobcron-reviewer", "chapt-worker", "chapt-reviewer",
                     "harness-worker", "harness-reviewer", "jss-worker", "jss-reviewer",
                     "harness-worker-2", "chapt-worker-2", "jobcron-worker-2", "jss-worker-2",
-                    "anki-worker", "anki-worker-2", "anki-reviewer", *GLM_IN_SERVICE]
+                    "anki-worker", "anki-worker-2", "anki-reviewer",
+                    # The first and second GLM worker of each board, then the five third GLM
+                    # workers in the order in which the switch script added them to the live
+                    # list (card t_55432326).
+                    *(name for name in GLM_IN_SERVICE if not name.endswith("-glm-3")),
+                    "harness-worker-glm-3", "chapt-worker-glm-3", "jobcron-worker-glm-3",
+                    "jss-worker-glm-3", "anki-worker-glm-3"]
 HARNESS = "/Users/chanbla11mit/hermes-local-harness"
 
 

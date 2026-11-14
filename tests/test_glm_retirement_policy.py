@@ -30,7 +30,7 @@ from test_jev_policy_sources import reverse_jev_policy_edits
 
 FLEETS = {"jobcron": "jobcron", "cha-pt": "chapt", "harness": "harness", "jss-genr": "jss", "anki": "anki"}
 GLM = tuple(f"{prefix}-worker-glm-{n}" for prefix in FLEETS.values() for n in (1, 2, 3))
-# Owner decisions of 2026-11-12, in dispatch order: back in service (card t_4f7740d0), and
+# Owner decisions of 2026-11-12, in board order: back in service (card t_4f7740d0), and
 # the GLM workers of jss-genr and anki (card t_71b4ef4a); the third GLM worker of every board
 # (owner request of 2026-11-14, card t_f4ce916d).
 GLM_IN_SERVICE = ("jobcron-worker-glm-1", "jobcron-worker-glm-2", "jobcron-worker-glm-3",
@@ -38,6 +38,12 @@ GLM_IN_SERVICE = ("jobcron-worker-glm-1", "jobcron-worker-glm-2", "jobcron-worke
                   "harness-worker-glm-1", "harness-worker-glm-2", "harness-worker-glm-3",
                   "jss-worker-glm-1", "jss-worker-glm-2", "jss-worker-glm-3",
                   "anki-worker-glm-1", "anki-worker-glm-2", "anki-worker-glm-3")
+# The same fifteen in the order of the dispatch lists: the first and second GLM worker of each
+# board, then the five third GLM workers in the order in which the switch script added them to
+# the live list (card t_55432326).
+GLM_IN_DISPATCH_ORDER = (*(name for name in GLM_IN_SERVICE if not name.endswith("-glm-3")),
+                         "harness-worker-glm-3", "chapt-worker-glm-3", "jobcron-worker-glm-3",
+                         "jss-worker-glm-3", "anki-worker-glm-3")
 # The generic GLM profiles stay retired: the RETIRED_PROFILES floor of verify-state.
 GLM_RETIRED = ("worker-flash-1", "worker-flash-2", "worker-flash-3", "worker-glm-full")
 # The 21 Claude subscription profiles that require the jev plugin.
@@ -156,7 +162,7 @@ class DesiredState(unittest.TestCase):
                 self.assertEqual(profiles[name]["required_plugins"], ["jev"])
                 self.assertIn(name, self.roster["approval_policy"]["profiles"])
         self.assertEqual([name for name in self.roster["project_dispatch_allowlist"] if name in GLM],
-                         list(GLM_IN_SERVICE))
+                         list(GLM_IN_DISPATCH_ORDER))
         lists = {
             "implementation_allowlist": self.roster["dispatch_pool"]["implementation_allowlist"],
             "dispatch_allowlist": self.roster["dispatch_pool"]["dispatch_allowlist"],
@@ -173,7 +179,7 @@ class DesiredState(unittest.TestCase):
     def test_no_glm_worker_in_snapshot(self):
         self.assertEqual(self.snapshot["profiles"], [p["name"] for p in self.roster["profiles"]])
         self.assertEqual([name for name in self.snapshot["kanban"]["dispatch_profiles"] if name in GLM],
-                         list(GLM_IN_SERVICE))
+                         list(GLM_IN_DISPATCH_ORDER))
         lists = {
             "profile_souls": list(self.snapshot["profile_souls"]),
         }
@@ -211,7 +217,7 @@ class DesiredState(unittest.TestCase):
             "jobcron-worker", "jobcron-reviewer", "chapt-worker", "chapt-reviewer",
             "harness-worker", "harness-reviewer", "jss-worker", "jss-reviewer",
             "harness-worker-2", "chapt-worker-2", "jobcron-worker-2", "jss-worker-2",
-            "anki-worker", "anki-worker-2", "anki-reviewer", *GLM_IN_SERVICE])
+            "anki-worker", "anki-worker-2", "anki-reviewer", *GLM_IN_DISPATCH_ORDER])
         self.assertEqual(dispatch, self.roster["project_dispatch_allowlist"])
 
     def test_verifier_constants(self):
@@ -568,7 +574,7 @@ class Pins(unittest.TestCase):
                     self.assertEqual({n: data["profile_models"].get(n) for n in GLM},
                                      {p["name"]: p["model"] for p in self.roster["profiles"] if p["name"] in GLM})
                 dispatch = [name for name in data["dispatch_profiles"] if name in GLM]
-                want = list(GLM_IN_SERVICE)
+                want = list(GLM_IN_DISPATCH_ORDER)
                 if fixture.name == RETIREMENT_FIXTURE:
                     self.assertEqual(data["dispatch_profiles"][-1], "worker-glm-full")
                 if fixture.name == GLM_MISSING_FIXTURE:
