@@ -221,7 +221,7 @@ write("jev-plugin-missing.yaml", delta(jev_plugin_missing))
 
 def compression_drift(d):
     # One profile carries a wrong value; another cannot report one key (unreadable).
-    d["profile_managed_settings"]["advisor"]["compression.threshold_tokens"] = 200000
+    d["profile_managed_settings"]["advisor"]["compression.threshold_tokens"] = 250000
     del d["profile_managed_settings"]["harness-orchestrator"]["compression.idle_compact_after_seconds"]
 
 

@@ -2167,7 +2167,7 @@ def check_managed_profile_settings(errors, managed, roster_profiles, read, name=
 def check_managed_setting_groups(errors, roster, fleets, roster_profiles, read):
     """Check every managed settings group in roster.yaml with the same reader.
     managed_profile_settings covers the compression settings of the advisor, the
-    default profile and three orchestrators; orchestrator_profile_settings covers the
+    default profile and the five project orchestrators; orchestrator_profile_settings covers the
     skill settings of every project orchestrator named in the snapshot's project_isolation."""
     groups = (("managed profile settings", roster.get("managed_profile_settings")),
               ("orchestrator profile settings", roster.get("orchestrator_profile_settings")))

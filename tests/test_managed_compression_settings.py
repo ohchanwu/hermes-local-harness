@@ -16,11 +16,12 @@ from unittest.mock import patch
 from incident_recovery_verify_fixture import ROOT, load_verifier
 from test_verify_fixture_isolation import ObservedReads, fixture_result
 
-PROFILES = ["advisor", "jobcron-orchestrator", "chapt-orchestrator", "harness-orchestrator", "default"]
+PROFILES = ["advisor", "jobcron-orchestrator", "chapt-orchestrator", "harness-orchestrator", "default",
+            "jss-orchestrator", "anki-orchestrator"]
 SETTINGS = {
-    "compression.threshold_tokens": 150000,
+    "compression.threshold_tokens": 200000,
     "compression.proactive_prune_tokens": 100000,
-    "compression.min_tail_user_messages": 3,
+    "compression.min_tail_user_messages": 1,
     "compression.idle_compact_after_seconds": 3600,
 }
 FIXTURES = ROOT / "tests/fixtures"
@@ -30,7 +31,7 @@ ORCHESTRATOR_GROUP = json.loads((ROOT / "roster.yaml").read_text())["orchestrato
 DRIFT_FIXTURES = ("compression-drift.yaml", "orchestrator-skill-settings-drift.yaml")
 DRIFT_MESSAGES = [
     "FAIL: managed setting drift advisor compression.threshold_tokens: "
-    f"expected {SETTINGS['compression.threshold_tokens']!r}, actual 200000",
+    f"expected {SETTINGS['compression.threshold_tokens']!r}, actual 250000",
     "FAIL: managed setting drift harness-orchestrator compression.idle_compact_after_seconds: "
     f"expected {SETTINGS['compression.idle_compact_after_seconds']!r}, actual <unreadable>",
 ]
@@ -85,7 +86,7 @@ class FixtureConsistencyTests(unittest.TestCase):
         managed = drift.pop("profile_managed_settings")
         clean.pop("profile_managed_settings")
         self.assertEqual(drift, clean)
-        self.assertEqual(managed["advisor"]["compression.threshold_tokens"], 200000)
+        self.assertEqual(managed["advisor"]["compression.threshold_tokens"], 250000)
         self.assertNotIn("compression.idle_compact_after_seconds", managed["harness-orchestrator"])
 
 
@@ -131,7 +132,7 @@ class FixtureVerifierTests(unittest.TestCase):
                     self.assert_isolated(guard)
             broken = json.loads(json.dumps(clean))
             broken["profile_managed_settings"]["default"] = None
-            broken["profile_managed_settings"]["chapt-orchestrator"]["compression.min_tail_user_messages"] = "3"
+            broken["profile_managed_settings"]["chapt-orchestrator"]["compression.min_tail_user_messages"] = "1"
             path.write_text(json.dumps(broken))
             code, output, _ = fixture_result(path)
             self.assertEqual(code, 1, output)
@@ -140,7 +141,7 @@ class FixtureVerifierTests(unittest.TestCase):
                 self.assertIn(f"FAIL: managed setting drift default {key}: expected {SETTINGS[key]!r}, "
                               "actual <unreadable>", failures)
             self.assertIn("FAIL: managed setting drift chapt-orchestrator compression.min_tail_user_messages: "
-                          f"expected {SETTINGS['compression.min_tail_user_messages']!r}, actual '3'", failures)
+                          f"expected {SETTINGS['compression.min_tail_user_messages']!r}, actual '1'", failures)
             self.assertEqual(len(failures), len(SETTINGS) + 1, output)
 
 

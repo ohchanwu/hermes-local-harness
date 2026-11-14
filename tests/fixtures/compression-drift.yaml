@@ -1148,15 +1148,15 @@
   "project_repair_cards": [],
   "profile_managed_settings": {
     "advisor": {
-      "compression.threshold_tokens": 200000,
+      "compression.threshold_tokens": 250000,
       "compression.proactive_prune_tokens": 100000,
-      "compression.min_tail_user_messages": 3,
+      "compression.min_tail_user_messages": 1,
       "compression.idle_compact_after_seconds": 3600
     },
     "jobcron-orchestrator": {
-      "compression.threshold_tokens": 150000,
+      "compression.threshold_tokens": 200000,
       "compression.proactive_prune_tokens": 100000,
-      "compression.min_tail_user_messages": 3,
+      "compression.min_tail_user_messages": 1,
       "compression.idle_compact_after_seconds": 3600,
       "skills.auto_load": [
         "multi-agent-coding-orchestrator"
@@ -1168,9 +1168,9 @@
       ]
     },
     "chapt-orchestrator": {
-      "compression.threshold_tokens": 150000,
+      "compression.threshold_tokens": 200000,
       "compression.proactive_prune_tokens": 100000,
-      "compression.min_tail_user_messages": 3,
+      "compression.min_tail_user_messages": 1,
       "compression.idle_compact_after_seconds": 3600,
       "skills.auto_load": [
         "multi-agent-coding-orchestrator"
@@ -1182,9 +1182,9 @@
       ]
     },
     "harness-orchestrator": {
-      "compression.threshold_tokens": 150000,
+      "compression.threshold_tokens": 200000,
       "compression.proactive_prune_tokens": 100000,
-      "compression.min_tail_user_messages": 3,
+      "compression.min_tail_user_messages": 1,
       "skills.auto_load": [
         "multi-agent-coding-orchestrator"
       ],
@@ -1195,12 +1195,16 @@
       ]
     },
     "default": {
-      "compression.threshold_tokens": 150000,
+      "compression.threshold_tokens": 200000,
       "compression.proactive_prune_tokens": 100000,
-      "compression.min_tail_user_messages": 3,
+      "compression.min_tail_user_messages": 1,
       "compression.idle_compact_after_seconds": 3600
     },
     "jss-orchestrator": {
+      "compression.threshold_tokens": 200000,
+      "compression.proactive_prune_tokens": 100000,
+      "compression.min_tail_user_messages": 1,
+      "compression.idle_compact_after_seconds": 3600,
       "skills.auto_load": [
         "multi-agent-coding-orchestrator"
       ],
@@ -1211,6 +1215,10 @@
       ]
     },
     "anki-orchestrator": {
+      "compression.threshold_tokens": 200000,
+      "compression.proactive_prune_tokens": 100000,
+      "compression.min_tail_user_messages": 1,
+      "compression.idle_compact_after_seconds": 3600,
       "skills.auto_load": [
         "multi-agent-coding-orchestrator"
       ],

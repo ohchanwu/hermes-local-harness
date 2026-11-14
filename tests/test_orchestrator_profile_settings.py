@@ -4,9 +4,10 @@
 roster.yaml orchestrator_profile_settings requires, on each of the five project
 orchestrators, skills.auto_load: ["multi-agent-coding-orchestrator"],
 skills.write_approval: true, security.protected_instruction_files: true and
-security.protected_instruction_extra_patterns: ["SKILL.md"]. The existing
-managed_profile_settings group (compression settings, which also covers advisor
-and default) stays unchanged; check_managed_setting_groups checks both groups
+security.protected_instruction_extra_patterns: ["SKILL.md"]. The
+managed_profile_settings group (compression settings, which covers the advisor,
+the default profile and the five project orchestrators since card t_b906fda1)
+shares no key with it; check_managed_setting_groups checks both groups
 with one reader in fixture mode and in live mode.
 
 Fixture runs go through the real verifier main() under the fixture-isolation guard;
@@ -35,7 +36,8 @@ SETTINGS = {
     "security.protected_instruction_files": True,
     "security.protected_instruction_extra_patterns": ["SKILL.md"],
 }
-COMPRESSION_PROFILES = ["advisor", "jobcron-orchestrator", "chapt-orchestrator", "harness-orchestrator", "default"]
+COMPRESSION_PROFILES = ["advisor", "jobcron-orchestrator", "chapt-orchestrator", "harness-orchestrator",
+                        "default", "jss-orchestrator", "anki-orchestrator"]
 # A value of the right shape that Hermes reads as a different setting, per key.
 WRONG = {
     "skills.auto_load": [],
@@ -166,7 +168,9 @@ class FixtureVerifierTests(unittest.TestCase):
         del fixture["profile_managed_settings"]["jss-orchestrator"]
         code, output = self.run_observation(fixture)
         self.assertEqual(code, 1, output)
-        self.assertEqual(len(fail_lines(output)), len(SETTINGS), output)
+        # jss-orchestrator carries the four skill keys and, since card t_b906fda1,
+        # also the four compression keys, so a missing entry reports all eight.
+        self.assertEqual(len(fail_lines(output)), len(SETTINGS) + 4, output)
 
     def test_advisor_and_default_are_not_required_to_have_the_new_keys(self):
         fixture = clean_fixture()
@@ -240,10 +244,10 @@ class CheckFunctionTests(unittest.TestCase):
 
     def test_a_key_declared_by_both_groups_for_one_profile_fails(self):
         roster = copy.deepcopy(self.roster)
-        roster["orchestrator_profile_settings"]["settings"]["compression.threshold_tokens"] = 150000
+        roster["orchestrator_profile_settings"]["settings"]["compression.threshold_tokens"] = 200000
 
         def read(profile, key):
-            return 150000 if key == "compression.threshold_tokens" else self.read_desired(profile, key)
+            return 200000 if key == "compression.threshold_tokens" else self.read_desired(profile, key)
 
         errors = self.run_groups(roster, read)
         self.assertEqual(sorted(errors), sorted(
