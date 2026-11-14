@@ -636,6 +636,53 @@ class SavingsTests(unittest.TestCase):
             self.assertEqual(tree_state(tmp), before)
 
 
+class AppliedRouteTests(unittest.TestCase):
+    """The route of a route record for the report comes from applied_route."""
+
+    def groups(self, *records):
+        return report.savings_groups(list(records))
+
+    def test_a_hard_record_with_applied_route_medium_is_glm_routed_as_medium(self):
+        record = route("t_a", "hard", True, 100, applied_route="medium")
+        self.assertEqual(self.groups(record), {"t_a": ("glm", "harness", "medium")})
+
+    def test_b_hard_control_record_with_applied_route_easy_is_control_of_easy(self):
+        record = route("t_b", "hard", False, 100, applied_route="easy",
+                       not_applied_reason="control_group")
+        self.assertEqual(self.groups(record), {"t_b": ("control", "harness", "easy")})
+
+    def test_c_without_the_key_and_with_null_the_result_is_as_at_the_baseline(self):
+        without_key = route("t_c", "easy", True, 100)
+        with_null = route("t_c", "easy", True, 100, applied_route=None)
+        baseline = self.groups(without_key)
+        self.assertEqual(baseline, {"t_c": ("glm", "harness", "easy")})
+        self.assertEqual(self.groups(with_null), baseline)
+
+    def test_d_hard_record_with_applied_route_hard_is_neither_group(self):
+        record = route("t_d", "hard", True, 100, applied_route="hard")
+        self.assertEqual(self.groups(record), {})
+
+    def test_report_rows_and_section_table_use_applied_route(self):
+        cards = (specs("a", 2, "harness", "hard", "hard", 0, 9000, 1000)
+                 + specs("c", 1, "harness", "easy", "control", 6000, 0, 2000))
+        # The last route record of each card decides: applied_route medium makes
+        # these two cards GLM-routed cards of the route medium.
+        extra = [route("t_a00", "hard", True, 100, board="harness", applied_route="medium"),
+                 route("t_a01", "hard", True, 100, board="harness", applied_route="medium")]
+        with tempfile.TemporaryDirectory() as tmp:
+            fixture = SavingsFixture(tmp, cards, extra_records=extra)
+            rows = fixture.rows()
+            medium = row_for(rows, "all", "medium")
+            self.assertEqual((medium["glm"]["cards"], medium["control"]["cards"]), (2, 0))
+            self.assertIsNone(row_for(rows, "all", "hard"))
+            every = row_for(rows, "all", "easy")
+            self.assertEqual((every["glm"]["cards"], every["control"]["cards"]), (0, 1))
+            text = fixture.text()
+            self.assertIn("  all boards route medium: GLM-routed cards 2, "
+                          "control cards 0, saved none\n", text)
+            self.assertIn("  route medium applied=yes: cards 2\n", text)
+
+
 def tree_state(root):
     """{relative path: (sha256, mtime_ns)} of every file below root."""
     state = {}

@@ -46,14 +46,18 @@ Sections:
   1. Card model routing: per route, number of cards, tokens per card from the
      sessions of the card's runs (all models, Claude, GLM), and the share of
      cards with at least one run whose outcome is changes_requested, crashed or
-     blocked. Then the Claude tokens saved by the easy and medium routes:
+     blocked. The route of a route record for this report is the value of its
+     applied_route when that is a non-empty string, otherwise the value of its
+     route (the field route stays the route that Jev chose; a record without
+     the key applied_route, or with the value null, gives the value of route).
+     Then the Claude tokens saved by the easy and medium routes:
        - GLM-routed card: a card with a route record (event route) whose route
-         is easy or medium and whose applied is true. Its route is the route of
-         its last such record.
-       - control card: a card with a route record whose route is easy or
-         medium, applied false and not_applied_reason control_group, and no
-         applied easy or medium route record. Its route is the route of its
-         last such record.
+         for this report is easy or medium and whose applied is true. Its route
+         is the route for this report of its last such record.
+       - control card: a card with a route record whose route for this report
+         is easy or medium, applied false and not_applied_reason control_group,
+         and no applied easy or medium route record. Its route is the route for
+         this report of its last such record.
        - only cards whose status in the board database is done are counted,
          and only cards with at least one linked session (the number of done
          cards without a linked session is printed).
@@ -341,25 +345,45 @@ def average_line(label, totals, family):
             f"cache write {averages['cache_write_tokens']:.0f}")
 
 
+def report_route(record):
+    """The route of a route record for this report.
+
+    The value of applied_route when it is a non-empty string, otherwise the
+    value of route (the field route stays the route that Jev chose). A record
+    without the key applied_route, or with the value null, gives the value of
+    route, so the output is the same as at the baseline.
+    """
+    applied_route = record.get("applied_route")
+    if isinstance(applied_route, str) and applied_route:
+        return applied_route
+    return record.get("route")
+
+
 def savings_groups(decisions):
     """{task_id: (group, board, route)} with group "glm" or "control".
 
     A card with an applied easy or medium route record is a GLM-routed card
     (route of its last such record). Otherwise a card with an easy or medium
     control_group record is a control card (route of its last such record).
+    The route of a record here is the value of applied_route when it is a
+    non-empty string, otherwise the value of route (report_route); the field
+    route stays the route that Jev chose.
     """
     applied, control = {}, {}
     for record in decisions:
-        if record.get("event") != "route" or record.get("route") not in SAVINGS_ROUTES:
+        if record.get("event") != "route":
+            continue
+        route_name = report_route(record)
+        if route_name not in SAVINGS_ROUTES:
             continue
         task_id = record.get("task_id")
         if not isinstance(task_id, str) or not task_id:
             continue
         board = record.get("board") if isinstance(record.get("board"), str) else "unknown"
         if record.get("applied") is True:
-            applied[task_id] = (board, record["route"])
+            applied[task_id] = (board, route_name)
         elif record.get("applied") is False and record.get("not_applied_reason") == "control_group":
-            control[task_id] = (board, record["route"])
+            control[task_id] = (board, route_name)
     groups = {task_id: ("glm", *value) for task_id, value in applied.items()}
     for task_id, value in control.items():
         groups.setdefault(task_id, ("control", *value))
@@ -489,7 +513,8 @@ def section_routing(out, decisions, kanban_dbs, state_dbs, now):
         if not isinstance(task_id, str) or not task_id:
             without_task += 1
             continue
-        label = f"{record.get('route') or 'none'} applied={'yes' if record.get('applied') else 'no'}"
+        route_name = report_route(record)
+        label = f"{route_name or 'none'} applied={'yes' if record.get('applied') else 'no'}"
         groups[label].add(task_id)
     out.append(f"  route records: {len(routes)}; without task_id: {without_task}")
     if not cards:
