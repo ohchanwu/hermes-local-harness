@@ -149,6 +149,31 @@ Before creating any card that force-loads skills, reject incompatible requests b
 
 This command uses the installed resolver under the exact profile home and fails if any requested name is unavailable or disabled; a mixed present/missing set is a failure.
 
+## 4a. Pin a deployed skill copy that the Hermes curator manages
+
+The Hermes curator is a background task that periodically reviews agent-created skills, prunes stale ones, consolidates overlaps, and archives obsolete skills. A skill that the curator manages and that has not been used for `curator.archive_after_days` days is archived: its files move from `/Users/chanbla11mit/.hermes/profiles/<profile>/skills/` into `/Users/chanbla11mit/.hermes/profiles/<profile>/skills/.archive/`, and `./scripts/verify-state` then reports the declared copy as missing (`deployed skill copy missing: <skill> <profile>`). Measured settings on `harness-orchestrator`, `chapt-orchestrator` and `jobcron-orchestrator` (2026-11-14, `hermes -p <profile> config get`): `curator.enabled` true, `curator.interval_hours` 168, `curator.stale_after_days` 14, `curator.archive_after_days` 30.
+
+The curator manages a skill only when the record of that skill in `/Users/chanbla11mit/.hermes/profiles/<profile>/skills/.usage.json` has `created_by` `agent`; other copies are never archived. Check one skill on one profile, read-only:
+
+    python3 -c "import json; r = json.load(open('/Users/chanbla11mit/.hermes/profiles/<profile>/skills/.usage.json'))['<skill>']; print(r['created_by']); print(r['pinned']); print(r['state'])"
+
+This prints exactly three lines: the values of `created_by`, `pinned` and `state` of that one record, nothing else.
+
+Step: after a declared skill has been deployed to a profile (section 4 above), run the read-only command for that skill and profile. If it prints `agent`, pin the copy so the curator never changes its state automatically:
+
+    hermes -p <profile> curator pin <skill>
+    # expect: curator: pinned '<skill>' (will bypass auto-transitions)
+
+Read back with the same read-only command: `pinned` must now print `True`. The pin changes only the `pinned` field in `.usage.json`; it does not change the skill files (measured 2026-11-14: after the pins, all three files of each pinned copy were byte-equal to their tracked source under `skills/`).
+
+If the curator has already archived a copy, bring it back with `hermes -p <profile> curator restore <skill>`.
+
+A pin is a live change to a profile. It needs the owner's authorization like every other live change in this procedure.
+
+Statements above that come from reading the Hermes source or the `--help` text only, without running the command behind them: the description of what the curator does and the archive behavior after `curator.archive_after_days` days (from `hermes curator --help` and `/Users/chanbla11mit/.hermes/hermes-agent/agent/curator.py`), the `created_by` `agent` management rule (from `/Users/chanbla11mit/.hermes/hermes-agent/tools/skill_usage.py`), and the `curator restore` command (from `hermes curator --help` only; it was not run in this procedure).
+
+Record of 2026-11-14: the curator archived `production-deployment` on `harness-orchestrator` (last use 2026-10-13; ledger entry `fc119ea5eee8` in `/Users/chanbla11mit/.hermes/profiles/harness-orchestrator/skills/.curator_ledger.jsonl`; files moved to `/Users/chanbla11mit/.hermes/profiles/harness-orchestrator/skills/.archive/production-deployment`), and `./scripts/verify-state` then printed `deployed skill copy missing: production-deployment harness-orchestrator`. The controller pinned the copies on `chapt-orchestrator` and `jobcron-orchestrator` with `hermes -p <profile> curator pin production-deployment`; each printed the expected line above, and in each `.usage.json` exactly one field changed (`pinned`, false to true). Backups of the two `.usage.json` files from before the pins: `/Users/chanbla11mit/.hermes/profiles/chapt-orchestrator/skill-backups/usage.json-pre-pin-20261114205748` and `/Users/chanbla11mit/.hermes/profiles/jobcron-orchestrator/skill-backups/usage.json-pre-pin-20261114205748`. Card `t_31846ed4` removes the Harness profiles from the `deploy_profiles` list of `production-deployment` in `snapshots/sanitized-current-state.yaml`, so the archived copy on `harness-orchestrator` is not restored.
+
 ## 4b. Interactive Claude/Codex sessions (manual live-state step)
 
 Desired policy for interactive Claude Code and Codex CLI sessions on this machine: upstream Ponytail remains installed and enabled, but the shared default mode is `off`, so sessions are manually activatable (`/ponytail`) rather than ambient. This is live `~/.claude` / `~/.codex` state — apply it manually; never commit it to this repository.
