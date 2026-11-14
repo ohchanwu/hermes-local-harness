@@ -54,10 +54,19 @@ def write_jsonl(path, records):
             handle.write(json.dumps(record) + "\n")
 
 
+CLAUDE_WORKER = "worker"
+GLM_WORKER = "worker-glm-1"
+
+
 def route(task_id, name, applied, tokens, age=3600, **extra):
+    """A route record. With applied true it names a Claude worker as
+    original_assignee and a GLM worker as new_assignee, as the plugin writes a
+    record of a card that it moved; extra overrides these fields."""
     record = {"ts": ts(age), "profile": "example-orchestrator", "event": "route",
               "board": "harness", "task_id": task_id, "route": name, "applied": applied,
               "jev_input_tokens": tokens, "error_class": None}
+    if applied is True:
+        record.update(original_assignee=CLAUDE_WORKER, new_assignee=GLM_WORKER)
     record.update(extra)
     return record
 
@@ -347,8 +356,11 @@ class SavingsFixture:
     Every card has one worker run (profile `worker`, sessions in worker.db) and
     one reviewer run (profile `reviewer`, sessions in reviewer.db). A card spec
     is (task_id, board, route, group, worker_claude, worker_glm,
-    reviewer_claude, status); group is "glm" (applied route record),
-    "control" (control_group record) or "hard" (applied hard route). Each token
+    reviewer_claude, status); group is "glm" (applied route record whose
+    new_assignee is a GLM worker), "control" (control_group record) or "hard"
+    (applied route record whose new_assignee equals its original_assignee, a
+    Claude worker, as the route records with route hard that were written
+    before the configuration with four routes). Each token
     number is split into input, output, cache read and cache write parts in the
     ratio 4:1:4:1, so a number must be a multiple of 10.
     """
@@ -392,6 +404,9 @@ class SavingsFixture:
                 records.append(route(task_id, route_name, False, 100, age=record_age, board=board,
                                      not_applied_reason="control_group",
                                      probabilities={route_name: 0.9}))
+            elif group == "hard":
+                records.append(route(task_id, route_name, True, 100, age=record_age, board=board,
+                                     new_assignee=CLAUDE_WORKER))
             else:
                 records.append(route(task_id, route_name, True, 100, age=record_age, board=board))
         records.extend(extra_records)
@@ -528,8 +543,13 @@ class SavingsTests(unittest.TestCase):
             medium = row_for(rows, "all", "medium")
             self.assertEqual((medium["glm"]["cards"], medium["control"]["cards"]), (1, 0))
             self.assertIsNone(medium["saved"])
+            # The three hard cards have applied route records whose new_assignee
+            # equals original_assignee (the card stayed with the Claude worker):
+            # neither group, so no hard row on any board.
             self.assertIsNone(row_for(rows, "all", "hard"))
+            self.assertIsNone(row_for(rows, "board", "hard", "harness"))
             text = fixture.text()
+            self.assertNotIn("route hard: GLM-routed cards", text)
             self.assertIn("  board harness route easy: GLM-routed cards 2, control cards 1, "
                           "saved 14000\n", text)
             self.assertIn("  all boards route easy: GLM-routed cards 3, control cards 2, "
@@ -619,6 +639,100 @@ class SavingsTests(unittest.TestCase):
         self.assertEqual(row_for(rows, "all", "easy")["saved"], 1000)
         self.assertNotIn(report.RULE_TEXT, text)
 
+    def test_hard_saved_figure_per_board_and_over_all_boards(self):
+        cards = (specs("hg", 2, "harness", "hard", "glm", 0, 9000, 1000)
+                 + specs("jg", 1, "jobcron", "hard", "glm", 2000, 9000, 1000)
+                 + specs("hc", 1, "harness", "hard", "control", 6000, 0, 2000)
+                 + specs("jc", 1, "jobcron", "hard", "control", 4000, 0, 2000)
+                 # Applied route records that kept the card with the Claude worker:
+                 # neither group, so their 90000 Claude tokens are not counted.
+                 + specs("hs", 3, "harness", "hard", "hard", 80000, 0, 10000))
+        with tempfile.TemporaryDirectory() as tmp:
+            fixture = SavingsFixture(tmp, cards)
+            rows = fixture.rows()
+            harness = row_for(rows, "board", "hard", "harness")
+            self.assertEqual((harness["glm"]["cards"], harness["control"]["cards"]), (2, 1))
+            self.assertEqual(harness["glm"]["mean_claude"], 1000)
+            self.assertEqual(harness["control"]["mean_claude"], 8000)
+            self.assertEqual(harness["glm"]["mean_glm"], 9000)
+            self.assertEqual(harness["saved"], (8000 - 1000) * 2)
+            self.assertEqual((harness["glm_done"], harness["control_done"]), (2, 1))
+            jobcron = row_for(rows, "board", "hard", "jobcron")
+            self.assertEqual(jobcron["saved"], (6000 - 3000) * 1)
+            every = row_for(rows, "all", "hard")
+            self.assertEqual((every["glm"]["cards"], every["control"]["cards"]), (3, 2))
+            self.assertAlmostEqual(every["glm"]["mean_claude"], 5000 / 3)
+            self.assertEqual(every["control"]["mean_claude"], 7000)
+            self.assertAlmostEqual(every["saved"], (7000 - 5000 / 3) * 3)
+            self.assertFalse(every["rule"])
+            self.assertEqual([r["route"] for r in rows], ["hard"] * 3)
+            text = fixture.text()
+            self.assertIn("  route hard applied=yes: cards 6\n", text)
+            self.assertIn("  route hard applied=no: cards 2\n", text)
+            self.assertIn("  board harness route hard: GLM-routed cards 2, control cards 1, "
+                          "saved 14000\n", text)
+            self.assertIn("  board jobcron route hard: GLM-routed cards 1, control cards 1, "
+                          "saved 3000\n", text)
+            self.assertIn("  all boards route hard: GLM-routed cards 3, control cards 2, "
+                          "saved 16000\n", text)
+            self.assertIn("    mean Claude tokens per GLM-routed card 1667, per control card 7000\n",
+                          text)
+            self.assertNotIn(report.RULE_TEXT, text)
+            self.assertNotIn(SENTINEL, text)
+
+    def route_rule_rows(self, route_name, glm_count, control_count, glm_claude, control_claude):
+        with tempfile.TemporaryDirectory() as tmp:
+            cards = (specs("g", glm_count, "harness", route_name, "glm", 0, 0, glm_claude)
+                     + specs("c", control_count, "jobcron", route_name, "control", 0, 0,
+                             control_claude))
+            fixture = SavingsFixture(tmp, cards)
+            return row_for(fixture.rows(), "all", route_name), fixture.text()
+
+    def test_hard_rule_line_under_the_same_two_minimums_as_easy(self):
+        line = "  route hard: disable this route: owner permission required\n"
+        for glm_count, control_count, glm_claude, expected in ((10, 3, 1200, True),
+                                                                (10, 3, 1000, True),
+                                                                (9, 3, 1200, False),
+                                                                (10, 2, 1200, False),
+                                                                (10, 3, 900, False)):
+            case = (glm_count, control_count, glm_claude)
+            hard, text = self.route_rule_rows("hard", glm_count, control_count, glm_claude, 1000)
+            easy, _easy_text = self.route_rule_rows("easy", glm_count, control_count, glm_claude,
+                                                    1000)
+            self.assertEqual(hard["rule"], expected, case)
+            self.assertEqual(easy["rule"], expected, case)
+            self.assertEqual(hard["saved"], easy["saved"], case)
+            self.assertEqual(line in text, expected, case)
+            self.assertEqual(text.count(report.RULE_TEXT), 1 if expected else 0, case)
+
+    def test_easy_and_medium_results_do_not_change_when_hard_cards_are_added(self):
+        base_cards = (specs("ha", 2, "harness", "easy", "glm", 0, 9000, 1000)
+                      + specs("hc", 1, "harness", "easy", "control", 6000, 0, 2000)
+                      + specs("hm", 2, "harness", "medium", "glm", 0, 100, 500)
+                      + specs("jm", 1, "jobcron", "medium", "control", 3000, 0, 0))
+        hard_cards = (specs("xg", 2, "harness", "hard", "glm", 500, 9000, 1000)
+                      + specs("xc", 1, "jobcron", "hard", "control", 6000, 0, 2000)
+                      + specs("xs", 2, "harness", "hard", "hard", 7000, 0, 1000))
+
+        def easy_and_medium(cards):
+            with tempfile.TemporaryDirectory() as tmp:
+                fixture = SavingsFixture(tmp, cards)
+                rows = [r for r in fixture.rows() if r["route"] in ("easy", "medium")]
+                lines = [line for line in fixture.text().splitlines()
+                         if "route easy" in line or "route medium" in line]
+                return rows, lines
+
+        without_hard = easy_and_medium(base_cards)
+        with_hard = easy_and_medium(base_cards + hard_cards)
+        self.assertEqual(with_hard, without_hard)
+        rows, lines = without_hard
+        self.assertEqual(row_for(rows, "all", "easy")["saved"], (8000 - 1000) * 2)
+        self.assertEqual(row_for(rows, "all", "medium")["saved"], (3000 - 500) * 2)
+        self.assertIn("  all boards route easy: GLM-routed cards 2, control cards 1, saved 14000",
+                      lines)
+        self.assertIn("  all boards route medium: GLM-routed cards 2, control cards 1, saved 5000",
+                      lines)
+
     def test_report_changes_no_file(self):
         with tempfile.TemporaryDirectory() as tmp:
             cards = (specs("g", 10, "harness", "easy", "glm", 0, 0, 1200)
@@ -658,9 +772,50 @@ class AppliedRouteTests(unittest.TestCase):
         self.assertEqual(baseline, {"t_c": ("glm", "harness", "easy")})
         self.assertEqual(self.groups(with_null), baseline)
 
-    def test_d_hard_record_with_applied_route_hard_is_neither_group(self):
-        record = route("t_d", "hard", True, 100, applied_route="hard")
-        self.assertEqual(self.groups(record), {})
+    def test_d_hard_record_with_equal_assignees_is_neither_group_and_with_a_glm_worker_is_glm(self):
+        # Route records with route hard written before the configuration with four
+        # routes: some have applied_route hard, some have no key applied_route.
+        for extra in ({"applied_route": "hard"}, {}):
+            stayed = route("t_d", "hard", True, 100, original_assignee=CLAUDE_WORKER,
+                           new_assignee=CLAUDE_WORKER, **extra)
+            self.assertEqual(self.groups(stayed), {}, extra)
+            moved = route("t_d", "hard", True, 100, original_assignee=CLAUDE_WORKER,
+                          new_assignee="worker-glm-3", **extra)
+            self.assertEqual(self.groups(moved), {"t_d": ("glm", "harness", "hard")}, extra)
+
+    def test_e_hard_control_record_is_a_control_card(self):
+        control = route("t_e", "hard", False, 100, applied_route="hard",
+                        not_applied_reason="control_group")
+        self.assertEqual(self.groups(control), {"t_e": ("control", "harness", "hard")})
+        # A record that kept the card with the Claude worker does not make the card
+        # GLM-routed, so the control record still decides.
+        stayed = route("t_e", "hard", True, 100, new_assignee=CLAUDE_WORKER)
+        self.assertEqual(self.groups(stayed, control), {"t_e": ("control", "harness", "hard")})
+        moved = route("t_e", "hard", True, 100)
+        self.assertEqual(self.groups(control, moved), {"t_e": ("glm", "harness", "hard")})
+
+    def test_f_easy_or_medium_record_without_a_different_new_assignee_is_neither_group(self):
+        for name in ("easy", "medium"):
+            equal = route("t_f", name, True, 100, new_assignee=CLAUDE_WORKER)
+            null = route("t_f", name, True, 100, new_assignee=None)
+            empty = route("t_f", name, True, 100, new_assignee="")
+            missing = route("t_f", name, True, 100)
+            del missing["new_assignee"]
+            for record in (equal, null, empty, missing):
+                self.assertEqual(self.groups(record), {}, (name, record.get("new_assignee", "missing")))
+            moved = route("t_f", name, True, 100)
+            self.assertEqual(self.groups(moved), {"t_f": ("glm", "harness", name)})
+
+    def test_g_very_hard_record_with_applied_true_is_neither_group(self):
+        stayed = route("t_g", "very_hard", True, 100, applied_route="very_hard",
+                       new_assignee=CLAUDE_WORKER)
+        moved = route("t_g", "very_hard", True, 100, applied_route="very_hard")
+        control = route("t_g", "very_hard", False, 100, applied_route="very_hard",
+                        not_applied_reason="control_group")
+        for record in (stayed, moved, control):
+            self.assertEqual(self.groups(record), {})
+        self.assertNotIn("very_hard", report.SAVINGS_ROUTES)
+        self.assertEqual(report.SAVINGS_ROUTES, ("easy", "medium", "hard"))
 
     def test_report_rows_and_section_table_use_applied_route(self):
         cards = (specs("a", 2, "harness", "hard", "hard", 0, 9000, 1000)
