@@ -144,11 +144,14 @@ class GLMWorkerSkillDeployment(unittest.TestCase):
                     profile = f"{prefix}-worker-glm-{number}"
                     if profile in deploy or worker1 in deploy:
                         pairs.add((entry["name"], profile))
-        # Every board contributes the two software-development skills for both its GLM
-        # workers (2 skills x 10 GLM workers = 20), jobcron/chapt/harness add both
-        # deployment skills (2 x 6 = 12) and human-deployment-guide-writing on
-        # jobcron/chapt (1 x 4 = 4): 36 (skill, GLM worker) pairs in total.
-        self.assertEqual(len(pairs), 36)
+        # Boards and skills: every board's two GLM workers are in the lists of
+        # minimal-implementation and simplification-review (2 skills x 10 GLM workers
+        # = 20); production-deployment-planning still covers jobcron/chapt/harness
+        # (1 skill x 6 = 6), while production-deployment covers jobcron/chapt only since
+        # card t_31846ed4 removed its seven harness profiles (1 skill x 4 = 4), and
+        # human-deployment-guide-writing stays on jobcron/chapt (1 skill x 4 = 4):
+        # 20 + 6 + 4 + 4 = 34 (skill, GLM worker) pairs.
+        self.assertEqual(len(pairs), 34)
         verifier = load_verifier()
         errors = []
         with redirect_stdout(io.StringIO()):
