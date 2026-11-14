@@ -101,10 +101,11 @@ clean["profile_approval_modes"] = {
     profile: desired["approvals"]["mode"] for profile in desired["approvals"]["profiles"]}
 # Observed config values of every managed settings group, merged per profile:
 # managed_profile_settings (mirrored in the snapshot), orchestrator_profile_settings
-# (roster.yaml only) and claude_worker_profile_settings (roster.yaml only).
+# (roster.yaml only), claude_worker_profile_settings (roster.yaml only) and
+# glm_worker_reasoning_effort_settings (roster.yaml only).
 clean["profile_managed_settings"] = {}
 for group in (desired["managed_profile_settings"], roster["orchestrator_profile_settings"],
-              roster["claude_worker_profile_settings"]):
+              roster["claude_worker_profile_settings"], roster["glm_worker_reasoning_effort_settings"]):
     for profile in group["profiles"]:
         clean["profile_managed_settings"].setdefault(profile, {}).update(copy.deepcopy(group["settings"]))
 # Observed fallback settings of every non-retired roster profile, as the roster declares

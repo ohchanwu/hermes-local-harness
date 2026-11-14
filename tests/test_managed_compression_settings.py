@@ -26,13 +26,17 @@ SETTINGS = {
 }
 FIXTURES = ROOT / "tests/fixtures"
 # The second managed settings group (t_0a8674fe); tests/test_orchestrator_profile_settings.py
-# checks it. The third group (t_2d357ca0) covers the ten Claude worker profiles.
+# checks it. The third group (t_2d357ca0) covers the ten Claude worker profiles. The fourth
+# group (t_e483301c) covers the reasoning effort of the five <board>-worker-glm-3 profiles.
 # Fixtures carry every group merged per profile.
 ORCHESTRATOR_GROUP = json.loads((ROOT / "roster.yaml").read_text())["orchestrator_profile_settings"]
 WORKER_PROFILES = ["jobcron-worker", "jobcron-worker-2", "chapt-worker", "chapt-worker-2",
                    "harness-worker", "harness-worker-2", "jss-worker", "jss-worker-2",
                    "anki-worker", "anki-worker-2"]
 WORKER_SETTINGS = {"compression.threshold_tokens": 300000}
+GLM_EFFORT_PROFILES = ["jobcron-worker-glm-3", "chapt-worker-glm-3", "harness-worker-glm-3",
+                       "jss-worker-glm-3", "anki-worker-glm-3"]
+GLM_EFFORT_SETTINGS = {"agent.reasoning_effort": "max"}
 DRIFT_FIXTURES = ("compression-drift.yaml", "orchestrator-skill-settings-drift.yaml")
 DRIFT_MESSAGES = [
     "FAIL: managed setting drift advisor compression.threshold_tokens: "
@@ -79,6 +83,20 @@ class DesiredStateTests(unittest.TestCase):
         self.assertFalse(set(WORKER_PROFILES) & set(PROFILES))
         self.assertNotIn("claude_worker_profile_settings", self.snapshot)
 
+    def test_glm_effort_group_pins_exact_profiles_and_value(self):
+        group = self.roster["glm_worker_reasoning_effort_settings"]
+        self.assertEqual(group, {"profiles": GLM_EFFORT_PROFILES, "settings": GLM_EFFORT_SETTINGS})
+        self.assertIs(type(group["settings"]["agent.reasoning_effort"]), str)
+        roster_profiles = {profile["name"]: profile for profile in self.roster["profiles"]}
+        for name in GLM_EFFORT_PROFILES:
+            self.assertIn(name, roster_profiles)
+            self.assertEqual(roster_profiles[name]["role"], "project implementation")
+            self.assertEqual(roster_profiles[name]["model"], "glm-5.3")
+            self.assertEqual(roster_profiles[name]["provider"], "zai")
+        self.assertFalse(set(GLM_EFFORT_PROFILES) & set(PROFILES))
+        self.assertFalse(set(GLM_EFFORT_PROFILES) & set(WORKER_PROFILES))
+        self.assertNotIn("glm_worker_reasoning_effort_settings", self.snapshot)
+
     def test_native_settings_unchanged(self):
         self.assertEqual(self.roster["native_settings"],
                          {"kanban.max_in_progress": None, "kanban.max_in_progress_per_profile": 1})
@@ -91,6 +109,8 @@ class FixtureConsistencyTests(unittest.TestCase):
             expected.setdefault(profile, {}).update(ORCHESTRATOR_GROUP["settings"])
         for profile in WORKER_PROFILES:
             expected.setdefault(profile, {}).update(WORKER_SETTINGS)
+        for profile in GLM_EFFORT_PROFILES:
+            expected.setdefault(profile, {}).update(GLM_EFFORT_SETTINGS)
         names = sorted(path.name for path in FIXTURES.glob("*.yaml"))
         self.assertIn("compression-drift.yaml", names)
         for name in names:
@@ -143,7 +163,8 @@ class FixtureVerifierTests(unittest.TestCase):
             self.assert_isolated(guard)
             every_key = (len(PROFILES) * len(SETTINGS)
                          + len(ORCHESTRATOR_GROUP["profiles"]) * len(ORCHESTRATOR_GROUP["settings"])
-                         + len(WORKER_PROFILES) * len(WORKER_SETTINGS))
+                         + len(WORKER_PROFILES) * len(WORKER_SETTINGS)
+                         + len(GLM_EFFORT_PROFILES) * len(GLM_EFFORT_SETTINGS))
             for observation in (None, [], {}, "not a mapping"):
                 with self.subTest(observation=observation):
                     path.write_text(json.dumps({**clean, "profile_managed_settings": observation}))
@@ -165,6 +186,29 @@ class FixtureVerifierTests(unittest.TestCase):
             self.assertIn("FAIL: managed setting drift chapt-orchestrator compression.min_tail_user_messages: "
                           f"expected {SETTINGS['compression.min_tail_user_messages']!r}, actual '1'", failures)
             self.assertEqual(len(failures), len(SETTINGS) + 1, output)
+
+    def test_glm_effort_drift_and_missing_value_fail_naming_profile_and_key(self):
+        clean = json.loads((FIXTURES / "clean.yaml").read_text())
+        with tempfile.TemporaryDirectory(prefix="managed-settings-") as directory:
+            path = Path(directory) / "observation.yaml"
+            wrong = json.loads(json.dumps(clean))
+            wrong["profile_managed_settings"]["harness-worker-glm-3"]["agent.reasoning_effort"] = "high"
+            path.write_text(json.dumps(wrong))
+            code, output, guard = fixture_result(path)
+            self.assertEqual(code, 1, output)
+            self.assertEqual(fail_lines(output), [
+                "FAIL: managed setting drift harness-worker-glm-3 agent.reasoning_effort: "
+                "expected 'max', actual 'high'"])
+            self.assert_isolated(guard)
+            missing = json.loads(json.dumps(clean))
+            del missing["profile_managed_settings"]["harness-worker-glm-3"]["agent.reasoning_effort"]
+            path.write_text(json.dumps(missing))
+            code, output, guard = fixture_result(path)
+            self.assertEqual(code, 1, output)
+            self.assertEqual(fail_lines(output), [
+                "FAIL: managed setting drift harness-worker-glm-3 agent.reasoning_effort: "
+                "expected 'max', actual <unreadable>"])
+            self.assert_isolated(guard)
 
 
 class CheckFunctionTests(unittest.TestCase):
@@ -233,6 +277,23 @@ class CheckFunctionTests(unittest.TestCase):
         self.assertEqual(errors, [
             "managed setting drift harness-worker-2 compression.threshold_tokens: "
             f"expected {WORKER_SETTINGS['compression.threshold_tokens']!r}, actual None"])
+
+    def test_live_path_reads_each_glm_effort_key_through_json_config(self):
+        group = load_json("roster.yaml")["glm_worker_reasoning_effort_settings"]
+        calls = []
+
+        def fake_run(*args):
+            calls.append(args)
+            profile = args[2]
+            output = '"high"' if profile == "harness-worker-glm-3" else '"max"'
+            return subprocess.CompletedProcess(args, 0, output, "")
+
+        with patch.dict(self.verifier.__dict__, {"run": fake_run}):
+            errors = self.run_check(group, self.verifier.json_config)
+        self.assertEqual(calls, [("hermes", "-p", profile, "config", "get", "--json",
+                                  "agent.reasoning_effort") for profile in GLM_EFFORT_PROFILES])
+        self.assertEqual(errors, [
+            "managed setting drift harness-worker-glm-3 agent.reasoning_effort: expected 'max', actual 'high'"])
 
 
 if __name__ == "__main__":

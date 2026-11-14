@@ -9,7 +9,9 @@ managed_profile_settings group (compression settings, which covers the advisor,
 the default profile and the five project orchestrators since card t_b906fda1)
 shares no key with it; the claude_worker_profile_settings group (compression
 threshold of the ten Claude worker profiles, card t_2d357ca0) shares no profile
-and no key with it; check_managed_setting_groups checks every group
+and no key with it; the glm_worker_reasoning_effort_settings group (reasoning effort
+of the five <board>-worker-glm-3 profiles, card t_e483301c) shares no profile and no
+key with it; check_managed_setting_groups checks every group (four groups)
 with one reader in fixture mode and in live mode.
 
 Fixture runs go through the real verifier main() under the fixture-isolation guard;
@@ -192,7 +194,8 @@ class CheckFunctionTests(unittest.TestCase):
     def read_desired(self, profile, key):
         for group in (self.roster["managed_profile_settings"],
                       self.roster["orchestrator_profile_settings"],
-                      self.roster["claude_worker_profile_settings"]):
+                      self.roster["claude_worker_profile_settings"],
+                      self.roster["glm_worker_reasoning_effort_settings"]):
             if profile in group["profiles"] and key in group["settings"]:
                 return copy.deepcopy(group["settings"][key])
         return self.verifier.UNREADABLE
@@ -214,7 +217,7 @@ class CheckFunctionTests(unittest.TestCase):
         self.assertEqual(self.run_groups(self.roster, read), [])
         for profile in ("advisor", "default"):
             self.assertFalse([key for read_profile, key in reads if read_profile == profile and key in SETTINGS])
-        self.assertEqual(len(reads), len(COMPRESSION_PROFILES) * 4 + len(ORCHESTRATORS) * len(SETTINGS) + 10)
+        self.assertEqual(len(reads), len(COMPRESSION_PROFILES) * 4 + len(ORCHESTRATORS) * len(SETTINGS) + 10 + 5)
 
     def test_malformed_group_fails(self):
         for group in (None, {}, [], {"profiles": [], "settings": SETTINGS},
@@ -245,6 +248,20 @@ class CheckFunctionTests(unittest.TestCase):
         errors = self.run_groups(roster)
         self.assertIn("Claude worker profile settings and managed profile settings both declare "
                       "harness-worker compression.threshold_tokens", errors)
+
+    def test_missing_glm_effort_group_fails(self):
+        roster = copy.deepcopy(self.roster)
+        del roster["glm_worker_reasoning_effort_settings"]
+        self.assertEqual(self.run_groups(roster), [
+            "GLM worker reasoning effort settings malformed: expected unique profiles and non-empty settings"])
+
+    def test_glm_effort_profile_declared_by_both_groups_fails(self):
+        roster = copy.deepcopy(self.roster)
+        roster["claude_worker_profile_settings"]["profiles"].append("harness-worker-glm-3")
+        roster["claude_worker_profile_settings"]["settings"]["agent.reasoning_effort"] = "high"
+        errors = self.run_groups(roster)
+        self.assertIn("GLM worker reasoning effort settings and Claude worker profile settings both declare "
+                      "harness-worker-glm-3 agent.reasoning_effort", errors)
 
     def test_group_must_name_every_project_orchestrator(self):
         roster = copy.deepcopy(self.roster)
@@ -310,7 +327,8 @@ class CheckFunctionTests(unittest.TestCase):
         expected_calls = [("hermes", "-p", profile, "config", "get", "--json", key)
                           for group in (self.roster["managed_profile_settings"],
                                         self.roster["orchestrator_profile_settings"],
-                                        self.roster["claude_worker_profile_settings"])
+                                        self.roster["claude_worker_profile_settings"],
+                                        self.roster["glm_worker_reasoning_effort_settings"])
                           for profile in group["profiles"] for key in group["settings"]]
         self.assertEqual(calls, expected_calls)
         self.assertEqual(errors, [

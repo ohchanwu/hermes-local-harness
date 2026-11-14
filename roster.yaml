@@ -103,6 +103,18 @@
       "compression.threshold_tokens": 300000
     }
   },
+  "glm_worker_reasoning_effort_settings": {
+    "profiles": [
+      "jobcron-worker-glm-3",
+      "chapt-worker-glm-3",
+      "harness-worker-glm-3",
+      "jss-worker-glm-3",
+      "anki-worker-glm-3"
+    ],
+    "settings": {
+      "agent.reasoning_effort": "max"
+    }
+  },
   "approval_policy": {
     "mode": "off",
     "profiles": [
