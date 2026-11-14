@@ -407,7 +407,7 @@ class Procedures(unittest.TestCase):
     def test_switching_procedure_counts_fifteen_glm_workers(self):
         text = (ROOT / "procedures/switching-hermes-models.md").read_text()
         self.assertIn("Card `t_f4ce916d` added a third GLM worker to every board on 2026-11-14", text)
-        self.assertIn("a later deployment card creates these five profiles", text)
+        self.assertIn("card `t_55432326` created these five profiles on 2026-11-14", text)
         self.assertIn("declares each of the fifteen with", text)
         self.assertIn("for the fifteen GLM workers in service", text)
         self.assertNotIn("each of the ten", text)
