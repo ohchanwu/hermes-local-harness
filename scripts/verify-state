@@ -378,6 +378,14 @@ MODEL_POLICY_BY_ROLE = {
     "independent reviewer": "claude-opus-5-5",
     "project independent reviewer": "claude-opus-5-5",
 }
+# Owner decision of 2026-11-14 (card t_822da1dd): the main model of a project
+# orchestrator on claude-subscription may be switched manually between these two
+# models (gateway command `/model <name> --global`), so the observed main model
+# of a project orchestrator may be either one; a model that differs from the
+# roster model only warns. MODEL_POLICY_BY_ROLE still names claude-fable-5-2
+# alone: a roster that declares claude-opus-5-5 for a project orchestrator
+# still fails check_model_policy.
+MANUAL_SWITCH_MODELS = ("claude-fable-5-2", "claude-opus-5-5")
 # The GLM workers of PROJECT_GLM_WORKER_POOLS are outside MODEL_POLICY_BY_ROLE
 # (owner decision of 2026-11-12, card t_4f7740d0): each one runs this model and provider.
 GLM_WORKER_MODEL = "glm-5.3"
@@ -446,6 +454,40 @@ def check_model_policy(errors, roster):
         elif profile.get("model") != want or profile.get("provider") != provider:
             fail(errors, f"roster model policy drift {name}: expected {want} on {provider}, "
                          f"declared {profile.get('model')} on {profile.get('provider')}")
+
+
+def manual_model_switch_allowed(profile):
+    """True when a roster profile may run any model of MANUAL_SWITCH_MODELS as its
+    observed main model: a project orchestrator that is not retired, on
+    claude-subscription, whose roster model is one of MANUAL_SWITCH_MODELS."""
+    return (isinstance(profile, dict)
+            and profile.get("role") == "project orchestrator"
+            and profile.get("lifecycle") != RETIRED_LIFECYCLE
+            and profile.get("provider") == MODEL_POLICY_PROVIDER
+            and profile.get("model") in MANUAL_SWITCH_MODELS)
+
+
+def check_model_observation(errors, warnings, name, profile, observed, drift_text):
+    """Compare one observed main model with the roster model of one profile.
+
+    Shared by the fixture path (profile_models) and the live path
+    (model.default), so the fixture tests also test the live rule. For a
+    profile of manual_model_switch_allowed, any observed model of
+    MANUAL_SWITCH_MODELS is accepted and a model that differs from the roster
+    model only warns; every other observed model, and an unreadable value,
+    fails. drift_text is the FAIL tail for a profile outside the rule, exactly
+    as the calling path printed it at the baseline."""
+    if manual_model_switch_allowed(profile):
+        if observed in MANUAL_SWITCH_MODELS:
+            if observed != profile["model"]:
+                warnings.append(f"manual model switch {name}: model.default is {observed}, "
+                                f"roster declares {profile['model']}")
+        else:
+            display = "<unreadable>" if observed is UNREADABLE else observed
+            fail(errors, f"model drift {name}: expected {' or '.join(MANUAL_SWITCH_MODELS)}, "
+                         f"actual {display}")
+    elif observed != profile["model"]:
+        fail(errors, f"model drift {name}: {drift_text}")
 
 
 def glm_worker_profiles():
@@ -2260,8 +2302,9 @@ def main():
                 continue
             if name not in models:
                 fail(errors, f"incomplete fixture: profile_models omits {name}")
-            elif models[name] != profile["model"]:
-                fail(errors, f"model drift {name}: expected {profile['model']}, actual {models[name]}")
+            else:
+                check_model_observation(errors, warnings, name, profile, models[name],
+                                        f"expected {profile['model']}, actual {models[name]}")
             if name not in providers:
                 fail(errors, f"incomplete fixture: profile_providers omits {name}")
             elif providers[name] != profile["provider"]:
@@ -2326,8 +2369,10 @@ def main():
             for name, profile in expected.items():
                 if name not in observed:
                     fail(errors, f"missing profile: {name}")
-                elif profile["installed"] and json_config(name, "model.default") != profile["model"]:
-                    fail(errors, f"model drift {name}: expected {profile['model']}")
+                elif profile["installed"]:
+                    check_model_observation(errors, warnings, name, profile,
+                                            json_config(name, "model.default"),
+                                            f"expected {profile['model']}")
                 if json_config(name, "model.provider") != profile["provider"]:
                     fail(errors, f"provider drift {name}: expected {profile['provider']}")
                 actual_approval_mode = json_config(name, "approvals.mode")
