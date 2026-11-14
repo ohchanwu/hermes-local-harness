@@ -271,12 +271,14 @@ class PolicySources(unittest.TestCase):
 
 
 class DesiredState(unittest.TestCase):
-    def test_jev_config_matches_the_card_t_3c7a581d_configuration_and_no_other_change(self):
+    def test_jev_config_matches_the_card_t_3c7a581d_and_t_52be75ab_configuration(self):
         # Card t_3c7a581d: on every board `glm_workers` keeps the two names of
         # the baseline, the new key `glm_max_workers` holds the third name, the
         # route `hard` is replaced by the entry that names `glm_max_workers`
         # with model `glm-5.3` and provider `zai`, and the route `very_hard`
         # with no `assignee_from`, no `model` and no `provider` is appended.
+        # Card t_52be75ab: the `hard` route of every board also carries its own
+        # change request limit, `max_glm_change_requests` 3.
         config = json.loads((ROOT / "plugins/jev/config.json").read_text())
         before = json.loads(baseline_bytes("plugins/jev/config.json"))
         boards = config["routing"]["boards"]
@@ -301,7 +303,7 @@ class DesiredState(unittest.TestCase):
                 hard_index = 2
                 entry["routes"][hard_index:hard_index] = [
                     {"name": "hard", "enabled": True, "assignee_from": "glm_max_workers", "model": "glm-5.3",
-                     "provider": "zai", "criterion": HARD_CRITERION},
+                     "provider": "zai", "max_glm_change_requests": 3, "criterion": HARD_CRITERION},
                     {"name": "very_hard", "enabled": True, "criterion": VERY_HARD_CRITERION},
                 ]
         # Card t_a40f99ed changed control_group_every from 5 to 10 (owner's instruction).

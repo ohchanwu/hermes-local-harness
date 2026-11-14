@@ -803,7 +803,10 @@ CLAUDE_CARD = "t_c1a0de01"
 
 
 class RequestChangesTests(unittest.TestCase):
-    """Part 4 (card t_df87b851): after the fifth change request a GLM card goes to a Claude worker.
+    """Part 4 (card t_df87b851): after the fifth change request a GLM card goes
+    to a Claude worker. Card t_52be75ab: a route can carry its own
+    ``max_glm_change_requests``, so a `hard` card goes at the third change
+    request and an `easy` or `medium` card at the fifth.
 
     The board database is synthetic and every board change goes through the fake
     ``hermes`` command, which applies ``set-model`` and ``reassign`` to it.
@@ -873,6 +876,13 @@ class RequestChangesTests(unittest.TestCase):
     def escalations(self):
         return [r for r in read_records(self.log_dir, "decisions") if r["event"] == "escalate"]
 
+    def route_record(self, task_id, route, new_assignee="harness-worker-glm-1",
+                     original_assignee="harness-worker-2", applied=True):
+        """One `route` record, written as `test_claude_worker_from_the_route_record` writes it."""
+        routing.jev_log.write("decisions", {"event": "route", "board": "harness", "task_id": task_id,
+                                            "original_assignee": original_assignee, "new_assignee": new_assignee,
+                                            "applied": applied, "route": route, "applied_route": route})
+
     def test_fifth_change_request_clears_override_and_reassigns(self):
         self.set_card(GLM_CARD, model_override="glm-5.3-flash")
         self.add_change_requests(GLM_CARD, 5)
@@ -884,10 +894,11 @@ class RequestChangesTests(unittest.TestCase):
         self.assertEqual(tuple(self.card(GLM_CARD)), ("ready", "harness-worker", None))
         [record] = self.escalations()
         self.assertEqual({k: record[k] for k in ("board", "task_id", "original_assignee", "new_assignee",
-                                                  "change_requests", "applied", "error_class")},
+                                                  "change_requests", "applied", "applied_route",
+                                                  "max_glm_change_requests", "error_class")},
                          {"board": "harness", "task_id": GLM_CARD, "original_assignee": "harness-worker-glm-1",
                           "new_assignee": "harness-worker", "change_requests": 5, "applied": True,
-                          "error_class": None})
+                          "applied_route": None, "max_glm_change_requests": 5, "error_class": None})
 
     def insert_card(self, task_id, assignee, model_override=None):
         import sqlite3
@@ -898,11 +909,12 @@ class RequestChangesTests(unittest.TestCase):
         conn.close()
 
     def test_second_list_card_moves_to_a_claude_worker_after_the_limit(self):
-        # Two-list configuration: a card of the second list (glm_max_workers) is
-        # moved to a Claude worker at the fifth change request.
+        # Two-list configuration: a card of the second list (glm_max_workers)
+        # is moved to a Claude worker at the third change request (card
+        # t_52be75ab: the `hard` route carries its own limit 3).
         task_id = "t_3c9d0003"
         self.insert_card(task_id, "harness-worker-glm-3", "glm-5.3")
-        self.add_change_requests(task_id, 5)
+        self.add_change_requests(task_id, 3)
         self.request_changes({"task_id": task_id, "reason": "again"}, config=two_list_config())
         self.assertEqual(fake_hermes_calls(self.calls_log), [
             ["kanban", "--board", "harness", "set-model", task_id, "none"],
@@ -910,13 +922,18 @@ class RequestChangesTests(unittest.TestCase):
         ])
         self.assertEqual(tuple(self.card(task_id)), ("ready", "harness-worker", None))
         [record] = self.escalations()
+        # The card has no `route` record; the worker list of the assignee (the
+        # `hard` route alone names `glm_max_workers`) gives the limit 3, so
+        # `applied_route` is None and the limit used is 3.
+        self.assertEqual((record["change_requests"], record["applied_route"], record["max_glm_change_requests"]),
+                         (3, None, 3))
         self.assertEqual((record["event"], record["task_id"], record["original_assignee"], record["applied"]),
                          ("escalate", task_id, "harness-worker-glm-3", True))
 
     def test_second_list_card_below_the_limit_stays(self):
         task_id = "t_3c9d0004"
         self.insert_card(task_id, "harness-worker-glm-3")
-        self.add_change_requests(task_id, 4)
+        self.add_change_requests(task_id, 2)
         self.request_changes({"task_id": task_id, "reason": "again"}, config=two_list_config())
         self.assertEqual(fake_hermes_calls(self.calls_log), [])
         self.assertEqual(self.card(task_id)[1], "harness-worker-glm-3")
@@ -967,6 +984,213 @@ class RequestChangesTests(unittest.TestCase):
         self.request_changes()
         self.assertEqual(self.card(GLM_CARD)[1], "harness-worker-2")
         self.assertEqual(self.escalations()[0]["new_assignee"], "harness-worker-2")
+
+    # --- card t_52be75ab: the limit of a card -----------------------------------------
+
+    def result_tuple(self):
+        """(change_requests, applied_route, max_glm_change_requests, applied, new_assignee) of the one escalate record."""
+        [record] = self.escalations()
+        return (record["change_requests"], record["applied_route"], record["max_glm_change_requests"],
+                record["applied"], record["new_assignee"])
+
+    def glm3_card(self, model_override="glm-5.3"):
+        """A card of `harness-worker-glm-3`, inserted like the second-list tests insert it."""
+        task_id = "t_5a1e0003"
+        self.insert_card(task_id, "harness-worker-glm-3", model_override)
+        return task_id
+
+    def test_hard_card_of_the_glm3_profile_goes_at_the_third_change_request(self):
+        task_id = self.glm3_card()
+        self.route_record(task_id, "hard", new_assignee="harness-worker-glm-3")
+        self.add_change_requests(task_id, 2)
+        self.request_changes({"task_id": task_id, "reason": "again"})
+        self.assertEqual(fake_hermes_calls(self.calls_log), [])  # nothing happens
+        self.assertEqual(self.card(task_id)[1], "harness-worker-glm-3")
+        self.add_change_requests(task_id, 1)
+        self.request_changes({"task_id": task_id, "reason": "again"})
+        self.assertEqual(fake_hermes_calls(self.calls_log), [
+            ["kanban", "--board", "harness", "set-model", task_id, "none"],
+            ["kanban", "--board", "harness", "reassign", task_id, "harness-worker-2", "--reclaim"],
+        ])
+        self.assertEqual(tuple(self.card(task_id)), ("ready", "harness-worker-2", None))
+        self.assertEqual(self.result_tuple(), (3, "hard", 3, True, "harness-worker-2"))
+
+    def test_medium_card_created_before_the_change_keeps_the_limit_five(self):
+        # A card that was created before the configuration change has a `medium`
+        # route record; its worker is now the `-glm-3` profile, but the route
+        # record decides and `medium` has no limit of its own.
+        task_id = self.glm3_card()
+        self.route_record(task_id, "medium", new_assignee="harness-worker-glm-3")
+        self.add_change_requests(task_id, 4)
+        self.request_changes({"task_id": task_id, "reason": "again"})
+        self.assertEqual(fake_hermes_calls(self.calls_log), [])  # nothing happens
+        self.add_change_requests(task_id, 1)
+        self.request_changes({"task_id": task_id, "reason": "again"})
+        self.assertEqual(self.result_tuple(), (5, "medium", 5, True, "harness-worker-2"))
+
+    def test_glm3_card_without_a_route_record_goes_at_the_third(self):
+        # The worker list of the assignee: only the `hard` route names a list
+        # that contains `harness-worker-glm-3`, so its limit 3 applies.
+        task_id = self.glm3_card()
+        self.add_change_requests(task_id, 2)
+        self.request_changes({"task_id": task_id, "reason": "again"})
+        self.assertEqual(fake_hermes_calls(self.calls_log), [])  # nothing happens
+        self.add_change_requests(task_id, 1)
+        self.request_changes({"task_id": task_id, "reason": "again"})
+        self.assertEqual(self.result_tuple(), (3, None, 3, True, "harness-worker"))
+
+    def test_first_list_card_without_a_route_record_keeps_the_limit_five(self):
+        # `harness-worker-glm-1` is named by `easy` and `medium`, which have no
+        # limit of their own, so the general value 5 applies.
+        self.add_change_requests(GLM_CARD, 4)
+        self.request_changes()
+        self.assertEqual(fake_hermes_calls(self.calls_log), [])  # nothing happens
+        self.add_change_requests(GLM_CARD, 1)
+        self.request_changes()
+        self.assertEqual(self.result_tuple(), (5, None, 5, True, "harness-worker"))
+
+    def test_easy_route_record_of_a_first_list_card_keeps_the_limit_five(self):
+        self.route_record(GLM_CARD, "easy")
+        self.add_change_requests(GLM_CARD, 4)
+        self.request_changes()
+        self.assertEqual(fake_hermes_calls(self.calls_log), [])  # nothing happens
+        self.add_change_requests(GLM_CARD, 1)
+        self.request_changes()
+        self.assertEqual(self.result_tuple(), (5, "easy", 5, True, "harness-worker-2"))
+
+    def test_route_own_limit_that_is_zero_or_invalid_falls_back_to_the_general_value(self):
+        task_id = self.glm3_card()
+        self.route_record(task_id, "hard", new_assignee="harness-worker-glm-3")
+        self.add_change_requests(task_id, 4)
+        for value in (0, "3", -1, True, "absent"):
+            with self.subTest(value=value):
+                self.calls_log.unlink(missing_ok=True)
+                config = json.loads(json.dumps(self.config))
+                route = next(r for r in config["routing"]["boards"]["harness"]["routes"] if r["name"] == "hard")
+                if value == "absent":
+                    del route["max_glm_change_requests"]
+                else:
+                    route["max_glm_change_requests"] = value
+                self.request_changes({"task_id": task_id, "reason": "again"}, config=config)
+                self.assertEqual(fake_hermes_calls(self.calls_log), [])  # nothing happens
+                self.assertEqual(self.escalations(), [])
+        # After a fifth change request, with the value 0, the general value 5
+        # gives the limit and the route record still names the route.
+        self.calls_log.unlink(missing_ok=True)
+        self.add_change_requests(task_id, 1)
+        config = json.loads(json.dumps(self.config))
+        route = next(r for r in config["routing"]["boards"]["harness"]["routes"] if r["name"] == "hard")
+        route["max_glm_change_requests"] = 0
+        self.request_changes({"task_id": task_id, "reason": "again"}, config=config)
+        self.assertEqual(self.result_tuple(), (5, "hard", 5, True, "harness-worker-2"))
+
+    def test_general_value_zero_turns_the_reassignment_off_for_every_route(self):
+        task_id = self.glm3_card()
+        self.route_record(task_id, "hard", new_assignee="harness-worker-glm-3")
+        self.add_change_requests(task_id, 9)
+        config = json.loads(json.dumps(self.config))
+        config["routing"]["max_glm_change_requests"] = 0
+        self.request_changes({"task_id": task_id, "reason": "again"}, config=config)
+        self.assertEqual(fake_hermes_calls(self.calls_log), [])  # nothing happens
+        self.assertEqual(self.escalations(), [])
+
+    def test_route_record_with_a_name_the_board_does_not_have_uses_the_worker_list(self):
+        task_id = self.glm3_card()
+        self.route_record(task_id, "gone", new_assignee="harness-worker-glm-3")
+        self.add_change_requests(task_id, 3)
+        self.request_changes({"task_id": task_id, "reason": "again"})
+        self.assertEqual(self.result_tuple(), (3, None, 3, True, "harness-worker-2"))
+
+    def test_route_record_of_another_board_task_or_not_applied_is_not_used(self):
+        task_id = self.glm3_card()
+        # Only these three records: another board, `applied` false, another task.
+        routing.jev_log.write("decisions", {"event": "route", "board": "cha-pt", "task_id": task_id,
+                                            "original_assignee": "chapt-worker", "new_assignee": "chapt-worker-glm-3",
+                                            "applied": True, "route": "medium", "applied_route": "medium"})
+        self.route_record(task_id, "medium", new_assignee="harness-worker-glm-3", applied=False)
+        self.route_record("t_5a1e0004", "medium", new_assignee="harness-worker-glm-3")
+        self.add_change_requests(task_id, 3)
+        self.request_changes({"task_id": task_id, "reason": "again"})
+        self.assertEqual(self.result_tuple()[:4], (3, None, 3, True))
+
+    def test_worker_list_with_two_routes_of_different_limits_uses_the_general_value(self):
+        config = json.loads(json.dumps(self.config))
+        route = next(r for r in config["routing"]["boards"]["harness"]["routes"] if r["name"] == "medium")
+        route["max_glm_change_requests"] = 2
+        # `harness-worker-glm-1` is named by `easy` (limit 5) and `medium`
+        # (limit 2); the limits differ, so the general value 5 applies.
+        self.add_change_requests(GLM_CARD, 4)
+        self.request_changes(config=config)
+        self.assertEqual(fake_hermes_calls(self.calls_log), [])  # nothing happens
+        self.assertEqual(self.escalations(), [])
+        # `harness-worker-glm-2` has a `medium` route record, so the first rule
+        # gives the limit 2 of `medium`.
+        self.route_record("t_5a1e0002", "medium", new_assignee="harness-worker-glm-2")
+        self.add_change_requests("t_5a1e0002", 2)
+        self.request_changes({"task_id": "t_5a1e0002", "reason": "again"}, config=config)
+        self.assertEqual(self.result_tuple(), (2, "medium", 2, True, "harness-worker-2"))
+
+    def test_last_route_record_decides(self):
+        task_id = self.glm3_card()
+        self.route_record(task_id, "hard", new_assignee="harness-worker-glm-3")
+        self.route_record(task_id, "medium", new_assignee="harness-worker-glm-3")
+        self.add_change_requests(task_id, 3)
+        self.request_changes({"task_id": task_id, "reason": "again"})
+        self.assertEqual(fake_hermes_calls(self.calls_log), [])  # nothing happens
+        self.assertEqual(self.escalations(), [])
+
+    def test_route_record_without_applied_route_uses_the_route_field(self):
+        # A record written before card t_92e29d10 has no `applied_route`: the
+        # line is written directly as JSON, with no such key.
+        task_id = self.glm3_card()
+        self.log_dir.mkdir(parents=True, exist_ok=True)
+        with open(self.log_dir / "decisions.jsonl", "a", encoding="utf-8") as handle:
+            handle.write(json.dumps({"event": "route", "board": "harness", "task_id": task_id,
+                                     "original_assignee": "harness-worker", "new_assignee": "harness-worker-glm-3",
+                                     "applied": True, "route": "medium"}) + "\n")
+        self.add_change_requests(task_id, 4)
+        self.request_changes({"task_id": task_id, "reason": "again"})
+        self.assertEqual(fake_hermes_calls(self.calls_log), [])  # nothing happens
+        self.add_change_requests(task_id, 1)
+        self.request_changes({"task_id": task_id, "reason": "again"})
+        self.assertEqual(self.result_tuple(), (5, "medium", 5, True, "harness-worker"))
+
+    def test_workspace_and_branch_are_unchanged_by_the_reassignment(self):
+        # Part 4 step 4: the reassignment changes only tasks.assignee, the model
+        # override and the body line; the card keeps its workspace and branch.
+        import sqlite3
+        conn = sqlite3.connect(self.db)
+        conn.execute("ALTER TABLE tasks ADD COLUMN workspace_kind TEXT")
+        conn.execute("ALTER TABLE tasks ADD COLUMN workspace_path TEXT")
+        conn.execute("ALTER TABLE tasks ADD COLUMN branch_name TEXT")
+        task_id = "t_5a1e0005"
+        conn.execute("INSERT INTO tasks (id, title, status, assignee, model_override, workspace_kind, workspace_path,"
+                     " branch_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                     (task_id, "synthetic card", "ready", "harness-worker-glm-3", "glm-5.3", "worktree",
+                      f"/Users/chanbla11mit/hermes-local-harness/.worktrees/{task_id}", f"wt/{task_id}"))
+        conn.commit()
+        conn.close()
+        self.route_record(task_id, "hard", new_assignee="harness-worker-glm-3")
+        self.add_change_requests(task_id, 3)
+        self.request_changes({"task_id": task_id, "reason": "again"})
+        self.assertEqual(fake_hermes_calls(self.calls_log), [
+            ["kanban", "--board", "harness", "set-model", task_id, "none"],
+            ["kanban", "--board", "harness", "reassign", task_id, "harness-worker-2", "--reclaim"],
+        ])
+        conn = sqlite3.connect(self.db)
+        row = conn.execute("SELECT workspace_kind, workspace_path, branch_name, assignee FROM tasks WHERE id=?",
+                           (task_id,)).fetchone()
+        conn.close()
+        self.assertEqual(row, ("worktree", f"/Users/chanbla11mit/hermes-local-harness/.worktrees/{task_id}",
+                               f"wt/{task_id}", "harness-worker-2"))
+        self.assertEqual(self.result_tuple(), (3, "hard", 3, True, "harness-worker-2"))
+
+    def test_procedure_states_the_two_sentences_of_the_card(self):
+        procedure = (ROOT / "procedures" / "jev-plugin.md").read_text(encoding="utf-8")
+        self.assertEqual(procedure.count("A route can have its own `max_glm_change_requests`; the route `hard` has "
+                                          "`3`, and the routes `easy` and `medium` use the general value `5`."), 1)
+        self.assertEqual(procedure.count("A run that ends by a crash, a timeout or a usage limit is not a change "
+                                          "request and is not counted."), 1)
 
     def test_claude_workers_alternate_without_a_route_record(self):
         self.add_change_requests(GLM_CARD, 5)
