@@ -258,6 +258,47 @@ class RouteSettingTests(unittest.TestCase):
         self.assertTrue(notice.route_is_on(config(mixed), "easy"))
 
 
+def four_route_board(glm_max_workers=("worker-glm-3",)):
+    """One board entry with the four routes of plugins/jev/config.json: hard takes
+    its worker from glm_max_workers, very_hard keeps the Claude worker."""
+    return {"implementation_workers": ["worker"], "glm_workers": ["worker-glm-1", "worker-glm-2"],
+            "glm_max_workers": list(glm_max_workers),
+            "routes": [
+                {"name": "easy", "enabled": True, "assignee_from": "glm_workers",
+                 "model": "glm-5.3-flash", "provider": "zai", "criterion": "synthetic"},
+                {"name": "medium", "enabled": True, "assignee_from": "glm_workers",
+                 "model": "glm-5.3", "provider": "zai", "criterion": "synthetic"},
+                {"name": "hard", "enabled": True, "assignee_from": "glm_max_workers",
+                 "model": "glm-5.3", "provider": "zai", "max_glm_change_requests": 3,
+                 "criterion": "synthetic"},
+                {"name": "very_hard", "enabled": True, "criterion": "synthetic"}]}
+
+
+class HardRouteTests(unittest.TestCase):
+    """A rule row for the route hard, which takes its worker from glm_max_workers."""
+
+    run_notice = NoticeTests.run_notice
+
+    def test_hard_rule_row_gives_a_message_only_while_glm_max_workers_is_not_empty(self):
+        cards = (base.specs("g", 10, "harness", "hard", "glm", 0, 0, 1200)
+                 + base.specs("c", 3, "jobcron", "hard", "control", 0, 0, 1000))
+        boards = {name: four_route_board() for name in ("harness", "jobcron", "anki")}
+        status, texts, errors = self.run_notice(cards, boards=boards)
+        self.assertEqual((status, errors), (0, ""))
+        self.assertEqual(len(texts), 1)
+        self.assertIn("- route hard: saved -2000 Claude tokens", texts[0])
+        self.assertIn("Do you give permission to turn off route hard?", texts[0])
+        self.assertNotIn("easy", texts[0])
+        self.assertNotIn("medium", texts[0])
+        empty = {name: four_route_board(glm_max_workers=()) for name in ("harness", "jobcron", "anki")}
+        status, texts, errors = self.run_notice(cards, boards=empty)
+        self.assertEqual(status, 0)
+        self.assertEqual(texts, [])
+        self.assertIn("jev-route-notice: route hard has a rule line and is off on every board in ",
+                      errors)
+        self.assertEqual(errors.count("\n"), 1)
+
+
 def fixture_config(fixture):
     """The settings file of a fixture, made with every route on at the first call."""
     if not hasattr(fixture, "config"):

@@ -50,14 +50,22 @@ Sections:
      applied_route when that is a non-empty string, otherwise the value of its
      route (the field route stays the route that Jev chose; a record without
      the key applied_route, or with the value null, gives the value of route).
-     Then the Claude tokens saved by the easy and medium routes:
+     Then the Claude tokens saved by the easy, medium and hard routes (the
+     route very_hard keeps the card with the Claude worker and is not counted):
        - GLM-routed card: a card with a route record (event route) whose route
-         for this report is easy or medium and whose applied is true. Its route
-         is the route for this report of its last such record.
+         for this report is easy, medium or hard, whose applied is true, and
+         whose new_assignee is a non-empty string that differs from its
+         original_assignee. Its route is the route for this report of its last
+         such record. A route record with applied true whose new_assignee
+         equals its original_assignee, or whose new_assignee is missing or
+         null, puts the card in neither group; the rule is the same for the
+         three routes. Reason: route records with route hard that were written
+         before the configuration with four routes (card t_3c7a581d) have
+         applied true for a card that stayed with the Claude worker.
        - control card: a card with a route record whose route for this report
-         is easy or medium, applied false and not_applied_reason control_group,
-         and no applied easy or medium route record. Its route is the route for
-         this report of its last such record.
+         is easy, medium or hard, applied false and not_applied_reason
+         control_group, and no route record that makes it a GLM-routed card.
+         Its route is the route for this report of its last such record.
        - only cards whose status in the board database is done are counted,
          and only cards with at least one linked session (the number of done
          cards without a linked session is printed).
@@ -101,7 +109,7 @@ SESSION_START_SLACK_SECONDS = 60
 NO_RECORDS = "  no records"
 TOKEN_KEYS = ("input_tokens", "output_tokens", "cache_read_tokens", "cache_write_tokens")
 MODEL_FAMILIES = ("claude", "glm", "other")
-SAVINGS_ROUTES = ("easy", "medium")
+SAVINGS_ROUTES = ("easy", "medium", "hard")
 RULE_MIN_GLM_CARDS = 10
 RULE_MIN_CONTROL_CARDS = 3
 RULE_TEXT = "disable this route: owner permission required"
@@ -359,15 +367,31 @@ def report_route(record):
     return record.get("route")
 
 
+def moved_to_another_worker(record):
+    """True when new_assignee is a non-empty string that differs from
+    original_assignee, that is, the plugin moved the card to another worker."""
+    new_assignee = record.get("new_assignee")
+    return (isinstance(new_assignee, str) and bool(new_assignee)
+            and new_assignee != record.get("original_assignee"))
+
+
 def savings_groups(decisions):
     """{task_id: (group, board, route)} with group "glm" or "control".
 
-    A card with an applied easy or medium route record is a GLM-routed card
-    (route of its last such record). Otherwise a card with an easy or medium
-    control_group record is a control card (route of its last such record).
-    The route of a record here is the value of applied_route when it is a
-    non-empty string, otherwise the value of route (report_route); the field
-    route stays the route that Jev chose.
+    The routes counted are SAVINGS_ROUTES: easy, medium and hard. A card is a
+    GLM-routed card when it has a route record whose route is one of them,
+    whose applied is true and whose new_assignee is a non-empty string that
+    differs from its original_assignee (route of its last such record). A
+    route record with applied true whose new_assignee equals its
+    original_assignee, or whose new_assignee is missing or null, puts the card
+    in neither group; the rule is the same for the three routes. Reason: route
+    records with route hard that were written before the configuration with
+    four routes (card t_3c7a581d) have applied true for a card that stayed
+    with the Claude worker. Otherwise a card with a control_group record
+    (applied false) of one of the three routes is a control card (route of its
+    last such record). The route of a record here is the value of
+    applied_route when it is a non-empty string, otherwise the value of route
+    (report_route); the field route stays the route that Jev chose.
     """
     applied, control = {}, {}
     for record in decisions:
@@ -381,7 +405,8 @@ def savings_groups(decisions):
             continue
         board = record.get("board") if isinstance(record.get("board"), str) else "unknown"
         if record.get("applied") is True:
-            applied[task_id] = (board, route_name)
+            if moved_to_another_worker(record):
+                applied[task_id] = (board, route_name)
         elif record.get("applied") is False and record.get("not_applied_reason") == "control_group":
             control[task_id] = (board, route_name)
     groups = {task_id: ("glm", *value) for task_id, value in applied.items()}
