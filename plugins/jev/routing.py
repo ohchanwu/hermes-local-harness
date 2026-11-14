@@ -110,9 +110,11 @@ def _update_state(directory: Optional[Path], change: Callable[[Dict[str, Any]], 
     write it back atomically (mode 0600) and return what ``change`` returned.
 
     The file holds only board names, route names, section names and counters:
-    ``counters`` (GLM worker alternation per board), ``control_group_counters``
-    (per board and route) and ``escalation_counters`` (Claude worker alternation
-    per board). Sections that ``change`` does not touch are kept.
+    ``counters`` (GLM worker alternation per board and per worker list; the
+    list ``glm_workers`` uses the key of the board name alone, every other
+    list the key ``<board>:<list name>``), ``control_group_counters``
+    (per board and route) and ``escalation_counters`` (Claude worker
+    alternation per board). Sections that ``change`` does not touch are kept.
     """
     path = (directory or jev_log.log_dir()) / STATE_FILE_NAME
     with _locked(path):
@@ -132,18 +134,31 @@ def _update_state(directory: Optional[Path], change: Callable[[Dict[str, Any]], 
     return value
 
 
-def _next_in_rotation(section: str, board: str, workers: List[str], directory: Optional[Path]) -> str:
+def _next_in_rotation(section: str, board: str, workers: List[str], directory: Optional[Path],
+                      list_name: str = "glm_workers") -> str:
+    # The counter key of the list `glm_workers` is the board name alone, so the
+    # existing live state files stay valid; every other list name is kept in
+    # its own key, `<board>:<list name>`, so two lists of different lengths on
+    # one board do not reset each other's alternation.
+    key = board if list_name == "glm_workers" else f"{board}:{list_name}"
+
     def change(state: Dict[str, Any]) -> str:
         counters = state.setdefault(section, {})
-        index = _counter(counters.get(board))
-        counters[board] = (index + 1) % len(workers)
+        index = _counter(counters.get(key))
+        counters[key] = (index + 1) % len(workers)
         return workers[index % len(workers)]
     return _update_state(directory, change)
 
 
-def next_glm_worker(board: str, workers: List[str], directory: Optional[Path] = None) -> str:
-    """Return the next GLM worker for ``board`` and advance its counter (section ``counters``)."""
-    return _next_in_rotation("counters", board, workers, directory)
+def next_glm_worker(board: str, workers: List[str], directory: Optional[Path] = None,
+                    list_name: str = "glm_workers") -> str:
+    """Return the next GLM worker for ``board`` from the worker list named
+    ``list_name`` and advance that list's counter (section ``counters``).
+
+    The counter key is the board name for ``glm_workers`` and
+    ``<board>:<list name>`` for every other list name.
+    """
+    return _next_in_rotation("counters", board, workers, directory, list_name)
 
 
 def next_escalation_worker(board: str, workers: List[str], directory: Optional[Path] = None) -> str:
@@ -320,7 +335,7 @@ def decide(args: Mapping[str, Any], config: Mapping[str, Any], ask: Callable[...
         record["not_applied_reason"] = "board_not_configured"
         return None, record
     workers = [str(w) for w in board_cfg.get("implementation_workers") or []]
-    glm = [str(w) for w in board_cfg.get("glm_workers") or []]
+    glm = peak_hold.glm_workers_by_board(config).get(board, [])
     if isinstance(assignee, str) and assignee in workers + glm:
         record["original_assignee"] = assignee
         record["new_assignee"] = assignee
@@ -404,7 +419,7 @@ def decide(args: Mapping[str, Any], config: Mapping[str, Any], ask: Callable[...
         return None, record
     new_args = dict(args)
     if pool:
-        new_assignee = next_glm_worker(board, pool, state_dir)
+        new_assignee = next_glm_worker(board, pool, state_dir, str(chosen["assignee_from"]))
         new_args["assignee"] = new_assignee
         new_args["body"] = rewrite_assigned_worker(args.get("body"), new_assignee)
         record["new_assignee"] = new_assignee
@@ -687,9 +702,11 @@ def handle_request_changes(args: Mapping[str, Any], next_call: Callable[..., Any
 
     The call runs first and its result is returned unchanged. Afterwards, when
     the card's assignee (the implementer that Hermes ``request_changes`` gave the
-    card back to) is one of the board's ``glm_workers`` and the card has at least
-    ``routing.max_glm_change_requests`` ``changes_requested`` events, the card
-    goes to a Claude worker of the board:
+    card back to) is one of the board's GLM workers (the list ``glm_workers``
+    and every other worker list that a route of the board names in
+    ``assignee_from``; see ``peak_hold.glm_workers_by_board``) and the card has
+    at least ``routing.max_glm_change_requests`` ``changes_requested`` events,
+    the card goes to a Claude worker of the board:
     1. ``hermes kanban --board <board> set-model <task id> none``;
     2. only when that worked, ``hermes kanban --board <board> reassign <task id>
        <Claude worker> --reclaim``. ``--reclaim`` ends a GLM run that a
@@ -720,7 +737,7 @@ def handle_request_changes(args: Mapping[str, Any], next_call: Callable[..., Any
         if task_id is None or board is None:
             return result
         board_cfg = (routing.get("boards") or {}).get(board) or {}
-        glm = [str(w) for w in board_cfg.get("glm_workers") or []]
+        glm = peak_hold.glm_workers_by_board(config).get(board, [])
         claude = [str(w) for w in board_cfg.get("implementation_workers") or []]
         conn = peak_hold.connect_readonly(peak_hold.kanban_db_path(config, board))
         try:
