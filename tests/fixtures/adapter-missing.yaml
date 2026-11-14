@@ -1523,6 +1523,14 @@
         {
           "provider": "anthropic",
           "model": "claude-fable-5-2"
+        },
+        {
+          "provider": "claude-subscription",
+          "model": "claude-opus-5-5"
+        },
+        {
+          "provider": "anthropic",
+          "model": "claude-opus-5-5"
         }
       ],
       "auxiliary": {
@@ -2075,6 +2083,14 @@
         {
           "provider": "anthropic",
           "model": "claude-fable-5-2"
+        },
+        {
+          "provider": "claude-subscription",
+          "model": "claude-opus-5-5"
+        },
+        {
+          "provider": "anthropic",
+          "model": "claude-opus-5-5"
         }
       ],
       "auxiliary": {
@@ -2627,6 +2643,14 @@
         {
           "provider": "anthropic",
           "model": "claude-fable-5-2"
+        },
+        {
+          "provider": "claude-subscription",
+          "model": "claude-opus-5-5"
+        },
+        {
+          "provider": "anthropic",
+          "model": "claude-opus-5-5"
         }
       ],
       "auxiliary": {
@@ -3179,6 +3203,14 @@
         {
           "provider": "anthropic",
           "model": "claude-fable-5-2"
+        },
+        {
+          "provider": "claude-subscription",
+          "model": "claude-opus-5-5"
+        },
+        {
+          "provider": "anthropic",
+          "model": "claude-opus-5-5"
         }
       ],
       "auxiliary": {
@@ -3779,6 +3811,14 @@
         {
           "provider": "anthropic",
           "model": "claude-fable-5-2"
+        },
+        {
+          "provider": "claude-subscription",
+          "model": "claude-opus-5-5"
+        },
+        {
+          "provider": "anthropic",
+          "model": "claude-opus-5-5"
         }
       ],
       "auxiliary": {

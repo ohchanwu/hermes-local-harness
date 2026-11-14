@@ -52,6 +52,20 @@ OTHER_MAIN_FALLBACK = {name: FABLE if name in FABLE_PRIMARY else OPUS for name i
 OTHER_PRIMARY = {name: "claude-fable-5-2" if name in FABLE_PRIMARY else "claude-opus-5-5" for name in OTHER_PROFILES}
 MAIN_FALLBACK = {**JOBCRON_MAIN_FALLBACK, **OTHER_MAIN_FALLBACK}
 PRIMARY = {**JOBCRON_PRIMARY, **OTHER_PRIMARY}
+# Card t_c69fd1c8 (owner decision of 2026-11-14): the five project orchestrators keep the Anthropic API
+# Fable entry first, then fall back to Opus 5.5 on claude-subscription, then to Opus 5.5 on the
+# Anthropic API. default and every other declaring profile keep one anthropic entry.
+PROJECT_ORCHESTRATORS = tuple(f"{board}-orchestrator" for board in ("harness", "chapt", "jobcron", "jss", "anki"))
+ORCHESTRATOR_MAIN_FALLBACK = [{"provider": "anthropic", "model": FABLE},
+                              {"provider": "claude-subscription", "model": OPUS},
+                              {"provider": "anthropic", "model": OPUS}]
+
+
+def declared_main_fallback(name):
+    """The roster's fallback_providers list for a declaring profile."""
+    if name in PROJECT_ORCHESTRATORS:
+        return ORCHESTRATOR_MAIN_FALLBACK
+    return [{"provider": "anthropic", "model": MAIN_FALLBACK[name]}]
 SECRET = "synthetic-credential-value"
 PROVIDERS = [{"provider": "anthropic", "model": "synthetic-main-fallback"}]
 CHAINS = {
@@ -176,7 +190,9 @@ class DeclarationTests(unittest.TestCase):
     def test_repository_roster_declarations(self):
         """t_731d4476 and t_875f53f3: exactly the four Jobcron entries and the 18 other claude-subscription
         entries declare the Anthropic API fallback, with the identifiers chosen from the live model list;
-        their primary provider and model are unchanged. GLM (zai) and retired entries declare none."""
+        their primary provider and model are unchanged. GLM (zai) and retired entries declare none.
+        t_c69fd1c8: the five project orchestrators declare three main fallback entries; every other
+        declaring profile, default included, keeps one anthropic entry."""
         roster = json.loads((ROOT / "roster.yaml").read_text())
         errors = []
         with redirect_stdout(io.StringIO()):
@@ -199,20 +215,25 @@ class DeclarationTests(unittest.TestCase):
             with self.subTest(profile=name):
                 profile = declared[name]
                 self.assertEqual((profile["provider"], profile["model"]), ("claude-subscription", JOBCRON_PRIMARY[name]))
-                self.assertEqual(profile["fallback_providers"],
-                                 [{"provider": "anthropic", "model": JOBCRON_MAIN_FALLBACK[name]}])
+                if name not in PROJECT_ORCHESTRATORS:
+                    self.assertEqual(profile["fallback_providers"],
+                                     [{"provider": "anthropic", "model": JOBCRON_MAIN_FALLBACK[name]}])
                 self.assertEqual(profile["auxiliary_fallback_chain"], JOBCRON_CHAIN)
+        self.assertTrue(set(PROJECT_ORCHESTRATORS) <= set(declared))
+        self.assertEqual(declared["default"]["fallback_providers"], [{"provider": "anthropic", "model": FABLE}])
         for name in JOBCRON_PROFILES + OTHER_PROFILES:
             with self.subTest(profile=name):
                 profile = declared[name]
                 self.assertEqual((profile["provider"], profile["model"]), ("claude-subscription", PRIMARY[name]))
-                self.assertEqual(profile["fallback_providers"], [{"provider": "anthropic", "model": MAIN_FALLBACK[name]}])
+                self.assertEqual(profile["fallback_providers"], declared_main_fallback(name))
                 self.assertEqual(profile["auxiliary_fallback_chain"], JOBCRON_CHAIN)
-                entries = profile["fallback_providers"] + [
-                    entry for chain in profile["auxiliary_fallback_chain"].values() for entry in chain]
-                self.assertEqual(len(entries), 17)
-                for entry in entries:
+                chain_entries = [entry for chain in profile["auxiliary_fallback_chain"].values() for entry in chain]
+                entries = profile["fallback_providers"] + chain_entries
+                self.assertEqual(len(entries), 19 if name in PROJECT_ORCHESTRATORS else 17)
+                for entry in chain_entries:
                     self.assertEqual(entry["provider"], "anthropic")
+                for entry in entries:
+                    self.assertIn(entry["provider"], ("anthropic", "claude-subscription"))
                     self.assertEqual(set(entry), {"provider", "model"})
                     for field in entry:
                         self.assertFalse(any(part in field.lower() for part in ("key", "token", "secret", "url")),
