@@ -1230,6 +1230,36 @@
       "security.protected_instruction_extra_patterns": [
         "SKILL.md"
       ]
+    },
+    "jobcron-worker": {
+      "compression.threshold_tokens": 300000
+    },
+    "jobcron-worker-2": {
+      "compression.threshold_tokens": 300000
+    },
+    "chapt-worker": {
+      "compression.threshold_tokens": 300000
+    },
+    "chapt-worker-2": {
+      "compression.threshold_tokens": 300000
+    },
+    "harness-worker": {
+      "compression.threshold_tokens": 300000
+    },
+    "harness-worker-2": {
+      "compression.threshold_tokens": 300000
+    },
+    "jss-worker": {
+      "compression.threshold_tokens": 300000
+    },
+    "jss-worker-2": {
+      "compression.threshold_tokens": 300000
+    },
+    "anki-worker": {
+      "compression.threshold_tokens": 300000
+    },
+    "anki-worker-2": {
+      "compression.threshold_tokens": 300000
     }
   },
   "profile_fallback_settings": {

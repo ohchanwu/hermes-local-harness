@@ -86,6 +86,23 @@
       ]
     }
   },
+  "claude_worker_profile_settings": {
+    "profiles": [
+      "jobcron-worker",
+      "jobcron-worker-2",
+      "chapt-worker",
+      "chapt-worker-2",
+      "harness-worker",
+      "harness-worker-2",
+      "jss-worker",
+      "jss-worker-2",
+      "anki-worker",
+      "anki-worker-2"
+    ],
+    "settings": {
+      "compression.threshold_tokens": 300000
+    }
+  },
   "approval_policy": {
     "mode": "off",
     "profiles": [

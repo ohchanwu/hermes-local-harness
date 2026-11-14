@@ -26,14 +26,21 @@ SETTINGS = {
 }
 FIXTURES = ROOT / "tests/fixtures"
 # The second managed settings group (t_0a8674fe); tests/test_orchestrator_profile_settings.py
-# checks it. Fixtures carry both groups merged per profile.
+# checks it. The third group (t_2d357ca0) covers the ten Claude worker profiles.
+# Fixtures carry every group merged per profile.
 ORCHESTRATOR_GROUP = json.loads((ROOT / "roster.yaml").read_text())["orchestrator_profile_settings"]
+WORKER_PROFILES = ["jobcron-worker", "jobcron-worker-2", "chapt-worker", "chapt-worker-2",
+                   "harness-worker", "harness-worker-2", "jss-worker", "jss-worker-2",
+                   "anki-worker", "anki-worker-2"]
+WORKER_SETTINGS = {"compression.threshold_tokens": 300000}
 DRIFT_FIXTURES = ("compression-drift.yaml", "orchestrator-skill-settings-drift.yaml")
 DRIFT_MESSAGES = [
     "FAIL: managed setting drift advisor compression.threshold_tokens: "
     f"expected {SETTINGS['compression.threshold_tokens']!r}, actual 250000",
     "FAIL: managed setting drift harness-orchestrator compression.idle_compact_after_seconds: "
     f"expected {SETTINGS['compression.idle_compact_after_seconds']!r}, actual <unreadable>",
+    "FAIL: managed setting drift jobcron-worker compression.threshold_tokens: "
+    f"expected {WORKER_SETTINGS['compression.threshold_tokens']!r}, actual 500000",
 ]
 
 
@@ -61,6 +68,17 @@ class DesiredStateTests(unittest.TestCase):
     def test_snapshot_mirrors_roster(self):
         self.assertEqual(self.snapshot["managed_profile_settings"], self.roster["managed_profile_settings"])
 
+    def test_worker_group_pins_exact_profiles_and_value(self):
+        workers = self.roster["claude_worker_profile_settings"]
+        self.assertEqual(workers, {"profiles": WORKER_PROFILES, "settings": WORKER_SETTINGS})
+        self.assertIs(type(workers["settings"]["compression.threshold_tokens"]), int)
+        roster_profiles = {profile["name"]: profile for profile in self.roster["profiles"]}
+        for name in WORKER_PROFILES:
+            self.assertEqual(roster_profiles[name]["role"], "project implementation")
+            self.assertEqual(roster_profiles[name]["model"], "claude-opus-5-5")
+        self.assertFalse(set(WORKER_PROFILES) & set(PROFILES))
+        self.assertNotIn("claude_worker_profile_settings", self.snapshot)
+
     def test_native_settings_unchanged(self):
         self.assertEqual(self.roster["native_settings"],
                          {"kanban.max_in_progress": None, "kanban.max_in_progress_per_profile": 1})
@@ -71,6 +89,8 @@ class FixtureConsistencyTests(unittest.TestCase):
         expected = {profile: dict(SETTINGS) for profile in PROFILES}
         for profile in ORCHESTRATOR_GROUP["profiles"]:
             expected.setdefault(profile, {}).update(ORCHESTRATOR_GROUP["settings"])
+        for profile in WORKER_PROFILES:
+            expected.setdefault(profile, {}).update(WORKER_SETTINGS)
         names = sorted(path.name for path in FIXTURES.glob("*.yaml"))
         self.assertIn("compression-drift.yaml", names)
         for name in names:
@@ -88,6 +108,7 @@ class FixtureConsistencyTests(unittest.TestCase):
         self.assertEqual(drift, clean)
         self.assertEqual(managed["advisor"]["compression.threshold_tokens"], 250000)
         self.assertNotIn("compression.idle_compact_after_seconds", managed["harness-orchestrator"])
+        self.assertEqual(managed["jobcron-worker"]["compression.threshold_tokens"], 500000)
 
 
 class FixtureVerifierTests(unittest.TestCase):
@@ -121,7 +142,8 @@ class FixtureVerifierTests(unittest.TestCase):
             self.assertIn("incomplete fixture: missing required section 'profile_managed_settings'", output)
             self.assert_isolated(guard)
             every_key = (len(PROFILES) * len(SETTINGS)
-                         + len(ORCHESTRATOR_GROUP["profiles"]) * len(ORCHESTRATOR_GROUP["settings"]))
+                         + len(ORCHESTRATOR_GROUP["profiles"]) * len(ORCHESTRATOR_GROUP["settings"])
+                         + len(WORKER_PROFILES) * len(WORKER_SETTINGS))
             for observation in (None, [], {}, "not a mapping"):
                 with self.subTest(observation=observation):
                     path.write_text(json.dumps({**clean, "profile_managed_settings": observation}))
@@ -193,6 +215,24 @@ class CheckFunctionTests(unittest.TestCase):
         with patch.dict(self.verifier.__dict__, {
                 "run": lambda *args: subprocess.CompletedProcess(args, 0, json.dumps(SETTINGS[args[-1]]), "")}):
             self.assertEqual(self.run_check(managed, self.verifier.json_config), [])
+
+    def test_live_path_reads_each_worker_key_through_json_config(self):
+        workers = load_json("roster.yaml")["claude_worker_profile_settings"]
+        calls = []
+
+        def fake_run(*args):
+            calls.append(args)
+            profile = args[2]
+            output = "null" if profile == "harness-worker-2" else "300000"
+            return subprocess.CompletedProcess(args, 0, output, "")
+
+        with patch.dict(self.verifier.__dict__, {"run": fake_run}):
+            errors = self.run_check(workers, self.verifier.json_config)
+        self.assertEqual(calls, [("hermes", "-p", profile, "config", "get", "--json",
+                                  "compression.threshold_tokens") for profile in WORKER_PROFILES])
+        self.assertEqual(errors, [
+            "managed setting drift harness-worker-2 compression.threshold_tokens: "
+            f"expected {WORKER_SETTINGS['compression.threshold_tokens']!r}, actual None"])
 
 
 if __name__ == "__main__":

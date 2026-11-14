@@ -100,10 +100,11 @@ clean["profile_providers"] = {profile["name"]: profile["provider"] for profile i
 clean["profile_approval_modes"] = {
     profile: desired["approvals"]["mode"] for profile in desired["approvals"]["profiles"]}
 # Observed config values of every managed settings group, merged per profile:
-# managed_profile_settings (mirrored in the snapshot) and orchestrator_profile_settings
-# (roster.yaml only).
+# managed_profile_settings (mirrored in the snapshot), orchestrator_profile_settings
+# (roster.yaml only) and claude_worker_profile_settings (roster.yaml only).
 clean["profile_managed_settings"] = {}
-for group in (desired["managed_profile_settings"], roster["orchestrator_profile_settings"]):
+for group in (desired["managed_profile_settings"], roster["orchestrator_profile_settings"],
+              roster["claude_worker_profile_settings"]):
     for profile in group["profiles"]:
         clean["profile_managed_settings"].setdefault(profile, {}).update(copy.deepcopy(group["settings"]))
 # Observed fallback settings of every non-retired roster profile, as the roster declares
@@ -220,9 +221,11 @@ write("jev-plugin-missing.yaml", delta(jev_plugin_missing))
 
 
 def compression_drift(d):
-    # One profile carries a wrong value; another cannot report one key (unreadable).
+    # One profile carries a wrong value; another cannot report one key (unreadable);
+    # one Claude worker profile carries a wrong compression threshold.
     d["profile_managed_settings"]["advisor"]["compression.threshold_tokens"] = 250000
     del d["profile_managed_settings"]["harness-orchestrator"]["compression.idle_compact_after_seconds"]
+    d["profile_managed_settings"]["jobcron-worker"]["compression.threshold_tokens"] = 500000
 
 
 write("compression-drift.yaml", delta(compression_drift))
