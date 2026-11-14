@@ -383,14 +383,7 @@
           "chapt-worker-glm-2",
           "chapt-worker-glm-3",
           "chapt-orchestrator",
-          "chapt-reviewer",
-          "harness-worker",
-          "harness-worker-2",
-          "harness-worker-glm-1",
-          "harness-worker-glm-2",
-          "harness-worker-glm-3",
-          "harness-orchestrator",
-          "harness-reviewer"
+          "chapt-reviewer"
         ],
         "version": "0.2.5",
         "files": [

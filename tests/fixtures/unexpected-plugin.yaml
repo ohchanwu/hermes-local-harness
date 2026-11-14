@@ -684,41 +684,6 @@
         "SKILL.md": "tracked-source",
         "references/live-state-reconciliation.md": "tracked-source",
         "references/release-ci-portability.md": "tracked-source"
-      },
-      "harness-worker": {
-        "SKILL.md": "tracked-source",
-        "references/live-state-reconciliation.md": "tracked-source",
-        "references/release-ci-portability.md": "tracked-source"
-      },
-      "harness-worker-2": {
-        "SKILL.md": "tracked-source",
-        "references/live-state-reconciliation.md": "tracked-source",
-        "references/release-ci-portability.md": "tracked-source"
-      },
-      "harness-worker-glm-1": {
-        "SKILL.md": "tracked-source",
-        "references/live-state-reconciliation.md": "tracked-source",
-        "references/release-ci-portability.md": "tracked-source"
-      },
-      "harness-worker-glm-2": {
-        "SKILL.md": "tracked-source",
-        "references/live-state-reconciliation.md": "tracked-source",
-        "references/release-ci-portability.md": "tracked-source"
-      },
-      "harness-worker-glm-3": {
-        "SKILL.md": "tracked-source",
-        "references/live-state-reconciliation.md": "tracked-source",
-        "references/release-ci-portability.md": "tracked-source"
-      },
-      "harness-orchestrator": {
-        "SKILL.md": "tracked-source",
-        "references/live-state-reconciliation.md": "tracked-source",
-        "references/release-ci-portability.md": "tracked-source"
-      },
-      "harness-reviewer": {
-        "SKILL.md": "tracked-source",
-        "references/live-state-reconciliation.md": "tracked-source",
-        "references/release-ci-portability.md": "tracked-source"
       }
     },
     "production-deployment-planning": {
