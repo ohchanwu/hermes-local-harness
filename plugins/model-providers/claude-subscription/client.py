@@ -5,6 +5,7 @@ goes to Hermes as one batch once the CLI's first request matches one of them;
 Hermes' results then answer the CLI's remaining requests as they arrive.
 """
 import asyncio
+import datetime
 import hashlib
 import json
 import logging
@@ -43,6 +44,15 @@ MAX_SECOND_MESSAGES = 4  # decided follow-on messages per request before the str
 # only its own MCP tools, so the CLI cannot start a subagent. tool_progress also declares the field;
 # it carries no model output and is accepted with any value of it.
 MESSAGE_EVENTS = ("assistant", "user", "stream_event")
+# The causes that _cancel() records for the first closing of a client. Hermes chooses its reaction to a
+# provider error from the error text, so the closed-client error names only these fixed texts; a detail
+# (a ProviderError text or an exception class name) goes to the log line, never into that error.
+CLOSED_BY_CLOSE = "close() called"
+CLOSED_BY_CANCEL = "cancel() called"
+CLOSED_BY_STREAM_CLOSE = "stream closed before it finished"
+CLOSED_BY_REQUEST_ERROR = "request failed"
+CLOSED_BY_OTHER_EXCEPTION = "request ended with an exception other than ProviderError"
+CLOSED_BY_RESET_FAILURE = "session reset failed"
 
 
 def protocol_error(exc):
@@ -112,7 +122,7 @@ class Stream:
 
     def close(self):
         if not self.finished:
-            self.client.cancel()
+            self.client._cancel(CLOSED_BY_STREAM_CLOSE)
             self.iterator.close()
             self.finished = True
             self.client._release_busy()
@@ -139,6 +149,7 @@ class ClaudeSubscriptionClient:
         self._busy_owner = None  # thread whose request (possibly an open stream) holds _busy
         self._lifecycle = threading.RLock()
         self._closed = threading.Event()
+        self._closed_by = None  # (cause, detail or None, local time) of the first closing; see _cancel()
         self._startup = None
         self._runtime = None
         self._bridge = None
@@ -180,9 +191,24 @@ class ClaudeSubscriptionClient:
                 os.environ.get("HERMES_KANBAN_TASK"), os.environ.get("HOME"),
                 os.environ.get("HERMES_KANBAN_WORKSPACE"), session_id)
 
+    def _closed_error(self):
+        """The error for a request that this closed client refuses, with the recorded cause and time of closing.
+
+        Each call writes one warning with the cause and its detail. Without a recorded cause (the closed
+        state was set some other way) the error is the text without cause or time, and nothing is logged.
+        """
+        closed_by = self._closed_by
+        if closed_by is None:
+            return ProviderError("client closed or cancelled; no retry/resume")
+        cause, detail, moment = closed_by
+        at = moment.isoformat(timespec="seconds")
+        log.warning("claude-subscription: request refused; the client was closed at %s by: %s%s",
+                    at, cause, "" if detail is None else ": " + detail)
+        return ProviderError(f"client closed or cancelled; no retry/resume (closed at {at} by: {cause})")
+
     def _check_active(self):
         if self.is_closed():
-            raise ProviderError("client closed or cancelled; no retry/resume")
+            raise self._closed_error()
         if self._scope is None or self._current_scope(self._scope[-1]) != self._scope:
             raise ProviderError("session/worktree/profile changed during execution; use a separate client")
         now = time.monotonic()
@@ -252,7 +278,7 @@ class ClaudeSubscriptionClient:
         self._busy_owner = threading.get_ident()
         try:
             if self.is_closed():
-                raise ProviderError("client closed or cancelled; no retry/resume")
+                raise self._closed_error()
             model, scope, tools, max_output, effort = self._validate(kwargs)
             # Never fall back to the interactive `claude` on PATH: it updates itself.
             # A bare name would be resolved through PATH, so only absolute paths count.
@@ -637,10 +663,15 @@ class ClaudeSubscriptionClient:
                     self._persist_stream_audit(stream_log, error, runtime, obj, observed=True)
                     raise error
         except (ValueError, TypeError, KeyError, OSError, subprocess.SubprocessError) as exc:
-            self.cancel()
-            raise protocol_error(exc) from None
-        except BaseException:
-            self.cancel()
+            error = protocol_error(exc)
+            self._cancel(CLOSED_BY_REQUEST_ERROR, str(error)[:200])
+            raise error from None
+        except BaseException as exc:
+            if isinstance(exc, ProviderError):
+                self._cancel(CLOSED_BY_REQUEST_ERROR, str(exc)[:200])
+            else:
+                # The class name only: the message of such an exception is never recorded.
+                self._cancel(CLOSED_BY_OTHER_EXCEPTION, type(exc).__name__)
             raise
 
     def _flush(self, message):
@@ -825,13 +856,23 @@ class ClaudeSubscriptionClient:
             with self._lifecycle:  # put the remains back so close() can still reap them
                 self._runtime, self._bridge, self._temporary = runtime, bridge, temporary
             try:
-                self.cancel()  # marks the client closed first, then retries the cleanup
+                # Marks the client closed first, then retries the cleanup.
+                self._cancel(CLOSED_BY_RESET_FAILURE, type(exc).__name__)
             except BaseException:
                 pass
             raise ProviderError(f"session reset failed ({type(exc).__name__}); client closed") from None
 
     def cancel(self):
+        self._cancel(CLOSED_BY_CANCEL)
+
+    def _cancel(self, cause, detail=None):
+        """cancel(), recording `cause`, `detail` and the local time if this call closes the client.
+
+        A client that is already closed keeps the cause, detail and time of its first closing.
+        """
         with self._lifecycle:
+            if not self._closed.is_set():
+                self._closed_by = (cause, detail, datetime.datetime.now().astimezone())
             self._closed.set()
             children = (self._startup, self._runtime)
             bridge = self._bridge
@@ -853,7 +894,7 @@ class ClaudeSubscriptionClient:
                 self._temporary.cleanup()
 
     def close(self):
-        self.cancel()
+        self._cancel(CLOSED_BY_CLOSE)
         if self._busy.acquire(blocking=False):
             try:
                 self._dispose_if_closed()

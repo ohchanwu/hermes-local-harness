@@ -224,11 +224,69 @@ activity for the idle timeout, and is never forwarded. A non-null
 `parent_tool_use_id` (a subagent's message) is rejected on `assistant`, `user`
 and `stream_event` events only, as `malformed runtime event or unexpected
 subagent`; `tool_progress` is accepted with any value of it.
-Snapshot/stream mismatch, malformed protocol, quota/refusal, rejected rate limit,
-process death and unsupported model/executor selection terminate the client.
+Snapshot/stream mismatch, malformed protocol, a stop reason that is not accepted
+(listed below), a runtime result that reports an error or arrives for an
+incomplete message (`runtime quota/refusal/permission/turn error or incomplete
+result`), rejected rate limit, process death and unsupported model/executor
+selection terminate the client.
 An unmatched tool cannot become a text-success result. Unknown usage is absent,
 not fabricated zero. Raw runtime usage/modelUsage is available on nonstream
 response metadata and the client audit; runtime list-price cost is not a bill.
+
+When a message's `message_stop` event arrives, its stop reason (from its
+`message_delta` event) must be `end_turn`, `max_tokens` or `tool_use`, and the
+message must have tool calls exactly when the stop reason is `tool_use`.
+Otherwise the request fails with the text of the first row below whose
+condition applies; `<n>` is the number of tool calls of the message:
+
+- `runtime message ended without a stop reason`: no stop reason was received
+  (no `message_delta` event, or one whose stop reason is null).
+- `runtime stop reason refusal`: the stop reason is `refusal`.
+- `runtime stop reason not supported: <value>`: any other stop reason outside
+  the three. `<value>` is the received value when it is a string of at most 40
+  characters that consists only of `A-Z`, `a-z`, `0-9`, `_`, `.`, `:` and `-`
+  (the rule that the stream audit uses for its values); otherwise it is the
+  literal text `<other>`.
+- `runtime stop reason end_turn inconsistent with <n> tool calls`: the stop
+  reason is `end_turn` and the message has tool calls.
+- `runtime message stopped at the output limit with <n> tool calls`: the stop
+  reason is `max_tokens` and the message has tool calls.
+- `runtime stop reason tool_use without a tool call`: the stop reason is
+  `tool_use` and the message has no tool call.
+
+After the client is closed, each request fails with
+`client closed or cancelled; no retry/resume (closed at <time> by: <cause>)`.
+`<time>` is the local time at which the client was first closed, in ISO 8601
+with UTC offset and seconds precision (for example `2026-11-14T10:00:36+09:00`).
+`<cause>` is the first cause that closed the client; a later `cancel()` or
+`close()` does not replace the recorded cause, detail or time. The causes:
+
+- `close() called`: `close()` on a client that was not closed. No detail.
+- `cancel() called`: `cancel()` called from outside the client. No detail.
+- `stream closed before it finished`: `close()` on a streaming iterator whose
+  stream had not finished. No detail.
+- `request failed`: a request ended with a `ProviderError`, including
+  `runtime startup, I/O or malformed protocol: <class name>`. Detail: the first
+  200 characters of the error text of that request.
+- `request ended with an exception other than ProviderError`: Detail: the class
+  name of the exception. Its message is not recorded.
+- `session reset failed`: ending the previous CLI session for a new
+  conversation failed. Detail: the class name of the exception.
+
+Each refused request also writes one warning on the logger of the plugin's
+`client` module: `claude-subscription: request refused; the client was closed
+at <time> by: <cause>`, followed by `: <detail>` when the cause has a detail.
+The detail appears only in this log line, never in the error. If the client is
+marked closed without a recorded cause, the error is
+`client closed or cancelled; no retry/resume` and no line is written.
+
+The texts of the stop reason errors and of the closed-client error are fixed.
+Hermes chooses its reaction to a provider error (retry, fallback to another
+provider, context compression, connection handling) from words in the error
+text, so a different wording can change that reaction. For this reason no stop
+reason text contains `max_tokens`, and the closed-client error contains neither
+the error text of the failed request nor the class name of the exception that
+closed the client.
 
 There is no session-level cap on user inputs, assistant messages, tool steps
 or session duration; the subscription's own rate limits are the usage bound,

@@ -36,7 +36,6 @@ MAX_RUNS = 256       # run-length-encoded event types, per message and for the w
 MAX_BLOCKS = 64      # per message
 MAX_AUDIT = 200      # newest client audit entries kept
 DRAIN_SECONDS, DRAIN_IDLE_SECONDS = 5.0, 1.0
-IDENTIFIER = re.compile(r"[A-Za-z0-9_.:-]+")
 PREFIX_BYTES = 200   # of a rejected (non-JSON) runtime stdout line
 TOKEN_BYTE = re.compile(rb"[A-Za-z0-9+/=_.~:%-]")    # bytes that can belong to a credential-like token
 TOKEN_TAIL = re.compile(rb"[A-Za-z0-9+/=_.~:%-]+\Z")
@@ -57,13 +56,7 @@ AUDIT_FIELDS = {
 }
 
 
-def label(value, limit=120):
-    """An identifier-like runtime string as is, otherwise a placeholder; never free text."""
-    if value is None:
-        return None
-    if isinstance(value, str) and len(value) <= limit and IDENTIFIER.fullmatch(value):
-        return value
-    return "<other>"
+label = stream_events.label  # one implementation, shared with the stop reason error text
 
 
 def scalar(value):
