@@ -79,13 +79,27 @@ Sections:
          or negative, with at least 10 GLM-routed cards and at least 3 control
          cards. The report changes no setting; only the owner permits turning
          off a route.
-  2. Peak-hours holds: hold, release and toggle records.
-  3. Tool result filter: results per tool and action, characters removed per
+  2. GLM review: per board of the jev settings file with glm_reviewers
+     (plugins/jev/config.json of the checkout that holds this script), within
+     the report's time window: the cards with at least one run by a GLM
+     reviewer, the change requests by a GLM reviewer (changes_requested events
+     whose payload reviewer is a GLM reviewer), the passes (blocked events
+     whose reason starts with jev-glm-review-pass, written by a run of a GLM
+     reviewer) and,
+     for the cards with a pass, the Opus reviewer's first review run after the
+     card's first pass: approved for outcome completed, changes requested for
+     outcome changes_requested, not yet reviewed for every other state. A
+     board without GLM reviewer activity prints one line that says so. This
+     section reads the board databases only, not the logs.
+  3. Peak-hours holds: hold, release and toggle records.
+  4. Tool result filter: results per tool and action, characters removed per
      tool and per profile, and the share of saved files read later.
-  4. Auxiliary model calls: calls and tokens per aux_task and model.
-  5. Jev usage: total Jev input tokens and cost at 0.042 US dollars per million
+  5. Auxiliary model calls: calls and tokens per aux_task and model.
+  6. Jev usage: total Jev input tokens and cost at 0.042 US dollars per million
      input tokens.
-A section whose log or database is empty or missing prints "no records".
+A section whose log or database is empty or missing prints "no records". The
+GLM review section prints "no records" when no board has glm_reviewers or no
+database of such a board is read.
 
 The output holds only identifiers, counts, token numbers and costs: never card
 titles, card bodies, run summaries, tool output or message text.
@@ -103,6 +117,9 @@ from collections import defaultdict
 
 HERMES_ROOT = "/Users/chanbla11mit/.hermes"
 DEFAULT_LOG_DIR = HERMES_ROOT + "/jev/logs"
+JEV_CONFIG_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(__file__))),
+                               "plugins", "jev", "config.json")
+PASS_REASON_PREFIX = "jev-glm-review-pass"
 COST_PER_MILLION_INPUT = 0.042
 RUN_OUTCOMES = ("changes_requested", "crashed", "blocked")
 SESSION_START_SLACK_SECONDS = 60
@@ -119,6 +136,32 @@ def default_kanban_dbs():
     paths = [HERMES_ROOT + "/kanban.db"]
     paths += sorted(glob.glob(HERMES_ROOT + "/kanban/boards/*/kanban.db"))
     return [p for p in paths if os.path.isfile(p)]
+
+
+def load_jev_config(path=JEV_CONFIG_PATH):
+    """The parsed jev settings file; {} when it cannot be read or parsed."""
+    try:
+        with open(path, encoding="utf-8") as handle:
+            data = json.load(handle)
+    except (OSError, ValueError):
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def glm_review_boards(config):
+    """{board: (glm_reviewers, opus_reviewer)} of the boards with glm_reviewers."""
+    boards = ((config.get("routing") or {}).get("boards") or {})
+    result = {}
+    for board, settings in boards.items():
+        if not isinstance(settings, dict):
+            continue
+        reviewers = settings.get("glm_reviewers")
+        if not isinstance(reviewers, list):
+            continue
+        opus = settings.get("opus_reviewer")
+        result[board] = ([r for r in reviewers if isinstance(r, str)],
+                         opus if isinstance(opus, str) else None)
+    return result
 
 
 def default_state_dbs():
@@ -569,6 +612,127 @@ def section_routing(out, decisions, kanban_dbs, state_dbs, now):
     out.extend(savings_lines(compute_savings(decisions, cards, sessions, now)))
 
 
+def glm_review_figures(conn, glm_reviewers, opus_reviewer, cutoff, after):
+    """(reviewed_cards, change_requests, passes, {task_id: (pass_time, outcome)})
+
+    Read only, from one board database. reviewed_cards counts the cards with
+    at least one run by a GLM reviewer. change_requests counts the
+    changes_requested events whose payload reviewer is a GLM reviewer. passes
+    counts the blocked events whose payload reason starts with
+    jev-glm-review-pass whose run is a run of a GLM reviewer (a GLM worker's
+    blocked event with that reason is not counted). For every card with a
+    pass, the outcome is that of the Opus reviewer's first review run that
+    started after the card's first pass with outcome completed or
+    changes_requested, or None when there is none.
+    Events are counted when their created_at is at or after cutoff and, when
+    after is given, later than after (the report's time window); a run counts
+    for reviewed_cards when its started_at is within the same window.
+    """
+    if not glm_reviewers:
+        return set(), 0, 0, {}
+    marks = ",".join("?" * len(glm_reviewers))
+    glm_run_ids = set()
+    reviewed_cards = set()
+    for run_id, task_id, started in conn.execute(
+            f"SELECT id, task_id, started_at FROM task_runs "
+            f"WHERE profile IN ({marks})", tuple(glm_reviewers)):
+        glm_run_ids.add(run_id)
+        if started is not None and started >= cutoff and (after is None or started > after):
+            reviewed_cards.add(task_id)
+    change_requests = 0
+    pass_events = 0
+    passes = {}
+    for kind, task_id, run_id, created, payload in conn.execute(
+            "SELECT kind, task_id, run_id, created_at, payload FROM task_events "
+            "WHERE kind IN ('changes_requested', 'blocked')"):
+        if created is None or created < cutoff or (after is not None and created <= after):
+            continue
+        try:
+            data = json.loads(payload) if payload else {}
+        except ValueError:
+            data = {}
+        if not isinstance(data, dict):
+            data = {}
+        if kind == "changes_requested":
+            if data.get("reviewer") in glm_reviewers:
+                change_requests += 1
+        else:
+            reason = data.get("reason")
+            if (run_id in glm_run_ids and isinstance(reason, str)
+                    and reason.startswith(PASS_REASON_PREFIX)):
+                pass_events += 1
+                current = passes.get(task_id)
+                if current is None or created < current:
+                    passes[task_id] = created
+    outcomes = {}
+    for task_id, pass_time in passes.items():
+        outcomes[task_id] = None
+        for outcome, in conn.execute(
+                "SELECT outcome FROM task_runs WHERE task_id = ? AND profile = ? "
+                "AND outcome IN ('completed', 'changes_requested') "
+                "AND started_at IS NOT NULL AND started_at > ? "
+                "ORDER BY started_at LIMIT 1", (task_id, opus_reviewer, pass_time)):
+            outcomes[task_id] = outcome
+    return reviewed_cards, change_requests, pass_events, outcomes
+
+
+def board_of_db(path):
+    """The board name of a board database path (.../kanban/boards/<board>/kanban.db),
+    or None for every other path (the default database has no board directory)."""
+    parts = os.path.normpath(os.path.abspath(path)).split(os.sep)
+    if len(parts) >= 3 and parts[-3] == "boards" and parts[-1] == "kanban.db":
+        return parts[-2]
+    return None
+
+
+def section_glm_review(out, kanban_dbs, since_days, after, now, config=None):
+    """Section 2: GLM review figures per board, read only."""
+    out.append("== GLM review (kanban databases of the boards with glm_reviewers) ==")
+    if config is None:
+        config = load_jev_config()
+    boards = glm_review_boards(config)
+    db_by_board = {}
+    for path in kanban_dbs:
+        board = board_of_db(path)
+        if board in boards and board not in db_by_board:
+            db_by_board[board] = path
+    if not db_by_board:
+        out.append(NO_RECORDS)
+        return
+    cutoff, after = read_window(since_days, after, now)
+    for board in sorted(boards):
+        figures = None
+        path = db_by_board.get(board)
+        if path is not None:
+            try:
+                conn = connect_ro(path)
+            except sqlite3.Error:
+                figures = None
+            else:
+                try:
+                    reviewers, opus_reviewer = boards[board]
+                    figures = glm_review_figures(conn, reviewers, opus_reviewer, cutoff, after)
+                except sqlite3.Error:
+                    figures = None
+                finally:
+                    conn.close()
+        if figures is None:
+            out.append(f"  board {board}: no records")
+            continue
+        reviewed_cards, change_requests, pass_events, outcomes = figures
+        if not reviewed_cards and not change_requests and not pass_events:
+            out.append(f"  board {board}: no GLM reviewer activity")
+            continue
+        approved = sum(1 for outcome in outcomes.values() if outcome == "completed")
+        requested = sum(1 for outcome in outcomes.values() if outcome == "changes_requested")
+        out.append(f"  board {board}: cards with at least one run by a GLM reviewer "
+                   f"{len(reviewed_cards)}, change requests by a GLM reviewer "
+                   f"{change_requests}, passes {pass_events}")
+        out.append(f"    Opus reviewer first outcome after a pass: approved {approved}, "
+                   f"changes requested {requested}, "
+                   f"not yet reviewed {len(outcomes) - approved - requested}")
+
+
 def section_peak_hold(out, decisions):
     out.append("== Peak-hours holds (decisions.jsonl events hold, release, toggle) ==")
     records = [r for r in decisions if r.get("event") in ("hold", "release", "toggle")]
@@ -682,7 +846,8 @@ def window_text(since_days, after):
     return ", ".join(parts) or "all records"
 
 
-def build_report(log_dir, since_days, kanban_dbs, state_dbs, now=None, after=None):
+def build_report(log_dir, since_days, kanban_dbs, state_dbs, now=None, after=None,
+                 jev_config=None):
     now = time.time() if now is None else now
     cutoff, after = read_window(since_days, after, now)
     decisions = read_log(log_dir, "decisions", cutoff, after)
@@ -690,6 +855,7 @@ def build_report(log_dir, since_days, kanban_dbs, state_dbs, now=None, after=Non
     auxiliary = read_log(log_dir, "auxiliary", cutoff, after)
     out = [f"jev report: log directory {log_dir}, {window_text(since_days, after)}"]
     section_routing(out, decisions, kanban_dbs, state_dbs, now)
+    section_glm_review(out, kanban_dbs, since_days, after, now, config=jev_config)
     section_peak_hold(out, decisions)
     section_tool_results(out, tool_results)
     section_auxiliary(out, auxiliary)
