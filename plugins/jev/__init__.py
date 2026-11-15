@@ -14,8 +14,12 @@ Registered callbacks:
   not called (``glm_review.handle_refused_tool``), and ``kanban_block`` with a
   reason that starts with ``jev-glm-review-pass`` blocks the card with the
   kind that keeps it out of ``triage``
-  (``glm_review.handle_pass_block``). Every other tool passes through
-  unchanged.
+  (``glm_review.handle_pass_block``). In a GLM review run that the dispatcher
+  started inside the active peak-hours hold window, every tool other than
+  ``kanban_block``, ``kanban_complete`` and ``kanban_request_review`` is
+  refused with an error result, and ``kanban_block`` blocks the card with the
+  hold reason (``glm_review.hold_action``, ``glm_review.handle_hold_block``).
+  Every other tool passes through unchanged.
 - ``transform_tool_result`` hook: calls ``tool_filter.transform`` (imported
   lazily); a missing module or any exception leaves the result unchanged.
 - ``post_auxiliary_call`` hook: one ``auxiliary`` log record per call.
@@ -70,6 +74,27 @@ def _tool_execution(**kwargs: Any) -> Any:
                 return glm_review.handle_refused_tool(tool_name, kwargs.get("args"))
         except Exception:
             return glm_review.REFUSAL_ERROR
+    # The peak-hours hold of a GLM review run that started inside the hold
+    # window (glm_review.hold_action): every tool other than kanban_block is
+    # refused, and kanban_block blocks the card with the hold reason. An
+    # exception in this part means the baseline behaviour for this call;
+    # ``next_call`` runs outside the ``try``, at most once.
+    hold_block: Any = None
+    hold_result: Any = None
+    try:
+        hold = glm_review.hold_action(tool_name, kwargs.get("args"), load_config())
+        if hold is not None:
+            if hold["action"] == "blocked" and isinstance(hold["payload"], dict):
+                hold_block = hold
+            elif hold["action"] == "refused" and isinstance(hold["result"], str):
+                hold_result = hold["result"]
+    except Exception:
+        hold_block = None
+        hold_result = None
+    if hold_result is not None:
+        return hold_result
+    if hold_block is not None:
+        return glm_review.handle_hold_block(hold_block, next_call)
     if tool_name == "kanban_block":
         # The pass of a review without findings (glm_review.handle_pass_block):
         # only in a GLM reviewer session and only for a reason that starts with

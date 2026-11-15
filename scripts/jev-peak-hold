@@ -27,8 +27,22 @@ Commands:
           HERMES_DELEGATED_CHILD_CONTEXT is set in the environment, the pass
           is refused for a process that a worker started and no pass command
           runs; the cards stay blocked.
+
+          On every run, each blocked card of the board's first GLM reviewer
+          whose newest blocked event has a reason that carries the marker
+          jev-peak-hold and records source_status review (a GLM review run
+          that started inside the window blocked it through the plugin) is
+          released with "hermes kanban unblock <id>", which returns it to
+          review on the same GLM reviewer, when the hold is not active or the
+          time in its reason has passed ("released <board> <id>
+          released_to=review"). Just before the command the card is read
+          again and skipped when it no longer meets these conditions. A failed
+          command leaves the card blocked; the next run tries again. In a
+          process that a worker started this release is refused and no
+          command runs.
   off     Turn the hold off (switch file enabled: false), then release every
-          card held with the marker at once.
+          card held with the marker in the scheduled status at once. Cards
+          held in review are released by the next run.
   on      Turn the hold on (switch file enabled: true). Cards are held again
           from the next run inside the window.
   status  Print on or off, when and by whom the switch was changed, and the
@@ -36,7 +50,8 @@ Commands:
 
 A hold is `hermes kanban --board <board> schedule <id> "jev-peak-hold until <time>"`;
 a release is `hermes kanban --board <board> unblock <id>`. Only cards in the
-scheduled status whose latest scheduled reason carries the marker are released.
+scheduled status whose latest scheduled reason carries the marker, and the
+cards held in review described under run, are released.
 A board database that cannot be read is reported ("failed read <board>
 error_class=<class>") and the other boards are still processed. Exit status 1
 when a board could not be read or a hold or release failed, else 0.
@@ -95,6 +110,9 @@ def _print_actions(actions: list, prefix: str) -> None:
         if item["action"] == "hold":
             print(f"{prefix}hold {item['board']} {item['task_id']} assignee={item['assignee']} "
                   f"until={item['held_until']}")
+        elif item.get("released_to"):
+            print(f"{prefix}release {item['board']} {item['task_id']} assignee={item['assignee']} "
+                  f"released_to={item['released_to']}")
         else:
             print(f"{prefix}release {item['board']} {item['task_id']} assignee={item['assignee']}")
 
@@ -209,11 +227,32 @@ def _print_pass_results(results: list) -> int:
     return 1 if failures else 0
 
 
+def _print_review_release_results(results: list) -> int:
+    failures = 0
+    for item in results:
+        if item.get("skipped"):
+            if item.get("error_class"):
+                print(f"skipped release {item['board']} {item['task_id']}: the card could not be read again "
+                      f"(error_class={item['error_class']}); the next run tries again")
+            else:
+                print(f"skipped release {item['board']} {item['task_id']}: it is no longer a blocked card "
+                      "of the GLM reviewer held in review with the marker")
+        elif item["applied"]:
+            print(f"released {item['board']} {item['task_id']} released_to={item['released_to']}")
+        else:
+            failures += 1
+            print(f"failed release {item['board']} {item['task_id']} error_class={item['error_class']}")
+    return 1 if failures else 0
+
+
 def _run(config: dict, args: argparse.Namespace) -> int:
     now = _parse_now(args.now)
     boards = _boards(config, args)
+    review_releases: list = []
+    review_status = 0
     if peak_hold.worker_session():
         print("pass refused: this process was started by a worker; the cards stay blocked")
+        print("release to review refused: this process was started by a worker; the cards stay blocked")
         pass_status = 0
         passes: list = []
         pass_errors: list = []
@@ -224,6 +263,8 @@ def _run(config: dict, args: argparse.Namespace) -> int:
             _print_pass_actions(passes, "planned ")
         if not passes:
             print("no card to pass to the Opus reviewer")
+        review_releases, review_errors = peak_hold.plan_review_release(config, now, boards)
+        review_status = _print_read_errors(review_errors, log=args.apply, now=now)
     actions, switch_error, errors = peak_hold.plan(config, now, boards)
     if switch_error:
         print(f"switch file error: {switch_error} (treated as on)")
@@ -232,18 +273,22 @@ def _run(config: dict, args: argparse.Namespace) -> int:
     read_status = _print_read_errors(errors, log=args.apply, now=now)
     if not args.apply:
         _print_actions(actions, "planned ")
-        if not actions:
+        _print_actions(review_releases, "planned ")
+        if not actions and not review_releases:
             print("nothing to hold or release")
-        return max(read_status, pass_status)
+        return max(read_status, pass_status, review_status)
     hold_status = read_status
     if actions:
         hold_status = max(_print_results(peak_hold.apply(config, actions, args.hermes, boards)), read_status)
-    else:
+    elif not review_releases:
         print("nothing to hold or release")
     if passes:
         pass_status = max(_print_pass_results(peak_hold.apply_glm_review_pass(
             config, passes, args.hermes, boards)), pass_status)
-    return max(hold_status, pass_status)
+    if review_releases:
+        review_status = max(_print_review_release_results(peak_hold.apply_review_release(
+            config, review_releases, args.hermes, boards)), review_status)
+    return max(hold_status, pass_status, review_status)
 
 
 def main(argv: list[str] | None = None) -> int:
