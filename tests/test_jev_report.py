@@ -36,6 +36,7 @@ NOW = 1_800_000_000
 SENTINEL = "SENTINEL-CARD-TEXT-5e2a71"
 HEADERS = (
     "== Card model routing (decisions.jsonl event route) ==",
+    "== GLM review (kanban databases of the boards with glm_reviewers) ==",
     "== Peak-hours holds (decisions.jsonl events hold, release, toggle) ==",
     "== Tool result filter (tool_results.jsonl) ==",
     "== Auxiliary model calls (auxiliary.jsonl) ==",
@@ -268,7 +269,10 @@ class FixtureTests(unittest.TestCase):
     def test_every_section_present(self):
         for header in HEADERS:
             self.assertIn(header, self.text)
-        self.assertNotIn("no records", self.text.split(HEADERS[1])[1])
+        # The GLM review section has no board database here (the fixture
+        # database is not under a boards directory), so the check on recorded
+        # sections starts after it, at the peak-hours hold section.
+        self.assertNotIn("no records", self.text.split(HEADERS[2])[1])
 
     def test_routing_counts_outcomes_and_tokens(self):
         self.assert_lines(
