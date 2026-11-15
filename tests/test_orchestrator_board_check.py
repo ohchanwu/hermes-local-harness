@@ -48,6 +48,20 @@ WAKE = ("notify+wake", "example-orchestrator", "example-user")
 WAKE_FALSE = '{"wakeAgent": false}'
 HEADER = "Board example-board check for example-orchestrator:"
 MARKER = "PRIVATE-MARKER-7f3a"
+FAILURE_TEXT = "synthetic worker run exited rate-limited (quota) and was requeued"
+BLOCKER_AUTH = '{"reason": "blocker_auth"}'
+CRON_PROMPT_RESPAWN_GUARDED_LINE = (
+    "5. RESPAWN-GUARDED: the line ends with `reason blocker_auth events <count>`. The Kanban dispatcher"
+    " has skipped the card on at least 3 ticks since the card's last claim, with the event"
+    " `respawn_guarded` and the reason `blocker_auth`, because the card still stores the failure text"
+    " of an earlier run. If kanban_show shows a run of the card that is running, or a status other than"
+    " `ready` and `review`, do nothing for that finding. If the status is `review`, the assignee in the"
+    " finding line is a profile name (not `-`), and the newest ended run of the card has the outcome"
+    " `review_requested`, the stored text is older than a run that ended normally: run"
+    " `hermes kanban --board <board> assign <card id> none`, then"
+    " `hermes kanban --board <board> assign <card id> <assignee from the finding line>`, confirm with"
+    " kanban_show that the assignee is that profile again, and report the card. In every other case"
+    " change nothing for the card; report the card, its status and the outcome of its newest ended run.")
 
 GIT_ENV = {
     "GIT_CONFIG_NOSYSTEM": "1",
@@ -94,7 +108,7 @@ class Board:
         self.conn = sqlite3.connect(path)
         self.conn.executescript(
             "CREATE TABLE tasks (id TEXT PRIMARY KEY, title TEXT, body TEXT, assignee TEXT,"
-            " status TEXT, created_at INTEGER);"
+            " status TEXT, created_at INTEGER, last_failure_error TEXT);"
             "CREATE TABLE task_runs (id INTEGER PRIMARY KEY, task_id TEXT, profile TEXT, status TEXT,"
             " outcome TEXT, summary TEXT, metadata TEXT, started_at INTEGER, ended_at INTEGER);"
             "CREATE TABLE task_events (id INTEGER PRIMARY KEY, task_id TEXT, kind TEXT, payload TEXT,"
@@ -107,11 +121,13 @@ class Board:
         self.order = 0
 
     def card(self, task_id, status, title="Example card", *, assignee="example-worker",
-             created_at=None, body="", wake=True):
+             created_at=None, body="", wake=True, last_failure_error=None):
         self.order += 1
-        self.conn.execute("INSERT INTO tasks VALUES (?, ?, ?, ?, ?, ?)",
+        self.conn.execute("INSERT INTO tasks (id, title, body, assignee, status, created_at,"
+                          " last_failure_error) VALUES (?, ?, ?, ?, ?, ?, ?)",
                           (task_id, title, body, assignee, status,
-                           NOW - HOUR + self.order if created_at is None else created_at))
+                           NOW - HOUR + self.order if created_at is None else created_at,
+                           last_failure_error))
         if wake:
             self.sub(task_id, *WAKE)
         self.conn.commit()
@@ -128,9 +144,9 @@ class Board:
                           (task_id, profile, outcome, summary, text, ended_at - 60, ended_at))
         self.conn.commit()
 
-    def event(self, task_id, created_at, payload=""):
-        self.conn.execute("INSERT INTO task_events (task_id, kind, payload, created_at) VALUES (?, 'edited', ?, ?)",
-                          (task_id, payload, created_at))
+    def event(self, task_id, created_at, payload="", *, kind="edited"):
+        self.conn.execute("INSERT INTO task_events (task_id, kind, payload, created_at) VALUES (?, ?, ?, ?)",
+                          (task_id, kind, payload, created_at))
         self.conn.commit()
 
     def comment(self, task_id, created_at, body=""):
@@ -496,6 +512,147 @@ class OrchestratorBoardCheckTests(unittest.TestCase):
     def test_title_is_printed_on_one_line(self):
         self.board.card("t_0070", "todo", "Two\nlines\tof title", assignee=None, wake=False)
         self.assertEqual(self.findings(), ["NO-WAKE-SUBSCRIPTION t_0070 todo - Two lines of title"])
+
+    # RESPAWN-GUARDED
+
+    def guarded_card(self, task_id, status="review", title="Guarded card", *, events=3, claimed=True,
+                     failure=FAILURE_TEXT, assignee="example-reviewer", created_at=None):
+        """A card with a stored failure text, an optional claimed event, then blocker_auth events."""
+        self.board.card(task_id, status, title, assignee=assignee, created_at=created_at,
+                        last_failure_error=failure)
+        if claimed:
+            self.board.event(task_id, NOW - 900, kind="claimed")
+        self.guarded_events(task_id, events)
+
+    def guarded_events(self, task_id, count, payload=BLOCKER_AUTH):
+        for number in range(count):
+            self.board.event(task_id, NOW - 600 + 60 * number, payload, kind="respawn_guarded")
+
+    def test_review_card_with_failure_text_and_three_blocker_auth_events_is_reported(self):
+        # Case a.
+        self.guarded_card("t_0400", title="Guarded review")
+        self.guarded_card("t_0401", title="Guarded without assignee", events=4, assignee=None)
+        self.assertEqual(self.findings(), [
+            "RESPAWN-GUARDED t_0400 review example-reviewer Guarded review reason blocker_auth events 3",
+            "RESPAWN-GUARDED t_0401 review - Guarded without assignee reason blocker_auth events 4",
+        ])
+
+    def test_two_blocker_auth_events_are_not_reported(self):
+        # Case b.
+        self.assertEqual(check.RESPAWN_GUARDED_MIN_EVENTS, 3)
+        self.guarded_card("t_0410", events=2)
+        self.assertEqual(self.findings(), [])
+
+    def test_only_events_after_the_newest_claimed_event_are_counted(self):
+        # Case c.
+        self.guarded_card("t_0420", title="Claimed again", events=3)
+        self.board.event("t_0420", NOW - 400, kind="claimed")
+        self.guarded_events("t_0420", 2)
+        self.assertEqual(self.findings(), [])
+        self.guarded_events("t_0420", 1)
+        self.assertEqual(self.findings(), [
+            "RESPAWN-GUARDED t_0420 review example-reviewer Claimed again reason blocker_auth events 3"])
+
+    def test_null_or_empty_failure_text_is_not_reported(self):
+        # Case d.
+        self.guarded_card("t_0430", failure=None)
+        self.guarded_card("t_0431", failure="")
+        self.assertEqual(self.findings(), [])
+
+    def test_payloads_without_reason_blocker_auth_are_not_counted_and_are_not_errors(self):
+        # Case e.
+        not_counted = ['{"reason": "rate_limit_cooldown"}', '{"reason": "blocker_auth"', "not json",
+                       '["blocker_auth"]', '"blocker_auth"', None, '{"reason": ["blocker_auth"]}',
+                       '{"other": "blocker_auth"}']
+        self.guarded_card("t_0440", title="Two counted", events=2)
+        self.guarded_card("t_0441", title="Three counted", events=3)
+        for task_id in ("t_0440", "t_0441"):
+            for payload in not_counted:
+                self.guarded_events(task_id, 1, payload)
+        code, out = self.run_check()
+        self.assertEqual(code, 0)
+        self.assertEqual(out, [
+            HEADER, "RESPAWN-GUARDED t_0441 review example-reviewer Three counted reason blocker_auth events 3"])
+        self.assertFalse(any(line.startswith("Board check error:") for line in out), out)
+        self.state.unlink()
+        self.board.conn.execute("DELETE FROM task_events WHERE task_id = 't_0441'")
+        self.board.conn.commit()
+        self.assertEqual(self.run_check(), (0, [WAKE_FALSE]))
+
+    def test_ready_card_is_reported_and_running_blocked_and_done_cards_are_not(self):
+        # Case f.
+        self.guarded_card("t_0450", "ready", "Guarded ready", assignee="example-worker")
+        for task_id, status in (("t_0451", "running"), ("t_0452", "blocked"), ("t_0453", "done")):
+            self.guarded_card(task_id, status, "Not ready or review")
+        self.assertEqual(self.findings(), [
+            "RESPAWN-GUARDED t_0450 ready example-worker Guarded ready reason blocker_auth events 3"])
+
+    def test_card_without_claimed_event_compares_every_event(self):
+        # Case g.
+        self.guarded_card("t_0460", title="Never claimed", claimed=False)
+        self.assertEqual(self.findings(), [
+            "RESPAWN-GUARDED t_0460 review example-reviewer Never claimed reason blocker_auth events 3"])
+
+    def test_failure_text_and_other_payload_text_never_appear_in_output(self):
+        # Case h.
+        self.guarded_card("t_0470", title="Marker card", failure="synthetic failure " + MARKER, events=2)
+        self.guarded_events("t_0470", 1, json.dumps({"reason": "blocker_auth", "detail": MARKER}))
+        self.board.event("t_0470", NOW - 30, json.dumps({"note": MARKER}))
+        self.board.event("t_0470", NOW - 20, json.dumps({"reason": MARKER}), kind="respawn_guarded")
+        code, out = self.run_check()
+        self.assertEqual(code, 0)
+        self.assertEqual(out, [
+            HEADER, "RESPAWN-GUARDED t_0470 review example-reviewer Marker card reason blocker_auth events 3"])
+        self.assertNotIn(MARKER, "\n".join(out))
+        self.assertNotIn(MARKER, self.state.read_text())
+
+    def test_respawn_guarded_repeat_control_and_end_after_reassignment(self):
+        # Case i.
+        self.guarded_card("t_0480", title="Repeat")
+        line = "RESPAWN-GUARDED t_0480 review example-reviewer Repeat reason blocker_auth events 3"
+        self.assertEqual(self.run_check(NOW), (0, [HEADER, line]))
+        self.assertEqual(self.read_state(), {"RESPAWN-GUARDED:t_0480": NOW})
+        # A second run within report_again_seconds; the dispatcher has written one more event.
+        self.guarded_events("t_0480", 1)
+        self.assertEqual(self.run_check(NOW + 60), (0, [WAKE_FALSE]))
+        self.assertEqual(self.read_state(), {"RESPAWN-GUARDED:t_0480": NOW})
+        # The recovery step changes the assignee; Hermes then sets last_failure_error to NULL.
+        self.board.conn.execute("UPDATE tasks SET last_failure_error = NULL WHERE id = 't_0480'")
+        self.board.conn.commit()
+        self.assertEqual(self.run_check(NOW + 120), (0, [WAKE_FALSE]))
+        self.assertEqual(self.read_state(), {})
+
+    def test_respawn_guarded_follows_stale_findings_and_precedes_on_fallback(self):
+        # Case j. The RESPAWN-GUARDED card is older than the STALE-BLOCKED card and is not
+        # STALE-REVIEW, because its respawn_guarded events are newer activity.
+        self.guarded_card("t_0490", title="Guarded old review", created_at=NOW - 4 * HOUR)
+        self.board.card("t_0491", "blocked", "Old blocked", created_at=NOW - 3 * HOUR)
+        home = ProfileHome(self.dir / "profiles" / "example-a")
+        home.route(FALLBACK, "example-fallback-model", NOW - 60)
+        self.settings["provider_watch"] = [
+            {"profile": "example-a", "home": str(home.path), "primary_provider": PRIMARY}]
+        self.write_settings()
+        self.assertEqual(self.findings(), [
+            "STALE-BLOCKED t_0491 blocked example-worker Old blocked",
+            "RESPAWN-GUARDED t_0490 review example-reviewer Guarded old review reason blocker_auth events 3",
+            f"ON-FALLBACK example-a: {FALLBACK}/example-fallback-model at {local_text(NOW - 60)}",
+        ])
+
+    def test_cron_prompt_has_the_respawn_guarded_line_after_the_stale_line(self):
+        # Case k.
+        lines = (SETTINGS_DIR / "cron-prompt.md").read_text(encoding="utf-8").splitlines()
+        stale = [n for n, text in enumerate(lines) if text.startswith("4. STALE-BLOCKED and STALE-REVIEW:")]
+        self.assertEqual(len(stale), 1, stale)
+        self.assertEqual(lines[stale[0] + 1], CRON_PROMPT_RESPAWN_GUARDED_LINE)
+        self.assertEqual(lines.count(CRON_PROMPT_RESPAWN_GUARDED_LINE), 1)
+
+    def test_database_without_last_failure_error_column_prints_error(self):
+        self.guarded_card("t_0495")
+        self.board.conn.execute("ALTER TABLE tasks DROP COLUMN last_failure_error")
+        self.board.conn.commit()
+        line = self.assert_error()
+        self.assertTrue(line.startswith(f"Board check error: cannot read database {self.board.path}:"), line)
+        self.assertIn("last_failure_error", line)
 
     # Repeat control
 
