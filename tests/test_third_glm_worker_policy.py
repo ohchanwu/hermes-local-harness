@@ -282,7 +282,7 @@ class PolicySources(unittest.TestCase):
 
 
 class DesiredState(unittest.TestCase):
-    def test_jev_config_matches_the_card_t_3c7a581d_and_t_52be75ab_configuration(self):
+    def test_jev_config_matches_the_third_glm_worker_cards_configuration(self):
         # Card t_3c7a581d: on every board `glm_workers` keeps the two names of
         # the baseline, the new key `glm_max_workers` holds the third name, the
         # route `hard` is replaced by the entry that names `glm_max_workers`
@@ -290,6 +290,9 @@ class DesiredState(unittest.TestCase):
         # with no `assignee_from`, no `model` and no `provider` is appended.
         # Card t_52be75ab: the `hard` route of every board also carries its own
         # change request limit, `max_glm_change_requests` 3.
+        # Card t_4c6f39f4: every board also names its GLM reviewer in the new
+        # list `glm_reviewers`, and `routing` carries the new switch `glm_review`
+        # (off; no code reads `max_glm_review_change_requests` yet).
         config = json.loads((ROOT / "plugins/jev/config.json").read_text())
         before = json.loads(baseline_bytes("plugins/jev/config.json"))
         boards = config["routing"]["boards"]
@@ -310,6 +313,7 @@ class DesiredState(unittest.TestCase):
                 self.assertEqual(before["routing"]["boards"][board]["glm_workers"],
                                  [f"{prefix}-worker-glm-1", f"{prefix}-worker-glm-2"])
                 entry["glm_max_workers"] = [f"{prefix}-worker-glm-3"]
+                entry["glm_reviewers"] = [f"{prefix}-reviewer-glm"]
                 entry["routes"] = [route for route in entry["routes"] if route["name"] != "hard"]
                 hard_index = 2
                 entry["routes"][hard_index:hard_index] = [
@@ -319,6 +323,7 @@ class DesiredState(unittest.TestCase):
                 ]
         # Card t_a40f99ed changed control_group_every from 5 to 10 (owner's instruction).
         expected["routing"]["control_group_every"] = 10
+        expected["routing"]["glm_review"] = {"enabled": False, "max_glm_review_change_requests": 2}
         self.assertEqual(config, expected)
 
     def test_roster_entries_of_the_third_glm_workers_equal_the_second(self):

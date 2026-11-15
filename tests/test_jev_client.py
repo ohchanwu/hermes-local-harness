@@ -492,8 +492,8 @@ class PluginFrameTests(unittest.TestCase):
         for tool, handler in (("kanban_create", "handle_create"), ("kanban_unblock", "handle_unblock"),
                               ("kanban_request_review", "handle_request_review"),
                               ("kanban_request_changes", "handle_request_changes")):
-            with self.subTest(tool=tool), mock.patch.object(self.plugin.routing, handler,
-                                                            return_value="handled") as called:
+            with self.subTest(tool=tool), mock.patch.dict(os.environ, {"HERMES_PROFILE": "harness-worker-glm-1"}), \
+                    mock.patch.object(self.plugin.routing, handler, return_value="handled") as called:
                 out = self.plugin._tool_execution(tool_name=tool, args={"task_id": "t_0a1b2c3d"},
                                                   next_call=next_call)
                 self.assertEqual(out, "handled")
