@@ -326,7 +326,8 @@ class DesiredState(unittest.TestCase):
                 ]
         # Card t_a40f99ed changed control_group_every from 5 to 10 (owner's instruction).
         expected["routing"]["control_group_every"] = 10
-        expected["routing"]["glm_review"] = {"enabled": False, "max_glm_review_change_requests": 2}
+        # Card t_e61ee47c turned GLM review on (owner approval of 2026-11-15).
+        expected["routing"]["glm_review"] = {"enabled": True, "max_glm_review_change_requests": 2}
         self.assertEqual(config, expected)
 
     def test_roster_entries_of_the_third_glm_workers_equal_the_second(self):

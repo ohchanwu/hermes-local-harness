@@ -421,8 +421,9 @@ class ReviewChoiceTests(unittest.TestCase):
             with self.subTest(board=board):
                 self.assertEqual(boards[board]["opus_reviewer"], name)
                 self.assertNotIn(name, boards[board]["glm_reviewers"])
+        # Card t_e61ee47c turned GLM review on (owner approval of 2026-11-15).
         self.assertEqual(CONFIG["routing"]["glm_review"],
-                         {"enabled": False, "max_glm_review_change_requests": 2})
+                         {"enabled": True, "max_glm_review_change_requests": 2})
 
 
 if __name__ == "__main__":
