@@ -48,7 +48,10 @@ PROJECT_DISPATCH = ["jobcron-worker", "jobcron-reviewer", "chapt-worker", "chapt
                     # list (card t_55432326).
                     *(name for name in GLM_IN_SERVICE if not name.endswith("-glm-3")),
                     "harness-worker-glm-3", "chapt-worker-glm-3", "jobcron-worker-glm-3",
-                    "jss-worker-glm-3", "anki-worker-glm-3"]
+                    "jss-worker-glm-3", "anki-worker-glm-3",
+                    # The five GLM reviewer profiles of card t_cca306ca.
+                    "jobcron-reviewer-glm", "chapt-reviewer-glm", "harness-reviewer-glm",
+                    "jss-reviewer-glm", "anki-reviewer-glm"]
 HARNESS = "/Users/chanbla11mit/hermes-local-harness"
 
 
@@ -107,7 +110,8 @@ class ModelPolicy(Base):
         for profile in self.roster["profiles"]:
             if profile["lifecycle"] != "retired":
                 with self.subTest(profile=profile["name"]):
-                    if profile["name"] in GLM_IN_SERVICE:
+                    if (profile["name"] in GLM_IN_SERVICE
+                            or profile["name"].endswith("-reviewer-glm")):
                         self.assertEqual((profile["model"], profile["provider"]), ("glm-5.3", "zai"))
                         continue
                     self.assertEqual((profile["model"], profile["provider"]), (OPUS, CLAUDE))

@@ -47,6 +47,9 @@ PROJECT_DISPATCH = [
     "harness-worker", "harness-reviewer", "jss-worker", "jss-reviewer",
     "harness-worker-2", "chapt-worker-2", "jobcron-worker-2", "jss-worker-2",
     "anki-worker", "anki-worker-2", "anki-reviewer", *GLM_IN_DISPATCH_ORDER,
+    # The five GLM reviewer profiles of card t_cca306ca, appended after the GLM workers.
+    "jobcron-reviewer-glm", "chapt-reviewer-glm", "harness-reviewer-glm",
+    "jss-reviewer-glm", "anki-reviewer-glm",
 ]
 GLM = tuple(f"{prefix}-worker-glm-{n}" for prefix in (*FLEETS.values(), "anki") for n in (1, 2, 3))
 GLM_NAME = re.compile(r"\b(?:jobcron|chapt|harness|jss|anki)-worker-glm-\d\b")
@@ -194,7 +197,8 @@ class Verifier(unittest.TestCase):
                                   (self.verifier.HARNESS_ASSIGNEES, "harness"),
                                   (self.verifier.JSS_ASSIGNEES, "jss"),
                                   (self.verifier.ANKI_ASSIGNEES, "anki")):
-            extra = {f"{prefix}-worker-glm-1", f"{prefix}-worker-glm-2", f"{prefix}-worker-glm-3"}
+            extra = {f"{prefix}-worker-glm-1", f"{prefix}-worker-glm-2", f"{prefix}-worker-glm-3",
+                     f"{prefix}-reviewer-glm"}
             self.assertEqual(assignees, {f"{prefix}-worker", f"{prefix}-worker-2", f"{prefix}-reviewer", *extra})
         for profile in PINNED_WORKERS:
             self.assertEqual(self.verifier.PROFILE_SOUL_PATHS[f"{profile}-2"], {

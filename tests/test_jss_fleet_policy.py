@@ -323,9 +323,10 @@ class FleetDesiredState(unittest.TestCase):
         self.assertEqual(self.snapshot["profiles"], list(self.profiles))
         for listing in (self.roster["project_dispatch_allowlist"], self.snapshot["kanban"]["dispatch_profiles"]):
             # The second worker was appended after the reviewer in the live dispatch order; the
-            # GLM workers were appended for the jev plugin (card t_71b4ef4a).
+            # GLM workers were appended for the jev plugin (card t_71b4ef4a), then the GLM
+            # reviewer of the board (card t_cca306ca).
             self.assertEqual([name for name in listing if name.startswith("jss-")],
-                             [WORKER, REVIEWER, WORKER2, *GLM_WORKERS])
+                             [WORKER, REVIEWER, WORKER2, *GLM_WORKERS, "jss-reviewer-glm"])
             self.assertNotIn(ORCH, listing)
         for name in GLM_WORKERS:
             with self.subTest(glm_worker=name):

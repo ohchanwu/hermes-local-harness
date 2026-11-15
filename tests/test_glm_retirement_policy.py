@@ -45,6 +45,10 @@ GLM_IN_SERVICE = ("jobcron-worker-glm-1", "jobcron-worker-glm-2", "jobcron-worke
 GLM_IN_DISPATCH_ORDER = (*(name for name in GLM_IN_SERVICE if not name.endswith("-glm-3")),
                          "harness-worker-glm-3", "chapt-worker-glm-3", "jobcron-worker-glm-3",
                          "jss-worker-glm-3", "anki-worker-glm-3")
+# The five GLM reviewer profiles of card t_cca306ca (tests/test_glm_reviewer_roster.py
+# checks them in full).
+GLM_REVIEWERS = ("jobcron-reviewer-glm", "chapt-reviewer-glm", "harness-reviewer-glm",
+                 "jss-reviewer-glm", "anki-reviewer-glm")
 # The generic GLM profiles stay retired: the RETIRED_PROFILES floor of verify-state.
 GLM_RETIRED = ("worker-flash-1", "worker-flash-2", "worker-flash-3", "worker-glm-full")
 # The 21 Claude subscription profiles that require the jev plugin.
@@ -218,7 +222,8 @@ class DesiredState(unittest.TestCase):
             "jobcron-worker", "jobcron-reviewer", "chapt-worker", "chapt-reviewer",
             "harness-worker", "harness-reviewer", "jss-worker", "jss-reviewer",
             "harness-worker-2", "chapt-worker-2", "jobcron-worker-2", "jss-worker-2",
-            "anki-worker", "anki-worker-2", "anki-reviewer", *GLM_IN_DISPATCH_ORDER])
+            "anki-worker", "anki-worker-2", "anki-reviewer", *GLM_IN_DISPATCH_ORDER,
+            *GLM_REVIEWERS])
         self.assertEqual(dispatch, self.roster["project_dispatch_allowlist"])
 
     def test_verifier_constants(self):
@@ -238,17 +243,19 @@ class DesiredState(unittest.TestCase):
             with self.subTest(board=board):
                 self.assertEqual(assignees[board], {f"{prefix}-worker", f"{prefix}-worker-2", f"{prefix}-reviewer",
                                                     f"{prefix}-worker-glm-1", f"{prefix}-worker-glm-2",
-                                                    f"{prefix}-worker-glm-3"})
+                                                    f"{prefix}-worker-glm-3", f"{prefix}-reviewer-glm"})
         for name in GLM:
             with self.subTest(profile=name):
                 self.assertNotIn(name, self.verifier.PROFILE_SOUL_PATHS)
-        self.assertEqual(set(self.verifier.jev_required_profiles()), set(JEV_CLAUDE) | set(GLM_IN_SERVICE))
+        self.assertEqual(set(self.verifier.jev_required_profiles()),
+                         set(JEV_CLAUDE) | set(GLM_IN_SERVICE) | set(GLM_REVIEWERS))
         self.assertEqual(len(set(JEV_CLAUDE)), 21)
 
     def test_jev_is_required_on_exactly_the_jev_profiles(self):
         for profile in self.roster["profiles"]:
             with self.subTest(profile=profile["name"]):
-                wanted = profile["name"] in JEV_CLAUDE or profile["name"] in GLM_IN_SERVICE
+                wanted = (profile["name"] in JEV_CLAUDE or profile["name"] in GLM_IN_SERVICE
+                          or profile["name"] in GLM_REVIEWERS)
                 self.assertEqual("jev" in profile["required_plugins"], wanted)
         self.assertEqual(quiet(self.verifier.check_jev_plugin_declarations, self.roster), [])
         roster = copy.deepcopy(self.roster)
@@ -258,10 +265,11 @@ class DesiredState(unittest.TestCase):
         # Errors follow the roster order, where worker-glm-full comes first.
         self.assertEqual(quiet(self.verifier.check_jev_plugin_declarations, roster), [
             "jev plugin declaration drift worker-glm-full: jev is required only on the 21 Claude "
-            "subscription profiles and the GLM workers in service",
+            "subscription profiles, the GLM workers in service and the GLM reviewers of the five boards",
             "jev plugin declaration drift harness-worker-glm-1: required_plugins must name jev"])
-        # 36 profiles: the 21 Claude subscription profiles and the 15 GLM workers (t_f4ce916d).
-        self.assertEqual(len(set(self.verifier.jev_required_profiles())), 36)
+        # 41 profiles: the 21 Claude subscription profiles, the 15 GLM workers (t_f4ce916d)
+        # and the five GLM reviewers (t_cca306ca).
+        self.assertEqual(len(set(self.verifier.jev_required_profiles())), 41)
 
     def test_verifier_requires_each_glm_worker_in_dispatch(self):
         fleets = self.snapshot["project_isolation"]
