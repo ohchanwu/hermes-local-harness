@@ -34,10 +34,11 @@ RELATIVE = "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md"
 PREFIXES = ("harness", "anki", "jss", "chapt", "jobcron")
 VERSIONS = {"harness": "0.6.7-harness.11", "anki": "0.6.10-anki.9", "jss": "0.6.7-jss.14",
             "chapt": "0.6.7-chapt.12", "jobcron": "0.6.9-jobcron.13"}
-# The current skill versions: card t_a8884510 raised the jss version by one more step, and card
-# t_e14a6d6a raised each version by one more step.
+# The current skill versions: card t_a8884510 raised the jss version by one more step, card
+# t_e14a6d6a raised each version by one more step, and card t_d3bb0983 raised the chapt and
+# jobcron versions by one more step.
 CURRENT_VERSIONS = {"harness": "0.6.7-harness.12", "anki": "0.6.10-anki.10", "jss": "0.6.7-jss.16",
-                    "chapt": "0.6.7-chapt.13", "jobcron": "0.6.9-jobcron.14"}
+                    "chapt": "0.6.7-chapt.14", "jobcron": "0.6.9-jobcron.15"}
 
 NEW_RULE = (
     "By default, when the work for a card has several parts that each have their own acceptance check, "

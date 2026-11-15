@@ -48,6 +48,7 @@ from hard_route_policy_edits import (HARD_ROUTE_POLICY_EDITS, apply_hard_route_p
                                      reverse_hard_route_policy_edits)
 import hard_route_policy_edits
 from jss_download_install_edits import reverse_download_install_edits
+from orchestrator_opus_5_5_edits import reverse_opus_5_5_orchestrator_edits
 from test_card_split_rule_policy import NEW_RULE, PASSAGE_EDITS
 from test_stale_test_rule_policy import reverse_stale_test_rule_edits
 from test_third_glm_worker_policy import with_third_glm_worker
@@ -443,8 +444,9 @@ class RoutingPolicyText(unittest.TestCase):
                 # Card t_46b5e63e raised each version by one step after this card; card t_89838618 raised
                 # the jss version by one more step, card t_f4ce916d each version by one more step, card
                 # t_c7cc3830 each version by one more step, card t_a8884510 the jss version by one more
-                # step, and card t_e14a6d6a each version by one more step.
-                current = {"harness": "0.6.7-harness.12", "chapt": "0.6.7-chapt.13", "jobcron": "0.6.9-jobcron.14",
+                # step, card t_e14a6d6a each version by one more step, and card t_d3bb0983 the chapt and
+                # jobcron versions by one more step.
+                current = {"harness": "0.6.7-harness.12", "chapt": "0.6.7-chapt.14", "jobcron": "0.6.9-jobcron.15",
                            "jss": "0.6.7-jss.16", "anki": "0.6.10-anki.10"}[prefix]
                 self.assertRegex(text, rf"(?m)^version: {re.escape(current)}$")
                 # Card t_c7cc3830 replaced the Part 5 rule text with the card split rule.
@@ -548,7 +550,8 @@ class RoutingPolicyText(unittest.TestCase):
         self.assertEqual(set(HARD_ROUTE_POLICY_EDITS), set(HARD_ROUTE_BASELINE_SHA256))
         self.assertEqual(len(HARD_ROUTE_BASELINE_SHA256), 12)
         for path, want in HARD_ROUTE_BASELINE_SHA256.items():
-            data = (ROOT / path).read_bytes()
+            # The later edits of card t_d3bb0983 are reversed first.
+            data = reverse_opus_5_5_orchestrator_edits(path, (ROOT / path).read_bytes())
             with self.subTest(path=path):
                 baseline = subprocess.run(["git", "-C", str(ROOT), "show", f"{HARD_ROUTE_BASELINE}:{path}"],
                                           stdout=subprocess.PIPE, check=True).stdout
