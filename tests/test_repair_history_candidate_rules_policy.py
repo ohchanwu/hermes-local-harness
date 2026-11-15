@@ -235,7 +235,7 @@ class InstructionText(unittest.TestCase):
         snapshot = json.loads((ROOT / SNAPSHOT).read_text())
         shared = next(entry for entry in snapshot["skill"]["shared_skills"]
                       if entry["name"] == "multi-agent-coding-orchestrator")
-        self.assertEqual(shared["version"], "0.6.14")  # raised by t_46b5e63e
+        self.assertEqual(shared["version"], "0.6.15")  # raised by t_46b5e63e and t_d3bb0983
         self.assertEqual(shared["source"], "skills/multi-agent-coding-orchestrator")
 
     def test_reversing_the_edits_recovers_the_baseline_bytes(self):

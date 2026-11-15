@@ -1,7 +1,7 @@
 ---
 name: multi-agent-coding-orchestrator
 description: "Use when orchestrating multi-agent coding with Hermes."
-version: 0.6.9-jobcron.14
+version: 0.6.9-jobcron.15
 author: chanbla11mit, Hermes Agent
 license: MIT
 platforms: [macos]
@@ -27,8 +27,8 @@ Do not use this procedure for a simple question that needs no repository change 
 
 Project-isolated fleets:
 
-- Jobcron board `jobcron`: `jobcron-orchestrator` (`claude-fable-5-2`); implementation workers `jobcron-worker` (`claude-opus-5-5`) and `jobcron-worker-2` (`claude-opus-5-5`); independent `jobcron-reviewer` (`claude-opus-5-5`). Repository root: `/Users/chanbla11mit/projects/jobcron`; preview port: `17777`.
-- Cha PT board `cha-pt`: `chapt-orchestrator` (`claude-fable-5-2`); implementation workers `chapt-worker` (`claude-opus-5-5`) and `chapt-worker-2` (`claude-opus-5-5`); independent `chapt-reviewer` (`claude-opus-5-5`). Repository root: `/Users/chanbla11mit/projects/cha-pt`; preview port: `18080`.
+- Jobcron board `jobcron`: `jobcron-orchestrator` (`claude-opus-5-5`); implementation workers `jobcron-worker` (`claude-opus-5-5`) and `jobcron-worker-2` (`claude-opus-5-5`); independent `jobcron-reviewer` (`claude-opus-5-5`). Repository root: `/Users/chanbla11mit/projects/jobcron`; preview port: `17777`.
+- Cha PT board `cha-pt`: `chapt-orchestrator` (`claude-opus-5-5`); implementation workers `chapt-worker` (`claude-opus-5-5`) and `chapt-worker-2` (`claude-opus-5-5`); independent `chapt-reviewer` (`claude-opus-5-5`). Repository root: `/Users/chanbla11mit/projects/cha-pt`; preview port: `18080`.
 
 Each project profile has an independent Hermes home, memory, sessions, and fixed terminal root. Named boards provide separate databases, logs, attachments, and workspaces. A project orchestrator may assign only its matching workers and reviewer. A task or callback with a mismatched board, profile, repository, or workspace is invalid and must be blocked before file access or mutation.
 
@@ -412,7 +412,7 @@ Before declaring the harness or an autonomous workstream complete, verify:
 - Every active profile returns its configured model identity on a fresh inference probe.
 - The dispatch allowlist contains each project's workers and reviewer, excludes project orchestrators, and has no project card assigned outside its project tuple.
 - Board `jobcron` resolves only the Jobcron repository/workspaces and board `cha-pt` only the Cha PT repository/workspaces.
-- Fresh project profile sessions have separate state homes and return `claude-fable-5-2` for orchestrator, `claude-opus-5-5` for worker and `claude-opus-5-5` for reviewer.
+- Fresh project profile sessions have separate state homes and return `claude-opus-5-5` for orchestrator, worker and reviewer.
 - Every code change reaches independent review before integration.
 - Git and Kanban contain no unexplained state.
 - No push, PR, deployment, purchase, credential change, or other external write occurred without approval.

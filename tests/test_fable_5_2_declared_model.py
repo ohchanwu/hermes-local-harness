@@ -14,17 +14,23 @@ ROLE_MODEL_EDITS lists the exact (new, old) text that card t_0faca45d
 (2026-11-13: orchestrators to claude-fable-5-2, reviewers to claude-opus-5-5)
 changed later in the same lines. reverse_role_model_edits() reverses it, and
 reverse_fable_5_2_edits() reverses it first, so every caller that recovers the
-bytes from before this card also recovers them from before t_0faca45d. This module
-imports only test_jev_policy_sources, which imports no other test module, so
-any test module can import it.
+bytes from before this card also recovers them from before t_0faca45d.
+
+Card t_d3bb0983 (2026-11-15: orchestrators to claude-opus-5-5) changed the
+orchestrator lines and the verification sentence again; its edits are recorded in
+orchestrator_opus_5_5_edits, and reverse_role_model_edits() reverses them first.
+This module imports only test_jev_policy_sources and orchestrator_opus_5_5_edits.
 """
 import hashlib
 import importlib.machinery
 import importlib.util
 import json
+import re
 from pathlib import Path
 import unittest
 
+from orchestrator_opus_5_5_edits import (BASELINE_SHA256 as OPUS_5_5_BASELINE_SHA256, VERSIONS as OPUS_5_5_VERSIONS,
+                                          reverse_opus_5_5_orchestrator_edits)
 from test_jev_policy_sources import reverse_jev_policy_edits
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -97,8 +103,8 @@ def _reverse(edits, relative_path, text):
 
 
 def reverse_role_model_edits(relative_path, text):
-    """Return text with the t_0faca45d edits reversed; text may be str or bytes."""
-    return _reverse(ROLE_MODEL_EDITS, relative_path, text)
+    """Return text with the t_d3bb0983 edits and then the t_0faca45d edits reversed; text may be str or bytes."""
+    return _reverse(ROLE_MODEL_EDITS, relative_path, reverse_opus_5_5_orchestrator_edits(relative_path, text))
 
 
 def reverse_fable_5_2_edits(relative_path, text):
@@ -128,6 +134,22 @@ class FableDeclaredModel(unittest.TestCase):
             with self.subTest(path=path):
                 self.assertNotIn(OLD_MODEL, text)
                 self.assertEqual(text.count(NEW_MODEL), len(edits))
+
+    def test_reversing_the_opus_5_5_orchestrator_edits_recovers_the_baseline_bytes(self):
+        for path, want in OPUS_5_5_BASELINE_SHA256.items():
+            with self.subTest(path=path):
+                original = reverse_opus_5_5_orchestrator_edits(path, (ROOT / path).read_bytes())
+                self.assertEqual(hashlib.sha256(original).hexdigest(), want)
+                # A second call on the reversed bytes returns them unchanged.
+                self.assertIs(reverse_opus_5_5_orchestrator_edits(path, original), original)
+
+    def test_skill_copies_name_no_fable_model_and_have_the_raised_versions(self):
+        for path, (_old, new) in OPUS_5_5_VERSIONS.items():
+            text = (ROOT / path).read_text()
+            with self.subTest(path=path):
+                self.assertNotIn("claude-fable", text)
+                self.assertEqual(re.findall(r"(?m)^version: (.+)$", text), [new])
+                self.assertIn(f"return `{OPUS}` for orchestrator, worker and reviewer.", text)
 
     def test_roster_switch_target_and_model_policy_declare_the_same_model(self):
         roster = json.loads((ROOT / "roster.yaml").read_text())

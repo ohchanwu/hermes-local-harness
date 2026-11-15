@@ -43,14 +43,15 @@ ROSTER_BOARDS = {
 }
 FORBIDDEN = re.compile(r"gpt-6\.1-sol|gpt-6-astra|[Vv]alue-blind")
 MODEL_PAIR = re.compile(r"`([a-z0-9-]+)` \(`([a-z0-9.-]+)`\)")
-# Card t_0faca45d (2026-11-13) put the orchestrators on Fable and the workers on Opus; the
-# Verification line still names that split. Card t_f03857d4 (owner change of 2026-11-15) moved
-# default, the advisor and the five project orchestrators to Opus in roster.yaml only, so the
-# skill copies this module reads still name claude-fable-5-2 for the jobcron, cha-pt and harness
-# orchestrators; a later card must bring these copies back in step with roster.yaml.
-VERIFICATION = re.compile(r"return `([^`]+)` for orchestrator, `([^`]+)` for worker and `([^`]+)` for reviewer\.")
+# Card t_0faca45d (2026-11-13) put the orchestrators on Fable and the workers on Opus. Card
+# t_f03857d4 (owner change of 2026-11-15) moved default, the advisor and the five project
+# orchestrators to Opus in roster.yaml, and card t_d3bb0983 changed the skill copies this module
+# reads to name claude-opus-5-5 for the jobcron, cha-pt and harness orchestrators and to name one
+# model for orchestrator, worker and reviewer in the Verification line, so every model that these
+# copies name equals the roster.yaml model again.
+VERIFICATION = re.compile(r"return `([^`]+)` for orchestrator, worker and reviewer\.")
 SKILL_ORCHESTRATORS = ("jobcron-orchestrator", "chapt-orchestrator", "harness-orchestrator")
-SKILL_ORCHESTRATOR_MODEL = "claude-fable-5-2"
+SKILL_ORCHESTRATOR_MODEL = "claude-opus-5-5"
 ROSTER_ORCHESTRATOR_MODEL = "claude-opus-5-5"
 
 # Bytes of each file at baseline 44320e4a3226bfa057cb532af7fe00b97095cfe8,
@@ -169,8 +170,8 @@ class OrchestratorSkillTerminologyTests(unittest.TestCase):
                 self.assertEqual(hits, [])
 
     def expected_skill_model(self, name):
-        """The model a skill copy names for a profile: the roster model, except the three
-        orchestrators it still names on the pre-t_f03857d4 model."""
+        """The model a skill copy names for a profile: the roster model; the three orchestrators
+        are named on SKILL_ORCHESTRATOR_MODEL, which equals their roster model since card t_d3bb0983."""
         if name in SKILL_ORCHESTRATORS:
             return SKILL_ORCHESTRATOR_MODEL
         return self.models[name]
@@ -188,8 +189,8 @@ class OrchestratorSkillTerminologyTests(unittest.TestCase):
                     self.assertEqual(sorted(pairs), sorted(names))
                     for name in names:
                         self.assertEqual(pairs[name], self.expected_skill_model(name), name)
-                    # The three orchestrators the skill copies name on the old model are the
-                    # only divergence from roster.yaml since card t_f03857d4.
+                    # Since card t_d3bb0983 the skill copies name the three orchestrators on
+                    # their roster model, which card t_f03857d4 set.
                     if fleet["orchestrator"] in SKILL_ORCHESTRATORS:
                         self.assertEqual(self.models[fleet["orchestrator"]], ROSTER_ORCHESTRATOR_MODEL,
                                          fleet["orchestrator"])
@@ -214,16 +215,16 @@ class OrchestratorSkillTerminologyTests(unittest.TestCase):
             matches = VERIFICATION.findall(self.text[path])
             with self.subTest(path=path):
                 self.assertEqual(len(matches), 1)
-                orchestrator, worker, reviewer = matches[0]
-                self.assertEqual(orchestrator, SKILL_ORCHESTRATOR_MODEL)
+                model = matches[0]
+                self.assertEqual(model, SKILL_ORCHESTRATOR_MODEL)
                 for board in boards:
                     fleet = self.fleets[board]
-                    # Since card t_f03857d4 the roster model of every fleet orchestrator is
-                    # Opus, so the Verification line's orchestrator model is no longer it.
-                    self.assertNotEqual(self.models[fleet["orchestrator"]], orchestrator, fleet["orchestrator"])
+                    # Since card t_d3bb0983 the Verification line names the roster model of the
+                    # orchestrator, the workers and the reviewer of every fleet.
+                    self.assertEqual(self.models[fleet["orchestrator"]], model, fleet["orchestrator"])
                     for name in fleet["workers"]:
-                        self.assertEqual(self.models[name], worker, name)
-                    self.assertEqual(self.models[fleet["reviewer"]], reviewer, fleet["reviewer"])
+                        self.assertEqual(self.models[name], model, name)
+                    self.assertEqual(self.models[fleet["reviewer"]], model, fleet["reviewer"])
         for path in (HARNESS, JSS):
             with self.subTest(path=path):
                 self.assertEqual(VERIFICATION.findall(self.text[path]), [])
