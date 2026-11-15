@@ -21,6 +21,14 @@ every ``run`` of ``scripts/jev-peak-hold`` is independent of
 ``peak_hold.enabled``, of the on/off switch and of the window, and it runs no
 command when the process itself was started by a worker (``worker_session``).
 
+The release of cards held in review (decision item 6, section 5 way 2): a GLM
+review run that started inside the hold window blocks its own card through
+the plugin with the hold reason (``glm_review.hold_action``). ``run`` releases
+such a card with ``hermes kanban unblock``, which returns it to ``review`` on
+the same GLM reviewer, when the hold is not active or the time in its reason
+has passed (``plan_review_release``, ``apply_review_release``). This part also
+runs no command in a process that a worker started.
+
 Changes to cards go through ``hermes kanban --board <board> ...`` commands only.
 Reads use a SQLite connection to the board database with ``PRAGMA query_only``
 (see ``connect_readonly``).
@@ -531,6 +539,154 @@ def apply_glm_review_pass(config: Mapping[str, Any], passes: List[Mapping[str, A
                             False, error_class)
         results.append({**item, "assigned": assigned, "unblocked": unblocked,
                         "skipped": False, "error_class": error_class})
+    return results
+
+
+# --- the release of GLM review runs held in review (decision item 6) -----------
+
+RELEASED_TO_REVIEW = "review"
+
+
+def first_glm_reviewer_by_board(config: Mapping[str, Any]) -> Dict[str, str]:
+    """``{board: first entry of the board's glm_reviewers}`` for boards that name one.
+
+    Nothing is raised when the list is absent or is not a list.
+    """
+    boards = ((config.get("routing") or {}).get("boards") or {})
+    out: Dict[str, str] = {}
+    for board, entry in boards.items():
+        reviewers = (entry or {}).get("glm_reviewers")
+        if isinstance(reviewers, (list, tuple)):
+            named = [str(name) for name in reviewers if isinstance(name, str) and name.strip()]
+            if named:
+                out[str(board)] = named[0]
+    return out
+
+
+def _review_hold_reason(conn: sqlite3.Connection, task_id: str, glm_reviewer: str,
+                        mark: str) -> Optional[str]:
+    """The reason of the newest ``blocked`` event when the card is held in review, else None.
+
+    Held in review: status ``blocked``, assignee ``glm_reviewer``, and the
+    newest ``blocked`` event has a ``reason`` that carries the marker
+    (``carries_marker``) and ``source_status`` ``review``. This is the block
+    that a GLM review run makes through the plugin (``glm_review.hold_action``);
+    ``hermes kanban unblock`` returns such a card to ``review`` with the same
+    assignee.
+    """
+    row = conn.execute("SELECT status, assignee FROM tasks WHERE id = ?", (task_id,)).fetchone()
+    if row is None or str(row["status"]) != "blocked" or row["assignee"] != glm_reviewer:
+        return None
+    event = _latest_blocked_event(conn, task_id)
+    if event is None:
+        return None
+    payload = _event_payload(event["payload"])
+    reason = payload.get("reason")
+    if not carries_marker(reason, mark) or payload.get("source_status") != "review":
+        return None
+    return reason
+
+
+def _until_passed(until: Optional[str], now: datetime, cfg: Mapping[str, Any]) -> bool:
+    """True when ``until`` (ISO 8601) is not later than ``now``; False when it is absent or unreadable."""
+    if not until:
+        return False
+    try:
+        return local_time(now, cfg) >= local_time(datetime.fromisoformat(until), cfg)
+    except Exception:
+        return False
+
+
+def plan_review_release(config: Mapping[str, Any], now: datetime, boards: Mapping[str, Path]
+                        ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+    """Planned releases of cards held in review, for ``boards`` (board name to database path).
+
+    Returns ``(releases, read_errors)``. A card held in review
+    (``_review_hold_reason``, with the first entry of the board's
+    ``glm_reviewers``) is released when the hold is not active (outside the
+    window, switch off or ``peak_hold.enabled`` false) or when the time in its
+    reason (``until_from_reason``) has passed. A release is ``{"action":
+    "release", "board", "task_id", "assignee", "held_until", "released_to":
+    "review"}``. A board whose database cannot be read adds ``{"board",
+    "error_class"}`` to ``read_errors`` and does not stop the other boards.
+    """
+    active, _switch_error = hold_active(config, now)
+    cfg = config.get("peak_hold") or {}
+    mark = marker(config)
+    reviewers = first_glm_reviewer_by_board(config)
+    releases: List[Dict[str, Any]] = []
+    errors: List[Dict[str, Any]] = []
+    for board, path in boards.items():
+        glm_reviewer = reviewers.get(board)
+        if glm_reviewer is None:
+            continue
+        try:
+            conn = connect_readonly(path)
+            try:
+                rows = conn.execute("SELECT id FROM tasks WHERE status = 'blocked' AND assignee = ? "
+                                    "ORDER BY id", (glm_reviewer,)).fetchall()
+                for row in rows:
+                    task_id = str(row["id"])
+                    reason = _review_hold_reason(conn, task_id, glm_reviewer, mark)
+                    if reason is None:
+                        continue
+                    until = until_from_reason(reason, mark)
+                    if active and not _until_passed(until, now, cfg):
+                        continue
+                    releases.append({"action": "release", "board": board, "task_id": task_id,
+                                     "assignee": glm_reviewer, "held_until": until,
+                                     "released_to": RELEASED_TO_REVIEW})
+            finally:
+                conn.close()
+        except Exception as exc:
+            errors.append({"board": board, "error_class": type(exc).__name__})
+    return releases, errors
+
+
+def still_held_in_review(config: Mapping[str, Any], board: str, task_id: str,
+                         path: Path) -> Tuple[bool, Optional[str]]:
+    """``(held, read error class)``: held when the card still meets the selection of
+    ``plan_review_release``. A read error returns ``(False, <error class>)``, so the
+    card stays ``blocked`` until the next run."""
+    glm_reviewer = first_glm_reviewer_by_board(config).get(board)
+    if glm_reviewer is None:
+        return False, None
+    try:
+        conn = connect_readonly(path)
+        try:
+            return _review_hold_reason(conn, task_id, glm_reviewer, marker(config)) is not None, None
+        finally:
+            conn.close()
+    except Exception as exc:
+        return False, type(exc).__name__
+
+
+def apply_review_release(config: Mapping[str, Any], releases: List[Mapping[str, Any]],
+                         command: Optional[str] = None,
+                         boards: Optional[Mapping[str, Path]] = None) -> List[Dict[str, Any]]:
+    """Release each planned card with ``hermes kanban unblock``; one ``release`` record each.
+
+    With ``boards`` (board name to database path) each card is read again
+    with ``still_held_in_review`` first; a card that no longer meets the
+    selection, or that cannot be read again, is skipped (``skipped`` true, no
+    command, no record). The record is the ``release`` record of
+    ``log_release`` with the added field ``released_to: review``. A failed
+    command leaves the card ``blocked``; the next run tries again. No other
+    ``hermes kanban`` command runs.
+    """
+    results: List[Dict[str, Any]] = []
+    for item in releases:
+        board = str(item["board"])
+        task_id = str(item["task_id"])
+        if boards is not None and board in boards:
+            held, read_error = still_held_in_review(config, board, task_id, boards[board])
+            if not held:
+                results.append({**item, "applied": False, "skipped": True, "error_class": read_error})
+                continue
+        ok, error_class = release_card(config, board, task_id, command)
+        log_release(board, task_id, item.get("assignee"), item.get("held_until"), ok, error_class,
+                    released_to=RELEASED_TO_REVIEW)
+        results.append({**item, "applied": ok, "skipped": False, "error_class": error_class})
     return results
 
 
