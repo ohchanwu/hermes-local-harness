@@ -12,6 +12,15 @@ The hold is active only when ``peak_hold.enabled`` in ``config.json`` is true,
 the shared switch file allows it (absent file means on), and the time is
 inside the window.
 
+The GLM review pass (decision document
+``docs/decisions/261114-glm-reviewer-pass-to-opus-reviewer.md``): a card that
+a GLM reviewer blocked with a reason that starts with
+``jev-glm-review-pass`` is passed to the board's Opus reviewer with
+``hermes kanban assign`` and then ``hermes kanban unblock``. This part of
+every ``run`` of ``scripts/jev-peak-hold`` is independent of
+``peak_hold.enabled``, of the on/off switch and of the window, and it runs no
+command when the process itself was started by a worker (``worker_session``).
+
 Changes to cards go through ``hermes kanban --board <board> ...`` commands only.
 Reads use a SQLite connection to the board database with ``PRAGMA query_only``
 (see ``connect_readonly``).
@@ -38,6 +47,11 @@ DEFAULT_STATE_DIR = "/Users/chanbla11mit/.hermes/jev"
 STATE_DIR_ENV = "HERMES_JEV_STATE_DIR"
 SWITCH_FILE_NAME = "peak-hold.json"
 DEFAULT_MARKER = "jev-peak-hold"
+GLM_REVIEW_PASS_PREFIX = "jev-glm-review-pass"
+# Any of these environment variables marks a process as a dispatcher-started
+# worker or as a process that one started.
+WORKER_SESSION_ENV_NAMES = ("HERMES_KANBAN_TASK", "HERMES_KANBAN_RUN_ID",
+                            "HERMES_DELEGATED_CHILD_CONTEXT")
 DEFAULT_KANBAN_HOME = "/Users/chanbla11mit/.hermes"
 READ_ERROR_STATE_FILE_NAME = "read-error-state.json"
 READ_ERROR_LOG_INTERVAL_SECONDS = 3600
@@ -191,6 +205,31 @@ def all_glm_workers(config: Mapping[str, Any]) -> set:
     return {w for workers in glm_workers_by_board(config).values() for w in workers}
 
 
+def glm_reviewer_pairs(config: Mapping[str, Any]) -> Dict[str, Tuple[str, str]]:
+    """``{board: (glm_reviewer, opus_reviewer)}`` for boards that name both.
+
+    The first entry of the board's ``glm_reviewers`` list is the GLM reviewer;
+    ``opus_reviewer`` is the board's Opus reviewer. A board without either name
+    is left out (the decision names one GLM reviewer per board, so there is no
+    second entry to choose). Nothing is raised when the values are absent or
+    are not strings.
+    """
+    boards = ((config.get("routing") or {}).get("boards") or {})
+    out: Dict[str, Tuple[str, str]] = {}
+    for board, entry in boards.items():
+        entry = entry or {}
+        reviewers = entry.get("glm_reviewers")
+        glm_reviewer = None
+        if isinstance(reviewers, (list, tuple)):
+            named = [str(name) for name in reviewers if isinstance(name, str) and name.strip()]
+            if named:
+                glm_reviewer = named[0]
+        opus_reviewer = entry.get("opus_reviewer")
+        if glm_reviewer and isinstance(opus_reviewer, str) and opus_reviewer.strip():
+            out[str(board)] = (glm_reviewer, opus_reviewer.strip())
+    return out
+
+
 def marker(config: Mapping[str, Any]) -> str:
     return str((config.get("peak_hold") or {}).get("marker") or DEFAULT_MARKER)
 
@@ -303,6 +342,198 @@ def held_cards(conn: sqlite3.Connection, mark: str, *, only: Optional[str] = Non
     return out
 
 
+# --- the GLM review pass (decision item 5) -----------------------------------
+
+def _event_payload(raw: Any) -> Dict[str, Any]:
+    """The parsed payload of one event row, or an empty dict (never raises)."""
+    try:
+        content = json.loads(raw or "{}")
+    except Exception:
+        return {}
+    return content if isinstance(content, dict) else {}
+
+
+def _latest_blocked_event(conn: sqlite3.Connection, task_id: str) -> Optional[sqlite3.Row]:
+    """The newest ``blocked`` event row of one card, or None when there is none."""
+    return conn.execute(
+        "SELECT run_id, payload FROM task_events WHERE task_id = ? AND kind = 'blocked' "
+        "ORDER BY id DESC LIMIT 1", (task_id,)).fetchone()
+
+
+def _run_profile(conn: sqlite3.Connection, run_id: Any) -> Optional[str]:
+    """The ``task_runs.profile`` of one run id, or None when absent."""
+    if not isinstance(run_id, int):
+        return None
+    row = conn.execute("SELECT profile FROM task_runs WHERE id = ?", (run_id,)).fetchone()
+    return None if row is None else row["profile"]
+
+
+def _card_matches_pass(conn: sqlite3.Connection, task_id: str, glm_reviewer: str,
+                       opus_reviewer: str) -> bool:
+    """True when the card meets every selection condition of decision item 5.3.
+
+    ``blocked`` status, the newest ``blocked`` event reason starts with the
+    pass prefix and its payload records ``source_status: review`` (Hermes
+    ``block_task`` writes it; the value comes from ``_retry_status_for_run``,
+    which reads the ``source_status`` of the run's ``claimed`` event), the run
+    of that event (``task_events.run_id`` joined to ``task_runs.profile``) is
+    the GLM reviewer, and the assignee is the GLM reviewer or the Opus
+    reviewer. Any unexpected shape (an unparsable payload, a missing run row)
+    makes the answer False.
+    """
+    row = conn.execute("SELECT status, assignee FROM tasks WHERE id = ?", (task_id,)).fetchone()
+    if row is None or str(row["status"]) != "blocked":
+        return False
+    if row["assignee"] not in (glm_reviewer, opus_reviewer):
+        return False
+    event = _latest_blocked_event(conn, task_id)
+    if event is None:
+        return False
+    payload = _event_payload(event["payload"])
+    reason = payload.get("reason")
+    if not (isinstance(reason, str) and reason.startswith(GLM_REVIEW_PASS_PREFIX)):
+        return False
+    if payload.get("source_status") != "review":
+        return False
+    return _run_profile(conn, event["run_id"]) == glm_reviewer
+
+
+def glm_review_pass_cards(conn: sqlite3.Connection, glm_reviewer: str,
+                          opus_reviewer: str) -> List[str]:
+    """The task ids of the cards to pass to the Opus reviewer, in ``id`` order."""
+    rows = conn.execute("SELECT id FROM tasks WHERE status = 'blocked' ORDER BY id").fetchall()
+    return [str(row["id"]) for row in rows
+            if _card_matches_pass(conn, str(row["id"]), glm_reviewer, opus_reviewer)]
+
+
+def plan_glm_review_pass(config: Mapping[str, Any], boards: Mapping[str, Path]
+                         ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+    """Planned passes for ``boards`` (board name to database path).
+
+    Returns ``(passes, read_errors)``. A pass is ``{"board", "task_id",
+    "glm_reviewer", "opus_reviewer", "assign"}`` where ``assign`` is true when
+    the card is not yet assigned to the Opus reviewer. A board whose database
+    cannot be read adds ``{"board", "error_class"}`` to ``read_errors`` and
+    does not stop the other boards. This is independent of
+    ``peak_hold.enabled``, of the switch and of the window.
+    """
+    passes: List[Dict[str, Any]] = []
+    errors: List[Dict[str, Any]] = []
+    pairs = glm_reviewer_pairs(config)
+    for board, path in boards.items():
+        pair = pairs.get(board)
+        if pair is None:
+            continue
+        glm_reviewer, opus_reviewer = pair
+        try:
+            conn = connect_readonly(path)
+            try:
+                for task_id in glm_review_pass_cards(conn, glm_reviewer, opus_reviewer):
+                    row = conn.execute("SELECT assignee FROM tasks WHERE id = ?", (task_id,)).fetchone()
+                    passes.append({"board": board, "task_id": task_id, "glm_reviewer": glm_reviewer,
+                                   "opus_reviewer": opus_reviewer,
+                                   "assign": row is None or row["assignee"] != opus_reviewer})
+            finally:
+                conn.close()
+        except Exception as exc:
+            errors.append({"board": board, "error_class": type(exc).__name__})
+    return passes, errors
+
+
+def still_passable(config: Mapping[str, Any], board: str, task_id: str,
+                   path: Path) -> Tuple[bool, Optional[str]]:
+    """``(passable, read error class)``: passable when the card still meets
+    every selection condition of the pass for ``board``.
+
+    ``apply_glm_review_pass`` reads the card again just before the commands,
+    as ``apply`` does with ``still_holdable`` for holds, so a card that a
+    person or the orchestrator changed between the selection and the commands
+    is skipped. A read error returns ``(False, <error class>)``, so the card
+    stays unchanged until the next run.
+    """
+    pair = glm_reviewer_pairs(config).get(board)
+    if pair is None:
+        return False, None
+    glm_reviewer, opus_reviewer = pair
+    try:
+        conn = connect_readonly(path)
+        try:
+            return _card_matches_pass(conn, task_id, glm_reviewer, opus_reviewer), None
+        finally:
+            conn.close()
+    except Exception as exc:
+        return False, type(exc).__name__
+
+
+def log_glm_review_pass(board: str, task_id: str, glm_reviewer: str, opus_reviewer: str,
+                        assigned: Optional[bool], unblocked: bool, skipped: bool,
+                        error_class: Optional[str]) -> None:
+    """One ``decisions`` record per passed card; a failure to write is ignored.
+
+    ``assigned`` is true or false when the assign command ran, and null when it
+    was not needed. No card text and no reason text is written.
+    """
+    try:
+        jev_log.write("decisions", {
+            "event": "glm_review_pass", "board": board, "task_id": task_id,
+            "glm_reviewer": glm_reviewer, "opus_reviewer": opus_reviewer,
+            "assigned": assigned, "unblocked": unblocked, "skipped": skipped,
+            "error_class": error_class,
+        })
+    except Exception:
+        pass
+
+
+def apply_glm_review_pass(config: Mapping[str, Any], passes: List[Mapping[str, Any]],
+                          command: Optional[str] = None,
+                          boards: Optional[Mapping[str, Path]] = None) -> List[Dict[str, Any]]:
+    """Pass each planned card to the Opus reviewer; one decisions record each.
+
+    With ``boards`` (board name to database path) each card is checked again
+    with ``still_passable`` first; a card that no longer meets the selection
+    conditions, or that cannot be read again, is skipped (no command). For a
+    card that is not yet assigned to the Opus reviewer, ``hermes kanban assign``
+    runs first; only after it succeeded, or when it was not needed,
+    ``hermes kanban unblock`` runs. A failed command stops the steps for that
+    card; the next run of the script tries again (a card already assigned to
+    the Opus reviewer gets only ``unblock``).
+    """
+    results: List[Dict[str, Any]] = []
+    for item in passes:
+        board = str(item["board"])
+        task_id = str(item["task_id"])
+        glm_reviewer = str(item["glm_reviewer"])
+        opus_reviewer = str(item["opus_reviewer"])
+        if boards is not None and board in boards:
+            passable, read_error = still_passable(config, board, task_id, boards[board])
+            if not passable:
+                log_glm_review_pass(board, task_id, glm_reviewer, opus_reviewer, None, False,
+                                    True, read_error)
+                results.append({**item, "assigned": None, "unblocked": False,
+                                "skipped": True, "error_class": read_error})
+                continue
+        assigned: Optional[bool] = None
+        unblocked = False
+        error_class: Optional[str] = None
+        if item.get("assign"):
+            ok, error_class = run_kanban(config, board, ["assign", task_id, opus_reviewer], command)
+            assigned = ok
+            if not ok:
+                log_glm_review_pass(board, task_id, glm_reviewer, opus_reviewer, assigned,
+                                    unblocked, False, error_class)
+                results.append({**item, "assigned": assigned, "unblocked": unblocked,
+                                "skipped": False, "error_class": error_class})
+                continue
+        ok, unblock_error = run_kanban(config, board, ["unblock", task_id], command)
+        unblocked = ok
+        error_class = error_class if error_class else unblock_error
+        log_glm_review_pass(board, task_id, glm_reviewer, opus_reviewer, assigned, unblocked,
+                            False, error_class)
+        results.append({**item, "assigned": assigned, "unblocked": unblocked,
+                        "skipped": False, "error_class": error_class})
+    return results
+
+
 # --- board changes ------------------------------------------------------------
 
 def hermes_argv(config: Mapping[str, Any], command: Optional[str] = None) -> List[str]:
@@ -325,13 +556,20 @@ def command_resolves(config: Mapping[str, Any], command: Optional[str] = None) -
 
 
 def worker_session() -> bool:
-    """True inside a dispatcher-started worker session.
+    """True inside a dispatcher-started worker session or in a process that
+    one started.
 
-    There ``hermes kanban schedule`` and ``hermes kanban unblock`` refuse every
-    card other than the worker's own (Hermes ``hermes_cli/kanban.py``
-    ``_worker_run_id_for`` and the ``unblock`` command).
+    ``HERMES_KANBAN_TASK`` marks a dispatcher-started worker;
+    ``HERMES_KANBAN_RUN_ID`` marks the same for the five run-lifecycle tools;
+    ``HERMES_DELEGATED_CHILD_CONTEXT`` marks a process that a worker started
+    (directly or through other processes). In all three ``hermes kanban
+    schedule``, ``hermes kanban unblock`` and ``hermes kanban assign`` refuse
+    the card or are refused for a delegated child (Hermes
+    ``hermes_cli/kanban.py`` ``_DELEGATED_CHILD_DENIED_ACTIONS``,
+    ``hermes_cli/kanban_db.py`` ``_assert_not_delegated_child_mutation`` and
+    the ``unblock`` command).
     """
-    return bool(os.environ.get("HERMES_KANBAN_TASK", "").strip())
+    return any(os.environ.get(name, "").strip() for name in WORKER_SESSION_ENV_NAMES)
 
 
 def run_kanban(config: Mapping[str, Any], board: Optional[str], args: List[str],

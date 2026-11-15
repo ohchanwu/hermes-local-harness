@@ -12,6 +12,21 @@ Commands:
           todo for a GLM worker (for example one reassigned to a Claude worker)
           is skipped ("skipped hold <board> <id>"); a card that cannot be read
           again is also skipped, with its error class, and the next run tries again.
+
+          On every run, independent of the window, of peak_hold.enabled and of
+          the on/off switch, each card that a GLM reviewer of the board blocked
+          with a reason that starts with jev-glm-review-pass, whose newest
+          blocked event records source_status review and a run of that GLM
+          reviewer, and whose assignee is that GLM reviewer or the board's
+          Opus reviewer, is passed to the Opus reviewer: "hermes kanban assign
+          <id> <Opus reviewer>" when the assignee is not yet the Opus reviewer,
+          then "hermes kanban unblock <id>". Just before the commands the card
+          is read again and skipped when it no longer meets the selection
+          conditions. A failed command stops the steps for that card; the next
+          run tries again. When HERMES_KANBAN_TASK, HERMES_KANBAN_RUN_ID or
+          HERMES_DELEGATED_CHILD_CONTEXT is set in the environment, the pass
+          is refused for a process that a worker started and no pass command
+          runs; the cards stay blocked.
   off     Turn the hold off (switch file enabled: false), then release every
           card held with the marker at once.
   on      Turn the hold on (switch file enabled: true). Cards are held again
@@ -170,9 +185,45 @@ def _status(config: dict, args: argparse.Namespace) -> int:
     return _print_read_errors(errors)
 
 
+def _print_pass_actions(passes: list, prefix: str) -> None:
+    for item in passes:
+        steps = "assign then unblock" if item["assign"] else "unblock"
+        print(f"{prefix}pass {item['board']} {item['task_id']} to {item['opus_reviewer']} ({steps})")
+
+
+def _print_pass_results(results: list) -> int:
+    failures = 0
+    for item in results:
+        if item.get("skipped"):
+            if item.get("error_class"):
+                print(f"skipped pass {item['board']} {item['task_id']}: the card could not be read again "
+                      f"(error_class={item['error_class']}); the next run tries again")
+            else:
+                print(f"skipped pass {item['board']} {item['task_id']}: it no longer meets the selection "
+                      "conditions of the GLM review pass")
+        elif item["unblocked"]:
+            print(f"passed {item['board']} {item['task_id']} to {item['opus_reviewer']}")
+        else:
+            failures += 1
+            print(f"failed pass {item['board']} {item['task_id']} error_class={item['error_class']}")
+    return 1 if failures else 0
+
+
 def _run(config: dict, args: argparse.Namespace) -> int:
     now = _parse_now(args.now)
     boards = _boards(config, args)
+    if peak_hold.worker_session():
+        print("pass refused: this process was started by a worker; the cards stay blocked")
+        pass_status = 0
+        passes: list = []
+        pass_errors: list = []
+    else:
+        passes, pass_errors = peak_hold.plan_glm_review_pass(config, boards)
+        pass_status = _print_read_errors(pass_errors, log=args.apply, now=now)
+        if not args.apply:
+            _print_pass_actions(passes, "planned ")
+        if not passes:
+            print("no card to pass to the Opus reviewer")
     actions, switch_error, errors = peak_hold.plan(config, now, boards)
     if switch_error:
         print(f"switch file error: {switch_error} (treated as on)")
@@ -183,11 +234,16 @@ def _run(config: dict, args: argparse.Namespace) -> int:
         _print_actions(actions, "planned ")
         if not actions:
             print("nothing to hold or release")
-        return read_status
-    if not actions:
+        return max(read_status, pass_status)
+    hold_status = read_status
+    if actions:
+        hold_status = max(_print_results(peak_hold.apply(config, actions, args.hermes, boards)), read_status)
+    else:
         print("nothing to hold or release")
-        return read_status
-    return max(_print_results(peak_hold.apply(config, actions, args.hermes, boards)), read_status)
+    if passes:
+        pass_status = max(_print_pass_results(peak_hold.apply_glm_review_pass(
+            config, passes, args.hermes, boards)), pass_status)
+    return max(hold_status, pass_status)
 
 
 def main(argv: list[str] | None = None) -> int:
