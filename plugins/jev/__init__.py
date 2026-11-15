@@ -11,8 +11,11 @@ Registered callbacks:
   ``routing.handle_request_changes``). In a GLM reviewer session
   (``glm_review.is_glm_reviewer``), ``kanban_complete`` and
   ``kanban_request_review`` are refused with an error result and the tool is
-  not called (``glm_review.handle_refused_tool``). Every other tool passes
-  through unchanged.
+  not called (``glm_review.handle_refused_tool``), and ``kanban_block`` with a
+  reason that starts with ``jev-glm-review-pass`` blocks the card with the
+  kind that keeps it out of ``triage``
+  (``glm_review.handle_pass_block``). Every other tool passes through
+  unchanged.
 - ``transform_tool_result`` hook: calls ``tool_filter.transform`` (imported
   lazily); a missing module or any exception leaves the result unchanged.
 - ``post_auxiliary_call`` hook: one ``auxiliary`` log record per call.
@@ -67,6 +70,24 @@ def _tool_execution(**kwargs: Any) -> Any:
                 return glm_review.handle_refused_tool(tool_name, kwargs.get("args"))
         except Exception:
             return glm_review.REFUSAL_ERROR
+    if tool_name == "kanban_block":
+        # The pass of a review without findings (glm_review.handle_pass_block):
+        # only in a GLM reviewer session and only for a reason that starts with
+        # the identifier of the decision document. ``next_call`` runs outside
+        # the ``try`` so it is called exactly once on every path.
+        args = kwargs.get("args")
+        pass_config: Any = None
+        try:
+            reason = args.get("reason") if isinstance(args, dict) else None
+            if isinstance(reason, str) and reason.startswith(glm_review.PASS_REASON):
+                config = load_config()
+                if glm_review.is_glm_reviewer(jev_log.profile_name(), config):
+                    pass_config = config
+        except Exception:
+            pass_config = None
+        if pass_config is not None:
+            return glm_review.handle_pass_block(args, next_call, config=pass_config)
+        return next_call()
     if tool_name not in ("kanban_create", "kanban_unblock", "kanban_request_review", "kanban_request_changes"):
         return next_call()
     args = kwargs.get("args")
