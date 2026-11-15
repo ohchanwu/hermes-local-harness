@@ -22,10 +22,16 @@ CLI_TESTED = {(2, 1, 283), (2, 1, 302)}
 # context_length is the context window of 1M tokens (1,000,000) stated on the
 # Anthropic model page https://platform.claude.com/docs/en/models/haiku-5-5/overview
 # (read by the controller on 2026-11-11), not a live measurement.
+# claude-sonnet-5-5: id from the same live Anthropic model id list of 2026-11-11
+# (card t_731d4476, procedures/anthropic-api-fallback.md line 66), the newest
+# Sonnet id in that list. Its context_length is the Hermes built-in family value
+# ("claude-sonnet-5": 1000000, agent/model_metadata.py:293 at Hermes 9cf7960f),
+# not a live measurement; a live smoke test is part of the deployment card.
 MODELS = {"claude-opus-5-5": {"context_length": 1000000},
           "claude-fable-5-1": {"context_length": 1000000},
           "claude-fable-5-2": {"context_length": 1000000},
-          "claude-haiku-5-5": {"context_length": 1000000}}
+          "claude-haiku-5-5": {"context_length": 1000000},
+          "claude-sonnet-5-5": {"context_length": 1000000}}
 
 # Fixed runtime flags. Per-session values (model, paths, tools, system prompt)
 # are appended by the client.

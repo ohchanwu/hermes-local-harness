@@ -965,6 +965,19 @@ class ClientTests(unittest.TestCase):
                 self.c._validate({'model': model, 'messages': messages})
         self.assertEqual(self.launches, [])
 
+    def test_validate_accepts_sonnet_5_5_with_its_documented_context_and_rejects_other_sonnet_ids(self):
+        # t_17149680: the Claude fallback of the GLM profiles runs on claude-sonnet-5-5; context
+        # length is the Hermes built-in family value ("claude-sonnet-5": 1000000).
+        messages = [{'role': 'user', 'content': 'unused'}]
+        self.assertEqual(self.c._validate({'model': 'claude-sonnet-5-5', 'messages': messages})[0], 'claude-sonnet-5-5')
+        self.assertEqual(client.compat.MODELS['claude-sonnet-5-5'], {'context_length': 1000000})
+        self.assertEqual(client.compat.served_names('claude-sonnet-5-5'), {'claude-sonnet-5-5'})
+        for model in ('claude-sonnet-4-5-20250929', 'claude-sonnet-4-6', 'claude-sonnet-5'):
+            with self.subTest(model=model), \
+                    self.assertRaisesRegex(client.ProviderError, 'exact model id from its allowlist'):
+                self.c._validate({'model': model, 'messages': messages})
+        self.assertEqual(self.launches, [])
+
     def test_concurrent_callers_on_one_client_are_queued(self):
         results, errors = [], []
         def call(text):

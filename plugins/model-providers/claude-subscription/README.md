@@ -3,7 +3,7 @@
 Repository source only. No live installation, profile/model change or rollout
 has been performed. Provider name: `claude-subscription`; models: the exact ids
 allowlisted in `compat.MODELS` (currently `claude-opus-5-5`, `claude-fable-5-1`,
-`claude-fable-5-2` and `claude-haiku-5-5`). It does not
+`claude-fable-5-2`, `claude-haiku-5-5` and `claude-sonnet-5-5`). It does not
 replace `anthropic` or the native `claude-code` alias. Independent review of the
 local candidate is still required. Design: [hardening specification](../../../docs/specs/261017-claude-subscription-provider-hardening.md).
 
@@ -497,6 +497,21 @@ claude-subscription profiles in the field `auxiliary_models`, and
 it. No live profile and no installed plugin copy changed with this card; the
 live steps are in `procedures/haiku-helper-routing.md`. Until a later card
 applies them, the live helpers stay on `claude-opus-5-5` as described above.
+
+### Claude Sonnet 5.5 allowlist entry (2026-11-16 KST, repository only)
+
+`claude-sonnet-5-5` is in `compat.MODELS` (card t_17149680). The id is the
+newest Sonnet id in the live Anthropic model id list of 2026-11-11 (card
+t_731d4476, `procedures/anthropic-api-fallback.md` line 66). Its
+`context_length` 1000000 is the Hermes built-in family value
+(`"claude-sonnet-5": 1000000`, `agent/model_metadata.py:293` at Hermes
+`9cf7960f`), not a live measurement; a live smoke test is part of the
+deployment card. The entry is for the Claude fallback of the GLM (zai)
+profiles: when the Z.ai subscription quota runs out, the GLM reviewers and the
+full GLM workers fall back to Claude Sonnet, and the GLM Flash workers fall
+back to Claude Haiku (owner request to `harness-orchestrator` on 2026-11-16).
+No live profile and no installed plugin copy changed with this card; a later
+card sets the fallback on the live profiles and copies the plugin files.
 
 ## Manual setup and rollback reference
 
