@@ -345,11 +345,11 @@ PROFILE_SOUL_PATHS = {
         "live": f"/Users/chanbla11mit/.hermes/profiles/{profile}/SOUL.md",
     }
     for profile in (
-        "chapt-orchestrator", "chapt-worker", "chapt-worker-2", "chapt-reviewer",
-        "harness-orchestrator", "harness-worker", "harness-worker-2", "harness-reviewer",
+        "chapt-orchestrator", "chapt-worker", "chapt-worker-2", "chapt-reviewer", "chapt-reviewer-glm",
+        "harness-orchestrator", "harness-worker", "harness-worker-2", "harness-reviewer", "harness-reviewer-glm",
         "jobcron-orchestrator",
-        "jss-orchestrator", "jss-worker", "jss-worker-2", "jss-reviewer",
-        "anki-orchestrator", "anki-worker", "anki-worker-2", "anki-reviewer",
+        "jss-orchestrator", "jss-worker", "jss-worker-2", "jss-reviewer", "jss-reviewer-glm",
+        "anki-orchestrator", "anki-worker", "anki-worker-2", "anki-reviewer", "anki-reviewer-glm",
     )
 }
 # Fleet GLM workers retired 2026-10-18 (procedures/switching-hermes-models.md).

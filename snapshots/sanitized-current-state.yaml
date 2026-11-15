@@ -680,6 +680,10 @@
       "source": "policies/profile-souls/chapt-reviewer/SOUL.md",
       "live": "/Users/chanbla11mit/.hermes/profiles/chapt-reviewer/SOUL.md"
     },
+    "chapt-reviewer-glm": {
+      "source": "policies/profile-souls/chapt-reviewer-glm/SOUL.md",
+      "live": "/Users/chanbla11mit/.hermes/profiles/chapt-reviewer-glm/SOUL.md"
+    },
     "harness-orchestrator": {
       "source": "policies/profile-souls/harness-orchestrator/SOUL.md",
       "live": "/Users/chanbla11mit/.hermes/profiles/harness-orchestrator/SOUL.md"
@@ -695,6 +699,10 @@
     "harness-reviewer": {
       "source": "policies/profile-souls/harness-reviewer/SOUL.md",
       "live": "/Users/chanbla11mit/.hermes/profiles/harness-reviewer/SOUL.md"
+    },
+    "harness-reviewer-glm": {
+      "source": "policies/profile-souls/harness-reviewer-glm/SOUL.md",
+      "live": "/Users/chanbla11mit/.hermes/profiles/harness-reviewer-glm/SOUL.md"
     },
     "jobcron-orchestrator": {
       "source": "policies/profile-souls/jobcron-orchestrator/SOUL.md",
@@ -716,6 +724,10 @@
       "source": "policies/profile-souls/jss-reviewer/SOUL.md",
       "live": "/Users/chanbla11mit/.hermes/profiles/jss-reviewer/SOUL.md"
     },
+    "jss-reviewer-glm": {
+      "source": "policies/profile-souls/jss-reviewer-glm/SOUL.md",
+      "live": "/Users/chanbla11mit/.hermes/profiles/jss-reviewer-glm/SOUL.md"
+    },
     "anki-orchestrator": {
       "source": "policies/profile-souls/anki-orchestrator/SOUL.md",
       "live": "/Users/chanbla11mit/.hermes/profiles/anki-orchestrator/SOUL.md"
@@ -731,6 +743,10 @@
     "anki-reviewer": {
       "source": "policies/profile-souls/anki-reviewer/SOUL.md",
       "live": "/Users/chanbla11mit/.hermes/profiles/anki-reviewer/SOUL.md"
+    },
+    "anki-reviewer-glm": {
+      "source": "policies/profile-souls/anki-reviewer-glm/SOUL.md",
+      "live": "/Users/chanbla11mit/.hermes/profiles/anki-reviewer-glm/SOUL.md"
     }
   },
   "repository_policies": {

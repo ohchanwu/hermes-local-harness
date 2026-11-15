@@ -35,6 +35,10 @@ LATER_SOULS = ("anki-orchestrator", "anki-worker", "anki-worker-2", "anki-review
 # The SOULs of the third GLM workers (card t_f4ce916d) were written after card t_46b5e63e, with
 # its stale test rule already appended after the block.
 THIRD_GLM_SOULS = ("anki-worker-glm-3", "chapt-worker-glm-3", "harness-worker-glm-3", "jss-worker-glm-3")
+# The SOULs of the GLM reviewers (card t_92a5f02e) were written from the reviewer SOULs after card
+# t_46b5e63e, with the reviewer sentence, the block and the stale test rule already in place.
+GLM_REVIEWER_SOULS = ("anki-reviewer-glm", "chapt-reviewer-glm", "harness-reviewer-glm",
+                      "jobcron-reviewer-glm", "jss-reviewer-glm")
 REVIEWER_SENTENCE = (b"Reject a card, document, or commit that introduces a coined compound term or a "
                      b"'(project term)' that is not defined in the repository glossary.\n")
 OK = "OK: desired state matches observed state"
@@ -73,19 +77,21 @@ class TrackedText(unittest.TestCase):
         # SOULs added after BASELINE (the anki fleet, t_06fc410a; the anki GLM workers,
         # t_71b4ef4a) have no baseline bytes; they were written with the block already at
         # their end.
-        later = {path for path in all_souls if path.parent.name in (*LATER_SOULS, *THIRD_GLM_SOULS)}
-        self.assertEqual({path.parent.name for path in later}, {*LATER_SOULS, *THIRD_GLM_SOULS})
+        later_names = (*LATER_SOULS, *THIRD_GLM_SOULS, *GLM_REVIEWER_SOULS)
+        later = {path for path in all_souls if path.parent.name in later_names}
+        self.assertEqual({path.parent.name for path in later}, set(later_names))
         stale_rule = b"\n" + (ROOT / "policies/stale-test-rule.md").read_bytes()
         for path in sorted(later):
             with self.subTest(profile=path.parent.name):
                 # The later append of card t_46b5e63e is reversed first.
                 text = reverse_stale_test_rule_edits(path.relative_to(ROOT).as_posix(), path.read_bytes())
-                if path.parent.name in THIRD_GLM_SOULS:
+                if path.parent.name in (*THIRD_GLM_SOULS, *GLM_REVIEWER_SOULS):
                     self.assertTrue(text.endswith(stale_rule))
                     text = text[:-len(stale_rule)]
                 self.assertTrue(text.endswith(b"\n\n" + block))
                 self.assertEqual(text.count(block), 1)
-                self.assertEqual(text.count(REVIEWER_SENTENCE), 1 if path.parent.name == "anki-reviewer" else 0)
+                reviewer = path.parent.name == "anki-reviewer" or path.parent.name in GLM_REVIEWER_SOULS
+                self.assertEqual(text.count(REVIEWER_SENTENCE), 1 if reviewer else 0)
         souls = [path for path in all_souls if path not in later]
         self.assertEqual(len(souls), 20)
         self.assertEqual({path.parent.name for path in souls} & set(REVIEWERS), set(REVIEWERS))
