@@ -22,7 +22,10 @@ from incident_recovery_verify_fixture import LocalReads, ROOT, load_verifier
 # The owner model policy as verify-state records it; the roster is checked against it, not copied.
 _POLICY = load_verifier()
 OPUS = _POLICY.MODEL_POLICY_BY_ROLE["implementation"]
-FABLE = _POLICY.MODEL_POLICY_BY_ROLE["advisor"]
+POLICY_ORCHESTRATOR = _POLICY.MODEL_POLICY_BY_ROLE["advisor"]
+# A model outside the owner model policy for every role since 2026-11-15 (card t_f03857d4:
+# default, the advisor and the five project orchestrators moved from Fable to Opus).
+FABLE = "claude-fable-5-2"
 CLAUDE = _POLICY.MODEL_POLICY_PROVIDER
 GLM = tuple(f"{prefix}-worker-glm-{n}" for prefix in ("jobcron", "chapt", "harness", "jss", "anki")
             for n in (1, 2, 3))
@@ -88,12 +91,16 @@ class ModelPolicy(Base):
     """Item 1: expectations follow the owner model policy; out-of-policy live stays red."""
 
     def test_live_corrected_expectations(self):
-        # Card t_0faca45d (2026-11-13): reviewers on Opus, orchestrators (default included) on Fable.
+        # Card t_0faca45d (2026-11-13) put the reviewers on Opus and the orchestrators (default
+        # included) on Fable; card t_f03857d4 (owner change of 2026-11-15) moved default, the
+        # advisor and the five project orchestrators to Opus.
         for name in ("jobcron-worker", "chapt-worker", "harness-worker",
                      "jobcron-reviewer", "chapt-reviewer", "harness-reviewer"):
             self.assertEqual((self.profiles[name]["model"], self.profiles[name]["provider"]), (OPUS, CLAUDE))
         for name in ("advisor", "default", "jobcron-orchestrator", "chapt-orchestrator", "harness-orchestrator"):
-            self.assertEqual((self.profiles[name]["model"], self.profiles[name]["provider"]), (FABLE, CLAUDE))
+            self.assertEqual((self.profiles[name]["model"], self.profiles[name]["provider"]),
+                             (POLICY_ORCHESTRATOR, CLAUDE))
+        self.assertEqual(POLICY_ORCHESTRATOR, OPUS)
 
     def test_every_non_retired_profile_is_in_policy(self):
         self.assertEqual(quiet(self.verifier.check_model_policy, self.roster), [])
@@ -103,8 +110,7 @@ class ModelPolicy(Base):
                     if profile["name"] in GLM_IN_SERVICE:
                         self.assertEqual((profile["model"], profile["provider"]), ("glm-5.3", "zai"))
                         continue
-                    want = FABLE if "orchestrator" in profile["role"] or profile["role"] == "advisor" else OPUS
-                    self.assertEqual((profile["model"], profile["provider"]), (want, CLAUDE))
+                    self.assertEqual((profile["model"], profile["provider"]), (OPUS, CLAUDE))
 
     def test_glm_worker_on_another_model_fails(self):
         roster = copy.deepcopy(self.roster)

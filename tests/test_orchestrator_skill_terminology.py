@@ -4,7 +4,9 @@
 Offline checks of tracked bytes only: no live ~/.hermes reads, board access,
 network or model calls. The retired GPT model names and the coined term
 "value-blind" must not appear in any copy, and every model named in a Fixed
-Roster or Verification line must equal that profile's model in roster.yaml.
+Roster or Verification line must equal that profile's model in roster.yaml,
+except the three fleet orchestrators the copies still name on claude-fable-5-2
+since card t_f03857d4 moved their roster model to claude-opus-5-5.
 
 TERMINOLOGY_EDITS lists the exact (new, old) text this card changed, so tests
 that pin older bytes of these files can reverse the change byte for byte.
@@ -41,8 +43,15 @@ ROSTER_BOARDS = {
 }
 FORBIDDEN = re.compile(r"gpt-6\.1-sol|gpt-6-astra|[Vv]alue-blind")
 MODEL_PAIR = re.compile(r"`([a-z0-9-]+)` \(`([a-z0-9.-]+)`\)")
-# Since card t_0faca45d the orchestrator (Fable) and the workers (Opus) run different models.
+# Card t_0faca45d (2026-11-13) put the orchestrators on Fable and the workers on Opus; the
+# Verification line still names that split. Card t_f03857d4 (owner change of 2026-11-15) moved
+# default, the advisor and the five project orchestrators to Opus in roster.yaml only, so the
+# skill copies this module reads still name claude-fable-5-2 for the jobcron, cha-pt and harness
+# orchestrators; a later card must bring these copies back in step with roster.yaml.
 VERIFICATION = re.compile(r"return `([^`]+)` for orchestrator, `([^`]+)` for worker and `([^`]+)` for reviewer\.")
+SKILL_ORCHESTRATORS = ("jobcron-orchestrator", "chapt-orchestrator", "harness-orchestrator")
+SKILL_ORCHESTRATOR_MODEL = "claude-fable-5-2"
+ROSTER_ORCHESTRATOR_MODEL = "claude-opus-5-5"
 
 # Bytes of each file at baseline 44320e4a3226bfa057cb532af7fe00b97095cfe8,
 # recovered by reversing TERMINOLOGY_EDITS.
@@ -159,6 +168,13 @@ class OrchestratorSkillTerminologyTests(unittest.TestCase):
                         if FORBIDDEN.search(line)]
                 self.assertEqual(hits, [])
 
+    def expected_skill_model(self, name):
+        """The model a skill copy names for a profile: the roster model, except the three
+        orchestrators it still names on the pre-t_f03857d4 model."""
+        if name in SKILL_ORCHESTRATORS:
+            return SKILL_ORCHESTRATOR_MODEL
+        return self.models[name]
+
     def test_fixed_roster_models_equal_roster(self):
         for path, boards in ROSTER_BOARDS.items():
             section = fixed_roster(self.text[path])
@@ -171,7 +187,12 @@ class OrchestratorSkillTerminologyTests(unittest.TestCase):
                     names = [fleet["orchestrator"], *fleet["workers"], fleet["reviewer"]]
                     self.assertEqual(sorted(pairs), sorted(names))
                     for name in names:
-                        self.assertEqual(pairs[name], self.models[name], name)
+                        self.assertEqual(pairs[name], self.expected_skill_model(name), name)
+                    # The three orchestrators the skill copies name on the old model are the
+                    # only divergence from roster.yaml since card t_f03857d4.
+                    if fleet["orchestrator"] in SKILL_ORCHESTRATORS:
+                        self.assertEqual(self.models[fleet["orchestrator"]], ROSTER_ORCHESTRATOR_MODEL,
+                                         fleet["orchestrator"])
             with self.subTest(path=path, check="no other board"):
                 other = [line for line in section.splitlines() if " board `" in line
                          and not any(f" board `{board}`: " in line for board in boards)]
@@ -186,7 +207,7 @@ class OrchestratorSkillTerminologyTests(unittest.TestCase):
                     self.assertEqual(pairs, [])
                 for name, model in pairs:
                     self.assertIn(name, self.models)
-                    self.assertEqual(model, self.models[name], name)
+                    self.assertEqual(model, self.expected_skill_model(name), name)
 
     def test_verification_models_equal_roster(self):
         for path, boards in ROSTER_BOARDS.items():
@@ -194,9 +215,12 @@ class OrchestratorSkillTerminologyTests(unittest.TestCase):
             with self.subTest(path=path):
                 self.assertEqual(len(matches), 1)
                 orchestrator, worker, reviewer = matches[0]
+                self.assertEqual(orchestrator, SKILL_ORCHESTRATOR_MODEL)
                 for board in boards:
                     fleet = self.fleets[board]
-                    self.assertEqual(self.models[fleet["orchestrator"]], orchestrator, fleet["orchestrator"])
+                    # Since card t_f03857d4 the roster model of every fleet orchestrator is
+                    # Opus, so the Verification line's orchestrator model is no longer it.
+                    self.assertNotEqual(self.models[fleet["orchestrator"]], orchestrator, fleet["orchestrator"])
                     for name in fleet["workers"]:
                         self.assertEqual(self.models[name], worker, name)
                     self.assertEqual(self.models[fleet["reviewer"]], reviewer, fleet["reviewer"])

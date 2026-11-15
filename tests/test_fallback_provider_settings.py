@@ -30,11 +30,13 @@ FIXTURES = ROOT / "tests/fixtures"
 JOBCRON_PROFILES = ("jobcron-orchestrator", "jobcron-worker", "jobcron-worker-2", "jobcron-reviewer")
 # Identifiers chosen from the live Anthropic model list of 2026-11-11 (t_731d4476).
 OPUS, FABLE, HAIKU = "claude-opus-5-5", "claude-fable-5-2", "claude-haiku-5-5"
-# Card t_0faca45d (2026-11-13): the orchestrators run Fable and the reviewers Opus; each main
-# fallback names the profile's main model.
+# Card t_0faca45d (2026-11-13): the orchestrators run Fable and the reviewers Opus. Card t_f03857d4
+# (owner change of 2026-11-15) moved default, the advisor and the five project orchestrators to
+# Opus in roster.yaml; every fallback declaration keeps the model it had, so the main fallback of
+# the advisor and default still names Fable.
 JOBCRON_MAIN_FALLBACK = {"jobcron-orchestrator": FABLE, "jobcron-worker": OPUS, "jobcron-worker-2": OPUS,
                          "jobcron-reviewer": OPUS}
-JOBCRON_PRIMARY = {"jobcron-orchestrator": "claude-fable-5-2", "jobcron-worker": "claude-opus-5-5",
+JOBCRON_PRIMARY = {"jobcron-orchestrator": "claude-opus-5-5", "jobcron-worker": "claude-opus-5-5",
                    "jobcron-worker-2": "claude-opus-5-5", "jobcron-reviewer": "claude-opus-5-5"}
 HAIKU_TASKS = ("title_generation", "memory_query_rewrite", "tts_audio_tags", "profile_describer", "skills_hub",
                "vision")
@@ -43,13 +45,15 @@ OPUS_TASKS = ("compression", "goal_judge", "review", "background_review", "kanba
 JOBCRON_CHAIN = {**{task: [{"provider": "anthropic", "model": HAIKU}] for task in HAIKU_TASKS},
                  **{task: [{"provider": "anthropic", "model": OPUS}] for task in OPUS_TASKS}}
 # t_875f53f3: the 18 other claude-subscription profiles; since t_0faca45d the advisor, default and the
-# orchestrators fall back to Fable, the others to Opus. Their auxiliary chains equal JOBCRON_CHAIN.
+# orchestrators fell back to Fable, the others to Opus. Card t_f03857d4 changed only the roster
+# model of the seven, so their fallback entries still name Fable. Their auxiliary chains equal JOBCRON_CHAIN.
 OTHER_PROFILES = ("default", "advisor", *(f"{project}-{role}" for project in ("chapt", "harness", "jss", "anki")
                                           for role in ("orchestrator", "worker", "worker-2", "reviewer")))
-FABLE_PRIMARY = {"advisor", "default", "chapt-orchestrator", "harness-orchestrator", "jss-orchestrator",
-                 "anki-orchestrator"}
-OTHER_MAIN_FALLBACK = {name: FABLE if name in FABLE_PRIMARY else OPUS for name in OTHER_PROFILES}
-OTHER_PRIMARY = {name: "claude-fable-5-2" if name in FABLE_PRIMARY else "claude-opus-5-5" for name in OTHER_PROFILES}
+FABLE_MAIN_FALLBACK = {"advisor", "default", "chapt-orchestrator", "harness-orchestrator", "jss-orchestrator",
+                       "anki-orchestrator"}
+OTHER_MAIN_FALLBACK = {name: FABLE if name in FABLE_MAIN_FALLBACK else OPUS for name in OTHER_PROFILES}
+# Card t_f03857d4: every one of the 18 now declares claude-opus-5-5 as its main model.
+OTHER_PRIMARY = dict.fromkeys(OTHER_PROFILES, OPUS)
 MAIN_FALLBACK = {**JOBCRON_MAIN_FALLBACK, **OTHER_MAIN_FALLBACK}
 PRIMARY = {**JOBCRON_PRIMARY, **OTHER_PRIMARY}
 # Card t_c69fd1c8 (owner decision of 2026-11-14): the five project orchestrators keep the Anthropic API
