@@ -371,11 +371,11 @@ Owner-approved and live; GPT is retired from 2026-10-18.
 
 | Home | Main model | Effort |
 | --- | --- | --- |
-| default (`/Users/chanbla11mit/.hermes`, main orchestrator) | `claude-fable-5-2` (since 2026-11-13, card `t_0faca45d`) | medium |
+| default (`/Users/chanbla11mit/.hermes`, main orchestrator) | `claude-opus-5-5` (since 2026-11-15, owner change; roster and policy from card `t_f03857d4`; `claude-fable-5-2` from 2026-11-13, card `t_0faca45d`) | medium |
 | `harness-`, `chapt-`, `jobcron-` `worker` | `claude-opus-5-5` | high |
-| `harness-`, `chapt-`, `jobcron-` `orchestrator` | `claude-fable-5-2` (since 2026-11-13, card `t_0faca45d`) | medium |
+| `harness-`, `chapt-`, `jobcron-` `orchestrator` | `claude-opus-5-5` (since 2026-11-15, owner change; roster and policy from card `t_f03857d4`; `claude-fable-5-2` from 2026-11-13, card `t_0faca45d`) | medium |
 | `harness-`, `chapt-`, `jobcron-` `reviewer` | `claude-opus-5-5` (since 2026-11-13, card `t_0faca45d`; `claude-fable-5-2` from 2026-11-11) | high |
-| `advisor` | `claude-fable-5-2` (live since 2026-11-11 15:38 KST) | high |
+| `advisor` | `claude-opus-5-5` (since 2026-11-15, owner change; roster and policy from card `t_f03857d4`; `claude-fable-5-2` from 2026-11-11 15:38 KST) | high |
 
 The reviewer and advisor row was `claude-fable-5-1` until 2026-11-11. On
 2026-11-11 (card t_cb1b2a0d) the live smoke test for `claude-fable-5-2` passed
