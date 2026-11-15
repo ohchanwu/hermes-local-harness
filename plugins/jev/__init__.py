@@ -8,8 +8,11 @@ Registered callbacks:
   handoff, ``routing.handle_request_review``) and ``kanban_request_changes``
   (after the call, a GLM card with at least its change request limit change
   requests goes to a Claude worker; a route can carry its own limit,
-  ``routing.handle_request_changes``). Every other tool passes through
-  unchanged.
+  ``routing.handle_request_changes``). In a GLM reviewer session
+  (``glm_review.is_glm_reviewer``), ``kanban_complete`` and
+  ``kanban_request_review`` are refused with an error result and the tool is
+  not called (``glm_review.handle_refused_tool``). Every other tool passes
+  through unchanged.
 - ``transform_tool_result`` hook: calls ``tool_filter.transform`` (imported
   lazily); a missing module or any exception leaves the result unchanged.
 - ``post_auxiliary_call`` hook: one ``auxiliary`` log record per call.
@@ -26,7 +29,7 @@ import os
 from pathlib import Path
 from typing import Any, Dict
 
-from . import jev_client, jev_log, routing
+from . import glm_review, jev_client, jev_log, routing
 
 CONFIG_PATH = Path(__file__).resolve().parent / "config.json"
 
@@ -58,6 +61,12 @@ def hermes_home() -> Path:
 def _tool_execution(**kwargs: Any) -> Any:
     next_call = kwargs["next_call"]
     tool_name = kwargs.get("tool_name")
+    if tool_name in ("kanban_complete", "kanban_request_review"):
+        try:
+            if glm_review.is_glm_reviewer(jev_log.profile_name(), load_config()):
+                return glm_review.handle_refused_tool(tool_name, kwargs.get("args"))
+        except Exception:
+            return glm_review.REFUSAL_ERROR
     if tool_name not in ("kanban_create", "kanban_unblock", "kanban_request_review", "kanban_request_changes"):
         return next_call()
     args = kwargs.get("args")
