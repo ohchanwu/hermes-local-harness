@@ -595,9 +595,12 @@ class JevPolicySources(unittest.TestCase):
     def test_jev_named_only_as_a_plugin(self):
         for path, text in self.text.items():
             with self.subTest(path=path):
+                # Card t_be416943: the five reviewer SOUL files also name the block reason prefix
+                # `jev-glm-review-pass`, the fixed identifier of the decision document
+                # docs/decisions/261114-glm-reviewer-pass-to-opus-reviewer.md.
                 for match in re.finditer(r"\bjev\b", text):
-                    following = text[match.end():match.end() + 10]
-                    self.assertTrue(following.startswith("` plugin") or following.startswith("-peak-hold"),
+                    following = text[match.end():match.end() + 16]
+                    self.assertTrue(following.startswith(("` plugin", "-peak-hold", "-glm-review-pass")),
                                     following)
 
 

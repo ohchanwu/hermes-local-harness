@@ -17,8 +17,8 @@ Card t_e14a6d6a later changed the version line of the jss-orchestrator skill aga
 the sentence NAMED_REVIEWER, replaced "that the paragraph above names" with "that an earlier
 paragraph of this file names". reverse_harness_repository_edits() therefore first calls
 hard_route_policy_edits.reverse_hard_route_policy_edits, which reverses the edits of that
-card. This module imports only hard_route_policy_edits, which imports no other test module,
-so any test module can import it without a circular import.
+card. This module imports only hard_route_policy_edits, which imports only test modules that
+import no other test module, so any test module can import it without a circular import.
 """
 from hard_route_policy_edits import reverse_hard_route_policy_edits
 
