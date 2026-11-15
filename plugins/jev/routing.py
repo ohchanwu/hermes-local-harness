@@ -817,6 +817,30 @@ def change_request_state(conn: Any, task_id: str) -> Optional[Tuple[str, Optiona
     return str(row["status"]), row["assignee"], int(count)
 
 
+def _counted_change_requests(conn: Any, task_id: str, glm_reviewers: Sequence[str]) -> int:
+    """The number of the card's ``changes_requested`` events that count
+    towards the change request limit: every event except one whose payload
+    can be read and names one of ``glm_reviewers`` as the ``reviewer``.
+
+    An event whose payload cannot be read, and an event whose payload has no
+    ``reviewer``, is counted. With an empty ``glm_reviewers`` every event is
+    counted, which is the number of the card's ``changes_requested`` events.
+    """
+    rows = conn.execute("SELECT payload FROM task_events WHERE task_id = ? AND kind = 'changes_requested'",
+                        (task_id,)).fetchall()
+    counted = 0
+    for row in rows:
+        try:
+            parsed = json.loads(row["payload"] or "null")
+        except Exception:
+            parsed = None
+        reviewer = parsed.get("reviewer") if isinstance(parsed, dict) else None
+        if isinstance(reviewer, str) and reviewer in glm_reviewers:
+            continue
+        counted += 1
+    return counted
+
+
 def routed_claude_worker(board: str, task_id: str, workers: Sequence[str],
                          directory: Optional[Path] = None) -> Optional[str]:
     """The ``original_assignee`` of the latest ``route`` record of ``task_id`` on
@@ -986,9 +1010,20 @@ def handle_request_changes(args: Mapping[str, Any], next_call: Callable[..., Any
     Hermes runs these commands inside the reviewer process: none checks
     ``HERMES_KANBAN_TASK`` (``hermes_cli/kanban.py`` ``_cmd_set_model``,
     ``_cmd_reassign`` and ``_cmd_edit``). One ``escalate`` record is written per
-    escalation; it names the route that gave the limit in ``applied_route`` and
-    the limit used in ``max_glm_change_requests``. Every failure leaves the card
+    escalation; it names the route that gave the limit in ``applied_route``,
+    the limit used in ``max_glm_change_requests`` and the number of counted
+    change requests in ``change_requests``. Every failure leaves the card
     as the earlier commands left it.
+
+    Not every change request of the card counts towards the limit. A
+    ``changes_requested`` event whose payload names one of the board's GLM
+    reviewers (the list ``glm_reviewers``, every name of the list) as the
+    ``reviewer`` does not count. Every other change request counts: an event
+    whose payload cannot be read, and an event whose payload has no
+    ``reviewer``, is counted. A board without ``glm_reviewers`` therefore
+    counts every change request. Only the counted change requests are
+    compared with the limit, and only the counted number is written as the
+    ``escalate`` record's ``change_requests``.
 
     The limit of a card is decided only here and by two rules in order (card
     t_52be75ab; ``_card_limit``). First the card's ``route`` record: the limit
@@ -1017,14 +1052,16 @@ def handle_request_changes(args: Mapping[str, Any], next_call: Callable[..., Any
         board_cfg = (routing.get("boards") or {}).get(board) or {}
         glm = peak_hold.glm_workers_by_board(config).get(board, [])
         claude = [str(w) for w in board_cfg.get("implementation_workers") or []]
+        glm_reviewers = _board_review_names(board_cfg)[1]
         conn = peak_hold.connect_readonly(peak_hold.kanban_db_path(config, board))
         try:
             state = change_request_state(conn, task_id)
+            count = _counted_change_requests(conn, task_id, glm_reviewers) if state is not None else 0
         finally:
             conn.close()
         if state is None:
             return result
-        status, assignee, count = state
+        status, assignee, _ = state
         if assignee not in glm or status not in _ESCALATION_STATUSES:
             return result
         limit, applied_route = _card_limit(board_cfg, assignee, routing, board, task_id, state_dir)
