@@ -5,16 +5,22 @@ Card t_85d4fbda (part 6 of card C3). This program makes no live change: it
 creates a temporary directory, points HERMES_HOME at it before any Hermes
 module is imported, writes a config.yaml with one pre_tool_call shell hook
 (the script scripts/jev-glm-reviewer-hook of this repository) and no plugins,
-and observes the Hermes code that registers and fires the hook. It deletes the
-temporary directory at the end.
+and observes the Hermes code that registers and fires the hook. It deletes
+the temporary directory on every exit: a finally block in main() removes it
+on success, on the early return and on an exception, and an atexit handler
+registered before the first Hermes import removes again, after the atexit
+handlers that the Hermes imports register, whatever they create once more
+under HERMES_HOME at interpreter exit.
 
-It exits 0 when every expected case of a to d holds, otherwise 1.
+It exits 0 when every expected case of a to d holds, otherwise 1. Case e is
+printed and reported; it does not affect the exit status.
 
 Run it from the repository root:
 
     /Users/chanbla11mit/.hermes/hermes-agent/venv/bin/python -I tests/observe_glm_reviewer_hook.py
 """
 
+import atexit
 import json
 import os
 import shutil
@@ -51,10 +57,25 @@ def observed(case, expected, facts):
         _failures.append(case)
 
 
+def remove_quietly(path):
+    """Remove path; print a line when it cannot be removed (never raise)."""
+    try:
+        shutil.rmtree(path)
+    except FileNotFoundError:
+        pass
+    except OSError as exc:
+        print(f"cannot remove temporary directory {path}: {exc}")
+
+
 def main():
     base = Path(tempfile.mkdtemp(prefix="glm-reviewer-hook-"))
     home = base / "home"
     home.mkdir()
+    # Registered now, before any Hermes import, so it runs after the atexit
+    # handlers that the Hermes imports register: atexit runs handlers in
+    # reverse order of registration. It removes again whatever the Hermes
+    # handlers create under HERMES_HOME once more at interpreter exit.
+    atexit.register(remove_quietly, base)
     # 1. An empty environment, HERMES_HOME inside the temporary directory,
     #    before any Hermes import.
     os.environ.update({
@@ -67,6 +88,13 @@ def main():
     if not SCRIPT.is_file():
         print(f"script missing: {SCRIPT}")
         return 1
+    try:
+        return observe(base, home)
+    finally:
+        remove_quietly(base)
+
+
+def observe(base, home):
     # No bytecode cache may be written into the installed Hermes tree this
     # program imports read only (the same rule as spikes/glm-reviewer-pass).
     sys.dont_write_bytecode = True
@@ -246,14 +274,20 @@ def main():
     e_text = result.get("error", "") if isinstance(result, dict) else ""
     e1 = not isinstance(result, dict) or ("A GLM reviewer may not call" not in e_text
                                           and "failed closed" not in e_text)
-    observed("e1 an exception inside _dispatch_pre_tool_call_hooks lets the call proceed past the guard: the "
-             "try/except of model_tools.py _pre_dispatch_guards lines 781 to 789 catches it, logs it at debug "
-             "level only and leaves block_message None, so the tool handler runs (here it refuses because no "
-             "HERMES_KANBAN_TASK is set); this is the remaining failure case of the second guard, reported, "
-             "not worked around",
-             e1, f"result={json.dumps(result)[:300]}")
-
-    shutil.rmtree(base, ignore_errors=True)
+    # Reported, never asserted: case e is the remaining failure case of the
+    # second guard. The card's exit status covers cases a to d only, so a
+    # Hermes change that makes this exception block (a fix) must not change
+    # this program's exit status.
+    if e1:
+        print(f"OBSERVED e1: holds, an exception inside _dispatch_pre_tool_call_hooks lets the call proceed "
+              f"past the guard: the try/except of model_tools.py _pre_dispatch_guards lines 781 to 789 catches "
+              f"it, logs it at debug level only and leaves block_message None, so the tool handler runs (here "
+              f"it refuses because no HERMES_KANBAN_TASK is set); this is the remaining failure case of the "
+              f"second guard, reported, not worked around, result={json.dumps(result)[:300]}")
+    else:
+        print(f"OBSERVED e1: no longer holds, the call was blocked with result={json.dumps(result)[:300]}; "
+              f"a Hermes change now makes an exception inside _dispatch_pre_tool_call_hooks block the call "
+              f"(model_tools.py _pre_dispatch_guards); case e does not affect the exit status of this program")
     if _failures:
         print(f"FAILED cases: {', '.join(_failures)}")
         return 1
