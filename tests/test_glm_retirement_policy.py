@@ -380,7 +380,10 @@ class PolicyText(unittest.TestCase):
         for profile, entry in souls.items():
             text = without_jev_text(ROOT / entry["source"])
             with self.subTest(profile=profile):
-                self.assertIsNone(GLM_NAME.search(text))
+                # The SOUL of a GLM reviewer (card t_92a5f02e) names the three GLM workers of its board,
+                # whose cards it reviews; tests/test_glm_reviewer_souls.py checks that text.
+                if not profile.endswith("-reviewer-glm"):
+                    self.assertIsNone(GLM_NAME.search(text))
                 self.assertIsNone(GLM_LANE.search(text))
 
     def test_orchestrator_and_reviewer_souls_name_only_the_remaining_worker(self):
@@ -411,7 +414,10 @@ class PolicyText(unittest.TestCase):
             else:
                 text = without_jev_text(path)
             with self.subTest(soul=name):
-                self.assertIsNone(GLM_NAME.search(text))
+                # The SOUL of a GLM reviewer (card t_92a5f02e) names the three GLM workers of its board,
+                # whose cards it reviews; tests/test_glm_reviewer_souls.py checks that text.
+                if not name.endswith("-reviewer-glm"):
+                    self.assertIsNone(GLM_NAME.search(text))
                 self.assertIsNone(LEGACY_GLM_NAME.search(text))
 
     def test_jobcron_orchestrator_soul_routes_only_to_its_worker(self):

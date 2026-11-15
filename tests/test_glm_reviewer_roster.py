@@ -129,8 +129,12 @@ class Roster(unittest.TestCase):
         self.assertEqual(groups[groups.index("glm_worker_reasoning_effort_settings") + 1],
                          "glm_reviewer_profile_settings")
 
-    def test_profile_souls_names_no_glm_reviewer(self):
-        self.assertEqual([name for name in self.roster["profile_souls"] if name in GLM_REVIEWERS], [])
+    def test_profile_souls_names_four_glm_reviewers(self):
+        # Card t_92a5f02e added the SOUL entries of the GLM reviewers whose board's reviewer has an
+        # entry; jobcron-reviewer-glm has none, as jobcron-reviewer has none
+        # (tests/test_glm_reviewer_souls.py).
+        self.assertEqual([name for name in self.roster["profile_souls"] if name in GLM_REVIEWERS],
+                         ["chapt-reviewer-glm", "harness-reviewer-glm", "jss-reviewer-glm", "anki-reviewer-glm"])
 
 
 class Verifier(unittest.TestCase):

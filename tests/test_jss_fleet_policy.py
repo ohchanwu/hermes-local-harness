@@ -1132,10 +1132,15 @@ class HarnessRepositoryInReadOnlyException(unittest.TestCase):
             f"pinned to repository `{REPO}`, as the first paragraph of this file states."))
         for line in self.line.values():
             self.assertIn("and never create a card on board `jss-genr` pinned to any of those repositories.", line)
-        # Only the three sources carry the exception.
+        # Only the three sources carry the exception, and the SOUL of the jss-genr GLM reviewer
+        # (card t_92a5f02e), which keeps the reviewer SOUL's exception paragraph byte for byte.
+        glm_reviewer_soul = "policies/profile-souls/jss-reviewer-glm/SOUL.md"
         carriers = sorted(str(path.relative_to(ROOT)) for path in (ROOT / "policies").rglob("*")
                           if path.is_file() and EXCEPTION_LEAD in path.read_text(errors="replace"))
-        self.assertEqual(carriers, sorted(self.SOURCES))
+        self.assertEqual(carriers, sorted((*self.SOURCES, glm_reviewer_soul)))
+        glm_lines = [line for line in (ROOT / glm_reviewer_soul).read_text().splitlines()
+                     if line.startswith(EXCEPTION_LEAD)]
+        self.assertEqual(glm_lines, [self.line[REVIEWER_SOUL_RELATIVE]])
 
     def test_jss_genr_card_pinned_to_the_harness_repository_is_rejected(self):
         verifier = load_verifier()

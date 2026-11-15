@@ -1149,19 +1149,23 @@
     "chapt-worker": "tracked-source",
     "chapt-worker-2": "tracked-source",
     "chapt-reviewer": "tracked-source",
+    "chapt-reviewer-glm": "tracked-source",
     "harness-orchestrator": "tracked-source",
     "harness-worker": "tracked-source",
     "harness-worker-2": "tracked-source",
     "harness-reviewer": "tracked-source",
+    "harness-reviewer-glm": "tracked-source",
     "jobcron-orchestrator": "tracked-source",
     "jss-orchestrator": "tracked-source",
     "jss-worker": "tracked-source",
     "jss-worker-2": "tracked-source",
     "jss-reviewer": "tracked-source",
+    "jss-reviewer-glm": "tracked-source",
     "anki-orchestrator": "tracked-source",
     "anki-worker": "tracked-source",
     "anki-worker-2": "tracked-source",
-    "anki-reviewer": "tracked-source"
+    "anki-reviewer": "tracked-source",
+    "anki-reviewer-glm": "tracked-source"
   },
   "repository_policy_hashes": {
     "cha-pt-frontend": "113b81fd55294cfc3057f66163e1745d590f520003997d36c85b46c938342817"
