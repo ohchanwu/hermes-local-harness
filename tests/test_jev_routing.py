@@ -761,7 +761,11 @@ class ReviewHandoffTests(unittest.TestCase):
         self.assertEqual(calls, [None])
         self.assertEqual(fake_hermes_calls(self.calls_log),
                          [["kanban", "--board", "harness", "set-model", "t_feedc0de", "none"]])
-        record = read_records(self.dir / "logs", "decisions")[-1]
+        # Card t_b668f19c: a review_choice record follows the clear_override
+        # record in a GLM worker session, so the clear_override record is
+        # selected by its event.
+        record = next(r for r in read_records(self.dir / "logs", "decisions")
+                      if r["event"] == "clear_override")
         self.assertEqual((record["event"], record["task_id"], record["applied"]), ("clear_override", "t_feedc0de", True))
 
     def test_second_list_worker_clears_override_before_review(self):
@@ -772,7 +776,8 @@ class ReviewHandoffTests(unittest.TestCase):
         self.assertEqual(calls, [None])
         self.assertEqual(fake_hermes_calls(self.calls_log),
                          [["kanban", "--board", "harness", "set-model", "t_feedc0de", "none"]])
-        record = read_records(self.dir / "logs", "decisions")[-1]
+        record = next(r for r in read_records(self.dir / "logs", "decisions")
+                      if r["event"] == "clear_override")
         self.assertEqual((record["event"], record["task_id"], record["applied"]), ("clear_override", "t_feedc0de", True))
 
     def test_claude_worker_does_not_clear(self):
@@ -794,7 +799,10 @@ class ReviewHandoffTests(unittest.TestCase):
         with mock.patch.dict(os.environ, {"FAKE_HERMES_EXIT": "3"}):
             calls = self.review("jobcron-worker-glm-1")
         self.assertEqual(calls, [None])
-        record = read_records(self.dir / "logs", "decisions")[-1]
+        # Card t_b668f19c: the review_choice record is the last record of the
+        # call, so the clear_override record is selected by its event.
+        record = next(r for r in read_records(self.dir / "logs", "decisions")
+                      if r["event"] == "clear_override")
         self.assertEqual((record["applied"], record["error_class"]), (False, "CommandFailed"))
 
 

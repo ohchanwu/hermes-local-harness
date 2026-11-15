@@ -587,6 +587,110 @@ def handle_unblock(args: Mapping[str, Any], next_call: Callable[..., Any], *, co
     })
 
 
+def _review_choice_record(board: Optional[str], task_id: Optional[str], profile: str,
+                          reviewer: Optional[str], opus_count: Optional[int], glm_count: Optional[int],
+                          switch: bool, applied: bool,
+                          not_applied_reason: Optional[str]) -> Dict[str, Any]:
+    """The ``decisions`` record ``event`` ``review_choice`` of items 2, 4 and 6:
+    identifiers, the two counts, the switch position and the applied flag only."""
+    return {"event": "review_choice", "board": board, "task_id": task_id,
+            "original_assignee": profile, "reviewer": reviewer,
+            "opus_change_requests": opus_count, "glm_change_requests": glm_count,
+            "switch": switch, "applied": applied, "not_applied_reason": not_applied_reason}
+
+
+def _board_review_names(board_cfg: Mapping[str, Any]) -> Tuple[Optional[str], List[str]]:
+    """``(opus_reviewer, glm_reviewers)`` of one board; the reviewers that are
+    not non-empty strings are missing. Only the returned names are used."""
+    opus = board_cfg.get("opus_reviewer")
+    glm = [str(name) for name in board_cfg.get("glm_reviewers") or [] if isinstance(name, str) and name]
+    return (opus if isinstance(opus, str) and opus else None), glm
+
+
+def _card_change_request_reviewers(conn: Any, task_id: str, opus_reviewer: str,
+                                   glm_reviewers: List[str]) -> Tuple[int, int, Optional[str]]:
+    """``(A, G, latest reviewer)`` of one card: A is the number of its
+    ``changes_requested`` events whose payload reviewer is ``opus_reviewer``,
+    G the number whose payload reviewer is in ``glm_reviewers``, and the latest
+    reviewer is the payload reviewer of the last event that has one. The events
+    are read in the order of their rows; no other text of a payload is used."""
+    rows = conn.execute("SELECT payload FROM task_events WHERE task_id = ? AND kind = 'changes_requested' "
+                        "ORDER BY id", (task_id,)).fetchall()
+    opus = glm = 0
+    latest: Optional[str] = None
+    for row in rows:
+        try:
+            parsed = json.loads(row["payload"] or "null")
+        except Exception:
+            parsed = None
+        reviewer = parsed.get("reviewer") if isinstance(parsed, dict) else None
+        if not isinstance(reviewer, str) or not reviewer:
+            continue
+        latest = reviewer
+        if reviewer == opus_reviewer:
+            opus += 1
+        elif reviewer in glm_reviewers:
+            glm += 1
+    return opus, glm, latest
+
+
+def _review_payload(args: Mapping[str, Any], config: Mapping[str, Any], profile: str,
+                    command: Optional[str]) -> Tuple[Optional[Dict[str, Any]], Dict[str, Any]]:
+    """``(arguments for the tool, record)`` of the reviewer choice; the
+    arguments are None when they are unchanged. Reads the card with read-only
+    connections only and starts no ``hermes kanban`` command."""
+    routing_section = config.get("routing")
+    routing: Mapping[str, Any] = routing_section if isinstance(routing_section, dict) else {}
+    glm_section = routing.get("glm_review")
+    glm_review: Mapping[str, Any] = glm_section if isinstance(glm_section, dict) else {}
+    switch_on = bool(glm_review.get("enabled"))
+    raw_task = args.get("task_id") or os.environ.get("HERMES_KANBAN_TASK", "").strip() or None
+    raw_board = args.get("board") or os.environ.get("HERMES_KANBAN_BOARD", "").strip() or None
+    task_id = _arg_task_id(raw_task)
+    board = _configured_board(raw_board, config)
+
+    def record(reviewer: Optional[str], applied: bool, reason: Optional[str],
+               opus_count: Optional[int] = None, glm_count: Optional[int] = None) -> Dict[str, Any]:
+        return _review_choice_record(board, task_id, profile, reviewer, opus_count, glm_count,
+                                     switch_on, applied, reason)
+
+    if task_id is None:
+        return None, record(None, False, "task_id_not_recognized")
+    if raw_board is not None and board is None:
+        return None, record(None, False, "board_not_configured")
+    if board is None:
+        return None, record(None, False, "board_not_configured")
+    board_cfg = (routing.get("boards") or {}).get(board) or {}
+    opus_reviewer, glm_reviewers = _board_review_names(board_cfg)
+    if opus_reviewer is None or not glm_reviewers:
+        return None, record(None, False, "reviewer_not_configured")
+
+    conn = peak_hold.connect_readonly(peak_hold.kanban_db_path(config, board))
+    try:
+        opus_events, glm_events, latest = _card_change_request_reviewers(conn, task_id, opus_reviewer,
+                                                                        glm_reviewers)
+    finally:
+        conn.close()
+
+    arg_reviewer = args.get("reviewer")
+    arg_names_glm = isinstance(arg_reviewer, str) and arg_reviewer in glm_reviewers
+    arg_missing_or_empty = not isinstance(arg_reviewer, str) or not arg_reviewer
+    chosen: Optional[str] = None
+    if switch_on:
+        maximum = setting_count(glm_review, "max_glm_review_change_requests")
+        if opus_events == 0 and glm_events < maximum:
+            chosen = glm_reviewers[0]
+        else:
+            chosen = opus_reviewer
+    elif arg_names_glm or (arg_missing_or_empty and latest in glm_reviewers):
+        chosen = opus_reviewer
+    if chosen is None:
+        return None, record(None, False, None, opus_events, glm_events)
+    payload = dict(args)
+    payload["reviewer"] = chosen
+    return payload, record(chosen, True, None, opus_events, glm_events)
+
+
 def handle_request_review(args: Mapping[str, Any], next_call: Callable[..., Any], *,
                           config: Mapping[str, Any], command: Optional[str] = None) -> Any:
     """``tool_execution`` middleware body for ``kanban_request_review``.
@@ -595,12 +699,60 @@ def handle_request_review(args: Mapping[str, Any], next_call: Callable[..., Any]
     reviewer run does not start with the GLM model and the ``zai`` provider.
     Only a task ID of the Hermes form and a board in ``routing.boards`` are
     used and logged; other argument values are never written to a log.
+
+    Then, in a GLM worker session with ``routing.enabled`` true, the reviewer
+    for the call is decided:
+
+    - Switch on (``routing.glm_review.enabled`` true): the card is read with a
+      read-only connection and its ``changes_requested`` events are counted by
+      the ``reviewer`` of each payload. A is the number of events whose
+      reviewer is the board's ``opus_reviewer``; G the number of events whose
+      reviewer is in the board's ``glm_reviewers``. When A is 0 and G is less
+      than ``max_glm_review_change_requests`` (read with ``setting_count``; 0
+      or a missing value means the GLM reviewer is never chosen), the reviewer
+      is the first name of ``glm_reviewers``; otherwise it is the board's
+      ``opus_reviewer``. The chosen reviewer is always passed explicitly with a
+      copy of the arguments that has ``reviewer`` set to it; the original
+      arguments are not changed, also when the arguments already name a
+      reviewer.
+    - Switch off or missing: when the ``reviewer`` argument names one of the
+      board's ``glm_reviewers``, or when it is missing or empty and the
+      ``reviewer`` of the card's latest ``changes_requested`` event is one of
+      them, the board's ``opus_reviewer`` is passed explicitly instead. In
+      every other case the arguments are unchanged. Reason (Rollback of Part 6
+      of the specification): after the switch is turned off, Hermes would
+      otherwise send a later review request back to a GLM reviewer, because
+      with no ``reviewer`` argument Hermes uses the reviewer of the card's
+      latest ``changes_requested`` event.
+    - Missing data (no ``opus_reviewer`` or no ``glm_reviewers`` on the board,
+      a task ID that is not of the Hermes form, a board that is not in
+      ``routing.boards``, or a read error of the card): the arguments are
+      unchanged, as at the baseline.
+    - In every other session (Claude workers, reviewers, orchestrators) the
+      arguments are unchanged, also when the switch is on.
+    - One ``decisions`` record ``event`` ``review_choice`` is written for each
+      call that reaches one of the two rules: ``board``, ``task_id``,
+      ``original_assignee`` (the profile), ``reviewer`` (the name passed, or
+      null when unchanged), ``opus_change_requests`` (A), ``glm_change_requests``
+      (G), ``switch`` (true or false), ``applied`` (true when the reviewer
+      argument was set), and ``not_applied_reason`` when it was not
+      (``task_id_not_recognized``, ``board_not_configured``,
+      ``reviewer_not_configured``, ``read_error``). No other argument value and
+      no card text is written. A failure to write the record is ignored.
+    - ``next_call`` is called exactly once on every path. An exception in the
+      new code never stops the call: the arguments are built inside ``try``,
+      and after it ``next_call`` runs once, with the unchanged arguments when
+      the new code raised.
     """
+    profile = ""
+    glm_worker_session = False
     try:
-        routing = config.get("routing") or {}
+        routing_section = config.get("routing")
+        routing = routing_section if isinstance(routing_section, dict) else {}
         profile = jev_log.profile_name()
-        if (routing.get("enabled", False) and routing.get("clear_override_at_review", True)
-                and profile in peak_hold.all_glm_workers(config)):
+        glm_worker_session = (bool(routing.get("enabled", False))
+                              and profile in peak_hold.all_glm_workers(config))
+        if glm_worker_session and routing.get("clear_override_at_review", True):
             raw_task = args.get("task_id") or os.environ.get("HERMES_KANBAN_TASK", "").strip() or None
             raw_board = args.get("board") or os.environ.get("HERMES_KANBAN_BOARD", "").strip() or None
             task_id = _arg_task_id(raw_task)
@@ -617,7 +769,27 @@ def handle_request_review(args: Mapping[str, Any], next_call: Callable[..., Any]
             jev_log.write("decisions", record)
     except Exception:
         pass
-    return next_call()
+
+    payload: Optional[Dict[str, Any]] = None
+    try:
+        if glm_worker_session:
+            payload, record = _review_payload(args, config, profile, command)
+            jev_log.write("decisions", record)
+    except Exception:
+        payload = None
+        try:
+            routing_section = config.get("routing")
+            routing = routing_section if isinstance(routing_section, dict) else {}
+            glm_section = routing.get("glm_review")
+            glm_review = glm_section if isinstance(glm_section, dict) else {}
+            raw_task = args.get("task_id") or os.environ.get("HERMES_KANBAN_TASK", "").strip() or None
+            raw_board = args.get("board") or os.environ.get("HERMES_KANBAN_BOARD", "").strip() or None
+            jev_log.write("decisions", _review_choice_record(
+                _configured_board(raw_board, config), _arg_task_id(raw_task), profile, None, None, None,
+                bool(glm_review.get("enabled")), False, "read_error"))
+        except Exception:
+            pass
+    return next_call(payload) if payload is not None else next_call()
 
 
 # Card statuses in which a GLM implementer may hold the card right after

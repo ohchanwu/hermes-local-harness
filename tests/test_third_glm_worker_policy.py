@@ -293,6 +293,8 @@ class DesiredState(unittest.TestCase):
         # Card t_4c6f39f4: every board also names its GLM reviewer in the new
         # list `glm_reviewers`, and `routing` carries the new switch `glm_review`
         # (off; no code reads `max_glm_review_change_requests` yet).
+        # Card t_b668f19c: every board also names its Opus reviewer in the new
+        # key `opus_reviewer`, directly after `glm_reviewers`.
         config = json.loads((ROOT / "plugins/jev/config.json").read_text())
         before = json.loads(baseline_bytes("plugins/jev/config.json"))
         boards = config["routing"]["boards"]
@@ -314,6 +316,7 @@ class DesiredState(unittest.TestCase):
                                  [f"{prefix}-worker-glm-1", f"{prefix}-worker-glm-2"])
                 entry["glm_max_workers"] = [f"{prefix}-worker-glm-3"]
                 entry["glm_reviewers"] = [f"{prefix}-reviewer-glm"]
+                entry["opus_reviewer"] = f"{prefix}-reviewer"
                 entry["routes"] = [route for route in entry["routes"] if route["name"] != "hard"]
                 hard_index = 2
                 entry["routes"][hard_index:hard_index] = [
