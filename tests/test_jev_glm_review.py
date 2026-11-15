@@ -287,7 +287,8 @@ class GlmReviewerRefusalTests(unittest.TestCase):
         for profile, board in BOARD_OF_GLM_REVIEWER.items():
             with self.subTest(board=board):
                 self.assertEqual(routing["boards"][board]["glm_reviewers"], [profile])
-        self.assertEqual(routing["glm_review"], {"enabled": False, "max_glm_review_change_requests": 2})
+        # Card t_e61ee47c turned GLM review on (owner approval of 2026-11-15).
+        self.assertEqual(routing["glm_review"], {"enabled": True, "max_glm_review_change_requests": 2})
 
 
 if __name__ == "__main__":
