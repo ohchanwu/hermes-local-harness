@@ -1,7 +1,7 @@
 ---
 name: multi-agent-coding-orchestrator
 description: "Use when orchestrating jss-genr repository and writing-round work."
-version: 0.6.7-jss.16
+version: 0.6.7-jss.17
 author: chanbla11mit, Hermes Agent
 license: MIT
 platforms: [macos]
@@ -252,6 +252,8 @@ User stop remains global: stop all owned workers, reviewers, and watchers, verif
 Request review with `kanban_request_review(..., reviewer: jss-reviewer, board: jss-genr)` only after the candidate and required test evidence exist: the commit and test output for repository cards; the new files with SHA-256 and the `tools/charcount.py` output for writing rounds.
 
 For approval, the reviewer calls `kanban_complete(..., board: jss-genr)`. For a material defect, the reviewer calls `kanban_request_changes(..., board: jss-genr)` with concrete findings that obey the privacy gate. Do not replace same-card review with a summary from another session.
+
+On a card that `jss-worker-glm-1`, `jss-worker-glm-2` or `jss-worker-glm-3` implements, the first review run or runs can be made by the GLM reviewer of board `jss-genr`, `jss-reviewer-glm`. Such a run is not an assignee or reviewer mismatch. The card's `Reviewer EXACT` line still names the Opus reviewer `jss-reviewer`, and that is correct. A change request from `jss-reviewer-glm` is routine same-card rework, in the same way as a change request from `jss-reviewer`. A `blocked` notification whose reason starts with `jev-glm-review-pass` means that the GLM review had no findings. It needs no action and is not an owner question: the script `/Users/chanbla11mit/hermes-local-harness/scripts/jev-peak-hold` assigns the card to `jss-reviewer` and unblocks it within about a minute. If the card is still `blocked` with that reason at the orchestrator's next check, the orchestrator passes it by hand with `hermes kanban --board jss-genr assign <task id> jss-reviewer` and then `hermes kanban --board jss-genr unblock <task id>`. The GLM reviewer cannot approve a card: only `kanban_complete` by `jss-reviewer` is the approval, and local integration starts only after it.
 
 After approval of a repository card, integrate locally into `/Users/chanbla11mit/projects/jss-genr` without another approval prompt only if:
 

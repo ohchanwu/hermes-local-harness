@@ -24,10 +24,13 @@ jss_harness_repository_edits.reverse_harness_repository_edits calls it first, so
 that recovers the bytes of an earlier commit reverses this card's edits before the edits of
 the earlier cards. The later edits of card t_d3bb0983 (orchestrator_opus_5_5_edits) are
 reversed first. Before those, the later edits of card t_be416943 in the five reviewer SOUL
-files (opus_reviewer_glm_review_edits) are reversed. This module imports only
-orchestrator_opus_5_5_edits and opus_reviewer_glm_review_edits, which import no other test
-module, so any test module can import it without a circular import.
+files (opus_reviewer_glm_review_edits) are reversed. Before those, the later edits of card
+t_35874d04 in the five orchestrator skills (orchestrator_glm_review_edits) are reversed. This
+module imports only orchestrator_opus_5_5_edits, opus_reviewer_glm_review_edits and
+orchestrator_glm_review_edits, which import no other test module, so any test module can import
+it without a circular import.
 """
+from orchestrator_glm_review_edits import reverse_orchestrator_glm_review_edits
 from opus_reviewer_glm_review_edits import reverse_opus_reviewer_glm_review_edits
 from orchestrator_opus_5_5_edits import reverse_opus_5_5_orchestrator_edits
 
@@ -153,8 +156,9 @@ def reverse_hard_route_policy_edits(relative_path, text):
     the card did not change, and a text that contains none of the new texts, is returned as
     the same object, so a caller may apply it to a text that another caller already reversed.
     A text that contains some of the new texts but not each of them exactly once raises
-    AssertionError. The later edits of card t_be416943, then those of card t_d3bb0983, are
-    reversed first."""
+    AssertionError. The later edits of card t_35874d04, then those of card t_be416943, then
+    those of card t_d3bb0983, are reversed first."""
+    text = reverse_orchestrator_glm_review_edits(relative_path, text)
     text = reverse_opus_reviewer_glm_review_edits(relative_path, text)
     text = reverse_opus_5_5_orchestrator_edits(relative_path, text)
     edits = HARD_ROUTE_POLICY_EDITS.get(relative_path)

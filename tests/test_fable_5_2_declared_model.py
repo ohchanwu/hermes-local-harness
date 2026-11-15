@@ -29,6 +29,8 @@ import re
 from pathlib import Path
 import unittest
 
+from orchestrator_glm_review_edits import (VERSIONS as GLM_REVIEW_VERSIONS, reverse_orchestrator_glm_review_edits,
+                                           skill as glm_review_skill)
 from orchestrator_opus_5_5_edits import (BASELINE_SHA256 as OPUS_5_5_BASELINE_SHA256, VERSIONS as OPUS_5_5_VERSIONS,
                                           reverse_opus_5_5_orchestrator_edits)
 from test_jev_policy_sources import reverse_jev_policy_edits
@@ -103,7 +105,9 @@ def _reverse(edits, relative_path, text):
 
 
 def reverse_role_model_edits(relative_path, text):
-    """Return text with the t_d3bb0983 edits and then the t_0faca45d edits reversed; text may be str or bytes."""
+    """Return text with the t_35874d04 edits, the t_d3bb0983 edits and then the t_0faca45d edits reversed;
+    text may be str or bytes."""
+    text = reverse_orchestrator_glm_review_edits(relative_path, text)
     return _reverse(ROLE_MODEL_EDITS, relative_path, reverse_opus_5_5_orchestrator_edits(relative_path, text))
 
 
@@ -138,13 +142,18 @@ class FableDeclaredModel(unittest.TestCase):
     def test_reversing_the_opus_5_5_orchestrator_edits_recovers_the_baseline_bytes(self):
         for path, want in OPUS_5_5_BASELINE_SHA256.items():
             with self.subTest(path=path):
-                original = reverse_opus_5_5_orchestrator_edits(path, (ROOT / path).read_bytes())
+                # The later edits of card t_35874d04 are reversed first.
+                original = reverse_opus_5_5_orchestrator_edits(
+                    path, reverse_orchestrator_glm_review_edits(path, (ROOT / path).read_bytes()))
                 self.assertEqual(hashlib.sha256(original).hexdigest(), want)
                 # A second call on the reversed bytes returns them unchanged.
                 self.assertIs(reverse_opus_5_5_orchestrator_edits(path, original), original)
 
     def test_skill_copies_name_no_fable_model_and_have_the_raised_versions(self):
+        # Card t_35874d04 raised the versions of the Jobcron and Cha PT copies by one more step.
+        current = {glm_review_skill(prefix): new for prefix, (_old, new) in GLM_REVIEW_VERSIONS.items()}
         for path, (_old, new) in OPUS_5_5_VERSIONS.items():
+            new = current.get(path, new)
             text = (ROOT / path).read_text()
             with self.subTest(path=path):
                 self.assertNotIn("claude-fable", text)

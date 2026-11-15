@@ -1,7 +1,7 @@
 ---
 name: multi-agent-coding-orchestrator
 description: "Use when orchestrating Harness repository work."
-version: 0.6.7-harness.12
+version: 0.6.7-harness.13
 author: chanbla11mit, Hermes Agent
 license: MIT
 platforms: [macos]
@@ -212,6 +212,8 @@ For broad-test child commands, explicitly remove the project's inspected optiona
 Request review with `kanban_request_review(..., reviewer: harness-reviewer, board: harness)` only after the candidate commit and required test evidence exist.
 
 For approval, the reviewer calls `kanban_complete(..., board: harness)`. For a material defect, the reviewer calls `kanban_request_changes(..., board: harness)` with concrete findings. Do not replace same-card review with a summary from another session.
+
+On a card that `harness-worker-glm-1`, `harness-worker-glm-2` or `harness-worker-glm-3` implements, the first review run or runs can be made by the GLM reviewer of board `harness`, `harness-reviewer-glm`. Such a run is not an assignee or reviewer mismatch. The card's `Reviewer EXACT` line still names the Opus reviewer `harness-reviewer`, and that is correct. A change request from `harness-reviewer-glm` is routine same-card rework, in the same way as a change request from `harness-reviewer`. A `blocked` notification whose reason starts with `jev-glm-review-pass` means that the GLM review had no findings. It needs no action and is not an owner question: the script `/Users/chanbla11mit/hermes-local-harness/scripts/jev-peak-hold` assigns the card to `harness-reviewer` and unblocks it within about a minute. If the card is still `blocked` with that reason at the orchestrator's next check, the orchestrator passes it by hand with `hermes kanban --board harness assign <task id> harness-reviewer` and then `hermes kanban --board harness unblock <task id>`. The GLM reviewer cannot approve a card: only `kanban_complete` by `harness-reviewer` is the approval, and local integration starts only after it.
 
 After approval, integrate locally without another approval prompt only if:
 

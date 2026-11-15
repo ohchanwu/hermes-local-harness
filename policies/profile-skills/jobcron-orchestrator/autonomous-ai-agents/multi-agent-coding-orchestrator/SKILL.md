@@ -1,7 +1,7 @@
 ---
 name: multi-agent-coding-orchestrator
 description: "Use when orchestrating multi-agent coding with Hermes."
-version: 0.6.9-jobcron.15
+version: 0.6.9-jobcron.16
 author: chanbla11mit, Hermes Agent
 license: MIT
 platforms: [macos]
@@ -343,6 +343,8 @@ No numeric caps on harmless actions: local reads, local tests, and anonymous pub
 Every code change requires independent board-designated review before local integration. Project boards use their board's designated reviewer (`jobcron-reviewer`, `chapt-reviewer`); the legacy reviewer `reviewer-sol` was retired on 2026-10-18. Inspect the specification, actual diff and commit, repository context, prior rung history, and test evidence. Do not edit implementation code.
 
 Approve only when acceptance criteria pass and no material correctness, security, regression, or scope defect remains. Every non-approval must name the verdict, attribution, revision count, findings, evidence, required next action, and whether continuation or a clean restart is safer.
+
+On a card that `jobcron-worker-glm-1`, `jobcron-worker-glm-2` or `jobcron-worker-glm-3` implements, the first review run or runs can be made by the GLM reviewer of board `jobcron`, `jobcron-reviewer-glm`. Such a run is not an assignee or reviewer mismatch. The card's `Reviewer EXACT` line still names the Opus reviewer `jobcron-reviewer`, and that is correct. A change request from `jobcron-reviewer-glm` is routine same-card rework, in the same way as a change request from `jobcron-reviewer`. A `blocked` notification whose reason starts with `jev-glm-review-pass` means that the GLM review had no findings. It needs no action and is not an owner question: the script `/Users/chanbla11mit/hermes-local-harness/scripts/jev-peak-hold` assigns the card to `jobcron-reviewer` and unblocks it within about a minute. If the card is still `blocked` with that reason at the orchestrator's next check, the orchestrator passes it by hand with `hermes kanban --board jobcron assign <task id> jobcron-reviewer` and then `hermes kanban --board jobcron unblock <task id>`. The GLM reviewer cannot approve a card: only `kanban_complete` by `jobcron-reviewer` is the approval, and local integration starts only after it.
 
 ## Integration
 
