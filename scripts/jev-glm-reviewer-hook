@@ -1,0 +1,8 @@
+#!/bin/sh
+# Second guard for a GLM reviewer profile (card t_85d4fbda, part 6 of card C3).
+# Hermes runs this script as a pre_tool_call shell hook for the tools named by
+# the matcher "kanban_complete|kanban_request_review". Exit status 2 blocks the
+# call; Hermes takes the block message from this script's stderr.
+cat >/dev/null 2>&1 || :
+echo 'A GLM reviewer may not call kanban_complete or kanban_request_review. Only the Opus reviewer approves a card. A review with no findings calls kanban_block with a reason that starts with jev-glm-review-pass.' >&2
+exit 2
