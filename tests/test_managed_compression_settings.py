@@ -28,8 +28,11 @@ FIXTURES = ROOT / "tests/fixtures"
 # The second managed settings group (t_0a8674fe); tests/test_orchestrator_profile_settings.py
 # checks it. The third group (t_2d357ca0) covers the ten Claude worker profiles. The fourth
 # group (t_e483301c) covers the reasoning effort of the five <board>-worker-glm-3 profiles.
+# The fifth group (t_cca306ca) covers the reasoning effort of the five <board>-reviewer-glm
+# profiles; tests/test_glm_reviewer_roster.py checks it.
 # Fixtures carry every group merged per profile.
 ORCHESTRATOR_GROUP = json.loads((ROOT / "roster.yaml").read_text())["orchestrator_profile_settings"]
+GLM_REVIEWER_GROUP = json.loads((ROOT / "roster.yaml").read_text())["glm_reviewer_profile_settings"]
 WORKER_PROFILES = ["jobcron-worker", "jobcron-worker-2", "chapt-worker", "chapt-worker-2",
                    "harness-worker", "harness-worker-2", "jss-worker", "jss-worker-2",
                    "anki-worker", "anki-worker-2"]
@@ -111,6 +114,8 @@ class FixtureConsistencyTests(unittest.TestCase):
             expected.setdefault(profile, {}).update(WORKER_SETTINGS)
         for profile in GLM_EFFORT_PROFILES:
             expected.setdefault(profile, {}).update(GLM_EFFORT_SETTINGS)
+        for profile in GLM_REVIEWER_GROUP["profiles"]:
+            expected.setdefault(profile, {}).update(GLM_REVIEWER_GROUP["settings"])
         names = sorted(path.name for path in FIXTURES.glob("*.yaml"))
         self.assertIn("compression-drift.yaml", names)
         for name in names:
@@ -164,7 +169,8 @@ class FixtureVerifierTests(unittest.TestCase):
             every_key = (len(PROFILES) * len(SETTINGS)
                          + len(ORCHESTRATOR_GROUP["profiles"]) * len(ORCHESTRATOR_GROUP["settings"])
                          + len(WORKER_PROFILES) * len(WORKER_SETTINGS)
-                         + len(GLM_EFFORT_PROFILES) * len(GLM_EFFORT_SETTINGS))
+                         + len(GLM_EFFORT_PROFILES) * len(GLM_EFFORT_SETTINGS)
+                         + len(GLM_REVIEWER_GROUP["profiles"]) * len(GLM_REVIEWER_GROUP["settings"]))
             for observation in (None, [], {}, "not a mapping"):
                 with self.subTest(observation=observation):
                     path.write_text(json.dumps({**clean, "profile_managed_settings": observation}))

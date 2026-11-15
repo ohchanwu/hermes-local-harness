@@ -472,9 +472,12 @@ assert roster["project_dispatch_allowlist"] == [
     "jss-worker-glm-1", "jss-worker-glm-2",
     "anki-worker-glm-1", "anki-worker-glm-2",
     # The third GLM worker of each board (card t_f4ce916d), at the end of the list in the order in
-    # which the switch script added them to the live list (card t_55432326).
+    # which the switch script added them to the live list (card t_55432326), then the five GLM
+    # reviewer profiles (card t_cca306ca).
     "harness-worker-glm-3", "chapt-worker-glm-3", "jobcron-worker-glm-3",
-    "jss-worker-glm-3", "anki-worker-glm-3"]
+    "jss-worker-glm-3", "anki-worker-glm-3",
+    "jobcron-reviewer-glm", "chapt-reviewer-glm", "harness-reviewer-glm",
+    "jss-reviewer-glm", "anki-reviewer-glm"]
 roster_profiles = {profile["name"]: profile for profile in roster["profiles"]}
 assert roster["approval_policy"]["mode"] == "off"
 assert roster["approval_policy"]["profiles"] == list(roster_profiles)

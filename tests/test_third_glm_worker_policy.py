@@ -374,9 +374,12 @@ class DesiredState(unittest.TestCase):
         snapshot = json.loads((ROOT / "snapshots/sanitized-current-state.yaml").read_text())
         roster = json.loads((ROOT / "roster.yaml").read_text())
         dispatch = snapshot["kanban"]["dispatch_profiles"]
-        self.assertEqual(dispatch[-5:], ["harness-worker-glm-3", "chapt-worker-glm-3", "jobcron-worker-glm-3",
-                                         "jss-worker-glm-3", "anki-worker-glm-3"])
-        self.assertEqual(len(dispatch), 30)
+        # Card t_cca306ca appended the five GLM reviewers after the third GLM workers.
+        self.assertEqual(dispatch[-10:], ["harness-worker-glm-3", "chapt-worker-glm-3", "jobcron-worker-glm-3",
+                                          "jss-worker-glm-3", "anki-worker-glm-3",
+                                          "jobcron-reviewer-glm", "chapt-reviewer-glm",
+                                          "harness-reviewer-glm", "jss-reviewer-glm", "anki-reviewer-glm"])
+        self.assertEqual(len(dispatch), 35)
         self.assertEqual(roster["project_dispatch_allowlist"], dispatch)
 
     def test_verifier_pools_have_three_glm_workers_per_board(self):

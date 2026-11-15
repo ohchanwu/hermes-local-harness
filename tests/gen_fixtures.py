@@ -101,11 +101,13 @@ clean["profile_approval_modes"] = {
     profile: desired["approvals"]["mode"] for profile in desired["approvals"]["profiles"]}
 # Observed config values of every managed settings group, merged per profile:
 # managed_profile_settings (mirrored in the snapshot), orchestrator_profile_settings
-# (roster.yaml only), claude_worker_profile_settings (roster.yaml only) and
-# glm_worker_reasoning_effort_settings (roster.yaml only).
+# (roster.yaml only), claude_worker_profile_settings (roster.yaml only),
+# glm_worker_reasoning_effort_settings (roster.yaml only) and
+# glm_reviewer_profile_settings (roster.yaml only, card t_cca306ca).
 clean["profile_managed_settings"] = {}
 for group in (desired["managed_profile_settings"], roster["orchestrator_profile_settings"],
-              roster["claude_worker_profile_settings"], roster["glm_worker_reasoning_effort_settings"]):
+              roster["claude_worker_profile_settings"], roster["glm_worker_reasoning_effort_settings"],
+              roster["glm_reviewer_profile_settings"]):
     for profile in group["profiles"]:
         clean["profile_managed_settings"].setdefault(profile, {}).update(copy.deepcopy(group["settings"]))
 # Observed fallback settings of every non-retired roster profile, as the roster declares
@@ -181,6 +183,13 @@ clean["plugins"] = base_plugins()
 set_skill_files(clean)
 clean["terminal_retry_policy"] = copy.deepcopy(
     json.loads((Path(__file__).resolve().parents[1] / "roster.yaml").read_text())["terminal_retry"])
+# The LaunchAgent of the jev peak-hours hold is loaded (card t_cca306ca, item 2.6): the
+# pass of a card from the GLM reviewer to the independent reviewer of a board needs it.
+clean["jev_peak_hold_agent"] = copy.deepcopy(desired["jev_peak_hold_agent"])
+# The skill sdlc-review is installed on every GLM reviewer (card t_cca306ca, item 2.3).
+GLM_REVIEWER_SKILL_INSTALLED = True
+clean["glm_reviewer_skills"] = {profile: GLM_REVIEWER_SKILL_INSTALLED
+                                for profile in roster["glm_reviewer_profile_settings"]["profiles"]}
 write("clean.yaml", clean)
 
 
@@ -210,6 +219,46 @@ def glm_worker_dispatch_missing(d):
 
 
 write("glm-worker-dispatch-missing.yaml", delta(glm_worker_dispatch_missing))
+
+
+def glm_reviewer_jev_plugin_missing(d):
+    # The jev plugin is absent on one GLM reviewer that requires it (card t_cca306ca).
+    del d["plugins"]["harness-reviewer-glm"][JEV]
+
+
+write("glm-reviewer-jev-plugin-missing.yaml", delta(glm_reviewer_jev_plugin_missing))
+
+
+def glm_reviewer_skill_missing(d):
+    # The skill sdlc-review is not installed on one GLM reviewer (card t_cca306ca).
+    d["glm_reviewer_skills"]["harness-reviewer-glm"] = False
+
+
+write("glm-reviewer-skill-missing.yaml", delta(glm_reviewer_skill_missing))
+
+
+def glm_reviewer_dispatch_missing(d):
+    # One GLM reviewer is missing from the dispatch list (card t_cca306ca).
+    d["dispatch_profiles"].remove("harness-reviewer-glm")
+
+
+write("glm-reviewer-dispatch-missing.yaml", delta(glm_reviewer_dispatch_missing))
+
+
+def glm_reviewer_model_drift(d):
+    # One GLM reviewer runs claude-opus-5-5 instead of glm-5.3 (card t_cca306ca).
+    d["profile_models"]["harness-reviewer-glm"] = "claude-opus-5-5"
+
+
+write("glm-reviewer-model-drift.yaml", delta(glm_reviewer_model_drift))
+
+
+def launch_agent_not_loaded(d):
+    # The LaunchAgent of the jev peak-hours hold is not loaded (card t_cca306ca).
+    d["jev_peak_hold_agent"]["loaded"] = False
+
+
+write("launch-agent-not-loaded.yaml", delta(launch_agent_not_loaded))
 
 
 def jev_plugin_missing(d):

@@ -121,7 +121,8 @@ class FleetDesiredState(unittest.TestCase):
         self.assertEqual(self.verifier.PROJECT_WORKER_POOLS["anki"], list(WORKERS))
         self.assertEqual(self.verifier.PROJECT_LAUNCHERS["anki"], "run-anki-orchestrator")
         self.assertEqual(self.verifier.ADOPTION_REPOS["anki"], "adoption/anki.md")
-        self.assertEqual(self.verifier.ANKI_ASSIGNEES, {WORKER, WORKER2, *GLM_WORKERS, REVIEWER})
+        self.assertEqual(self.verifier.ANKI_ASSIGNEES,
+                         {WORKER, WORKER2, *GLM_WORKERS, REVIEWER, "anki-reviewer-glm"})
         self.assertEqual(self.verifier.PROJECT_GLM_WORKER_POOLS["anki"], list(GLM_WORKERS))
         self.assertIn("anki", self.verifier.PROJECTS_WITHOUT_PREVIEW_PORT)
         for mutate, expected in (
@@ -175,7 +176,7 @@ class FleetDesiredState(unittest.TestCase):
         self.assertEqual(self.snapshot["profiles"], list(self.profiles))
         for listing in (self.roster["project_dispatch_allowlist"], self.snapshot["kanban"]["dispatch_profiles"]):
             self.assertEqual([name for name in listing if name.startswith("anki-")],
-                             [WORKER, WORKER2, REVIEWER, *GLM_WORKERS])
+                             [WORKER, WORKER2, REVIEWER, *GLM_WORKERS, "anki-reviewer-glm"])
             self.assertNotIn(ORCH, listing)
         for name in GLM_WORKERS:
             with self.subTest(glm_worker=name):

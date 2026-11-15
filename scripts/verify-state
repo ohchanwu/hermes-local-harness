@@ -197,12 +197,14 @@ def shared_skill_declaration_valid(entry):
 
 def glm_workers_of_board(roster, board):
     """Sorted names of one board's GLM workers, taken from roster fields only: the
-    non-retired profiles whose `modes` field is ["project-isolated", <board>] and
-    whose provider is GLM_WORKER_PROVIDER."""
+    non-retired profiles whose `modes` field is ["project-isolated", <board>], whose
+    provider is GLM_WORKER_PROVIDER and whose role is not GLM_REVIEWER_ROLE (a GLM
+    reviewer shares the modes and provider of the board's GLM workers)."""
     profiles = roster.get("profiles", []) if isinstance(roster, dict) else []
     return sorted(p.get("name") for p in profiles
                   if isinstance(p, dict) and p.get("modes") == ["project-isolated", board]
                   and p.get("provider") == GLM_WORKER_PROVIDER
+                  and p.get("role") != GLM_REVIEWER_ROLE
                   and p.get("lifecycle") != RETIRED_LIFECYCLE)
 
 
@@ -390,8 +392,10 @@ MODEL_POLICY_BY_ROLE = {
 # since card t_f03857d4, so a project orchestrator switched back to
 # claude-fable-5-2 gives only the warning.
 MANUAL_SWITCH_MODELS = ("claude-fable-5-2", "claude-opus-5-5")
-# The GLM workers of PROJECT_GLM_WORKER_POOLS are outside MODEL_POLICY_BY_ROLE
-# (owner decision of 2026-11-12, card t_4f7740d0): each one runs this model and provider.
+# The GLM workers of PROJECT_GLM_WORKER_POOLS and the GLM reviewers of
+# PROJECT_GLM_REVIEWERS are outside MODEL_POLICY_BY_ROLE (owner decision of
+# 2026-11-12, card t_4f7740d0, and owner request of 2026-11-14, card t_cca306ca):
+# each one runs this model and provider.
 GLM_WORKER_MODEL = "glm-5.3"
 GLM_WORKER_PROVIDER = "zai"
 GLM_WORKER_LIFECYCLE = "project-active"
@@ -449,7 +453,7 @@ def check_model_policy(errors, roster):
         if not isinstance(profile, dict) or profile.get("lifecycle") == RETIRED_LIFECYCLE:
             continue
         name = profile.get("name")
-        if name in glm_worker_profiles():
+        if name in glm_worker_profiles() or name in PROJECT_GLM_REVIEWERS.values():
             want, provider = GLM_WORKER_MODEL, GLM_WORKER_PROVIDER
         else:
             want, provider = MODEL_POLICY_BY_ROLE.get(profile.get("role")), MODEL_POLICY_PROVIDER
@@ -515,16 +519,54 @@ def check_glm_worker_profiles(errors, roster):
             fail(errors, f"GLM worker not dispatchable {name}: dispatch_eligible and in_dispatch_pool must be true")
 
 
+def glm_reviewer_profiles():
+    """Names of the GLM reviewers, in PROJECT_GLM_REVIEWERS board order."""
+    return tuple(PROJECT_GLM_REVIEWERS.values())
+
+
+def check_glm_reviewer_profiles(errors, roster):
+    """Each GLM reviewer is declared with the role `project GLM reviewer`, the modes of
+    its board's independent reviewer, toolsets review, its lifecycle and dispatch flags,
+    and no auxiliary models and no fallback (check_model_policy checks its model and
+    provider; check_jev_plugin_declarations its jev plugin). The board of a GLM reviewer
+    is PROJECT_GLM_REVIEWERS, so the roster needs no `glm_reviewer` fleet field."""
+    profiles = {p.get("name"): p for p in roster.get("profiles", []) if isinstance(p, dict)}
+    fleets = roster.get("project_fleets") if isinstance(roster.get("project_fleets"), dict) else {}
+    for board, name in PROJECT_GLM_REVIEWERS.items():
+        fleet = fleets.get(board) if isinstance(fleets.get(board), dict) else {}
+        reviewer = fleet.get("reviewer")
+        profile = profiles.get(name)
+        if profile is None:
+            fail(errors, f"GLM reviewer profile missing from roster: {name}")
+            continue
+        for field, want in (("role", GLM_REVIEWER_ROLE), ("toolsets", "review")):
+            if profile.get(field) != want:
+                fail(errors, f"GLM reviewer {field} drift {name}: expected {want!r}, "
+                             f"declared {profile.get(field)!r}")
+        if isinstance(reviewer, str) and profile.get("modes") != profiles.get(reviewer, {}).get("modes"):
+            fail(errors, f"GLM reviewer modes drift {name}: expected the modes of {reviewer}, "
+                         f"declared {profile.get('modes')!r}")
+        if profile.get("lifecycle") != GLM_WORKER_LIFECYCLE:
+            fail(errors, f"GLM reviewer lifecycle drift {name}: expected {GLM_WORKER_LIFECYCLE}, "
+                         f"declared {profile.get('lifecycle')!r}")
+        if profile.get("dispatch_eligible") is not True or profile.get("in_dispatch_pool") is not True:
+            fail(errors, f"GLM reviewer not dispatchable {name}: dispatch_eligible and in_dispatch_pool must be true")
+        for field in ("auxiliary_models", "fallback_providers", "auxiliary_fallback_chain"):
+            if field in profile:
+                fail(errors, f"GLM reviewer declares {field}: {name} must declare none, as the GLM workers")
+
+
 # The jev plugin (plugins/jev/, card t_4f7740d0) is a required enabled plugin
 # on the 21 Claude subscription profiles (the advisor and the orchestrator, reviewer and
-# two Claude workers of every project fleet) and on the GLM workers in service.
+# two Claude workers of every project fleet), on the GLM workers in service and on the
+# GLM reviewers of the five boards (41 profiles; card t_cca306ca).
 JEV_PLUGIN = "jev"
 JEV_CLAUDE_PROFILES = ("advisor", *(f"{prefix}-{role}" for prefix in ("anki", "chapt", "harness", "jobcron", "jss")
                                     for role in ("orchestrator", "reviewer", "worker", "worker-2")))
 
 
 def jev_required_profiles():
-    return (*JEV_CLAUDE_PROFILES, *glm_worker_profiles())
+    return (*JEV_CLAUDE_PROFILES, *glm_worker_profiles(), *glm_reviewer_profiles())
 
 
 def check_jev_plugin_declarations(errors, roster):
@@ -541,7 +583,8 @@ def check_jev_plugin_declarations(errors, roster):
             fail(errors, f"jev plugin declaration drift {name}: required_plugins must name {JEV_PLUGIN}")
         elif name not in wanted and declared:
             fail(errors, f"jev plugin declaration drift {name}: {JEV_PLUGIN} is required only on "
-                         "the 21 Claude subscription profiles and the GLM workers in service")
+                         "the 21 Claude subscription profiles, the GLM workers in service and the "
+                         "GLM reviewers of the five boards")
 
 
 # Fallback providers (t_54fc49fb, procedures/anthropic-api-fallback.md). A roster
@@ -805,8 +848,8 @@ def check_auxiliary_models(errors, roster, read, allowed_models):
 
 
 def check_fleet_dispatch(errors, label, fleets, profiles, exact=False):
-    """Both workers of every fleet, its reviewer and the GLM workers in service stay
-    dispatchable; exact lists admit nothing else."""
+    """Both workers of every fleet, its reviewer, the GLM workers in service and the
+    GLM reviewers of the five boards stay dispatchable; exact lists admit nothing else."""
     if not isinstance(profiles, list) or not isinstance(fleets, dict):
         return
     wanted = [name for pool in PROJECT_WORKER_POOLS.values() for name in pool]
@@ -818,6 +861,10 @@ def check_fleet_dispatch(errors, label, fleets, profiles, exact=False):
         if name not in profiles:
             fail(errors, f"GLM worker missing from {label}: {name}")
     wanted += list(glm_worker_profiles())
+    for name in glm_reviewer_profiles():
+        if name not in profiles:
+            fail(errors, f"GLM reviewer missing from {label}: {name}")
+    wanted += list(glm_reviewer_profiles())
     if exact:
         for name in profiles:
             if name not in wanted:
@@ -1065,10 +1112,28 @@ PROJECT_GLM_WORKER_POOLS = {
     "jss-genr": ["jss-worker-glm-1", "jss-worker-glm-2", "jss-worker-glm-3"],
     "anki": ["anki-worker-glm-1", "anki-worker-glm-2", "anki-worker-glm-3"],
 }
-CHAPT_ASSIGNEES = {"chapt-worker", "chapt-worker-2", *PROJECT_GLM_WORKER_POOLS["cha-pt"], "chapt-reviewer"}
-HARNESS_ASSIGNEES = {"harness-worker", "harness-worker-2", *PROJECT_GLM_WORKER_POOLS["harness"], "harness-reviewer"}
-JSS_ASSIGNEES = {"jss-worker", "jss-worker-2", *PROJECT_GLM_WORKER_POOLS["jss-genr"], "jss-reviewer"}
-ANKI_ASSIGNEES = {"anki-worker", "anki-worker-2", *PROJECT_GLM_WORKER_POOLS["anki"], "anki-reviewer"}
+# GLM reviewers (owner request of 2026-11-14, card t_cca306ca): one per board, the role
+# `project GLM reviewer` of roster.yaml; PROJECT_GLM_REVIEWERS itself is the mapping
+# from board to GLM reviewer.
+# A GLM reviewer is the assignee of a card in status `review` (the first reviewer of the
+# review pipeline of docs/decisions/261114-glm-reviewer-pass-to-opus-reviewer.md); the
+# `Reviewer EXACT` line of a card still names the board's independent reviewer.
+PROJECT_GLM_REVIEWERS = {
+    "jobcron": "jobcron-reviewer-glm",
+    "cha-pt": "chapt-reviewer-glm",
+    "harness": "harness-reviewer-glm",
+    "jss-genr": "jss-reviewer-glm",
+    "anki": "anki-reviewer-glm",
+}
+GLM_REVIEWER_ROLE = "project GLM reviewer"
+CHAPT_ASSIGNEES = {"chapt-worker", "chapt-worker-2", *PROJECT_GLM_WORKER_POOLS["cha-pt"], "chapt-reviewer",
+                   PROJECT_GLM_REVIEWERS["cha-pt"]}
+HARNESS_ASSIGNEES = {"harness-worker", "harness-worker-2", *PROJECT_GLM_WORKER_POOLS["harness"], "harness-reviewer",
+                     PROJECT_GLM_REVIEWERS["harness"]}
+JSS_ASSIGNEES = {"jss-worker", "jss-worker-2", *PROJECT_GLM_WORKER_POOLS["jss-genr"], "jss-reviewer",
+                 PROJECT_GLM_REVIEWERS["jss-genr"]}
+ANKI_ASSIGNEES = {"anki-worker", "anki-worker-2", *PROJECT_GLM_WORKER_POOLS["anki"], "anki-reviewer",
+                  PROJECT_GLM_REVIEWERS["anki"]}
 # Anki add-on repository (owner decision 2026-10-22): its cards declare the add-on
 # project line; cards for the primary Anki repository never carry it.
 ANKI_REPOSITORY = "/Users/chanbla11mit/projects/anki"
@@ -1949,6 +2014,84 @@ def check_terminal_notification_observed(errors, plugins, producer_profiles):
             fail(errors, f"terminal notification deployment pending {profile}: plugin not enabled")
 
 
+# The LaunchAgent of the jev peak-hours hold (procedures/jev-plugin.md): its `--apply`
+# run also passes a card from the GLM reviewer of a board to that board's independent
+# reviewer (docs/decisions/261114-glm-reviewer-pass-to-opus-reviewer.md, items 5 and 10),
+# so the pass needs the job loaded. Read it the way the other launchd checks read their
+# job: `launchctl print` of the GUI domain job, a read-only command.
+JEV_PEAK_HOLD_LABEL = "com.nous.hermes-jev-peak-hold"
+# A fixture section that the fixture does not carry; never a live observation.
+_ABSENT_SECTION = object()
+
+
+def launchctl_observation(runner, label):
+    """Read one loaded job with the read-only `launchctl print` command the other
+    launchd checks use, and return the observed mapping of its loaded state."""
+    printed = runner("launchctl", "print", f"gui/{os.getuid()}/{label}")
+    return {"loaded": not printed.returncode}
+
+
+def check_jev_peak_hold_agent(errors, observed=_ABSENT_SECTION):
+    """The LaunchAgent com.nous.hermes-jev-peak-hold must be loaded: the pass of a card
+    from the GLM reviewer to the independent reviewer of a board needs this LaunchAgent.
+    observed is a mapping with the observed loaded value; the absent-marker sentinel
+    (a fixture without the section) and a malformed section are incomplete fixtures."""
+    if not isinstance(observed, dict):
+        fail(errors, "incomplete fixture: missing required section 'jev_peak_hold_agent'")
+        return
+    loaded = observed.get("loaded")
+    if loaded is None:
+        fail(errors, "incomplete fixture: missing required section 'jev_peak_hold_agent'")
+        return
+    if loaded is not True:
+        fail(errors, f"LaunchAgent {JEV_PEAK_HOLD_LABEL} is not loaded: the pass of a card from "
+                     "the GLM reviewer to the independent reviewer of a board needs this LaunchAgent")
+
+
+# The platform toolset list of every implementation worker and reviewer (one definition;
+# check_live_glm_reviewers and the fleet toolset check of main() both use it).
+GLM_REVIEWER_TOOLSETS = ["browser", "clarify", "code_execution", "file", "memory", "skills",
+                         "terminal", "todo", "vision", "web"]
+# The skill the dispatcher force-loads on every review run (hermes_cli/kanban_db_dispatch.py);
+# a GLM reviewer must have it installed, as the independent reviewer of the board does.
+# The skill is not a tracked source of this repository, so the observation is presence only.
+GLM_REVIEWER_SKILL = "sdlc-review"
+
+
+def glm_reviewer_skill_installed(name):
+    skill = (Path.home() / ".hermes" / "profiles" / name / "skills"
+             / "devops" / GLM_REVIEWER_SKILL / "SKILL.md")
+    return skill.is_file()
+
+
+def check_glm_reviewer_skills(errors, observed=_ABSENT_SECTION):
+    """Each GLM reviewer has the skill sdlc-review installed. observed is a mapping of
+    the observed installed value per name; the absent-marker sentinel (a fixture without
+    the section) is an incomplete fixture. Live mode calls this with the live values."""
+    if not isinstance(observed, dict):
+        fail(errors, "incomplete fixture: missing required section 'glm_reviewer_skills'")
+        return
+    for name in glm_reviewer_profiles():
+        installed = observed.get(name)
+        if installed is None:
+            fail(errors, "incomplete fixture: missing required section 'glm_reviewer_skills'")
+            return
+        if installed is not True:
+            fail(errors, f"GLM reviewer skill missing {name}: {GLM_REVIEWER_SKILL} is not installed")
+
+
+def check_live_glm_reviewers(errors, fleets, read):
+    """Live checks of the five GLM reviewer profiles: toolsets review (the platform
+    toolset list of the board's independent reviewer) and the skill sdlc-review installed
+    in the profile's own skill home. read(profile, key) is json_config."""
+    for board, name in PROJECT_GLM_REVIEWERS.items():
+        tools = read(name, "platform_toolsets.cli")
+        if tools is UNREADABLE or tools != GLM_REVIEWER_TOOLSETS:
+            fail(errors, f"project toolset drift {name}: expected {GLM_REVIEWER_TOOLSETS!r}")
+    check_glm_reviewer_skills(errors, {name: glm_reviewer_skill_installed(name)
+                                       for name in glm_reviewer_profiles()})
+
+
 def usable_absolute_path(value):
     return isinstance(value, str) and Path(value).is_absolute() and not value.startswith("__")
 
@@ -2175,11 +2318,13 @@ def check_managed_setting_groups(errors, roster, fleets, roster_profiles, read):
     skill settings of every project orchestrator named in the snapshot's project_isolation;
     claude_worker_profile_settings covers the compression threshold of the ten Claude
     worker profiles; glm_worker_reasoning_effort_settings covers the reasoning effort of the
-    five <board>-worker-glm-3 profiles."""
+    five <board>-worker-glm-3 profiles; glm_reviewer_profile_settings covers the reasoning
+    effort of the five <board>-reviewer-glm profiles."""
     groups = (("managed profile settings", roster.get("managed_profile_settings")),
               ("orchestrator profile settings", roster.get("orchestrator_profile_settings")),
               ("Claude worker profile settings", roster.get("claude_worker_profile_settings")),
-              ("GLM worker reasoning effort settings", roster.get("glm_worker_reasoning_effort_settings")))
+              ("GLM worker reasoning effort settings", roster.get("glm_worker_reasoning_effort_settings")),
+              ("GLM reviewer profile settings", roster.get("glm_reviewer_profile_settings")))
     orchestrators = {fleet.get("orchestrator") for fleet in (fleets or {}).values() if isinstance(fleet, dict)}
     declared = {}
     for name, group in groups:
@@ -2255,6 +2400,7 @@ def main():
     retired = roster_retired(roster)
     check_retired_profiles(errors, roster)
     check_glm_worker_profiles(errors, roster)
+    check_glm_reviewer_profiles(errors, roster)
     check_jev_plugin_declarations(errors, roster)
     check_model_policy(errors, roster)
     check_fallback_declarations(errors, roster)
@@ -2276,7 +2422,7 @@ def main():
             return 2
         # Fail-closed fixture schema: a passing fixture must represent every required
         # observed field and every installed roster profile; omission is drift, not success.
-        for section in ("profile_models", "profile_providers", "profile_approval_modes", "plugins", "dispatch_profiles", "kanban", "skill_files", "profile_local_skill_overrides", "profile_soul_hashes", "repository_policy_hashes", "adapters", "terminal_notification_runtime", "terminal_retry_policy", "project_isolation", "project_repair_policy", "project_repair_cards", "profile_managed_settings", "profile_fallback_settings", "profile_auxiliary_settings"):
+        for section in ("profile_models", "profile_providers", "profile_approval_modes", "plugins", "dispatch_profiles", "kanban", "skill_files", "profile_local_skill_overrides", "profile_soul_hashes", "repository_policy_hashes", "adapters", "terminal_notification_runtime", "terminal_retry_policy", "jev_peak_hold_agent", "glm_reviewer_skills", "project_isolation", "project_repair_policy", "project_repair_cards", "profile_managed_settings", "profile_fallback_settings", "profile_auxiliary_settings"):
             if section not in observed:
                 fail(errors, f"incomplete fixture: missing required section '{section}'")
         # None is a live/desired-only sentinel in these helpers, not a fixture
@@ -2335,6 +2481,8 @@ def main():
         check_terminal_notification_runtime(errors, observed.get("terminal_notification_runtime", {}),
                                             snapshot["terminal_notification"]["producer_profiles"])
         check_terminal_retry_policy(errors, roster, observed)
+        check_jev_peak_hold_agent(errors, observed.get("jev_peak_hold_agent", _ABSENT_SECTION))
+        check_glm_reviewer_skills(errors, observed.get("glm_reviewer_skills", _ABSENT_SECTION))
         check_project_isolation(errors, snapshot.get("project_isolation"), observed.get("project_isolation"))
         check_project_repair_policy(errors, project_repair_policy, observed.get("project_repair_policy"))
         project_cards = observed.get("project_repair_cards")
@@ -2403,6 +2551,8 @@ def main():
         check_fallback_settings(errors, roster, json_config)
         check_auxiliary_models(errors, roster, json_config, allowed_models)
         check_live_terminal_notification_runtime(errors, snapshot["terminal_notification"]["producer_profiles"])
+        check_jev_peak_hold_agent(errors, launchctl_observation(run, JEV_PEAK_HOLD_LABEL))
+        check_live_glm_reviewers(errors, fleets, json_config)
         for key, want in snapshot["kanban"].items():
             actual = json_config("default", f"kanban.{key}")
             if actual is UNREADABLE or actual != want:
@@ -2429,7 +2579,7 @@ def main():
             for profile in project_profiles:
                 if json_config(profile, "terminal.cwd") != fleet["repository"]:
                     fail(errors, f"project terminal root drift {profile}: expected {fleet['repository']}")
-            worker_tools = ["browser", "clarify", "code_execution", "file", "memory", "skills", "terminal", "todo", "vision", "web"]
+            worker_tools = GLM_REVIEWER_TOOLSETS  # the worker and reviewer tool list, one definition
             expected_toolsets = {
                 fleet["orchestrator"]: ["clarify", "kanban", "memory", "session_search", "skills", "todo"],
                 **{profile: worker_tools for profile in fleet["workers"]},
