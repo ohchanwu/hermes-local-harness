@@ -170,9 +170,18 @@ class _BoardCase(unittest.TestCase):
         self.calls_log = self.dir / "hermes-calls.jsonl"
         self.log_dir = self.dir / "logs"
         self.env.update({"FAKE_HERMES_LOG": str(self.calls_log), "FAKE_KANBAN_DB": str(self.db)})
+        # The handlers below run inside this test process and act for an
+        # orchestrator session. Since the pass card extended worker_session to
+        # HERMES_KANBAN_RUN_ID and HERMES_DELEGATED_CHILD_CONTEXT, a test
+        # process that a worker started (its environment carries one of the
+        # three names) must clear them.
+        for name in peak_hold.WORKER_SESSION_ENV_NAMES:
+            self.env.pop(name, None)
         patcher = mock.patch.dict(os.environ, self.env)
         patcher.start()
         self.addCleanup(patcher.stop)
+        for name in peak_hold.WORKER_SESSION_ENV_NAMES:
+            os.environ.pop(name, None)
         self.config_path = self.dir / "config.json"
         self.config = json.loads(json.dumps(CONFIG))
         self.save_config()
