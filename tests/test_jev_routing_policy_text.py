@@ -48,6 +48,7 @@ from hard_route_policy_edits import (HARD_ROUTE_POLICY_EDITS, apply_hard_route_p
                                      reverse_hard_route_policy_edits)
 import hard_route_policy_edits
 from jss_download_install_edits import reverse_download_install_edits
+from opus_reviewer_glm_review_edits import reverse_opus_reviewer_glm_review_edits
 from orchestrator_opus_5_5_edits import reverse_opus_5_5_orchestrator_edits
 from test_card_split_rule_policy import NEW_RULE, PASSAGE_EDITS
 from test_stale_test_rule_policy import reverse_stale_test_rule_edits
@@ -550,8 +551,9 @@ class RoutingPolicyText(unittest.TestCase):
         self.assertEqual(set(HARD_ROUTE_POLICY_EDITS), set(HARD_ROUTE_BASELINE_SHA256))
         self.assertEqual(len(HARD_ROUTE_BASELINE_SHA256), 12)
         for path, want in HARD_ROUTE_BASELINE_SHA256.items():
-            # The later edits of card t_d3bb0983 are reversed first.
-            data = reverse_opus_5_5_orchestrator_edits(path, (ROOT / path).read_bytes())
+            # The later edits of cards t_be416943 and t_d3bb0983 are reversed first.
+            data = reverse_opus_5_5_orchestrator_edits(
+                path, reverse_opus_reviewer_glm_review_edits(path, (ROOT / path).read_bytes()))
             with self.subTest(path=path):
                 baseline = subprocess.run(["git", "-C", str(ROOT), "show", f"{HARD_ROUTE_BASELINE}:{path}"],
                                           stdout=subprocess.PIPE, check=True).stdout
@@ -657,9 +659,12 @@ class RoutingPolicyText(unittest.TestCase):
     def test_jev_named_only_as_a_plugin(self):
         for path, text in self.text.items():
             with self.subTest(path=path):
+                # Card t_be416943: the five reviewer SOUL files also name the block reason prefix
+                # `jev-glm-review-pass`, the fixed identifier of the decision document
+                # docs/decisions/261114-glm-reviewer-pass-to-opus-reviewer.md.
                 for match in re.finditer(r"\bjev\b", text):
-                    following = text[match.end():match.end() + 10]
-                    self.assertTrue(following.startswith("` plugin") or following.startswith("-peak-hold"),
+                    following = text[match.end():match.end() + 16]
+                    self.assertTrue(following.startswith(("` plugin", "-peak-hold", "-glm-review-pass")),
                                     following)
 
 
