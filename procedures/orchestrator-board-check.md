@@ -105,6 +105,8 @@ Live rollout is a separate card. Use these steps for one orchestrator profile at
 
 harness-orchestrator's own job is installed by the owner, because it changes the live setup of the controlling orchestrator itself. The existing harness-orchestrator job "harness filed-card check" stays.
 
+On 2026-11-15, card t_88a36a37 deployed the script and the cron prompt of commit 30497b104f3a14116f55ff29a7f9b19d799bf287 to chapt-orchestrator, jss-orchestrator and anki-orchestrator; the chapt-orchestrator job stayed paused, and jobcron-orchestrator and harness-orchestrator were not changed.
+
 ## Rollback for one profile
 
 1. Find the job id with `hermes -p <profile> cron list` and remove the job with `hermes -p <profile> cron remove <job id>`.
