@@ -73,10 +73,10 @@ JOBCRON_PRODUCTION_DEPLOYMENT = ("devops/production-deployment/SKILL.md",
                                  "devops/production-deployment/references/release-ci-portability.md")
 SHARED_SKILL = ROOT / "skills/multi-agent-coding-orchestrator/SKILL.md"
 VERSIONS = {
-    PROFILE_SKILLS["jobcron-orchestrator"]: "0.6.9-jobcron.15",  # raised by t_b7455361, t_b722c617, t_ac454595, t_46b5e63e, t_f4ce916d, t_c7cc3830, t_e14a6d6a and t_d3bb0983
-    PROFILE_SKILLS["chapt-orchestrator"]: "0.6.7-chapt.14",  # raised by t_b722c617, t_ac454595, t_46b5e63e, t_f4ce916d, t_c7cc3830, t_e14a6d6a and t_d3bb0983
-    PROFILE_SKILLS["harness-orchestrator"]: "0.6.7-harness.12",  # raised by t_b722c617, t_ac454595, t_46b5e63e, t_f4ce916d, t_c7cc3830 and t_e14a6d6a
-    PROFILE_SKILLS["jss-orchestrator"]: "0.6.7-jss.16",  # raised by t_71b4ef4a, t_ac454595, t_46b5e63e, t_89838618, t_f4ce916d, t_c7cc3830, t_a8884510 and t_e14a6d6a
+    PROFILE_SKILLS["jobcron-orchestrator"]: "0.6.9-jobcron.16",  # raised by t_b7455361, t_b722c617, t_ac454595, t_46b5e63e, t_f4ce916d, t_c7cc3830, t_e14a6d6a, t_d3bb0983 and t_35874d04
+    PROFILE_SKILLS["chapt-orchestrator"]: "0.6.7-chapt.15",  # raised by t_b722c617, t_ac454595, t_46b5e63e, t_f4ce916d, t_c7cc3830, t_e14a6d6a, t_d3bb0983 and t_35874d04
+    PROFILE_SKILLS["harness-orchestrator"]: "0.6.7-harness.13",  # raised by t_b722c617, t_ac454595, t_46b5e63e, t_f4ce916d, t_c7cc3830, t_e14a6d6a and t_35874d04
+    PROFILE_SKILLS["jss-orchestrator"]: "0.6.7-jss.17",  # raised by t_71b4ef4a, t_ac454595, t_46b5e63e, t_89838618, t_f4ce916d, t_c7cc3830, t_a8884510, t_e14a6d6a and t_35874d04
     SHARED_SKILL: "0.6.15",  # raised by t_46b5e63e and t_d3bb0983
 }
 PROCEDURE = ROOT / "procedures/switching-hermes-models.md"

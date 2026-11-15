@@ -1,7 +1,7 @@
 ---
 name: multi-agent-coding-orchestrator
 description: "Use when orchestrating anki add-on, tooling, and deck change work."
-version: 0.6.10-anki.10
+version: 0.6.10-anki.11
 author: chanbla11mit, Hermes Agent
 license: MIT
 platforms: [macos]
@@ -252,6 +252,8 @@ User stop remains global: stop all owned workers, reviewers, and watchers, verif
 Request review with `kanban_request_review(..., reviewer: anki-reviewer, board: anki)` only after the candidate commit and required test evidence exist.
 
 For approval, the reviewer calls `kanban_complete(..., board: anki)`. For a material defect, the reviewer calls `kanban_request_changes(..., board: anki)` with concrete findings. Do not replace same-card review with a summary from another session.
+
+On a card that `anki-worker-glm-1`, `anki-worker-glm-2` or `anki-worker-glm-3` implements, the first review run or runs can be made by the GLM reviewer of board `anki`, `anki-reviewer-glm`. Such a run is not an assignee or reviewer mismatch. The card's `Reviewer EXACT` line still names the Opus reviewer `anki-reviewer`, and that is correct. A change request from `anki-reviewer-glm` is routine same-card rework, in the same way as a change request from `anki-reviewer`. A `blocked` notification whose reason starts with `jev-glm-review-pass` means that the GLM review had no findings. It needs no action and is not an owner question: the script `/Users/chanbla11mit/hermes-local-harness/scripts/jev-peak-hold` assigns the card to `anki-reviewer` and unblocks it within about a minute. If the card is still `blocked` with that reason at the orchestrator's next check, the orchestrator passes it by hand with `hermes kanban --board anki assign <task id> anki-reviewer` and then `hermes kanban --board anki unblock <task id>`. The GLM reviewer cannot approve a card: only `kanban_complete` by `anki-reviewer` is the approval, and local integration starts only after it.
 
 After approval, integrate locally into the card's repository without another approval prompt only if:
 
