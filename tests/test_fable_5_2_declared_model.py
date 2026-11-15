@@ -76,10 +76,12 @@ BASELINE_SHA256 = {
     JOBCRON: "e999adc7145a8b71db7bda8b7191f170d8ab5c2d67c9962f0f330ed9a74bf09c",
     CHAPT: "eb8380a518d73756527026aaffcb9cac5a23b98924d4405b649df49245adc852",
 }
-# Since card t_0faca45d (2026-11-13) the advisor and the orchestrators (default included) run Fable;
-# the reviewers moved to Opus.
-FABLE_PROFILES = ("advisor", "default", "anki-orchestrator", "chapt-orchestrator", "harness-orchestrator",
-                  "jobcron-orchestrator", "jss-orchestrator")
+# Since card t_0faca45d (2026-11-13) the advisor and the orchestrators (default included) ran Fable;
+# the reviewers moved to Opus. On 2026-11-15 the owner set claude-opus-5-5 as the main model of
+# these seven profiles, and card t_f03857d4 changed roster.yaml and MODEL_POLICY_BY_ROLE to
+# follow it; the claude-fable target of scripts/switch-profile-model is unchanged.
+OPUS_PROFILES = ("advisor", "default", "anki-orchestrator", "chapt-orchestrator", "harness-orchestrator",
+                 "jobcron-orchestrator", "jss-orchestrator")
 FABLE_ROLES = ("advisor", "orchestrator", "project orchestrator")
 
 
@@ -130,17 +132,17 @@ class FableDeclaredModel(unittest.TestCase):
     def test_roster_switch_target_and_model_policy_declare_the_same_model(self):
         roster = json.loads((ROOT / "roster.yaml").read_text())
         fable = sorted(p["name"] for p in roster["profiles"] if p.get("model", "").startswith("claude-fable"))
-        self.assertEqual(fable, sorted(FABLE_PROFILES))
+        self.assertEqual(fable, [])
         for profile in roster["profiles"]:
-            if profile["name"] in FABLE_PROFILES:
+            if profile["name"] in OPUS_PROFILES:
                 with self.subTest(profile=profile["name"]):
-                    self.assertEqual(profile["model"], NEW_MODEL)
+                    self.assertEqual(profile["model"], OPUS)
                     self.assertEqual(profile["provider"], "claude-subscription")
         switch = load_script("switch_profile_model_fable_5_2", "scripts/switch-profile-model")
         provider, _, main_model, helper_model = switch.TARGETS["claude-fable"]
         self.assertEqual((provider, main_model, helper_model), ("claude-subscription", NEW_MODEL, "claude-opus-5-5"))
         policy = switch.VERIFIER.MODEL_POLICY_BY_ROLE
-        self.assertEqual({role: policy[role] for role in FABLE_ROLES}, dict.fromkeys(FABLE_ROLES, NEW_MODEL))
+        self.assertEqual({role: policy[role] for role in FABLE_ROLES}, dict.fromkeys(FABLE_ROLES, OPUS))
 
 
 if __name__ == "__main__":

@@ -28,10 +28,10 @@ HAIKU, OPUS, FABLE = "claude-haiku-5-5", "claude-opus-5-5", "claude-fable-5-2"
 LIGHT = ("title_generation", "memory_query_rewrite", "tts_audio_tags", "profile_describer", "skills_hub", "vision")
 # The profiles that procedures/haiku-helper-routing.md switched with --to claude-fable on 2026-11-11.
 FABLE_PROFILES = ("advisor", "anki-reviewer", "chapt-reviewer", "harness-reviewer", "jobcron-reviewer", "jss-reviewer")
-# The profiles of SCOPE that roster.yaml declares on Fable since card t_0faca45d (2026-11-13): the
-# advisor and the project orchestrators. The reviewers moved to Opus.
-ROSTER_FABLE_PROFILES = ("advisor", "anki-orchestrator", "chapt-orchestrator", "harness-orchestrator",
-                         "jobcron-orchestrator", "jss-orchestrator")
+# The profiles of SCOPE that roster.yaml declared on Fable between cards t_0faca45d (2026-11-13)
+# and t_f03857d4 (owner change of 2026-11-15): the advisor and the project orchestrators. The
+# reviewers moved to Opus in t_0faca45d; since t_f03857d4 every profile of SCOPE runs Opus.
+ROSTER_FABLE_PROFILES = ()
 SCOPE = ("advisor", *(f"{project}-{role}" for project in ("anki", "chapt", "harness", "jobcron", "jss")
                       for role in ("orchestrator", "worker", "worker-2", "reviewer")))
 DECLARATION = {"light_tasks": HAIKU, "other_tasks": OPUS}

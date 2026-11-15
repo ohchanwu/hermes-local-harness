@@ -2,10 +2,12 @@
 """Manual model switch policy for the five project orchestrators (t_822da1dd).
 
 Owner decision of 2026-11-14: a project orchestrator on claude-subscription may
-run claude-opus-5-5 as its observed main model while the roster still declares
-claude-fable-5-2; verify-state accepts it and prints one warning. Every other
-profile keeps the baseline comparison. Checks the fixture path of the verifier
-only; no live profile, board, network or model observation.
+run the other model of MANUAL_SWITCH_MODELS as its observed main model; since
+card t_f03857d4 (owner change of 2026-11-15) the roster declares
+claude-opus-5-5, so an orchestrator observed on claude-fable-5-2 is accepted
+with one warning. Every other profile keeps the baseline comparison. Checks the
+fixture path of the verifier only; no live profile, board, network or model
+observation.
 """
 from contextlib import redirect_stdout
 import copy
@@ -71,7 +73,7 @@ class FixtureMode(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.clean = json.loads((ROOT / "tests/fixtures/clean.yaml").read_text())
-        assert all(cls.clean["profile_models"][name] == FABLE for name in ORCHESTRATORS)
+        assert all(cls.clean["profile_models"][name] == OPUS for name in ORCHESTRATORS)
 
     def observed(self, observed, providers=None):
         fixture = copy.deepcopy(self.clean)
@@ -85,22 +87,22 @@ class FixtureMode(unittest.TestCase):
         self.assertEqual(code, 0, output)
         self.assertNotIn("manual model switch", output)
 
-    def test_one_orchestrator_on_opus_is_accepted_with_one_warning(self):
-        code, output = self.observed({"harness-orchestrator": OPUS})
+    def test_one_orchestrator_on_fable_is_accepted_with_one_warning(self):
+        code, output = self.observed({"harness-orchestrator": FABLE})
         self.assertEqual(code, 0, output)
         self.assertNotIn("model drift", output)
         warning = MANUAL_SWITCH_WARNING.format(
-            name="harness-orchestrator", observed=OPUS, roster=FABLE)
+            name="harness-orchestrator", observed=FABLE, roster=OPUS)
         self.assertEqual(output.count(f"WARN: {warning}"), 1)
         self.assertEqual(output.count("WARN: manual model switch"), 1)
 
-    def test_all_five_orchestrators_on_opus_give_five_warnings(self):
-        code, output = self.observed({name: OPUS for name in ORCHESTRATORS})
+    def test_all_five_orchestrators_on_fable_give_five_warnings(self):
+        code, output = self.observed({name: FABLE for name in ORCHESTRATORS})
         self.assertEqual(code, 0, output)
         self.assertNotIn("model drift", output)
         self.assertEqual(output.count("WARN: manual model switch"), 5)
         for name in ORCHESTRATORS:
-            self.assertIn(f"WARN: {MANUAL_SWITCH_WARNING.format(name=name, observed=OPUS, roster=FABLE)}",
+            self.assertIn(f"WARN: {MANUAL_SWITCH_WARNING.format(name=name, observed=FABLE, roster=OPUS)}",
                           output)
 
     def test_orchestrator_on_any_other_model_fails(self):
@@ -127,12 +129,12 @@ class FixtureMode(unittest.TestCase):
                 self.assertNotIn("manual model switch", output)
 
     def test_orchestrator_model_switch_does_not_mask_provider_drift(self):
-        code, output = self.observed({"harness-orchestrator": OPUS},
+        code, output = self.observed({"harness-orchestrator": FABLE},
                                      providers={"harness-orchestrator": "anthropic"})
         self.assertEqual(code, 1, output)
         self.assertIn("FAIL: provider drift harness-orchestrator: expected claude-subscription, "
                       "actual anthropic", output)
-        self.assertIn(f"WARN: {MANUAL_SWITCH_WARNING.format(name='harness-orchestrator', observed=OPUS, roster=FABLE)}",
+        self.assertIn(f"WARN: {MANUAL_SWITCH_WARNING.format(name='harness-orchestrator', observed=FABLE, roster=OPUS)}",
                       output)
 
 

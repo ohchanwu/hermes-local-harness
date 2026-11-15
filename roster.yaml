@@ -186,7 +186,7 @@
     {
       "name": "default",
       "role": "orchestrator",
-      "model": "claude-fable-5-2",
+      "model": "claude-opus-5-5",
       "provider": "claude-subscription",
       "installed": true,
       "dispatch_eligible": false,
@@ -308,7 +308,7 @@
     {
       "name": "advisor",
       "role": "advisor",
-      "model": "claude-fable-5-2",
+      "model": "claude-opus-5-5",
       "provider": "claude-subscription",
       "installed": true,
       "dispatch_eligible": false,
@@ -682,7 +682,7 @@
     {
       "name": "jobcron-orchestrator",
       "role": "project orchestrator",
-      "model": "claude-fable-5-2",
+      "model": "claude-opus-5-5",
       "provider": "claude-subscription",
       "installed": true,
       "dispatch_eligible": false,
@@ -1220,7 +1220,7 @@
     {
       "name": "chapt-orchestrator",
       "role": "project orchestrator",
-      "model": "claude-fable-5-2",
+      "model": "claude-opus-5-5",
       "provider": "claude-subscription",
       "installed": true,
       "dispatch_eligible": false,
@@ -1758,7 +1758,7 @@
     {
       "name": "harness-orchestrator",
       "role": "project orchestrator",
-      "model": "claude-fable-5-2",
+      "model": "claude-opus-5-5",
       "provider": "claude-subscription",
       "installed": true,
       "dispatch_eligible": false,
@@ -2296,7 +2296,7 @@
     {
       "name": "jss-orchestrator",
       "role": "project orchestrator",
-      "model": "claude-fable-5-2",
+      "model": "claude-opus-5-5",
       "provider": "claude-subscription",
       "installed": true,
       "dispatch_eligible": false,
@@ -3098,7 +3098,7 @@
     {
       "name": "anki-orchestrator",
       "role": "project orchestrator",
-      "model": "claude-fable-5-2",
+      "model": "claude-opus-5-5",
       "provider": "claude-subscription",
       "installed": true,
       "dispatch_eligible": false,

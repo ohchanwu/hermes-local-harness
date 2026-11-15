@@ -299,8 +299,9 @@ class FleetDesiredState(unittest.TestCase):
             "project isolation mapping must contain exactly jobcron, cha-pt, harness, jss-genr, and anki"])
 
     def test_profiles_models_and_dispatch(self):
+        # Card t_f03857d4 (owner change of 2026-11-15): the orchestrator runs Opus.
         expected = {
-            ORCH: ("claude-fable-5-2", "claude-subscription", "orchestrator", False),
+            ORCH: ("claude-opus-5-5", "claude-subscription", "orchestrator", False),
             WORKER: ("claude-opus-5-5", "claude-subscription", "implementation", True),
             WORKER2: ("claude-opus-5-5", "claude-subscription", "implementation", True),
             REVIEWER: ("claude-opus-5-5", "claude-subscription", "review", True),

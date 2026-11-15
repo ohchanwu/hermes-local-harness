@@ -363,18 +363,20 @@ RETIRED_PROFILES = (
     "worker-flash-1", "worker-flash-2", "worker-flash-3", "worker-glm-full",
 )
 RETIRED_LIFECYCLE = "retired"
-# Owner model policy for every non-retired roster profile: one provider; Fable
-# for the orchestrators (default included) and the advisor, Opus for the
-# workers, the reviewers and the helper tasks (owner decision of 2026-10-19,
-# changed on 2026-11-13 by card t_0faca45d: reviewers from Fable to Opus,
-# orchestrators from Opus to Fable). Retired profiles keep their historical models.
+# Owner model policy for every non-retired roster profile: one provider; Opus
+# for the orchestrators (default included), the advisor, the workers, the
+# reviewers and the helper tasks (owner decision of 2026-10-19, changed on
+# 2026-11-13 by card t_0faca45d: reviewers from Fable to Opus, orchestrators
+# from Opus to Fable; changed on 2026-11-15 by the owner, followed by card
+# t_f03857d4: default, the advisor and the five project orchestrators from
+# Fable to Opus). Retired profiles keep their historical models.
 MODEL_POLICY_PROVIDER = "claude-subscription"
 MODEL_POLICY_BY_ROLE = {
-    "orchestrator": "claude-fable-5-2",
-    "project orchestrator": "claude-fable-5-2",
+    "orchestrator": "claude-opus-5-5",
+    "project orchestrator": "claude-opus-5-5",
     "project implementation": "claude-opus-5-5",
     "implementation": "claude-opus-5-5",
-    "advisor": "claude-fable-5-2",
+    "advisor": "claude-opus-5-5",
     "independent reviewer": "claude-opus-5-5",
     "project independent reviewer": "claude-opus-5-5",
 }
@@ -382,9 +384,11 @@ MODEL_POLICY_BY_ROLE = {
 # orchestrator on claude-subscription may be switched manually between these two
 # models (gateway command `/model <name> --global`), so the observed main model
 # of a project orchestrator may be either one; a model that differs from the
-# roster model only warns. MODEL_POLICY_BY_ROLE still names claude-fable-5-2
-# alone: a roster that declares claude-opus-5-5 for a project orchestrator
-# still fails check_model_policy.
+# roster model only warns. On 2026-11-15 the owner set claude-opus-5-5 as the
+# main model of default, the advisor and the five project orchestrators;
+# roster.yaml and MODEL_POLICY_BY_ROLE have declared claude-opus-5-5 for them
+# since card t_f03857d4, so a project orchestrator switched back to
+# claude-fable-5-2 gives only the warning.
 MANUAL_SWITCH_MODELS = ("claude-fable-5-2", "claude-opus-5-5")
 # The GLM workers of PROJECT_GLM_WORKER_POOLS are outside MODEL_POLICY_BY_ROLE
 # (owner decision of 2026-11-12, card t_4f7740d0): each one runs this model and provider.
