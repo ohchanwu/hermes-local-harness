@@ -30,9 +30,12 @@ A session belongs to a card run (a worker run or a reviewer run) when the
 session has source `kanban`, started between 60 seconds before the run started
 and the end of the run (or now, for a running run), its profile_name is empty
 or equal to the run profile, and its cwd is empty, equal to the card's
-workspace_path, or below it. A session whose parent_session_id chain leads to
-such a session in the same database (a subagent session) also belongs to the
-card run.
+workspace_path, or below it. A session whose profile_name differs from the run
+profile also belongs when the run profile is in the previous_names list of the
+session profile's profile.yaml (/Users/chanbla11mit/.hermes/profiles/<session
+profile>/profile.yaml, the list that `hermes profile rename` writes). A
+session whose parent_session_id chain leads to such a session in the same
+database (a subagent session) also belongs to the card run.
 
 Tokens of a session are taken per model from session_model_usage (the main
 model and every auxiliary model call). A session without session_model_usage
@@ -109,6 +112,7 @@ import datetime
 import glob
 import json
 import os
+import re
 import sqlite3
 import sys
 import time
@@ -127,6 +131,12 @@ NO_RECORDS = "  no records"
 TOKEN_KEYS = ("input_tokens", "output_tokens", "cache_read_tokens", "cache_write_tokens")
 MODEL_FAMILIES = ("claude", "glm", "other")
 SAVINGS_ROUTES = ("easy", "medium", "hard")
+PROFILES_DIR = os.path.join(HERMES_ROOT, "profiles")
+# The previous names of a renamed profile: the key previous_names of
+# PROFILES_DIR/<profile>/profile.yaml, as hermes profile rename writes it.
+PREVIOUS_NAMES_KEY = "previous_names"
+PREVIOUS_NAMES_KEY_RE = re.compile(
+    r"^" + PREVIOUS_NAMES_KEY + r"[ \t]*:(.*)$", re.MULTILINE)
 RULE_MIN_GLM_CARDS = 10
 RULE_MIN_CONTROL_CARDS = 3
 RULE_TEXT = "disable this route: owner permission required"
@@ -342,10 +352,90 @@ def under(cwd, workspace):
     return cwd == workspace or cwd.startswith(workspace + "/")
 
 
+PREVIOUS_NAMES_ITEM_RE = re.compile(r"^[ \t]*-[ \t]*(.*)$")
+FLOW_LIST_RE = re.compile(r"^\[(.*)\]$")
+
+
+def previous_names_from_text(text):
+    """The list of the key previous_names in profile.yaml text, or [] when the
+    file has no such list.
+
+    Read is the form that the writer of `hermes profile rename` produces: a
+    block list of one-line items below the key (unindented or indented) and
+    the single-line flow list. Any other value of the key, for example a
+    scalar, means no previous names. A hand-written comment after an item
+    stays part of the item text, so that item does not match (no extra
+    match, never a wrong one).
+    """
+    match = PREVIOUS_NAMES_KEY_RE.search(text)
+    if match is None:
+        return []
+    inline = match.group(1).strip()
+    if inline:
+        flow = FLOW_LIST_RE.match(inline)
+        if flow is None:
+            return []
+        return [name for name in
+                (clean_previous_name(item) for item in flow.group(1).split(","))
+                if name]
+    names = []
+    lines = text[match.end():].splitlines()
+    for line in lines:
+        if line[:1].isspace() or line.startswith("- "):
+            item = PREVIOUS_NAMES_ITEM_RE.match(line)
+            if item is not None:
+                name = clean_previous_name(item.group(1))
+                if name:
+                    names.append(name)
+        elif line[:1]:
+            # A top-level key at column 0 ends the list.
+            break
+    return names
+
+
+def clean_previous_name(item):
+    """One previous name without quotes and blanks, or "" for no name."""
+    item = item.strip()
+    if len(item) >= 2 and item[0] == item[-1] and item[0] in "'\"":
+        return item[1:-1].strip()
+    return item
+
+
+def profile_previous_names(session_profile, cache=None):
+    """The names the session profile was known by before its last rename: the
+    key previous_names of PROFILES_DIR/<session profile>/profile.yaml.
+
+    A missing or unreadable file, or a value that is not a list of strings,
+    gives an empty list. The profile file is read at most once per report when
+    a cache dict is given.
+    """
+    if not session_profile or "/" in session_profile or session_profile in (".", ".."):
+        return []
+    if cache is not None and session_profile in cache:
+        return cache[session_profile]
+    path = os.path.join(PROFILES_DIR, session_profile, "profile.yaml")
+    names = []
+    try:
+        with open(path, encoding="utf-8") as handle:
+            names = previous_names_from_text(handle.read())
+    except (OSError, UnicodeDecodeError):
+        names = []
+    if cache is not None:
+        cache[session_profile] = names
+    return names
+
+
 def card_tokens(card, sessions, now):
     """{family: {token name: count}} over the sessions of the card's runs and
-    their subagent sessions, or None if no session matches."""
+    their subagent sessions, or None if no session matches.
+
+    A session whose profile is a current name also matches a run whose profile
+    is a previous name of it, when the session profile has profile.yaml with a
+    previous_names list that holds the run profile. The previous names come
+    from sessions["previous_names"], a per-report cache.
+    """
     matched = set()
+    previous_names_cache = sessions.setdefault("previous_names", {})
     for profile, started, ended, _outcome in card["runs"]:
         if started is None:
             continue
@@ -353,7 +443,8 @@ def card_tokens(card, sessions, now):
         for key, s_started, s_profile, s_cwd in sessions["kanban"]:
             if s_started is None or not started - SESSION_START_SLACK_SECONDS <= s_started <= end:
                 continue
-            if s_profile and profile and s_profile != profile:
+            if s_profile and profile and s_profile != profile \
+                    and profile not in profile_previous_names(s_profile, previous_names_cache):
                 continue
             if not under(s_cwd, card["workspace_path"]):
                 continue
