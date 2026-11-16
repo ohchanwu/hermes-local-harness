@@ -26,6 +26,7 @@ from pathlib import Path
 import subprocess
 import unittest
 
+from glm_route_worker_names_edits import reverse_glm_route_worker_name_edits
 from jss_harness_repository_edits import reverse_harness_repository_edits
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -37,8 +38,8 @@ VERSIONS = {"harness": "0.6.7-harness.11", "anki": "0.6.10-anki.9", "jss": "0.6.
 # The current skill versions: card t_a8884510 raised the jss version by one more step, card
 # t_e14a6d6a raised each version by one more step, and card t_d3bb0983 raised the chapt and
 # jobcron versions by one more step.
-CURRENT_VERSIONS = {"harness": "0.6.7-harness.14", "anki": "0.6.10-anki.12", "jss": "0.6.7-jss.18",
-                    "chapt": "0.6.7-chapt.16", "jobcron": "0.6.9-jobcron.17"}
+CURRENT_VERSIONS = {"harness": "0.6.7-harness.15", "anki": "0.6.10-anki.13", "jss": "0.6.7-jss.19",
+                    "chapt": "0.6.7-chapt.17", "jobcron": "0.6.9-jobcron.18"}
 
 NEW_RULE = (
     "By default, when the work for a card has several parts that each have their own acceptance check, "
@@ -149,7 +150,8 @@ class Helper(unittest.TestCase):
     def test_other_paths_are_returned_unchanged(self):
         for relative_path in ("policies/profile-souls/harness-orchestrator/SOUL.md",
                               "procedures/jev-plugin.md"):
-            data = (ROOT / relative_path).read_bytes()
+            # Card t_18a2dc93 later changed the orchestrator SOUL; its edits are reversed first.
+            data = reverse_glm_route_worker_name_edits(relative_path, (ROOT / relative_path).read_bytes())
             with self.subTest(path=relative_path):
                 self.assertIs(reverse_card_split_rule_edits(relative_path, data), data)
 

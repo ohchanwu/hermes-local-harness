@@ -24,6 +24,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
+from glm_route_worker_names_edits import text_before_card
 from jss_download_install_edits import reverse_download_install_edits
 from test_third_glm_worker_policy import reverse_third_glm_worker_edits
 
@@ -135,9 +136,11 @@ class PolicyFile(unittest.TestCase):
         self.assertTrue(AFTER_SHA256)
         for relative_path, want in AFTER_SHA256.items():
             with self.subTest(path=relative_path):
-                # The later download and install change (t_89838618) and the later third GLM worker
-                # change (t_f4ce916d) are reversed first.
-                current = reverse_download_install_edits(relative_path, (ROOT / relative_path).read_bytes())
+                # The later GLM worker names change (t_18a2dc93, which also moved the GLM worker SOUL
+                # sources), the later download and install change (t_89838618) and the later third GLM
+                # worker change (t_f4ce916d) are reversed first.
+                current = reverse_download_install_edits(relative_path,
+                                                         text_before_card(ROOT, relative_path, as_bytes=True))
                 current = reverse_third_glm_worker_edits(relative_path, current)
                 self.assertEqual(hashlib.sha256(current).hexdigest(), want)
                 self.assertEqual(reverse_stale_test_rule_edits(relative_path, current), baseline_bytes(relative_path))

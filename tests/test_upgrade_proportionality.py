@@ -31,7 +31,8 @@ FIXTURE_RESULTS = {
     "astra-local-override.yaml": (0, "OK: desired state matches observed state"),
     "dormant-extra.yaml": (0, "WARN: dormant"),
     "retired-glm-dispatch-drift.yaml": (1, "retired profile back in dispatch_profiles: worker-glm-full"),
-    "glm-worker-dispatch-missing.yaml": (1, "GLM worker missing from dispatch_profiles: chapt-worker-glm-2"),
+    # Card t_18a2dc93 renamed chapt-worker-glm-2 to chapt-worker-glm-medium-1.
+    "glm-worker-dispatch-missing.yaml": (1, "GLM worker missing from dispatch_profiles: chapt-worker-glm-medium-1"),
     "glm-reviewer-jev-plugin-missing.yaml": (1, "plugin drift harness-reviewer-glm: required jev not enabled"),
     "glm-reviewer-skill-missing.yaml": (1, "GLM reviewer skill missing harness-reviewer-glm: sdlc-review is not installed"),
     "glm-reviewer-dispatch-missing.yaml": (1, "GLM reviewer missing from dispatch_profiles: harness-reviewer-glm"),

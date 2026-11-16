@@ -40,6 +40,7 @@ import re
 from pathlib import Path
 import unittest
 
+from glm_route_worker_names_edits import board_glm_workers, path_after_card, text_before_card
 from hard_route_policy_edits import reverse_hard_route_policy_edits
 from jss_download_install_edits import reverse_download_install_edits
 from test_jev_routing_policy_text import reverse_jev_routing_policy_edits
@@ -409,8 +410,8 @@ BASELINE_SHA256 = {
 }
 # Raised again by cards t_ac454595, t_46b5e63e, t_f4ce916d and t_e14a6d6a, for jss by t_89838618 and t_a8884510,
 # and for chapt and jobcron by t_d3bb0983.
-VERSIONS = {skill("harness"): "0.6.7-harness.14", skill("chapt"): "0.6.7-chapt.16",
-            skill("jobcron"): "0.6.9-jobcron.17", skill("jss"): "0.6.7-jss.18", skill("anki"): "0.6.10-anki.12"}
+VERSIONS = {skill("harness"): "0.6.7-harness.15", skill("chapt"): "0.6.7-chapt.17",
+            skill("jobcron"): "0.6.9-jobcron.18", skill("jss"): "0.6.7-jss.19", skill("anki"): "0.6.10-anki.13"}
 # The GLM worker SOULs in this repository (the jobcron GLM workers have none).
 GLM_WORKER_SOUL_BOARDS = ("harness", "chapt", "jss", "anki")
 ANKI_GLM_SOULS = (soul("anki-worker-glm-1"), soul("anki-worker-glm-2"))
@@ -437,7 +438,13 @@ def implementation_profiles(text, prefix):
 
 class JevPolicySources(unittest.TestCase):
     def setUp(self):
-        self.text = {path: (ROOT / path).read_text() for path in (*JEV_POLICY_EDITS, *ANKI_GLM_SOULS)}
+        # Card t_18a2dc93 later moved the GLM worker SOUL sources to the names of their routes and
+        # changed the names of the GLM workers in these files. self.text holds the text of each path of
+        # this card before that card (read at the path after it, with its edits reversed), so the checks
+        # of this card's sentences use the names of their time; self.current holds the text after it.
+        paths = (*JEV_POLICY_EDITS, *ANKI_GLM_SOULS)
+        self.text = {path: text_before_card(ROOT, path) for path in paths}
+        self.current = {path: (ROOT / path_after_card(path)).read_text() for path in paths}
 
     def test_every_board_is_covered(self):
         self.assertEqual(sorted(board for board, *_ in BOARDS.values()),
@@ -450,7 +457,7 @@ class JevPolicySources(unittest.TestCase):
                 self.assertIn(skill(prefix), JEV_POLICY_EDITS)
                 if key in GLM_WORKER_SOUL_BOARDS:
                     for profile in glm:
-                        self.assertTrue((ROOT / soul(profile)).is_file(), profile)
+                        self.assertTrue((ROOT / path_after_card(soul(profile))).is_file(), profile)
 
     def test_anki_glm_worker_souls_follow_the_anki_worker_soul(self):
         for number, path in enumerate(ANKI_GLM_SOULS, start=1):
@@ -460,10 +467,10 @@ class JevPolicySources(unittest.TestCase):
                 worker = (ROOT / soul("anki-worker")).read_text()
                 # The terminology rule of the anki SOULs is kept unchanged.
                 terminology = worker[worker.index("Terminology and wording\n"):]
-                self.assertTrue(self.text[path].endswith(terminology))
-                self.assertIn("board `anki`", self.text[path])
-                self.assertIn("`/Users/chanbla11mit/projects/anki`", self.text[path])
-                self.assertIn("`/Users/chanbla11mit/projects/anki-addons`", self.text[path])
+                self.assertTrue(self.current[path].endswith(terminology))
+                self.assertIn("board `anki`", self.current[path])
+                self.assertIn("`/Users/chanbla11mit/projects/anki`", self.current[path])
+                self.assertIn("`/Users/chanbla11mit/projects/anki-addons`", self.current[path])
 
     def test_reversing_the_edits_recovers_the_baseline_bytes(self):
         # The later edits of card t_89838618, then those of card t_46b5e63e and then the later model
@@ -472,7 +479,8 @@ class JevPolicySources(unittest.TestCase):
         from test_fable_5_2_declared_model import reverse_role_model_edits
         for path, want in BASELINE_SHA256.items():
             with self.subTest(path=path):
-                current = reverse_download_install_edits(path, (ROOT / path).read_bytes())
+                # The later edits of card t_18a2dc93 are reversed before all of them.
+                current = reverse_download_install_edits(path, text_before_card(ROOT, path, as_bytes=True))
                 current = reverse_stale_test_rule_edits(path, current)
                 original = reverse_jev_policy_edits(path, reverse_role_model_edits(path, current))
                 self.assertEqual(hashlib.sha256(original).hexdigest(), want)
@@ -505,7 +513,7 @@ class JevPolicySources(unittest.TestCase):
         for key, (board, prefix, _claude, glm, _reviewer) in BOARDS.items():
             text = self.text[skill(prefix)]
             with self.subTest(key=key):
-                self.assertRegex(text, rf"(?m)^version: {re.escape(VERSIONS[skill(prefix)])}$")
+                self.assertRegex(self.current[skill(prefix)], rf"(?m)^version: {re.escape(VERSIONS[skill(prefix)])}$")
                 # Card t_e14a6d6a later replaced the GLM worker names and the route of the worker selection
                 # sentence; the sentence of this card is checked after that change is reversed.
                 original = reverse_hard_route_policy_edits(skill(prefix), text)
@@ -530,11 +538,15 @@ class JevPolicySources(unittest.TestCase):
     def test_glm_worker_souls_state_the_model_override_and_the_review_call(self):
         for key in GLM_WORKER_SOUL_BOARDS:
             board, prefix, _claude, glm, reviewer = BOARDS[key]
-            # The third GLM worker (card t_f4ce916d) follows the same rules.
-            for profile in (*glm, f"{prefix}-worker-glm-3"):
+            # The third GLM worker (card t_f4ce916d) follows the same rules, and so do the six GLM workers
+            # of card t_18a2dc93; that card made each SOUL name only the model of its route.
+            for profile in board_glm_workers(prefix):
                 text = (ROOT / soul(profile)).read_text()
                 with self.subTest(profile=profile):
-                    self.assertIn("`glm-5.3-flash`", text)
+                    if "-glm-easy-" in profile:
+                        self.assertIn("`glm-5.3-flash`", text)
+                    else:
+                        self.assertNotIn("glm-5.3-flash", text)
                     self.assertIn("`glm-5.3`", text)
                     self.assertEqual(text.count(f"`kanban_request_review(..., reviewer: {reviewer}, board: {board})`"),
                                      1)
@@ -542,22 +554,23 @@ class JevPolicySources(unittest.TestCase):
                     self.assertNotIn("GLM Full", text)
                     self.assertNotIn("multimodal", text)
 
-    def test_procedure_lists_36_profiles_and_glm_routing_on_every_board(self):
+    def test_procedure_lists_51_profiles_and_glm_routing_on_every_board(self):
         text = (ROOT / "procedures/jev-plugin.md").read_text()
         install = text.split("## Install on a profile\n", 1)[1].split("\n## ", 1)[0]
-        # Card t_f4ce916d added the third GLM worker of every board: 36 profiles.
-        self.assertIn("Profiles (36 in total;", install)
+        # Card t_f4ce916d added the third GLM worker of every board: 36 profiles. Card t_18a2dc93 gave
+        # every board six GLM workers: 51 profiles.
+        self.assertIn("Profiles (51 in total;", install)
         claude = {"advisor"} | {f"{prefix}-{role}" for _b, prefix, *_rest in BOARDS.values()
                                 for role in ("orchestrator", "reviewer", "worker", "worker-2")}
-        glm = {name for _b, prefix, _c, glm_workers, _reviewer in BOARDS.values()
-               for name in (*glm_workers, f"{prefix}-worker-glm-3")}
-        self.assertEqual((len(claude), len(glm)), (21, 15))
+        glm = {name for _b, prefix, *_rest in BOARDS.values() for name in board_glm_workers(prefix)}
+        self.assertEqual((len(claude), len(glm)), (21, 30))
         named = set(re.findall(r"`([a-z0-9-]+)`", install))
         self.assertLessEqual(claude | glm, named)
         for key, (board, prefix, claude_workers, glm_workers, _reviewer) in BOARDS.items():
             with self.subTest(board=board):
+                names = [f"`{name}`" for name in board_glm_workers(prefix)]
                 row = (f"| `{board}` | `{claude_workers[0]}`, `{claude_workers[1]}` | "
-                       f"`{glm_workers[0]}`, `{glm_workers[1]}` | `{prefix}-worker-glm-3` | "
+                       f"{', '.join(names[:4])} | {', '.join(names[4:])} | "
                        "`easy`, `medium`, `hard`, `very_hard` |")
                 self.assertEqual(text.count(row), 1)
         self.assertNotIn("have no GLM worker profile", text)

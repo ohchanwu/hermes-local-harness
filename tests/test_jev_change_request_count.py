@@ -40,8 +40,8 @@ CONFIG = json.loads((PLUGIN_DIR / "config.json").read_text(encoding="utf-8"))
 # one GLM worker of the `hard` route (limit 3), and the Claude workers.
 GLM_REVIEWER = "harness-reviewer-glm"
 OPUS_REVIEWER = "harness-reviewer"
-GLM_CARD = "t_5a1e0001"          # of harness-worker-glm-1; easy and medium, limit 5
-HARD_CARD = "t_5a1e0003"         # of harness-worker-glm-3; the hard route, limit 3
+GLM_CARD = "t_5a1e0001"          # of harness-worker-glm-easy-1; easy and medium, limit 5
+HARD_CARD = "t_5a1e0003"         # of harness-worker-glm-hard-1; the hard route, limit 3
 CLAUDE_WORKER = "harness-worker"
 
 
@@ -52,8 +52,8 @@ def event_payload(reviewer=None):
     if reviewer == "broken":
         return "{not json"
     if reviewer is None:
-        return json.dumps({"implementer": "harness-worker-glm-1", "reason": "fix"})
-    return json.dumps({"reason": "fix", "implementer": "harness-worker-glm-1", "reviewer": reviewer})
+        return json.dumps({"implementer": "harness-worker-glm-easy-1", "reason": "fix"})
+    return json.dumps({"reason": "fix", "implementer": "harness-worker-glm-easy-1", "reviewer": reviewer})
 
 
 class CountedChangeRequestTests(unittest.TestCase):
@@ -68,8 +68,8 @@ class CountedChangeRequestTests(unittest.TestCase):
         self.dir = Path(self.tmp.name)
         env = isolated_env(self.dir)
         self.db = Path(env["HERMES_KANBAN_HOME"]) / "kanban" / "boards" / "harness" / "kanban.db"
-        build_board_db(self.db, [(GLM_CARD, "ready", "harness-worker-glm-1"),
-                                 (HARD_CARD, "ready", "harness-worker-glm-3")])
+        build_board_db(self.db, [(GLM_CARD, "ready", "harness-worker-glm-easy-1"),
+                                 (HARD_CARD, "ready", "harness-worker-glm-hard-1")])
         self.hermes = write_fake_hermes(self.dir)
         self.calls_log = self.dir / "hermes-calls.jsonl"
         self.log_dir = self.dir / "logs"
@@ -130,7 +130,7 @@ class CountedChangeRequestTests(unittest.TestCase):
         self.add_events(HARD_CARD, [GLM_REVIEWER, GLM_REVIEWER, OPUS_REVIEWER])
         self.request_changes(HARD_CARD, {"task_id": HARD_CARD, "reason": "again"})
         self.assertEqual(fake_hermes_calls(self.calls_log), [])
-        self.assertEqual(self.card(HARD_CARD)[1], "harness-worker-glm-3")
+        self.assertEqual(self.card(HARD_CARD)[1], "harness-worker-glm-hard-1")
         self.assertEqual(self.escalations(), [])
 
     def test_hard_card_two_more_opus_change_requests_reassign(self):
@@ -149,7 +149,7 @@ class CountedChangeRequestTests(unittest.TestCase):
         self.assertEqual((record["task_id"], record["original_assignee"], record["new_assignee"],
                           record["change_requests"], record["applied"], record["applied_route"],
                           record["max_glm_change_requests"]),
-                         (HARD_CARD, "harness-worker-glm-3", CLAUDE_WORKER, 3, True, None, 3))
+                         (HARD_CARD, "harness-worker-glm-hard-1", CLAUDE_WORKER, 3, True, None, 3))
 
     # --- an `easy` card with limit 5 ------------------------------------------
 
@@ -159,7 +159,7 @@ class CountedChangeRequestTests(unittest.TestCase):
         self.add_events(GLM_CARD, [GLM_REVIEWER, GLM_REVIEWER])
         self.request_changes(GLM_CARD)
         self.assertEqual(fake_hermes_calls(self.calls_log), [])
-        self.assertEqual(self.card(GLM_CARD)[1], "harness-worker-glm-1")
+        self.assertEqual(self.card(GLM_CARD)[1], "harness-worker-glm-easy-1")
         self.assertEqual(self.escalations(), [])
 
     def test_easy_card_five_glm_change_requests_count_zero(self):
@@ -169,7 +169,7 @@ class CountedChangeRequestTests(unittest.TestCase):
         self.add_events(GLM_CARD, [GLM_REVIEWER] * 5)
         self.request_changes(GLM_CARD)
         self.assertEqual(fake_hermes_calls(self.calls_log), [])
-        self.assertEqual(self.card(GLM_CARD)[1], "harness-worker-glm-1")
+        self.assertEqual(self.card(GLM_CARD)[1], "harness-worker-glm-easy-1")
         self.assertEqual(self.escalations(), [])
 
     def test_easy_card_four_glm_and_one_opus_change_request_reassigns(self):
@@ -248,7 +248,7 @@ class CountedChangeRequestTests(unittest.TestCase):
         try:
             conn.row_factory = sqlite3.Row
             self.assertEqual(routing.change_request_state(conn, GLM_CARD),
-                             ("ready", "harness-worker-glm-1", 3))
+                             ("ready", "harness-worker-glm-easy-1", 3))
         finally:
             conn.close()
 

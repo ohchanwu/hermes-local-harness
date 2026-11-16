@@ -17,6 +17,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
+from glm_route_worker_names_edits import board_glm_workers
 from incident_recovery_verify_fixture import LocalReads, ROOT, load_verifier, resolved_fixture
 from jss_download_install_edits import reverse_download_install_edits
 from test_jev_policy_sources import reverse_jev_policy_edits
@@ -30,29 +31,29 @@ ALL_POOLS = {**POOLS, "anki": ["anki-worker", "anki-worker-2"]}
 # Owner decisions of 2026-11-12: the GLM workers of jobcron, cha-pt and harness are back in
 # service for the jev plugin (card t_4f7740d0), and the GLM workers of jss-genr and anki
 # joined them (card t_71b4ef4a). Card t_f4ce916d (owner request of 2026-11-14) added a third GLM
-# worker to every board. The generic GLM profiles stay retired.
-GLM_IN_SERVICE = tuple(f"{prefix}-worker-glm-{n}" for prefix in ("jobcron", "chapt", "harness", "jss", "anki")
-                       for n in (1, 2, 3))
+# worker to every board. The generic GLM profiles stay retired. Card t_18a2dc93 (owner decision of
+# 2026-11-16) gave the GLM workers the names of their routes and added the second worker of each
+# route: six GLM workers per board, listed board by board.
+GLM_IN_SERVICE = tuple(name for prefix in ("jobcron", "chapt", "harness", "jss", "anki")
+                       for name in board_glm_workers(prefix))
 GLM_RETIRED = ("worker-flash-1", "worker-flash-2", "worker-flash-3", "worker-glm-full")
-# The GLM workers in service in the order of the dispatch lists: the first and second GLM worker
-# of each board, then the five third GLM workers in the order in which the switch script added
-# them to the live list (card t_55432326).
-GLM_IN_DISPATCH_ORDER = (*(name for name in GLM_IN_SERVICE if not name.endswith("-glm-3")),
-                         "harness-worker-glm-3", "chapt-worker-glm-3", "jobcron-worker-glm-3",
-                         "jss-worker-glm-3", "anki-worker-glm-3")
+# The GLM workers in service in the order of the dispatch lists (card t_18a2dc93: the same order).
+GLM_IN_DISPATCH_ORDER = GLM_IN_SERVICE
 # Live default-home kanban.dispatch_profiles order after the controller's 2026-10-18 change,
-# followed by the GLM workers in service (cards t_4f7740d0, t_71b4ef4a, t_f4ce916d and t_55432326).
+# followed by the five GLM reviewer profiles of card t_cca306ca and the GLM workers in service
+# (cards t_4f7740d0, t_71b4ef4a, t_f4ce916d, t_55432326 and t_18a2dc93).
 PROJECT_DISPATCH = [
     "jobcron-worker", "jobcron-reviewer", "chapt-worker", "chapt-reviewer",
     "harness-worker", "harness-reviewer", "jss-worker", "jss-reviewer",
     "harness-worker-2", "chapt-worker-2", "jobcron-worker-2", "jss-worker-2",
-    "anki-worker", "anki-worker-2", "anki-reviewer", *GLM_IN_DISPATCH_ORDER,
-    # The five GLM reviewer profiles of card t_cca306ca, appended after the GLM workers.
+    "anki-worker", "anki-worker-2", "anki-reviewer",
     "jobcron-reviewer-glm", "chapt-reviewer-glm", "harness-reviewer-glm",
     "jss-reviewer-glm", "anki-reviewer-glm",
+    *GLM_IN_DISPATCH_ORDER,
 ]
-GLM = tuple(f"{prefix}-worker-glm-{n}" for prefix in (*FLEETS.values(), "anki") for n in (1, 2, 3))
-GLM_NAME = re.compile(r"\b(?:jobcron|chapt|harness|jss|anki)-worker-glm-\d\b")
+GLM = GLM_IN_SERVICE
+# A GLM worker name before or after card t_18a2dc93.
+GLM_NAME = re.compile(r"\b(?:jobcron|chapt|harness|jss|anki)-worker-glm-(?:(?:easy|medium|hard)-)?\d\b")
 RULE = ("Spread independent ready cards across the two workers; keep cards that touch the same files "
         "serialized or dependency-linked.")
 RELATIVE = "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md"
@@ -68,10 +69,10 @@ JOBCRON_PRODUCTION_DEPLOYMENT = ("devops/production-deployment/SKILL.md",
                                  "devops/production-deployment/references/release-ci-portability.md")
 SHARED_SKILL = ROOT / "skills/multi-agent-coding-orchestrator/SKILL.md"
 VERSIONS = {
-    PROFILE_SKILLS["jobcron"]: "0.6.9-jobcron.17",  # raised by t_b7455361, t_b722c617, t_ac454595, t_46b5e63e, t_f4ce916d, t_c7cc3830, t_e14a6d6a, t_d3bb0983, t_35874d04 and t_cf518fd0
-    PROFILE_SKILLS["chapt"]: "0.6.7-chapt.16",  # raised by t_b722c617, t_ac454595, t_46b5e63e, t_f4ce916d, t_c7cc3830, t_e14a6d6a, t_d3bb0983, t_35874d04 and t_cf518fd0
-    PROFILE_SKILLS["harness"]: "0.6.7-harness.14",  # raised by t_b722c617, t_ac454595, t_46b5e63e, t_f4ce916d, t_c7cc3830, t_e14a6d6a, t_35874d04 and t_cf518fd0
-    PROFILE_SKILLS["jss"]: "0.6.7-jss.18",  # raised by t_71b4ef4a, t_ac454595, t_46b5e63e, t_89838618, t_f4ce916d, t_c7cc3830, t_a8884510, t_e14a6d6a, t_35874d04 and t_cf518fd0
+    PROFILE_SKILLS["jobcron"]: "0.6.9-jobcron.18",  # raised by t_b7455361, t_b722c617, t_ac454595, t_46b5e63e, t_f4ce916d, t_c7cc3830, t_e14a6d6a, t_d3bb0983, t_35874d04, t_cf518fd0 and t_18a2dc93
+    PROFILE_SKILLS["chapt"]: "0.6.7-chapt.17",  # raised by t_b722c617, t_ac454595, t_46b5e63e, t_f4ce916d, t_c7cc3830, t_e14a6d6a, t_d3bb0983, t_35874d04, t_cf518fd0 and t_18a2dc93
+    PROFILE_SKILLS["harness"]: "0.6.7-harness.15",  # raised by t_b722c617, t_ac454595, t_46b5e63e, t_f4ce916d, t_c7cc3830, t_e14a6d6a, t_35874d04, t_cf518fd0 and t_18a2dc93
+    PROFILE_SKILLS["jss"]: "0.6.7-jss.19",  # raised by t_71b4ef4a, t_ac454595, t_46b5e63e, t_89838618, t_f4ce916d, t_c7cc3830, t_a8884510, t_e14a6d6a, t_35874d04, t_cf518fd0 and t_18a2dc93
     # The shared skill's version is recorded in the snapshot; read it rather than copy it.
     SHARED_SKILL: next(entry["version"] for entry in json.loads(
         (ROOT / "snapshots/sanitized-current-state.yaml").read_text())["skill"]["shared_skills"]
@@ -169,8 +170,9 @@ class DesiredState(unittest.TestCase):
         for name in SECOND:
             self.assertIsNone(GLM_NAME.search(name))
         # Owner decision 2026-10-19: the GLM workers stay declared. The generic GLM profiles
-        # stay retired; the fifteen GLM workers of the five boards are in service (cards
-        # t_4f7740d0, t_71b4ef4a and t_f4ce916d) but are not fleet workers and have no profile_souls entry.
+        # stay retired; the thirty GLM workers of the five boards are in service (cards
+        # t_4f7740d0, t_71b4ef4a, t_f4ce916d and t_18a2dc93) but are not fleet workers and have no
+        # profile_souls entry.
         for name in GLM_RETIRED:
             self.assertEqual(self.profiles[name]["lifecycle"], "retired")
             self.assertFalse(self.profiles[name]["dispatch_eligible"])
@@ -197,8 +199,7 @@ class Verifier(unittest.TestCase):
                                   (self.verifier.HARNESS_ASSIGNEES, "harness"),
                                   (self.verifier.JSS_ASSIGNEES, "jss"),
                                   (self.verifier.ANKI_ASSIGNEES, "anki")):
-            extra = {f"{prefix}-worker-glm-1", f"{prefix}-worker-glm-2", f"{prefix}-worker-glm-3",
-                     f"{prefix}-reviewer-glm"}
+            extra = {*board_glm_workers(prefix), f"{prefix}-reviewer-glm"}
             self.assertEqual(assignees, {f"{prefix}-worker", f"{prefix}-worker-2", f"{prefix}-reviewer", *extra})
         for profile in PINNED_WORKERS:
             self.assertEqual(self.verifier.PROFILE_SOUL_PATHS[f"{profile}-2"], {
@@ -214,7 +215,7 @@ class Verifier(unittest.TestCase):
                 ("unknown extra worker", lambda pool: pool.append("harness-worker-3")),
                 ("renamed second worker", lambda pool: pool.__setitem__(1, "harness-worker-3")),
                 ("swapped order", lambda pool: pool.reverse()),
-                ("GLM worker", lambda pool: pool.__setitem__(1, "harness-worker-glm-1"))):
+                ("GLM worker", lambda pool: pool.__setitem__(1, "harness-worker-glm-easy-1"))):
             fleets = copy.deepcopy(self.fleets)
             mutate(fleets["harness"]["workers"])
             with self.subTest(case=label):

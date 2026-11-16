@@ -18,6 +18,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
+from glm_route_worker_names_edits import before_card
 from incident_recovery_verify_fixture import ROOT
 from test_verify_state_derived_expectations import TempTree, TreeReads, load, redeployed, tree_verifier
 from jss_download_install_edits import reverse_download_install_edits
@@ -73,32 +74,38 @@ class TrackedText(unittest.TestCase):
 
     def test_every_soul_is_its_baseline_bytes_plus_the_exact_append(self):
         block = (ROOT / POLICY).read_bytes()
-        all_souls = sorted((ROOT / "policies/profile-souls").glob("*/SOUL.md"))
+        # Card t_18a2dc93 moved the GLM worker SOUL sources to the names of their routes and added the
+        # second worker of each route as a copy of the first; each SOUL is checked as the source at
+        # its path before that card (a copy as the source that it copies), with that card's edits
+        # reversed. Each entry: (profile, profile before card t_18a2dc93, path before it, bytes before it).
+        entries = []
+        for path in sorted((ROOT / "policies/profile-souls").glob("*/SOUL.md")):
+            before, data = before_card(path.relative_to(ROOT).as_posix(), path.read_bytes())
+            entries.append((path.parent.name, Path(before).parent.name, before, data))
         # SOULs added after BASELINE (the anki fleet, t_06fc410a; the anki GLM workers,
         # t_71b4ef4a) have no baseline bytes; they were written with the block already at
         # their end.
         later_names = (*LATER_SOULS, *THIRD_GLM_SOULS, *GLM_REVIEWER_SOULS)
-        later = {path for path in all_souls if path.parent.name in later_names}
-        self.assertEqual({path.parent.name for path in later}, set(later_names))
+        later = [entry for entry in entries if entry[1] in later_names]
+        self.assertEqual({entry[1] for entry in later}, set(later_names))
         stale_rule = b"\n" + (ROOT / "policies/stale-test-rule.md").read_bytes()
-        for path in sorted(later):
-            with self.subTest(profile=path.parent.name):
+        for profile, name, relative, data in later:
+            with self.subTest(profile=profile):
                 # The later append of card t_46b5e63e is reversed first.
-                text = reverse_stale_test_rule_edits(path.relative_to(ROOT).as_posix(), path.read_bytes())
-                if path.parent.name in (*THIRD_GLM_SOULS, *GLM_REVIEWER_SOULS):
+                text = reverse_stale_test_rule_edits(relative, data)
+                if name in (*THIRD_GLM_SOULS, *GLM_REVIEWER_SOULS):
                     self.assertTrue(text.endswith(stale_rule))
                     text = text[:-len(stale_rule)]
                 self.assertTrue(text.endswith(b"\n\n" + block))
                 self.assertEqual(text.count(block), 1)
-                reviewer = path.parent.name == "anki-reviewer" or path.parent.name in GLM_REVIEWER_SOULS
+                reviewer = name == "anki-reviewer" or name in GLM_REVIEWER_SOULS
                 self.assertEqual(text.count(REVIEWER_SENTENCE), 1 if reviewer else 0)
-        souls = [path for path in all_souls if path not in later]
-        self.assertEqual(len(souls), 20)
-        self.assertEqual({path.parent.name for path in souls} & set(REVIEWERS), set(REVIEWERS))
-        for path in souls:
-            profile = path.parent.name
-            with self.subTest(profile=profile):
-                old = baseline_bytes(path.relative_to(ROOT).as_posix())
+        souls = [entry for entry in entries if entry not in later]
+        self.assertEqual(len({entry[2] for entry in souls}), 20)
+        self.assertEqual({entry[1] for entry in souls} & set(REVIEWERS), set(REVIEWERS))
+        for current_profile, profile, relative, data in souls:
+            with self.subTest(profile=current_profile):
+                old = baseline_bytes(relative)
                 self.assertNotIn(block, old)
                 want = old if old.endswith(b"\n") else old + b"\n"
                 if profile in REVIEWERS:
@@ -109,8 +116,7 @@ class TrackedText(unittest.TestCase):
                 # The jev plugin policy change (t_b722c617, and t_71b4ef4a for jss-genr) is the
                 # latest change before the download and install change (t_89838618), which is
                 # reversed first.
-                relative = path.relative_to(ROOT).as_posix()
-                text = reverse_download_install_edits(relative, path.read_bytes())
+                text = reverse_download_install_edits(relative, data)
                 text = reverse_jev_policy_edits(relative, text)
                 text = reverse_app_only_deploy_edits(relative, reverse_read_only_exception_edits(relative, text))
                 self.assertEqual(text, want)

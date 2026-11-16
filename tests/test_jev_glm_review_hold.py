@@ -53,7 +53,7 @@ CARD = "t_0a1b2c3d"
 RUN_ID = "71"
 GLM_REVIEWER = "harness-reviewer-glm"
 OPUS_REVIEWER = "harness-reviewer"
-GLM_WORKER = "harness-worker-glm-1"
+GLM_WORKER = "harness-worker-glm-easy-1"
 UNTIL = "2026-11-11T19:00:00+09:00"
 HOLD_REASON = "jev-peak-hold until " + UNTIL
 # Wednesday 2026-11-11; the window is 15:00 to 19:00 Asia/Seoul.

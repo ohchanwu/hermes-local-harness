@@ -10,7 +10,8 @@ the default profile and the five project orchestrators since card t_b906fda1)
 shares no key with it; the claude_worker_profile_settings group (compression
 threshold of the ten Claude worker profiles, card t_2d357ca0) shares no profile
 and no key with it; the glm_worker_reasoning_effort_settings group (reasoning effort
-of the five <board>-worker-glm-3 profiles, card t_e483301c) shares no profile and no
+of the five <board>-worker-glm-3 profiles, card t_e483301c; since card t_18a2dc93 the ten
+<board>-worker-glm-hard-1 and <board>-worker-glm-hard-2 profiles) shares no profile and no
 key with it; the glm_reviewer_profile_settings group (reasoning effort of the five
 <board>-reviewer-glm profiles, card t_cca306ca; tests/test_glm_reviewer_roster.py
 checks it) shares no profile and no key with it; check_managed_setting_groups checks
@@ -220,8 +221,9 @@ class CheckFunctionTests(unittest.TestCase):
         self.assertEqual(self.run_groups(self.roster, read), [])
         for profile in ("advisor", "default"):
             self.assertFalse([key for read_profile, key in reads if read_profile == profile and key in SETTINGS])
+        # Ten Claude workers, ten GLM `hard` workers (card t_18a2dc93) and five GLM reviewers.
         self.assertEqual(len(reads), len(COMPRESSION_PROFILES) * 4 + len(ORCHESTRATORS) * len(SETTINGS)
-                         + 10 + 5 + 5)
+                         + 10 + 10 + 5)
 
     def test_malformed_group_fails(self):
         for group in (None, {}, [], {"profiles": [], "settings": SETTINGS},
@@ -275,11 +277,11 @@ class CheckFunctionTests(unittest.TestCase):
 
     def test_glm_effort_profile_declared_by_both_groups_fails(self):
         roster = copy.deepcopy(self.roster)
-        roster["claude_worker_profile_settings"]["profiles"].append("harness-worker-glm-3")
+        roster["claude_worker_profile_settings"]["profiles"].append("harness-worker-glm-hard-2")
         roster["claude_worker_profile_settings"]["settings"]["agent.reasoning_effort"] = "high"
         errors = self.run_groups(roster)
         self.assertIn("GLM worker reasoning effort settings and Claude worker profile settings both declare "
-                      "harness-worker-glm-3 agent.reasoning_effort", errors)
+                      "harness-worker-glm-hard-2 agent.reasoning_effort", errors)
 
     def test_group_must_name_every_project_orchestrator(self):
         roster = copy.deepcopy(self.roster)

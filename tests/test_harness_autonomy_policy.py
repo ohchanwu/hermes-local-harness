@@ -43,7 +43,7 @@ class HarnessAutonomyPolicy(unittest.TestCase):
 
     def test_version_and_bounded_growth(self):
         # Raised by the jev plugin policy change (t_b722c617).
-        self.assertRegex(self.raw, r"(?m)^version: 0\.6\.7-harness\.14$")  # raised by t_ac454595, t_46b5e63e, t_f4ce916d, t_c7cc3830, t_e14a6d6a, t_35874d04 and t_cf518fd0
+        self.assertRegex(self.raw, r"(?m)^version: 0\.6\.7-harness\.15$")  # raised by t_ac454595, t_46b5e63e, t_f4ce916d, t_c7cc3830, t_e14a6d6a, t_35874d04, t_cf518fd0 and t_18a2dc93
         # Plus the 9 lines of repair_history candidate rules and example (t_6436ac1c)
         # and the 6 lines of the Skill Changes section (t_0a8674fe), and the 5 lines of the card
         # splitting rule (with its blank line) and the 3 jev routing bullets in Worker Selection (t_ac454595).

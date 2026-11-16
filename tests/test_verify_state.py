@@ -464,20 +464,15 @@ assert roster["project_dispatch_allowlist"] == [
     "jss-worker", "jss-reviewer",
     "harness-worker-2", "chapt-worker-2", "jobcron-worker-2", "jss-worker-2",
     "anki-worker", "anki-worker-2", "anki-reviewer",
-    # GLM workers back in service for the jev plugin (card t_4f7740d0).
-    "jobcron-worker-glm-1", "jobcron-worker-glm-2",
-    "chapt-worker-glm-1", "chapt-worker-glm-2",
-    "harness-worker-glm-1", "harness-worker-glm-2",
-    # GLM workers of jss-genr and anki for the jev plugin (card t_71b4ef4a).
-    "jss-worker-glm-1", "jss-worker-glm-2",
-    "anki-worker-glm-1", "anki-worker-glm-2",
-    # The third GLM worker of each board (card t_f4ce916d), at the end of the list in the order in
-    # which the switch script added them to the live list (card t_55432326), then the five GLM
-    # reviewer profiles (card t_cca306ca).
-    "harness-worker-glm-3", "chapt-worker-glm-3", "jobcron-worker-glm-3",
-    "jss-worker-glm-3", "anki-worker-glm-3",
+    # The five GLM reviewer profiles (card t_cca306ca).
     "jobcron-reviewer-glm", "chapt-reviewer-glm", "harness-reviewer-glm",
-    "jss-reviewer-glm", "anki-reviewer-glm"]
+    "jss-reviewer-glm", "anki-reviewer-glm",
+    # The six GLM workers of each board (card t_18a2dc93, which renamed the GLM workers of cards
+    # t_4f7740d0, t_71b4ef4a and t_f4ce916d and added the second worker of each route), board by
+    # board in the order of section 1 of
+    # docs/specs/261116-glm-worker-profiles-by-route-and-claude-fallback.md.
+    *(f"{prefix}-worker-glm-{suffix}" for prefix in ("jobcron", "chapt", "harness", "jss", "anki")
+      for suffix in ("easy-1", "easy-2", "medium-1", "medium-2", "hard-1", "hard-2"))]
 roster_profiles = {profile["name"]: profile for profile in roster["profiles"]}
 assert roster["approval_policy"]["mode"] == "off"
 assert roster["approval_policy"]["profiles"] == list(roster_profiles)
