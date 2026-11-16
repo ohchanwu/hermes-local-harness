@@ -4147,116 +4147,3868 @@
       }
     },
     "jobcron-worker-glm-easy-1": {
-      "fallback_providers": [],
-      "auxiliary": {}
+      "fallback_providers": [
+        {
+          "provider": "claude-subscription",
+          "model": "claude-haiku-5-5"
+        }
+      ],
+      "auxiliary": {
+        "vision": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "compression": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "skills_hub": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "approval": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "review": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "mcp": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "title_generation": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "memory_query_rewrite": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "tts_audio_tags": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "triage_specifier": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "kanban_decomposer": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "profile_describer": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "goal_judge": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "curator": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "monitor": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "background_review": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        }
+      }
     },
     "jobcron-worker-glm-easy-2": {
-      "fallback_providers": [],
-      "auxiliary": {}
+      "fallback_providers": [
+        {
+          "provider": "claude-subscription",
+          "model": "claude-haiku-5-5"
+        }
+      ],
+      "auxiliary": {
+        "vision": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "compression": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "skills_hub": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "approval": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "review": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "mcp": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "title_generation": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "memory_query_rewrite": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "tts_audio_tags": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "triage_specifier": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "kanban_decomposer": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "profile_describer": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "goal_judge": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "curator": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "monitor": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "background_review": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        }
+      }
     },
     "jobcron-worker-glm-medium-1": {
-      "fallback_providers": [],
-      "auxiliary": {}
+      "fallback_providers": [
+        {
+          "provider": "claude-subscription",
+          "model": "claude-sonnet-5-5"
+        }
+      ],
+      "auxiliary": {
+        "vision": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "compression": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "skills_hub": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "approval": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "review": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "mcp": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "title_generation": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "memory_query_rewrite": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "tts_audio_tags": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "triage_specifier": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "kanban_decomposer": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "profile_describer": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "goal_judge": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "curator": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "monitor": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "background_review": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        }
+      }
     },
     "jobcron-worker-glm-medium-2": {
-      "fallback_providers": [],
-      "auxiliary": {}
+      "fallback_providers": [
+        {
+          "provider": "claude-subscription",
+          "model": "claude-sonnet-5-5"
+        }
+      ],
+      "auxiliary": {
+        "vision": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "compression": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "skills_hub": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "approval": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "review": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "mcp": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "title_generation": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "memory_query_rewrite": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "tts_audio_tags": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "triage_specifier": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "kanban_decomposer": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "profile_describer": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "goal_judge": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "curator": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "monitor": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "background_review": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        }
+      }
     },
     "jobcron-worker-glm-hard-1": {
-      "fallback_providers": [],
-      "auxiliary": {}
+      "fallback_providers": [
+        {
+          "provider": "claude-subscription",
+          "model": "claude-sonnet-5-5"
+        }
+      ],
+      "auxiliary": {
+        "vision": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "compression": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "skills_hub": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "approval": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "review": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "mcp": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "title_generation": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "memory_query_rewrite": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "tts_audio_tags": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "triage_specifier": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "kanban_decomposer": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "profile_describer": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "goal_judge": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "curator": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "monitor": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "background_review": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        }
+      }
     },
     "jobcron-worker-glm-hard-2": {
-      "fallback_providers": [],
-      "auxiliary": {}
+      "fallback_providers": [
+        {
+          "provider": "claude-subscription",
+          "model": "claude-sonnet-5-5"
+        }
+      ],
+      "auxiliary": {
+        "vision": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "compression": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "skills_hub": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "approval": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "review": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "mcp": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "title_generation": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "memory_query_rewrite": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "tts_audio_tags": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "triage_specifier": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "kanban_decomposer": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "profile_describer": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "goal_judge": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "curator": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "monitor": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "background_review": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        }
+      }
     },
     "jobcron-reviewer-glm": {
-      "fallback_providers": [],
-      "auxiliary": {}
+      "fallback_providers": [
+        {
+          "provider": "claude-subscription",
+          "model": "claude-sonnet-5-5"
+        }
+      ],
+      "auxiliary": {
+        "vision": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "compression": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "skills_hub": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "approval": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "review": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "mcp": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "title_generation": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "memory_query_rewrite": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "tts_audio_tags": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "triage_specifier": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "kanban_decomposer": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "profile_describer": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "goal_judge": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "curator": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "monitor": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "background_review": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        }
+      }
     },
     "chapt-worker-glm-easy-1": {
-      "fallback_providers": [],
-      "auxiliary": {}
+      "fallback_providers": [
+        {
+          "provider": "claude-subscription",
+          "model": "claude-haiku-5-5"
+        }
+      ],
+      "auxiliary": {
+        "vision": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "compression": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "skills_hub": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "approval": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "review": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "mcp": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "title_generation": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "memory_query_rewrite": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "tts_audio_tags": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "triage_specifier": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "kanban_decomposer": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "profile_describer": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "goal_judge": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "curator": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "monitor": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "background_review": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        }
+      }
     },
     "chapt-worker-glm-easy-2": {
-      "fallback_providers": [],
-      "auxiliary": {}
+      "fallback_providers": [
+        {
+          "provider": "claude-subscription",
+          "model": "claude-haiku-5-5"
+        }
+      ],
+      "auxiliary": {
+        "vision": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "compression": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "skills_hub": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "approval": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "review": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "mcp": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "title_generation": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "memory_query_rewrite": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "tts_audio_tags": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "triage_specifier": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "kanban_decomposer": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "profile_describer": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "goal_judge": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "curator": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "monitor": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "background_review": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        }
+      }
     },
     "chapt-worker-glm-medium-1": {
-      "fallback_providers": [],
-      "auxiliary": {}
+      "fallback_providers": [
+        {
+          "provider": "claude-subscription",
+          "model": "claude-sonnet-5-5"
+        }
+      ],
+      "auxiliary": {
+        "vision": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "compression": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "skills_hub": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "approval": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "review": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "mcp": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "title_generation": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "memory_query_rewrite": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "tts_audio_tags": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "triage_specifier": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "kanban_decomposer": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "profile_describer": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "goal_judge": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "curator": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "monitor": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "background_review": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        }
+      }
     },
     "chapt-worker-glm-medium-2": {
-      "fallback_providers": [],
-      "auxiliary": {}
+      "fallback_providers": [
+        {
+          "provider": "claude-subscription",
+          "model": "claude-sonnet-5-5"
+        }
+      ],
+      "auxiliary": {
+        "vision": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "compression": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "skills_hub": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "approval": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "review": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "mcp": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "title_generation": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "memory_query_rewrite": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "tts_audio_tags": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "triage_specifier": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "kanban_decomposer": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "profile_describer": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "goal_judge": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "curator": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "monitor": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "background_review": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        }
+      }
     },
     "chapt-worker-glm-hard-1": {
-      "fallback_providers": [],
-      "auxiliary": {}
+      "fallback_providers": [
+        {
+          "provider": "claude-subscription",
+          "model": "claude-sonnet-5-5"
+        }
+      ],
+      "auxiliary": {
+        "vision": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "compression": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "skills_hub": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "approval": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "review": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "mcp": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "title_generation": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "memory_query_rewrite": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "tts_audio_tags": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "triage_specifier": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "kanban_decomposer": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "profile_describer": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "goal_judge": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "curator": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "monitor": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "background_review": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        }
+      }
     },
     "chapt-worker-glm-hard-2": {
-      "fallback_providers": [],
-      "auxiliary": {}
+      "fallback_providers": [
+        {
+          "provider": "claude-subscription",
+          "model": "claude-sonnet-5-5"
+        }
+      ],
+      "auxiliary": {
+        "vision": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "compression": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "skills_hub": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "approval": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "review": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "mcp": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "title_generation": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "memory_query_rewrite": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "tts_audio_tags": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "triage_specifier": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "kanban_decomposer": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "profile_describer": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "goal_judge": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "curator": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "monitor": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "background_review": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        }
+      }
     },
     "chapt-reviewer-glm": {
-      "fallback_providers": [],
-      "auxiliary": {}
+      "fallback_providers": [
+        {
+          "provider": "claude-subscription",
+          "model": "claude-sonnet-5-5"
+        }
+      ],
+      "auxiliary": {
+        "vision": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "compression": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "skills_hub": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "approval": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "review": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "mcp": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "title_generation": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "memory_query_rewrite": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "tts_audio_tags": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "triage_specifier": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "kanban_decomposer": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "profile_describer": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "goal_judge": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "curator": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "monitor": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "background_review": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        }
+      }
     },
     "harness-worker-glm-easy-1": {
-      "fallback_providers": [],
-      "auxiliary": {}
+      "fallback_providers": [
+        {
+          "provider": "claude-subscription",
+          "model": "claude-haiku-5-5"
+        }
+      ],
+      "auxiliary": {
+        "vision": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "compression": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "skills_hub": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "approval": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "review": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "mcp": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "title_generation": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "memory_query_rewrite": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "tts_audio_tags": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "triage_specifier": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "kanban_decomposer": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "profile_describer": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "goal_judge": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "curator": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "monitor": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "background_review": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        }
+      }
     },
     "harness-worker-glm-easy-2": {
-      "fallback_providers": [],
-      "auxiliary": {}
+      "fallback_providers": [
+        {
+          "provider": "claude-subscription",
+          "model": "claude-haiku-5-5"
+        }
+      ],
+      "auxiliary": {
+        "vision": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "compression": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "skills_hub": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "approval": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "review": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "mcp": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "title_generation": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "memory_query_rewrite": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "tts_audio_tags": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "triage_specifier": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "kanban_decomposer": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "profile_describer": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "goal_judge": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "curator": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "monitor": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "background_review": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        }
+      }
     },
     "harness-worker-glm-medium-1": {
-      "fallback_providers": [],
-      "auxiliary": {}
+      "fallback_providers": [
+        {
+          "provider": "claude-subscription",
+          "model": "claude-sonnet-5-5"
+        }
+      ],
+      "auxiliary": {
+        "vision": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "compression": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "skills_hub": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "approval": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "review": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "mcp": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "title_generation": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "memory_query_rewrite": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "tts_audio_tags": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "triage_specifier": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "kanban_decomposer": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "profile_describer": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "goal_judge": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "curator": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "monitor": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "background_review": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        }
+      }
     },
     "harness-worker-glm-medium-2": {
-      "fallback_providers": [],
-      "auxiliary": {}
+      "fallback_providers": [
+        {
+          "provider": "claude-subscription",
+          "model": "claude-sonnet-5-5"
+        }
+      ],
+      "auxiliary": {
+        "vision": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "compression": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "skills_hub": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "approval": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "review": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "mcp": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "title_generation": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "memory_query_rewrite": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "tts_audio_tags": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "triage_specifier": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "kanban_decomposer": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "profile_describer": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "goal_judge": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "curator": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "monitor": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "background_review": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        }
+      }
     },
     "harness-worker-glm-hard-1": {
-      "fallback_providers": [],
-      "auxiliary": {}
+      "fallback_providers": [
+        {
+          "provider": "claude-subscription",
+          "model": "claude-sonnet-5-5"
+        }
+      ],
+      "auxiliary": {
+        "vision": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "compression": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "skills_hub": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "approval": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "review": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "mcp": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "title_generation": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "memory_query_rewrite": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "tts_audio_tags": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "triage_specifier": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "kanban_decomposer": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "profile_describer": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "goal_judge": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "curator": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "monitor": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "background_review": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        }
+      }
     },
     "harness-worker-glm-hard-2": {
-      "fallback_providers": [],
-      "auxiliary": {}
+      "fallback_providers": [
+        {
+          "provider": "claude-subscription",
+          "model": "claude-sonnet-5-5"
+        }
+      ],
+      "auxiliary": {
+        "vision": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "compression": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "skills_hub": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "approval": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "review": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "mcp": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "title_generation": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "memory_query_rewrite": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "tts_audio_tags": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "triage_specifier": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "kanban_decomposer": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "profile_describer": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "goal_judge": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "curator": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "monitor": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "background_review": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        }
+      }
     },
     "harness-reviewer-glm": {
-      "fallback_providers": [],
-      "auxiliary": {}
+      "fallback_providers": [
+        {
+          "provider": "claude-subscription",
+          "model": "claude-sonnet-5-5"
+        }
+      ],
+      "auxiliary": {
+        "vision": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "compression": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "skills_hub": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "approval": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "review": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "mcp": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "title_generation": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "memory_query_rewrite": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "tts_audio_tags": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "triage_specifier": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "kanban_decomposer": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "profile_describer": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "goal_judge": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "curator": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "monitor": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "background_review": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        }
+      }
     },
     "jss-worker-glm-easy-1": {
-      "fallback_providers": [],
-      "auxiliary": {}
+      "fallback_providers": [
+        {
+          "provider": "claude-subscription",
+          "model": "claude-haiku-5-5"
+        }
+      ],
+      "auxiliary": {
+        "vision": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "compression": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "skills_hub": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "approval": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "review": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "mcp": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "title_generation": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "memory_query_rewrite": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "tts_audio_tags": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "triage_specifier": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "kanban_decomposer": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "profile_describer": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "goal_judge": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "curator": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "monitor": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "background_review": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        }
+      }
     },
     "jss-worker-glm-easy-2": {
-      "fallback_providers": [],
-      "auxiliary": {}
+      "fallback_providers": [
+        {
+          "provider": "claude-subscription",
+          "model": "claude-haiku-5-5"
+        }
+      ],
+      "auxiliary": {
+        "vision": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "compression": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "skills_hub": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "approval": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "review": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "mcp": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "title_generation": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "memory_query_rewrite": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "tts_audio_tags": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "triage_specifier": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "kanban_decomposer": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "profile_describer": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "goal_judge": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "curator": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "monitor": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "background_review": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        }
+      }
     },
     "jss-worker-glm-medium-1": {
-      "fallback_providers": [],
-      "auxiliary": {}
+      "fallback_providers": [
+        {
+          "provider": "claude-subscription",
+          "model": "claude-sonnet-5-5"
+        }
+      ],
+      "auxiliary": {
+        "vision": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "compression": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "skills_hub": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "approval": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "review": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "mcp": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "title_generation": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "memory_query_rewrite": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "tts_audio_tags": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "triage_specifier": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "kanban_decomposer": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "profile_describer": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "goal_judge": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "curator": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "monitor": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "background_review": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        }
+      }
     },
     "jss-worker-glm-medium-2": {
-      "fallback_providers": [],
-      "auxiliary": {}
+      "fallback_providers": [
+        {
+          "provider": "claude-subscription",
+          "model": "claude-sonnet-5-5"
+        }
+      ],
+      "auxiliary": {
+        "vision": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "compression": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "skills_hub": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "approval": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "review": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "mcp": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "title_generation": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "memory_query_rewrite": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "tts_audio_tags": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "triage_specifier": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "kanban_decomposer": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "profile_describer": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "goal_judge": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "curator": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "monitor": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "background_review": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        }
+      }
     },
     "jss-worker-glm-hard-1": {
-      "fallback_providers": [],
-      "auxiliary": {}
+      "fallback_providers": [
+        {
+          "provider": "claude-subscription",
+          "model": "claude-sonnet-5-5"
+        }
+      ],
+      "auxiliary": {
+        "vision": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "compression": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "skills_hub": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "approval": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "review": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "mcp": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "title_generation": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "memory_query_rewrite": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "tts_audio_tags": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "triage_specifier": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "kanban_decomposer": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "profile_describer": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "goal_judge": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "curator": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "monitor": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "background_review": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        }
+      }
     },
     "jss-worker-glm-hard-2": {
-      "fallback_providers": [],
-      "auxiliary": {}
+      "fallback_providers": [
+        {
+          "provider": "claude-subscription",
+          "model": "claude-sonnet-5-5"
+        }
+      ],
+      "auxiliary": {
+        "vision": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "compression": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "skills_hub": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "approval": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "review": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "mcp": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "title_generation": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "memory_query_rewrite": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "tts_audio_tags": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "triage_specifier": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "kanban_decomposer": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "profile_describer": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "goal_judge": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "curator": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "monitor": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "background_review": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        }
+      }
     },
     "jss-reviewer-glm": {
-      "fallback_providers": [],
-      "auxiliary": {}
+      "fallback_providers": [
+        {
+          "provider": "claude-subscription",
+          "model": "claude-sonnet-5-5"
+        }
+      ],
+      "auxiliary": {
+        "vision": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "compression": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "skills_hub": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "approval": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "review": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "mcp": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "title_generation": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "memory_query_rewrite": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "tts_audio_tags": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "triage_specifier": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "kanban_decomposer": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "profile_describer": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "goal_judge": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "curator": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "monitor": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "background_review": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        }
+      }
     },
     "anki-orchestrator": {
       "fallback_providers": [
@@ -4819,32 +8571,970 @@
       }
     },
     "anki-worker-glm-easy-1": {
-      "fallback_providers": [],
-      "auxiliary": {}
+      "fallback_providers": [
+        {
+          "provider": "claude-subscription",
+          "model": "claude-haiku-5-5"
+        }
+      ],
+      "auxiliary": {
+        "vision": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "compression": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "skills_hub": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "approval": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "review": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "mcp": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "title_generation": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "memory_query_rewrite": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "tts_audio_tags": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "triage_specifier": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "kanban_decomposer": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "profile_describer": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "goal_judge": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "curator": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "monitor": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "background_review": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        }
+      }
     },
     "anki-worker-glm-easy-2": {
-      "fallback_providers": [],
-      "auxiliary": {}
+      "fallback_providers": [
+        {
+          "provider": "claude-subscription",
+          "model": "claude-haiku-5-5"
+        }
+      ],
+      "auxiliary": {
+        "vision": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "compression": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "skills_hub": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "approval": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "review": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "mcp": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "title_generation": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "memory_query_rewrite": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "tts_audio_tags": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "triage_specifier": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "kanban_decomposer": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "profile_describer": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "goal_judge": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "curator": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "monitor": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "background_review": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        }
+      }
     },
     "anki-worker-glm-medium-1": {
-      "fallback_providers": [],
-      "auxiliary": {}
+      "fallback_providers": [
+        {
+          "provider": "claude-subscription",
+          "model": "claude-sonnet-5-5"
+        }
+      ],
+      "auxiliary": {
+        "vision": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "compression": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "skills_hub": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "approval": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "review": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "mcp": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "title_generation": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "memory_query_rewrite": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "tts_audio_tags": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "triage_specifier": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "kanban_decomposer": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "profile_describer": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "goal_judge": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "curator": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "monitor": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "background_review": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        }
+      }
     },
     "anki-worker-glm-medium-2": {
-      "fallback_providers": [],
-      "auxiliary": {}
+      "fallback_providers": [
+        {
+          "provider": "claude-subscription",
+          "model": "claude-sonnet-5-5"
+        }
+      ],
+      "auxiliary": {
+        "vision": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "compression": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "skills_hub": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "approval": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "review": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "mcp": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "title_generation": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "memory_query_rewrite": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "tts_audio_tags": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "triage_specifier": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "kanban_decomposer": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "profile_describer": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "goal_judge": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "curator": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "monitor": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "background_review": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        }
+      }
     },
     "anki-worker-glm-hard-1": {
-      "fallback_providers": [],
-      "auxiliary": {}
+      "fallback_providers": [
+        {
+          "provider": "claude-subscription",
+          "model": "claude-sonnet-5-5"
+        }
+      ],
+      "auxiliary": {
+        "vision": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "compression": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "skills_hub": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "approval": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "review": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "mcp": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "title_generation": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "memory_query_rewrite": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "tts_audio_tags": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "triage_specifier": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "kanban_decomposer": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "profile_describer": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "goal_judge": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "curator": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "monitor": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "background_review": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        }
+      }
     },
     "anki-worker-glm-hard-2": {
-      "fallback_providers": [],
-      "auxiliary": {}
+      "fallback_providers": [
+        {
+          "provider": "claude-subscription",
+          "model": "claude-sonnet-5-5"
+        }
+      ],
+      "auxiliary": {
+        "vision": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "compression": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "skills_hub": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "approval": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "review": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "mcp": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "title_generation": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "memory_query_rewrite": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "tts_audio_tags": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "triage_specifier": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "kanban_decomposer": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "profile_describer": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "goal_judge": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "curator": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "monitor": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "background_review": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        }
+      }
     },
     "anki-reviewer-glm": {
-      "fallback_providers": [],
-      "auxiliary": {}
+      "fallback_providers": [
+        {
+          "provider": "claude-subscription",
+          "model": "claude-sonnet-5-5"
+        }
+      ],
+      "auxiliary": {
+        "vision": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "compression": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "skills_hub": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "approval": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "review": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "mcp": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "title_generation": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "memory_query_rewrite": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "tts_audio_tags": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "triage_specifier": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "kanban_decomposer": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "profile_describer": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-haiku-5-5"
+            }
+          ]
+        },
+        "goal_judge": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "curator": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "monitor": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        },
+        "background_review": {
+          "fallback_chain": [
+            {
+              "provider": "claude-subscription",
+              "model": "claude-sonnet-5-5"
+            }
+          ]
+        }
+      }
     }
   },
   "profile_auxiliary_settings": {

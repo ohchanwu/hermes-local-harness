@@ -17,9 +17,11 @@ the SOUL source that it copies.
 reverse_glm_route_worker_name_edits() reverses the edits byte for byte.
 test_jev_easy_medium_worker_split.reverse_easy_medium_split_edits calls it first, so every test
 that recovers the bytes of an earlier commit reverses this card's edits before the edits of the
-earlier cards. This module imports only the standard library, so any test module can import it
-without a circular import.
+earlier cards. This module imports only the standard library and
+test_glm_claude_fallback (card t_50fd66f2, which imports only the standard library), so any
+test module can import it without a circular import.
 """
+from test_glm_claude_fallback import reverse_glm_claude_fallback_edits
 
 BASELINE = "b62e851cb7c0cdf0f23f6fb32f3a0698470ba618"
 RELATIVE = "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md"
@@ -205,7 +207,11 @@ def reverse_glm_route_worker_name_edits(relative_path, text):
     path after this card (for a moved SOUL source, its new path). A path that the card did not change,
     and a text that contains none of the new texts, is returned as the same object, so a caller may
     apply it to a text that another caller already reversed. A text that contains some of the new
-    texts but not each of them the recorded number of times raises AssertionError."""
+    texts but not each of them the recorded number of times raises AssertionError.
+
+    The later SOUL sentence of card t_50fd66f2 is reversed first
+    (test_glm_claude_fallback.reverse_glm_claude_fallback_edits)."""
+    text = reverse_glm_claude_fallback_edits(relative_path, text)
     edits = GLM_ROUTE_WORKER_NAME_EDITS.get(relative_path)
     if not edits:
         return text

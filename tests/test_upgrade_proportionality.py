@@ -47,6 +47,8 @@ FIXTURE_RESULTS = {
     "compression-drift.yaml": (1, "managed setting drift advisor compression.threshold_tokens"),
     "orchestrator-skill-settings-drift.yaml": (1, "managed setting drift jobcron-orchestrator skills.auto_load"),
     "fallback-drift.yaml": (1, "fallback drift jobcron-worker fallback_providers"),
+    # Card t_50fd66f2: a GLM worker that falls back to the provider anthropic.
+    "glm-fallback-anthropic.yaml": (1, "fallback drift harness-worker-glm-medium-1 fallback_providers"),
     "auxiliary-model-drift.yaml": (1, "auxiliary model drift harness-worker auxiliary.title_generation.model"),
     "terminal-deployment-pending.yaml": (1, "terminal notification deployment pending"),
     "terminal-notification-rollback.yaml": (1, "terminal notification deployment pending"),

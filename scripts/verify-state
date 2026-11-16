@@ -503,9 +503,11 @@ def glm_worker_profiles():
     return tuple(name for pool in PROJECT_GLM_WORKER_POOLS.values() for name in pool)
 
 
-def check_glm_worker_profiles(errors, roster):
-    """Each GLM worker in service is declared with its lifecycle and dispatch flags
-    (check_model_policy checks its model and provider)."""
+def check_glm_worker_profiles(errors, roster, allowed_models=None):
+    """Each GLM worker in service is declared with its lifecycle and dispatch flags and with
+    the Claude subscription fallback of glm_fallback_errors (check_model_policy checks its
+    model and provider). allowed_models is the claude-subscription allowlist; None reads it
+    from CLAUDE_SUBSCRIPTION_COMPAT."""
     profiles = {p.get("name"): p for p in roster.get("profiles", []) if isinstance(p, dict)}
     for name in glm_worker_profiles():
         profile = profiles.get(name)
@@ -517,6 +519,92 @@ def check_glm_worker_profiles(errors, roster):
                          f"declared {profile.get('lifecycle')!r}")
         if profile.get("dispatch_eligible") is not True or profile.get("in_dispatch_pool") is not True:
             fail(errors, f"GLM worker not dispatchable {name}: dispatch_eligible and in_dispatch_pool must be true")
+        for message in glm_fallback_errors(profile, allowed_models):
+            fail(errors, message)
+
+
+# Claude subscription fallback of the GLM workers and GLM reviewers (owner decisions of
+# 2026-11-16, card t_50fd66f2; section 1 of
+# docs/specs/261116-glm-worker-profiles-by-route-and-claude-fallback.md). When the Z.ai
+# quota is used up, the workers of the route `easy` fall back to claude-haiku-5-5, the
+# workers of the routes `medium` and `hard` and the GLM reviewers to claude-sonnet-5-5,
+# always on provider claude-subscription. The provider `anthropic` is never a GLM fallback,
+# because it is a paid Console key. The fallback_chain of every HELPER_TASKS task names
+# claude-subscription as well: LIGHT_HELPER_TASKS on GLM_LIGHT_HELPER_FALLBACK_MODEL, the
+# other tasks on the profile's own fallback model (owner answer to question Q1).
+GLM_FALLBACK_PROVIDER = "claude-subscription"
+GLM_FALLBACK_REFUSED_PROVIDER = "anthropic"
+GLM_ROUTE_FALLBACK_MODELS = {"easy": "claude-haiku-5-5", "medium": "claude-sonnet-5-5", "hard": "claude-sonnet-5-5"}
+GLM_REVIEWER_FALLBACK_MODEL = "claude-sonnet-5-5"
+GLM_LIGHT_HELPER_FALLBACK_MODEL = "claude-haiku-5-5"
+
+
+def glm_fallback_model(name):
+    """The fallback model of a GLM worker or GLM reviewer by its name, or None for another name.
+    A GLM worker name is <prefix>-worker-glm-<route>-<number>."""
+    if name in PROJECT_GLM_REVIEWERS.values():
+        return GLM_REVIEWER_FALLBACK_MODEL
+    if name in glm_worker_profiles():
+        route = name.rsplit("-worker-glm-", 1)[-1].rsplit("-", 1)[0]
+        return GLM_ROUTE_FALLBACK_MODELS.get(route)
+    return None
+
+
+def expected_glm_fallback(name):
+    """(fallback_providers, auxiliary_fallback_chain) that a GLM worker or GLM reviewer declares."""
+    model = glm_fallback_model(name)
+    providers = [{"provider": GLM_FALLBACK_PROVIDER, "model": model}]
+    chains = {task: [{"provider": GLM_FALLBACK_PROVIDER,
+                      "model": GLM_LIGHT_HELPER_FALLBACK_MODEL if task in LIGHT_HELPER_TASKS else model}]
+              for task in HELPER_TASKS}
+    return providers, chains
+
+
+def glm_fallback_errors(profile, allowed_models=None):
+    """Errors of the fallback declarations of one GLM worker or GLM reviewer roster entry.
+
+    The entry declares exactly the fallback_providers and auxiliary_fallback_chain of
+    expected_glm_fallback; every entry of both has provider GLM_FALLBACK_PROVIDER and a model
+    in MODELS of CLAUDE_SUBSCRIPTION_COMPAT, and no entry names GLM_FALLBACK_REFUSED_PROVIDER.
+    allowed_models is that allowlist; None reads it from CLAUDE_SUBSCRIPTION_COMPAT. Messages
+    show provider and model values only (fallback_display), never the value of another field."""
+    name = profile.get("name")
+    want_providers, want_chains = expected_glm_fallback(name)
+    if allowed_models is None:
+        allowed_models = claude_subscription_models()
+    errors = []
+    if allowed_models is None:
+        errors.append(f"GLM fallback check impossible {name}: the claude-subscription allowlist (MODELS in "
+                      f"{CLAUDE_SUBSCRIPTION_COMPAT.relative_to(ROOT)}) is unreadable")
+    providers = profile.get("fallback_providers")
+    if providers != want_providers:
+        errors.append(f"GLM fallback drift {name} fallback_providers: expected {fallback_display(want_providers)}, "
+                      f"declared {fallback_display(providers)}")
+    chains = profile.get("auxiliary_fallback_chain")
+    chains = chains if isinstance(chains, dict) else {}
+    for task in HELPER_TASKS:
+        if chains.get(task) != want_chains[task]:
+            errors.append(f"GLM fallback drift {name} auxiliary_fallback_chain.{task}: expected "
+                          f"{fallback_display(want_chains[task])}, declared {fallback_display(chains.get(task))}")
+    declared = [("fallback_providers", providers)] + [(f"auxiliary_fallback_chain.{task}", entries)
+                                                      for task, entries in chains.items()]
+    for label, entries in declared:
+        for index, entry in enumerate(entries if isinstance(entries, list) else []):
+            if not isinstance(entry, dict):
+                continue  # check_fallback_declarations reports an entry that is not an object
+            where = f"{name} {label}[{index}]"
+            provider, model = entry.get("provider"), entry.get("model")
+            if provider == GLM_FALLBACK_REFUSED_PROVIDER:
+                errors.append(f"GLM fallback names {GLM_FALLBACK_REFUSED_PROVIDER} {where}: the "
+                              f"{GLM_FALLBACK_REFUSED_PROVIDER} provider is a paid Console key and is never "
+                              "a fallback of a GLM worker or GLM reviewer")
+            elif provider != GLM_FALLBACK_PROVIDER:
+                errors.append(f"GLM fallback provider not allowed {where}: provider {setting_display(provider)}, "
+                              f"expected {GLM_FALLBACK_PROVIDER}")
+            if allowed_models is not None and model not in allowed_models:
+                errors.append(f"GLM fallback model not allowed {where}: model {setting_display(model)} is not in "
+                              f"MODELS of {CLAUDE_SUBSCRIPTION_COMPAT.relative_to(ROOT)}")
+    return errors
 
 
 def glm_reviewer_profiles():
@@ -524,12 +612,14 @@ def glm_reviewer_profiles():
     return tuple(PROJECT_GLM_REVIEWERS.values())
 
 
-def check_glm_reviewer_profiles(errors, roster):
+def check_glm_reviewer_profiles(errors, roster, allowed_models=None):
     """Each GLM reviewer is declared with the role `project GLM reviewer`, the modes of
     its board's independent reviewer, toolsets review, its lifecycle and dispatch flags,
-    and no auxiliary models and no fallback (check_model_policy checks its model and
-    provider; check_jev_plugin_declarations its jev plugin). The board of a GLM reviewer
-    is PROJECT_GLM_REVIEWERS, so the roster needs no `glm_reviewer` fleet field."""
+    no auxiliary models, and the Claude subscription fallback of glm_fallback_errors
+    (check_model_policy checks its model and provider; check_jev_plugin_declarations its
+    jev plugin). The board of a GLM reviewer is PROJECT_GLM_REVIEWERS, so the roster needs
+    no `glm_reviewer` fleet field. allowed_models is the claude-subscription allowlist;
+    None reads it from CLAUDE_SUBSCRIPTION_COMPAT."""
     profiles = {p.get("name"): p for p in roster.get("profiles", []) if isinstance(p, dict)}
     fleets = roster.get("project_fleets") if isinstance(roster.get("project_fleets"), dict) else {}
     for board, name in PROJECT_GLM_REVIEWERS.items():
@@ -551,9 +641,10 @@ def check_glm_reviewer_profiles(errors, roster):
                          f"declared {profile.get('lifecycle')!r}")
         if profile.get("dispatch_eligible") is not True or profile.get("in_dispatch_pool") is not True:
             fail(errors, f"GLM reviewer not dispatchable {name}: dispatch_eligible and in_dispatch_pool must be true")
-        for field in ("auxiliary_models", "fallback_providers", "auxiliary_fallback_chain"):
-            if field in profile:
-                fail(errors, f"GLM reviewer declares {field}: {name} must declare none, as the GLM workers")
+        if "auxiliary_models" in profile:
+            fail(errors, f"GLM reviewer declares auxiliary_models: {name} must declare none, as the GLM workers")
+        for message in glm_fallback_errors(profile, allowed_models):
+            fail(errors, message)
 
 
 # The jev plugin (plugins/jev/, card t_4f7740d0) is a required enabled plugin
@@ -2417,12 +2508,12 @@ def main():
     # mode is still verified) but never in a dispatch list or pool.
     retired = roster_retired(roster)
     check_retired_profiles(errors, roster)
-    check_glm_worker_profiles(errors, roster)
-    check_glm_reviewer_profiles(errors, roster)
+    allowed_models = claude_subscription_models()
+    check_glm_worker_profiles(errors, roster, allowed_models)
+    check_glm_reviewer_profiles(errors, roster, allowed_models)
     check_jev_plugin_declarations(errors, roster)
     check_model_policy(errors, roster)
     check_fallback_declarations(errors, roster)
-    allowed_models = claude_subscription_models()
     check_auxiliary_model_declarations(errors, roster, allowed_models)
     check_retired_dispatch(errors, "desired dispatch_profiles", dispatch_profiles, retired)
     fleets = snapshot.get("project_isolation")
