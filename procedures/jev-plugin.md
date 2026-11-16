@@ -177,6 +177,464 @@ For each `<profile>` with its `<source>` from the table:
 
    The SOULs of the five reviewers and the five orchestrators and the five orchestrator skills that card `t_f4ce916d` changed are deployed by the same deployment card. Deploy the five reviewer SOULs before step 7: a reviewer whose SOUL is from before card `t_f4ce916d` accepts review only for the four implementation profiles named there, so it would not accept a card that a `-3` profile implemented. Until these SOULs and skills are deployed, the live run prints `FAIL: profile SOUL drift <profile>` for the nine of these SOULs that `scripts/verify-state` checks (`PROFILE_SOUL_PATHS` has no entry for `jobcron-reviewer`) and `FAIL: profile-local skill override drift: <orchestrator profile>/autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md` for the five orchestrators; after that deployment these lines must be absent as well.
 
+## Renaming the GLM worker profiles and creating the second worker of each route
+
+Card `t_aabef2e4` wrote this section in the repository only and ran none of its steps. The deployment card (its ID is `<card id>` below) runs the live steps D0 to D10 in the order given, with the owner's authorization. Source: `/Users/chanbla11mit/hermes-local-harness/docs/specs/261116-glm-worker-profiles-by-route-and-claude-fallback.md` (card `t_6957cef4`): section 2 (`hermes profile rename`), section 5 (fallback to the Claude subscription), section 7 (steps D0 to D10) and the open questions Q1 to Q5 of section 9. The owner answered the open questions in a Telegram direct message to `harness-orchestrator` on 2026-11-16: "1. Yes 2. Yes 3. Yes 4. Yes 5. Yes, that's ok. I approve the GLM doubling deployment D0 to D10, with yes to questions 1, 2 and 3." The steps below include these answers:
+
+- Q1: the helper tasks of the GLM profiles get the fallback chains that card R2 declares in `roster.yaml`: the light helper tasks (`LIGHT_HELPER_TASKS` of `/Users/chanbla11mit/hermes-local-harness/scripts/verify-state`: `title_generation`, `memory_query_rewrite`, `tts_audio_tags`, `profile_describer`, `skills_hub` and `vision`) fall back to `claude-subscription` `claude-haiku-5-5`, and the other helper tasks to the profile's own fallback model (step D6).
+- Q2: step D3 also adds `HERMES_CLAUDE_SUBSCRIPTION_EFFORT` to each GLM profile `.env` that does not have it, copied without printing from the same source `.env` as the two path lines. The four anki GLM profiles already have it.
+- Q3: the owner approved deploying the changed SOULs of the five Opus reviewers, the five GLM reviewers, the five orchestrators and the 30 GLM workers, and the orchestrator skills of `anki`, `chapt`, `jobcron` and `jss` (steps D2, D4 and D7). Step D9 deploys the harness-orchestrator skill (owner decision 5 of the specification).
+- Q4: the disabled cron job `94d7b3d1dc19` "Jobcron emergency autonomous deployment controller" in `/Users/chanbla11mit/.hermes/profiles/jobcron-orchestrator/cron/jobs.json` names `jobcron-worker-glm-1` and `jobcron-worker-glm-2` in its prompt. It is outside this procedure: board `jobcron` handles it, and this harness deployment does not read or change it.
+- Q5: card creation does not stop during the deployment. A card that is created from D1 step 4 to D8 and routed to an old name by the `jev` configuration that is installed at that time is moved afterwards by D2a and by the repeated check of D2a in D8 step 4 and in D10.
+
+Names. The 15 old names and their new names (`hermes profile rename`), on every board prefix `jobcron`, `chapt`, `harness`, `jss` and `anki`: `<prefix>-worker-glm-1` becomes `<prefix>-worker-glm-easy-1`, `<prefix>-worker-glm-2` becomes `<prefix>-worker-glm-medium-1` and `<prefix>-worker-glm-3` becomes `<prefix>-worker-glm-hard-1`. The 15 copies: `<prefix>-worker-glm-easy-2` from `<prefix>-worker-glm-easy-1`, `<prefix>-worker-glm-medium-2` from `<prefix>-worker-glm-medium-1` and `<prefix>-worker-glm-hard-2` from `<prefix>-worker-glm-hard-1`. The five GLM reviewers keep their names. Board names: prefix `chapt` is board `cha-pt` and prefix `jss` is board `jss-genr`; the other prefixes are also the board names.
+
+Placeholders and directories:
+
+- `<integrated commit>`: the full commit of local `main` of `/Users/chanbla11mit/hermes-local-harness` that holds cards R1 (`t_18a2dc93`), R2 (fallback declarations), R3 (`scripts/jev-report` and `previous_names`) and R4 (this section), each approved by its reviewer. Before D0, `git -C /Users/chanbla11mit/hermes-local-harness rev-parse HEAD` prints this commit and `git -C /Users/chanbla11mit/hermes-local-harness status --porcelain` prints nothing. Every file that a step copies comes from this checkout, and `/Users/chanbla11mit/hermes-local-harness/scripts/switch-profile-model` reads `/Users/chanbla11mit/hermes-local-harness/roster.yaml` of this checkout (option `--roster`, default the checkout of the script), so the fallback declarations of R2 must be in it before D1.
+- `/Users/chanbla11mit/.hermes/backups/<card id>`: the backup directory of the deployment. D1 step 1 creates it with mode 0700. Every backup and every card list of this procedure is written there and not to the scratch directory of a profile, because Hermes removes scratch entries that were not used for 24 hours, and the card list of D1 step 6 is still needed after the deployment (D2a step 3). A backup of the plugin `claude-subscription` must never be placed in `plugins/model-providers/` of a profile: Hermes imports every directory there as a model provider plugin (`providers/__init__.py`, `_user_plugins_dir` lines 297 to 305, and `_scan_home_layer` from line 359).
+- `<date>`: the date of the rename in the form `2026-11-16`.
+
+Local `main` already held card R1 when this section was written: merge commit `c91e172f9a19adb6a5964852ec10c2397d231f8a` (2026-11-16). The `com.nous.hermes-jev-peak-hold` LaunchAgent runs `/Users/chanbla11mit/hermes-local-harness/scripts/jev-peak-hold --apply` of the main checkout, and that script reads `plugins/jev/config.json` of the same checkout (`scripts/jev-peak-hold` lines 70 and 304). Since that merge the LaunchAgent therefore reads the 30 new names, and it holds in the peak hours only `ready` and `todo` cards that are assigned to a GLM worker named in that file (`scripts/jev-peak-hold` lines 5 to 7; `plugins/jev/peak_hold.py`, `glm_workers_by_board` and `all_glm_workers`). Until D2a moves them, cards that are assigned to an old name are not held in the peak hours.
+
+Fallback to the Claude subscription. After step D6 every GLM worker profile and every GLM reviewer has the `fallback_providers` entry of card R2: `claude-subscription` `claude-haiku-5-5` on the ten workers of the route `easy`, `claude-subscription` `claude-sonnet-5-5` on the twenty workers of the routes `medium` and `hard` and on the five GLM reviewers; the `anthropic` provider is never used. The fallback starts when a Z.ai call fails with the quota error that was observed on 2026-11-13 (HTTP 429, code `1308`, "Usage limit reached for 5 hour"): Hermes classifies it as `billing` (`agent/error_classifier.py`, `_status_429`, lines 1049 to 1078; `rate_limit` if the response has a reset header), and for both reasons it switches to the first fallback entry at the first error of the call, without a retry (`agent/turn_recovery.py` lines 1666 to 1680 and 1884 to 1921). The switch comes later only while the credential pool can rotate to another available Z.ai entry (`_pool_may_recover_from_rate_limit`, `run_agent.py` lines 217 to 224), and a Z.ai overload 429 switches only after two retries (`agent/turn_recovery.py` lines 1899 to 1908). A card model override such as `-m glm-5.3-flash --provider zai` does not remove the chain: the CLI reads `fallback_providers` from the profile configuration whatever model it was started with (`hermes_cli/cli_init_mixin.py` line 295). The fallback lasts for the rest of the run: Hermes returns to the primary model only at the start of the next turn (`agent/agent_runtime_helpers.py` lines 1426 to 1434), and a worker that the dispatcher starts runs one `chat -q` turn; the next run of the same card starts on `zai` again. A fallback run still counts as the GLM worker profile for the `jev` rules, because every rule selects by the profile name in `HERMES_PROFILE` (`plugins/jev/jev_log.py` lines 44 to 52) and by the lists in `config.json`, never by the model: the card is held in the peak hours, its model override is cleared at the review handoff, it is counted against the change request limit of its route, and its first review is by the board's GLM reviewer. The provider takes its reasoning effort from `HERMES_CLAUDE_SUBSCRIPTION_EFFORT` in the profile `.env` (step D3), not from `agent.reasoning_effort`, and the helper tasks use the `auxiliary.<task>.fallback_chain` entries of step D6. The Claude tokens of a fallback run lower the saving that `/Users/chanbla11mit/hermes-local-harness/scripts/jev-report` shows: the report sorts tokens by model family (`model_family`), so they count as Claude tokens of a card that was moved to a GLM worker.
+
+Reading the cards of the old names. Steps D1, D2a, D8 and D10 use this program. It changes nothing on the boards: it calls `hermes kanban --board <board> list --json` (`hermes_cli/kanban_parser.py` lines 234 to 248; without `--archived` the list has no archived card) and, for each card that is not `done`, `hermes kanban --board <board> show <task id> --json` (`hermes_cli/kanban.py` lines 473 to 497; the `events` field has `kind` and `payload`). It writes one file with the board, the task ID, the status, the assignee, the `implementer` of the latest `review_requested` event and whether the card already has the comment of D2a step 2, for every card whose assignee is an old name and every card whose latest `review_requested` event names an old implementer. It prints one line with the cards of conditions (a) and (b) of D1 step 3 and the cards that are assigned to an old name. Replace `<step>` with the step that runs it, for example `d1-2`:
+
+    python3 - /Users/chanbla11mit/.hermes/backups/<card id>/old-name-cards-<step>.json <<'EOF'
+    import json, re, subprocess, sys
+    OLD = re.compile(r"^(jobcron|chapt|harness|jss|anki)-worker-glm-[123]$")
+    BOARDS = ("jobcron", "cha-pt", "harness", "jss-genr", "anki")
+    def kanban(board, *args):
+        out = subprocess.run(["hermes", "kanban", "--board", board, *args, "--json"],
+                             check=True, capture_output=True, text=True).stdout
+        return json.loads(out)
+    def payload(event):
+        value = event.get("payload") or {}
+        return json.loads(value) if isinstance(value, str) else value
+    cards = []
+    for board in BOARDS:
+        for task in kanban(board, "list"):
+            if task["status"] == "done":
+                continue
+            shown = kanban(board, "show", task["id"])
+            requested = sorted((e for e in shown["events"] if e["kind"] == "review_requested"),
+                               key=lambda e: e["created_at"])
+            implementer = payload(requested[-1]).get("implementer") if requested else None
+            if OLD.match(task["assignee"] or "") or OLD.match(implementer or ""):
+                cards.append({"board": board, "id": task["id"], "status": task["status"],
+                              "assignee": task["assignee"], "implementer": implementer,
+                              "renamed_comment": any(" was renamed to " in (c["body"] or "")
+                                                      for c in shown["comments"])})
+    with open(sys.argv[1], "w") as f:
+        json.dump(cards, f, indent=1)
+    running = [c["id"] for c in cards if c["status"] == "running" and OLD.match(c["assignee"] or "")]
+    review = [c["id"] for c in cards if c["status"] == "review" and OLD.match(c["implementer"] or "")]
+    assigned = [c["id"] for c in cards if OLD.match(c["assignee"] or "")]
+    print(f"cards {len(cards)}; (a) running on an old name: {running}; "
+          f"(b) in review with an old implementer: {review}; assigned to an old name: {assigned}")
+    EOF
+
+The `implementer` of a `review_requested` event is the profile of the card's latest run (`hermes_cli/kanban_db.py` lines 3498 to 3506). A change request reads the `implementer` of the latest `review_requested` event (lines 3602 to 3607) and writes it as the assignee (line 3617), and `reopen_review_task` does the same (lines 3768 to 3797). A card in `review` has its reviewer as its assignee, so a wait that reads only the assignee does not see a card in `review` whose implementer is an old name. `unblock_task` returns a card that was blocked from `review` to `review` (`hermes_cli/kanban_db.py` lines 3724 to 3744, line 3742), so such a card can return to an old name long after the rename.
+
+### D0. Smoke test of `claude-sonnet-5-5`
+
+This uses the method of `procedures/haiku-helper-routing.md` step 4a and a temporary `HERMES_HOME`, so it changes no live state. Run it once:
+
+    python3 /Users/chanbla11mit/hermes-local-harness/plugins/model-providers/claude-subscription/smoke.py --cli /Users/chanbla11mit/.hermes/runtimes/claude-code/2.1.302/claude --model claude-sonnet-5-5
+
+- Check: the output is `SMOKE PASS cli=2.1.302 model=claude-sonnet-5-5`. On `SMOKE FAIL: <reason>`, stop and record the reason; no later step runs.
+- Rollback: none, because nothing changes.
+
+### D1. Back up, let the existing runs finish, then stop new runs on the old names
+
+The dispatcher starts a card only when its assignee is in `kanban.dispatch_profiles` and the profile exists (`_gated`, `hermes_cli/kanban_db_dispatch.py` lines 1685 to 1690). For any other assignee it records `skipped_nonspawnable` and starts nothing (lines 2049 to 2064). After the old names leave the list, a `ready` card on an old name is never started: also not a `scheduled` card that the peak hold releases to `ready`, and not a card that a change request returns. A wait for zero cards that are assigned to an old name could therefore not end after that removal, so this step does not wait for it; step D2a moves those cards. `rename_profile` has no check for a running Kanban worker of the profile (specification section 2), so the rename waits for the runs instead. Until D7 the reviewers have their old SOULs, which name the old implementation profiles, so they accept a card whose implementer is an old name.
+
+1. Create the backup directory and back up the dispatch list:
+
+        mkdir -p -m 700 /Users/chanbla11mit/.hermes/backups/<card id>
+        cp -p /Users/chanbla11mit/.hermes/config.yaml /Users/chanbla11mit/.hermes/backups/<card id>/config.yaml
+
+2. Record the cards, read only: run the program of "Reading the cards of the old names" with `<step>` `d1-2`.
+3. Let the existing runs finish while the 15 old names stay in `kanban.dispatch_profiles`. Run the program again every 5 minutes (`<step>` `d1-3`), and wait until both of these hold on every board:
+   - (a) No card has status `running` with an old name as its assignee.
+   - (b) No card in `review` has an old name as the `implementer` of its latest `review_requested` event.
+
+   Cards in `ready`, `todo`, `scheduled`, `triage` or `blocked` that are assigned to an old name may remain; step D2a moves them. While the old names are in the list the dispatcher starts `ready` cards on them, so this wait has no fixed end. The deployment card may stop it after a time limit that it records in a comment on its own card, and go on to step 4. The wait of step 5 has no time limit.
+4. Remove the 15 old names from `kanban.dispatch_profiles`, one at a time. Preview each command with `--dry-run` added first. The script writes the dispatch entry only together with `--to` (`scripts/switch-profile-model` lines 160 to 162); `--to glm` writes the model, provider and helper tasks that the profile already has, and the script backs up the profile's `config.yaml` to `config.yaml.pre-switch-<time>` in the profile directory first (line 208). After this the dispatcher starts no new run on these names (`kanban_db_dispatch.py` lines 1690 and 2049 to 2064):
+
+        python3 /Users/chanbla11mit/hermes-local-harness/scripts/switch-profile-model --profile jobcron-worker-glm-1 --to glm --dispatch remove
+        python3 /Users/chanbla11mit/hermes-local-harness/scripts/switch-profile-model --profile jobcron-worker-glm-2 --to glm --dispatch remove
+        python3 /Users/chanbla11mit/hermes-local-harness/scripts/switch-profile-model --profile jobcron-worker-glm-3 --to glm --dispatch remove
+        python3 /Users/chanbla11mit/hermes-local-harness/scripts/switch-profile-model --profile chapt-worker-glm-1 --to glm --dispatch remove
+        python3 /Users/chanbla11mit/hermes-local-harness/scripts/switch-profile-model --profile chapt-worker-glm-2 --to glm --dispatch remove
+        python3 /Users/chanbla11mit/hermes-local-harness/scripts/switch-profile-model --profile chapt-worker-glm-3 --to glm --dispatch remove
+        python3 /Users/chanbla11mit/hermes-local-harness/scripts/switch-profile-model --profile harness-worker-glm-1 --to glm --dispatch remove
+        python3 /Users/chanbla11mit/hermes-local-harness/scripts/switch-profile-model --profile harness-worker-glm-2 --to glm --dispatch remove
+        python3 /Users/chanbla11mit/hermes-local-harness/scripts/switch-profile-model --profile harness-worker-glm-3 --to glm --dispatch remove
+        python3 /Users/chanbla11mit/hermes-local-harness/scripts/switch-profile-model --profile jss-worker-glm-1 --to glm --dispatch remove
+        python3 /Users/chanbla11mit/hermes-local-harness/scripts/switch-profile-model --profile jss-worker-glm-2 --to glm --dispatch remove
+        python3 /Users/chanbla11mit/hermes-local-harness/scripts/switch-profile-model --profile jss-worker-glm-3 --to glm --dispatch remove
+        python3 /Users/chanbla11mit/hermes-local-harness/scripts/switch-profile-model --profile anki-worker-glm-1 --to glm --dispatch remove
+        python3 /Users/chanbla11mit/hermes-local-harness/scripts/switch-profile-model --profile anki-worker-glm-2 --to glm --dispatch remove
+        python3 /Users/chanbla11mit/hermes-local-harness/scripts/switch-profile-model --profile anki-worker-glm-3 --to glm --dispatch remove
+
+   The script also writes the profile's model and provider into `/Users/chanbla11mit/hermes-local-harness/roster.yaml`; the roster declares no entry for an old name after R1, so the script prints `roster: <old name> is not declared in ...; no roster change`, and `git -C /Users/chanbla11mit/hermes-local-harness status --porcelain` stays empty.
+5. Run the program again (`<step>` `d1-5`) and repeat it every 5 minutes until (a) and (b) hold on every board. A run can start between the last reading of step 3 and step 4, so the result of step 3 alone is not enough. This wait ends, for these reasons:
+   - After step 4 no run starts on an old name, so no new `review_requested` event names an old implementer.
+   - A running run ends, at the latest when it reaches its runtime limit.
+   - A card in `review` leaves `review` when its reviewer approves it (`done`), requests changes (the card returns to `ready` on the old name and waits for D2a), or blocks it. A card that is blocked from `review` stays in the file of step 6, and step D2a handles it.
+6. Write the card list again from new readings (`<step>` `d1-6`). Cards that changed status, and cards that were created since step 2, are then in it. The file `/Users/chanbla11mit/.hermes/backups/<card id>/old-name-cards-d1-6.json` is the card list of D2a, D8 step 4, D10 and the check after the deployment.
+7. Count the notification subscriptions that name an old name, read only:
+
+        sqlite3 -readonly /Users/chanbla11mit/.hermes/kanban/boards/jobcron/kanban.db "SELECT COUNT(*) FROM kanban_notify_subs WHERE notifier_profile LIKE '%-worker-glm-%'"
+        sqlite3 -readonly /Users/chanbla11mit/.hermes/kanban/boards/cha-pt/kanban.db "SELECT COUNT(*) FROM kanban_notify_subs WHERE notifier_profile LIKE '%-worker-glm-%'"
+        sqlite3 -readonly /Users/chanbla11mit/.hermes/kanban/boards/harness/kanban.db "SELECT COUNT(*) FROM kanban_notify_subs WHERE notifier_profile LIKE '%-worker-glm-%'"
+        sqlite3 -readonly /Users/chanbla11mit/.hermes/kanban/boards/jss-genr/kanban.db "SELECT COUNT(*) FROM kanban_notify_subs WHERE notifier_profile LIKE '%-worker-glm-%'"
+        sqlite3 -readonly /Users/chanbla11mit/.hermes/kanban/boards/anki/kanban.db "SELECT COUNT(*) FROM kanban_notify_subs WHERE notifier_profile LIKE '%-worker-glm-%'"
+
+   If a count is not 0, stop and ask the owner.
+
+- Check: the program of step 5 prints `(a) running on an old name: []` and `(b) in review with an old implementer: []`. `grep -c -- '-worker-glm-[123]$' /Users/chanbla11mit/.hermes/config.yaml` gives 0. The file `/Users/chanbla11mit/.hermes/backups/<card id>/old-name-cards-d1-6.json` exists.
+- Rollback: `cp -p /Users/chanbla11mit/.hermes/backups/<card id>/config.yaml /Users/chanbla11mit/.hermes/config.yaml`. This returns the 15 old names to the dispatch list; use it only while the old profiles exist (before D2, or after the D2 rollback).
+
+### D2. Rename the 15 profiles
+
+Run the commands one at a time, and check the output of each before the next:
+
+    hermes profile rename jobcron-worker-glm-1 jobcron-worker-glm-easy-1
+    hermes profile rename jobcron-worker-glm-2 jobcron-worker-glm-medium-1
+    hermes profile rename jobcron-worker-glm-3 jobcron-worker-glm-hard-1
+    hermes profile rename chapt-worker-glm-1 chapt-worker-glm-easy-1
+    hermes profile rename chapt-worker-glm-2 chapt-worker-glm-medium-1
+    hermes profile rename chapt-worker-glm-3 chapt-worker-glm-hard-1
+    hermes profile rename harness-worker-glm-1 harness-worker-glm-easy-1
+    hermes profile rename harness-worker-glm-2 harness-worker-glm-medium-1
+    hermes profile rename harness-worker-glm-3 harness-worker-glm-hard-1
+    hermes profile rename jss-worker-glm-1 jss-worker-glm-easy-1
+    hermes profile rename jss-worker-glm-2 jss-worker-glm-medium-1
+    hermes profile rename jss-worker-glm-3 jss-worker-glm-hard-1
+    hermes profile rename anki-worker-glm-1 anki-worker-glm-easy-1
+    hermes profile rename anki-worker-glm-2 anki-worker-glm-medium-1
+    hermes profile rename anki-worker-glm-3 anki-worker-glm-hard-1
+
+With the live gateway the rename takes the multiplexer path: it stops serving the old name before the move and serves the new name after it, and the gateway migrates the session identity (`hermes_cli/profiles.py` lines 2484 to 2487 and 2538 to 2542; `hermes_cli/profile_identity.py` lines 195 to 215). The whole directory moves with one `rename` (line 2499), so `auth.json` with the Z.ai login, `.env`, `config.yaml`, `SOUL.md`, `skills/`, `plugins/`, `memories/`, `sessions/` and `state.db` move with it, and `profile.yaml` records the old name in `previous_names` (lines 2431 to 2443 and 2517), which card R3 reads. Do not restart the gateway while a Kanban worker runs, because the dispatcher runs in the gateway process.
+
+Then back up the SOUL of each renamed profile and replace it:
+
+    mkdir -p /Users/chanbla11mit/.hermes/backups/<card id>/jobcron-worker-glm-easy-1 && cp -p /Users/chanbla11mit/.hermes/profiles/jobcron-worker-glm-easy-1/SOUL.md /Users/chanbla11mit/.hermes/backups/<card id>/jobcron-worker-glm-easy-1/SOUL.md
+    mkdir -p /Users/chanbla11mit/.hermes/backups/<card id>/jobcron-worker-glm-medium-1 && cp -p /Users/chanbla11mit/.hermes/profiles/jobcron-worker-glm-medium-1/SOUL.md /Users/chanbla11mit/.hermes/backups/<card id>/jobcron-worker-glm-medium-1/SOUL.md
+    mkdir -p /Users/chanbla11mit/.hermes/backups/<card id>/jobcron-worker-glm-hard-1 && cp -p /Users/chanbla11mit/.hermes/profiles/jobcron-worker-glm-hard-1/SOUL.md /Users/chanbla11mit/.hermes/backups/<card id>/jobcron-worker-glm-hard-1/SOUL.md
+    mkdir -p /Users/chanbla11mit/.hermes/backups/<card id>/chapt-worker-glm-easy-1 && cp -p /Users/chanbla11mit/.hermes/profiles/chapt-worker-glm-easy-1/SOUL.md /Users/chanbla11mit/.hermes/backups/<card id>/chapt-worker-glm-easy-1/SOUL.md
+    mkdir -p /Users/chanbla11mit/.hermes/backups/<card id>/chapt-worker-glm-medium-1 && cp -p /Users/chanbla11mit/.hermes/profiles/chapt-worker-glm-medium-1/SOUL.md /Users/chanbla11mit/.hermes/backups/<card id>/chapt-worker-glm-medium-1/SOUL.md
+    mkdir -p /Users/chanbla11mit/.hermes/backups/<card id>/chapt-worker-glm-hard-1 && cp -p /Users/chanbla11mit/.hermes/profiles/chapt-worker-glm-hard-1/SOUL.md /Users/chanbla11mit/.hermes/backups/<card id>/chapt-worker-glm-hard-1/SOUL.md
+    mkdir -p /Users/chanbla11mit/.hermes/backups/<card id>/harness-worker-glm-easy-1 && cp -p /Users/chanbla11mit/.hermes/profiles/harness-worker-glm-easy-1/SOUL.md /Users/chanbla11mit/.hermes/backups/<card id>/harness-worker-glm-easy-1/SOUL.md
+    mkdir -p /Users/chanbla11mit/.hermes/backups/<card id>/harness-worker-glm-medium-1 && cp -p /Users/chanbla11mit/.hermes/profiles/harness-worker-glm-medium-1/SOUL.md /Users/chanbla11mit/.hermes/backups/<card id>/harness-worker-glm-medium-1/SOUL.md
+    mkdir -p /Users/chanbla11mit/.hermes/backups/<card id>/harness-worker-glm-hard-1 && cp -p /Users/chanbla11mit/.hermes/profiles/harness-worker-glm-hard-1/SOUL.md /Users/chanbla11mit/.hermes/backups/<card id>/harness-worker-glm-hard-1/SOUL.md
+    mkdir -p /Users/chanbla11mit/.hermes/backups/<card id>/jss-worker-glm-easy-1 && cp -p /Users/chanbla11mit/.hermes/profiles/jss-worker-glm-easy-1/SOUL.md /Users/chanbla11mit/.hermes/backups/<card id>/jss-worker-glm-easy-1/SOUL.md
+    mkdir -p /Users/chanbla11mit/.hermes/backups/<card id>/jss-worker-glm-medium-1 && cp -p /Users/chanbla11mit/.hermes/profiles/jss-worker-glm-medium-1/SOUL.md /Users/chanbla11mit/.hermes/backups/<card id>/jss-worker-glm-medium-1/SOUL.md
+    mkdir -p /Users/chanbla11mit/.hermes/backups/<card id>/jss-worker-glm-hard-1 && cp -p /Users/chanbla11mit/.hermes/profiles/jss-worker-glm-hard-1/SOUL.md /Users/chanbla11mit/.hermes/backups/<card id>/jss-worker-glm-hard-1/SOUL.md
+    mkdir -p /Users/chanbla11mit/.hermes/backups/<card id>/anki-worker-glm-easy-1 && cp -p /Users/chanbla11mit/.hermes/profiles/anki-worker-glm-easy-1/SOUL.md /Users/chanbla11mit/.hermes/backups/<card id>/anki-worker-glm-easy-1/SOUL.md
+    mkdir -p /Users/chanbla11mit/.hermes/backups/<card id>/anki-worker-glm-medium-1 && cp -p /Users/chanbla11mit/.hermes/profiles/anki-worker-glm-medium-1/SOUL.md /Users/chanbla11mit/.hermes/backups/<card id>/anki-worker-glm-medium-1/SOUL.md
+    mkdir -p /Users/chanbla11mit/.hermes/backups/<card id>/anki-worker-glm-hard-1 && cp -p /Users/chanbla11mit/.hermes/profiles/anki-worker-glm-hard-1/SOUL.md /Users/chanbla11mit/.hermes/backups/<card id>/anki-worker-glm-hard-1/SOUL.md
+
+    cp /Users/chanbla11mit/hermes-local-harness/policies/profile-souls/chapt-worker-glm-easy-1/SOUL.md /Users/chanbla11mit/.hermes/profiles/chapt-worker-glm-easy-1/SOUL.md
+    cp /Users/chanbla11mit/hermes-local-harness/policies/profile-souls/chapt-worker-glm-medium-1/SOUL.md /Users/chanbla11mit/.hermes/profiles/chapt-worker-glm-medium-1/SOUL.md
+    cp /Users/chanbla11mit/hermes-local-harness/policies/profile-souls/chapt-worker-glm-hard-1/SOUL.md /Users/chanbla11mit/.hermes/profiles/chapt-worker-glm-hard-1/SOUL.md
+    cp /Users/chanbla11mit/hermes-local-harness/policies/profile-souls/harness-worker-glm-easy-1/SOUL.md /Users/chanbla11mit/.hermes/profiles/harness-worker-glm-easy-1/SOUL.md
+    cp /Users/chanbla11mit/hermes-local-harness/policies/profile-souls/harness-worker-glm-medium-1/SOUL.md /Users/chanbla11mit/.hermes/profiles/harness-worker-glm-medium-1/SOUL.md
+    cp /Users/chanbla11mit/hermes-local-harness/policies/profile-souls/harness-worker-glm-hard-1/SOUL.md /Users/chanbla11mit/.hermes/profiles/harness-worker-glm-hard-1/SOUL.md
+    cp /Users/chanbla11mit/hermes-local-harness/policies/profile-souls/jss-worker-glm-easy-1/SOUL.md /Users/chanbla11mit/.hermes/profiles/jss-worker-glm-easy-1/SOUL.md
+    cp /Users/chanbla11mit/hermes-local-harness/policies/profile-souls/jss-worker-glm-medium-1/SOUL.md /Users/chanbla11mit/.hermes/profiles/jss-worker-glm-medium-1/SOUL.md
+    cp /Users/chanbla11mit/hermes-local-harness/policies/profile-souls/jss-worker-glm-hard-1/SOUL.md /Users/chanbla11mit/.hermes/profiles/jss-worker-glm-hard-1/SOUL.md
+    cp /Users/chanbla11mit/hermes-local-harness/policies/profile-souls/anki-worker-glm-easy-1/SOUL.md /Users/chanbla11mit/.hermes/profiles/anki-worker-glm-easy-1/SOUL.md
+    cp /Users/chanbla11mit/hermes-local-harness/policies/profile-souls/anki-worker-glm-medium-1/SOUL.md /Users/chanbla11mit/.hermes/profiles/anki-worker-glm-medium-1/SOUL.md
+    cp /Users/chanbla11mit/hermes-local-harness/policies/profile-souls/anki-worker-glm-hard-1/SOUL.md /Users/chanbla11mit/.hermes/profiles/anki-worker-glm-hard-1/SOUL.md
+
+The three Jobcron GLM workers have no SOUL source in this repository (see "Attachment and diff procedure of the GLM workers"). Write each one from its backup with the profile name and the worker number replaced, by the method of "Creating the third GLM worker profile of each board", step 3:
+
+    sed -e 's/jobcron-worker-glm-1/jobcron-worker-glm-easy-1/g' -e 's/implementation worker 1/implementation worker easy-1/g' /Users/chanbla11mit/.hermes/backups/<card id>/jobcron-worker-glm-easy-1/SOUL.md > /Users/chanbla11mit/.hermes/profiles/jobcron-worker-glm-easy-1/SOUL.md
+    sed -e 's/jobcron-worker-glm-2/jobcron-worker-glm-medium-1/g' -e 's/implementation worker 2/implementation worker medium-1/g' /Users/chanbla11mit/.hermes/backups/<card id>/jobcron-worker-glm-medium-1/SOUL.md > /Users/chanbla11mit/.hermes/profiles/jobcron-worker-glm-medium-1/SOUL.md
+    sed -e 's/jobcron-worker-glm-3/jobcron-worker-glm-hard-1/g' -e 's/implementation worker 3/implementation worker hard-1/g' /Users/chanbla11mit/.hermes/backups/<card id>/jobcron-worker-glm-hard-1/SOUL.md > /Users/chanbla11mit/.hermes/profiles/jobcron-worker-glm-hard-1/SOUL.md
+
+The fallback sentence that card R2 adds to the SOUL sources of the other boards is not in these three files, because they have no repository source.
+
+- Check: each command prints `✓ Renamed <old name> → <new name>` (`hermes_cli/profiles.py` line 2508) and does not print `⚠ Profile was renamed, but the live gateway could not migrate session identity` (`hermes_cli/profile_identity.py` line 211). If it prints that warning, stop the rename sequence; after all Kanban workers have ended, restart the gateway, then run `hermes profile migrate-identity <old name> <new name>` as the warning says. `hermes profile list` shows the 15 new names and none of the old names. `python3 -c 'import json; print(sorted(n for n in json.load(open("/Users/chanbla11mit/.hermes/gateway_state.json"))["served_profiles"] if "-worker-glm-" in n))'` prints the 15 new names and none of the old names. For each new name, `ls /Users/chanbla11mit/.hermes/profiles/<new name>/auth.json` prints the path, and `grep -c '<old name>' /Users/chanbla11mit/.hermes/profiles/<new name>/profile.yaml` gives at least 1. `shasum -a 256` of each of the twelve copied SOULs equals that of its source. `diff /Users/chanbla11mit/.hermes/backups/<card id>/<new name>/SOUL.md /Users/chanbla11mit/.hermes/profiles/<new name>/SOUL.md` of each Jobcron profile shows only the two replacements, and `grep -c -E 'jobcron-worker-glm-[123]([^0-9]|$)' /Users/chanbla11mit/.hermes/profiles/<new name>/SOUL.md` gives 0.
+- Rollback: for each renamed profile, `hermes profile rename <new name> <old name>`, then `cp -p /Users/chanbla11mit/.hermes/backups/<card id>/<new name>/SOUL.md /Users/chanbla11mit/.hermes/profiles/<old name>/SOUL.md`. Then the D2a rollback, and the D1 rollback if the old names are to run again.
+
+### D2a. Move the cards of the old names to the new names
+
+Start this step directly after D2. Run the program of "Reading the cards of the old names" with `<step>` `d2a`.
+
+1. Move each card of `/Users/chanbla11mit/.hermes/backups/<card id>/old-name-cards-d2a.json` whose assignee is an old name and whose status is not `running` and not `review`, to the new name of its assignee (`<prefix>-worker-glm-1` to `<prefix>-worker-glm-easy-1`, `-2` to `-medium-1`, `-3` to `-hard-1`):
+
+        hermes kanban --board <board> assign <task id> <new name>
+
+   (`hermes_cli/kanban_parser.py` line 251). `assign_task` refuses only a card that is `running` under a claim (`hermes_cli/kanban_db.py` lines 1634 to 1638); after D1 no such card remains on an old name. A new assignee starts with a failure count of 0 (lines 1639 to 1643). Do not move a card in `review`: its assignee is its reviewer.
+2. Add one comment to each card of `/Users/chanbla11mit/.hermes/backups/<card id>/old-name-cards-d1-6.json` and of `/Users/chanbla11mit/.hermes/backups/<card id>/old-name-cards-d2a.json`, once for each card, both the moved cards and the cards that only have an old implementer. A card whose `renamed_comment` is true in the newer file already has it:
+
+        hermes kanban --board <board> comment <task id> "Profile <old name> was renamed to <new name> by hermes profile rename on <date> (deployment card <card id>). The name <old name> in the card body and in earlier events is the same profile."
+
+   (`hermes_cli/kanban_parser.py` lines 280 to 284). Card bodies name the assigned worker exactly, and the worker SOULs and, after D7, the reviewer SOULs treat a different profile name as a boundary mismatch, so the comment records the rename in the card history.
+3. A card with an old implementer that is still `blocked`, or that returns to `review` later (`unblock_task`, `hermes_cli/kanban_db.py` line 3742), returns to the old name when its reviewer requests changes (line 3617), and the dispatcher records `skipped_nonspawnable` for it, because the profile does not exist (`kanban_db_dispatch.py` lines 2049 to 2064). Steps 1 and 2 are therefore repeated in D8 step 4 and in D10, and, after the deployment, after each change request on a card of the list, until the program prints no card that is not `done` or archived.
+
+The moved cards start only after D6 adds the new names to `kanban.dispatch_profiles`.
+
+- Check: the program run again with `<step>` `d2a-check` prints `assigned to an old name: []`. `hermes kanban --board <board> show <task id> --json` of each card of both files shows the comment in `comments`.
+- Rollback: after the D2 rollback, `hermes kanban --board <board> assign <task id> <old name>` for each moved card. Comments are not removed; add one comment that records the rollback.
+
+### D3. `.env` lines and the `claude-subscription` plugin on the renamed profiles and the GLM reviewers
+
+Nobody opens or prints a `.env` file in this step; the commands copy whole lines between files and print only counts. The source is `/Users/chanbla11mit/.hermes/profiles/anki-worker-glm-easy-1/.env` (the renamed `anki-worker-glm-1`), which has all three settings. The 16 target profiles are the twelve renamed profiles of `harness`, `chapt`, `jobcron` and `jss` and the GLM reviewers of those four boards; the four anki GLM profiles already have the three settings and are not changed.
+
+1. Check the source: each of the three commands gives 1:
+
+        grep -c '^HERMES_CLAUDE_SUBSCRIPTION_CLI=' /Users/chanbla11mit/.hermes/profiles/anki-worker-glm-easy-1/.env
+        grep -c '^HERMES_CLAUDE_SUBSCRIPTION_TOKEN_FILE=' /Users/chanbla11mit/.hermes/profiles/anki-worker-glm-easy-1/.env
+        grep -c '^HERMES_CLAUDE_SUBSCRIPTION_EFFORT=' /Users/chanbla11mit/.hermes/profiles/anki-worker-glm-easy-1/.env
+
+2. Back up the 16 `.env` files (`cp -p` keeps mode 0600):
+
+        for p in jobcron-worker-glm-easy-1 jobcron-worker-glm-medium-1 jobcron-worker-glm-hard-1 chapt-worker-glm-easy-1 chapt-worker-glm-medium-1 chapt-worker-glm-hard-1 harness-worker-glm-easy-1 harness-worker-glm-medium-1 harness-worker-glm-hard-1 jss-worker-glm-easy-1 jss-worker-glm-medium-1 jss-worker-glm-hard-1 jobcron-reviewer-glm chapt-reviewer-glm harness-reviewer-glm jss-reviewer-glm; do
+          mkdir -p /Users/chanbla11mit/.hermes/backups/<card id>/$p && cp -p /Users/chanbla11mit/.hermes/profiles/$p/.env /Users/chanbla11mit/.hermes/backups/<card id>/$p/.env
+        done
+
+3. Append each of the settings `HERMES_CLAUDE_SUBSCRIPTION_CLI`, `HERMES_CLAUDE_SUBSCRIPTION_TOKEN_FILE` and `HERMES_CLAUDE_SUBSCRIPTION_EFFORT` that a target does not have. The `tail` test adds a line break first when the file does not end with one; it prints nothing:
+
+        for p in jobcron-worker-glm-easy-1 jobcron-worker-glm-medium-1 jobcron-worker-glm-hard-1 chapt-worker-glm-easy-1 chapt-worker-glm-medium-1 chapt-worker-glm-hard-1 harness-worker-glm-easy-1 harness-worker-glm-medium-1 harness-worker-glm-hard-1 jss-worker-glm-easy-1 jss-worker-glm-medium-1 jss-worker-glm-hard-1 jobcron-reviewer-glm chapt-reviewer-glm harness-reviewer-glm jss-reviewer-glm; do
+          f=/Users/chanbla11mit/.hermes/profiles/$p/.env
+          for name in HERMES_CLAUDE_SUBSCRIPTION_CLI HERMES_CLAUDE_SUBSCRIPTION_TOKEN_FILE HERMES_CLAUDE_SUBSCRIPTION_EFFORT; do
+            if [ "$(grep -c "^$name=" "$f")" = 0 ]; then
+              [ -z "$(tail -c 1 "$f")" ] || printf '\n' >> "$f"
+              grep "^$name=" /Users/chanbla11mit/.hermes/profiles/anki-worker-glm-easy-1/.env >> "$f"
+            fi
+          done
+        done
+
+4. Export the plugin of the integrated commit, and copy it to the 15 renamed profiles and the five GLM reviewers. An existing copy (on the four anki profiles) is moved to the backup directory first:
+
+        mkdir -p /Users/chanbla11mit/.hermes/backups/<card id>/source
+        git -C /Users/chanbla11mit/hermes-local-harness archive <integrated commit> plugins/model-providers/claude-subscription | tar -x -C /Users/chanbla11mit/.hermes/backups/<card id>/source
+        for p in jobcron-worker-glm-easy-1 jobcron-worker-glm-medium-1 jobcron-worker-glm-hard-1 chapt-worker-glm-easy-1 chapt-worker-glm-medium-1 chapt-worker-glm-hard-1 harness-worker-glm-easy-1 harness-worker-glm-medium-1 harness-worker-glm-hard-1 jss-worker-glm-easy-1 jss-worker-glm-medium-1 jss-worker-glm-hard-1 anki-worker-glm-easy-1 anki-worker-glm-medium-1 anki-worker-glm-hard-1 jobcron-reviewer-glm chapt-reviewer-glm harness-reviewer-glm jss-reviewer-glm anki-reviewer-glm; do
+          live=/Users/chanbla11mit/.hermes/profiles/$p/plugins/model-providers/claude-subscription
+          if [ -e "$live" ]; then mkdir -p /Users/chanbla11mit/.hermes/backups/<card id>/$p && mv "$live" /Users/chanbla11mit/.hermes/backups/<card id>/$p/claude-subscription; fi
+          mkdir -p /Users/chanbla11mit/.hermes/profiles/$p/plugins/model-providers
+          cp -Rp /Users/chanbla11mit/.hermes/backups/<card id>/source/plugins/model-providers/claude-subscription "$live"
+        done
+
+- Check: for each of the 20 profiles, this command prints `<profile> 1 1 1 0 600` (the three settings once each, no `ANTHROPIC_API` line, mode 0600):
+
+      for p in jobcron-worker-glm-easy-1 jobcron-worker-glm-medium-1 jobcron-worker-glm-hard-1 chapt-worker-glm-easy-1 chapt-worker-glm-medium-1 chapt-worker-glm-hard-1 harness-worker-glm-easy-1 harness-worker-glm-medium-1 harness-worker-glm-hard-1 jss-worker-glm-easy-1 jss-worker-glm-medium-1 jss-worker-glm-hard-1 anki-worker-glm-easy-1 anki-worker-glm-medium-1 anki-worker-glm-hard-1 jobcron-reviewer-glm chapt-reviewer-glm harness-reviewer-glm jss-reviewer-glm anki-reviewer-glm; do
+        f=/Users/chanbla11mit/.hermes/profiles/$p/.env
+        echo "$p $(grep -c '^HERMES_CLAUDE_SUBSCRIPTION_CLI=' $f) $(grep -c '^HERMES_CLAUDE_SUBSCRIPTION_TOKEN_FILE=' $f) $(grep -c '^HERMES_CLAUDE_SUBSCRIPTION_EFFORT=' $f) $(grep -c '^ANTHROPIC_API' $f) $(stat -f '%Lp' $f)"
+      done
+
+  `diff -r -x __pycache__ /Users/chanbla11mit/.hermes/backups/<card id>/source/plugins/model-providers/claude-subscription /Users/chanbla11mit/.hermes/profiles/<profile>/plugins/model-providers/claude-subscription` prints nothing for each of the 20 profiles, and `shasum -a 256` of each copied `compat.py` equals `git -C /Users/chanbla11mit/hermes-local-harness show <integrated commit>:plugins/model-providers/claude-subscription/compat.py | shasum -a 256`.
+- Rollback: `cp -p /Users/chanbla11mit/.hermes/backups/<card id>/<profile>/.env /Users/chanbla11mit/.hermes/profiles/<profile>/.env` for each of the 16 profiles. For each of the 20 profiles, `rm -rf /Users/chanbla11mit/.hermes/profiles/<profile>/plugins/model-providers/claude-subscription`, and on the four anki profiles `mv /Users/chanbla11mit/.hermes/backups/<card id>/<profile>/claude-subscription /Users/chanbla11mit/.hermes/profiles/<profile>/plugins/model-providers/claude-subscription`.
+
+### D4. Create the 15 new profiles by copy
+
+Run this after D3, so that each copy gets the `.env` lines and the plugin of its source:
+
+    hermes profile create jobcron-worker-glm-easy-2 --clone-from jobcron-worker-glm-easy-1
+    hermes profile create jobcron-worker-glm-medium-2 --clone-from jobcron-worker-glm-medium-1
+    hermes profile create jobcron-worker-glm-hard-2 --clone-from jobcron-worker-glm-hard-1
+    hermes profile create chapt-worker-glm-easy-2 --clone-from chapt-worker-glm-easy-1
+    hermes profile create chapt-worker-glm-medium-2 --clone-from chapt-worker-glm-medium-1
+    hermes profile create chapt-worker-glm-hard-2 --clone-from chapt-worker-glm-hard-1
+    hermes profile create harness-worker-glm-easy-2 --clone-from harness-worker-glm-easy-1
+    hermes profile create harness-worker-glm-medium-2 --clone-from harness-worker-glm-medium-1
+    hermes profile create harness-worker-glm-hard-2 --clone-from harness-worker-glm-hard-1
+    hermes profile create jss-worker-glm-easy-2 --clone-from jss-worker-glm-easy-1
+    hermes profile create jss-worker-glm-medium-2 --clone-from jss-worker-glm-medium-1
+    hermes profile create jss-worker-glm-hard-2 --clone-from jss-worker-glm-hard-1
+    hermes profile create anki-worker-glm-easy-2 --clone-from anki-worker-glm-easy-1
+    hermes profile create anki-worker-glm-medium-2 --clone-from anki-worker-glm-medium-1
+    hermes profile create anki-worker-glm-hard-2 --clone-from anki-worker-glm-hard-1
+
+Without `--clone-all` the copy contains `config.yaml`, `.env` (mode 0600), `SOUL.md`, `skills/`, `memories/` and `plugins/`, and no `auth.json` (see "Creating the third GLM worker profile of each board", step 1). Then, by steps 2 to 4 of that section:
+
+1. Delete the copied memory files:
+
+        for p in jobcron-worker-glm-easy-2 jobcron-worker-glm-medium-2 jobcron-worker-glm-hard-2 chapt-worker-glm-easy-2 chapt-worker-glm-medium-2 chapt-worker-glm-hard-2 harness-worker-glm-easy-2 harness-worker-glm-medium-2 harness-worker-glm-hard-2 jss-worker-glm-easy-2 jss-worker-glm-medium-2 jss-worker-glm-hard-2 anki-worker-glm-easy-2 anki-worker-glm-medium-2 anki-worker-glm-hard-2; do
+          rm -f /Users/chanbla11mit/.hermes/profiles/$p/memories/MEMORY.md /Users/chanbla11mit/.hermes/profiles/$p/memories/USER.md
+        done
+
+2. Replace the copied SOUL. Twelve profiles have a tracked source:
+
+        cp /Users/chanbla11mit/hermes-local-harness/policies/profile-souls/chapt-worker-glm-easy-2/SOUL.md /Users/chanbla11mit/.hermes/profiles/chapt-worker-glm-easy-2/SOUL.md
+        cp /Users/chanbla11mit/hermes-local-harness/policies/profile-souls/chapt-worker-glm-medium-2/SOUL.md /Users/chanbla11mit/.hermes/profiles/chapt-worker-glm-medium-2/SOUL.md
+        cp /Users/chanbla11mit/hermes-local-harness/policies/profile-souls/chapt-worker-glm-hard-2/SOUL.md /Users/chanbla11mit/.hermes/profiles/chapt-worker-glm-hard-2/SOUL.md
+        cp /Users/chanbla11mit/hermes-local-harness/policies/profile-souls/harness-worker-glm-easy-2/SOUL.md /Users/chanbla11mit/.hermes/profiles/harness-worker-glm-easy-2/SOUL.md
+        cp /Users/chanbla11mit/hermes-local-harness/policies/profile-souls/harness-worker-glm-medium-2/SOUL.md /Users/chanbla11mit/.hermes/profiles/harness-worker-glm-medium-2/SOUL.md
+        cp /Users/chanbla11mit/hermes-local-harness/policies/profile-souls/harness-worker-glm-hard-2/SOUL.md /Users/chanbla11mit/.hermes/profiles/harness-worker-glm-hard-2/SOUL.md
+        cp /Users/chanbla11mit/hermes-local-harness/policies/profile-souls/jss-worker-glm-easy-2/SOUL.md /Users/chanbla11mit/.hermes/profiles/jss-worker-glm-easy-2/SOUL.md
+        cp /Users/chanbla11mit/hermes-local-harness/policies/profile-souls/jss-worker-glm-medium-2/SOUL.md /Users/chanbla11mit/.hermes/profiles/jss-worker-glm-medium-2/SOUL.md
+        cp /Users/chanbla11mit/hermes-local-harness/policies/profile-souls/jss-worker-glm-hard-2/SOUL.md /Users/chanbla11mit/.hermes/profiles/jss-worker-glm-hard-2/SOUL.md
+        cp /Users/chanbla11mit/hermes-local-harness/policies/profile-souls/anki-worker-glm-easy-2/SOUL.md /Users/chanbla11mit/.hermes/profiles/anki-worker-glm-easy-2/SOUL.md
+        cp /Users/chanbla11mit/hermes-local-harness/policies/profile-souls/anki-worker-glm-medium-2/SOUL.md /Users/chanbla11mit/.hermes/profiles/anki-worker-glm-medium-2/SOUL.md
+        cp /Users/chanbla11mit/hermes-local-harness/policies/profile-souls/anki-worker-glm-hard-2/SOUL.md /Users/chanbla11mit/.hermes/profiles/anki-worker-glm-hard-2/SOUL.md
+
+   The three Jobcron copies are written from the SOUL of their source profile, which D2 wrote:
+
+        sed -e 's/jobcron-worker-glm-easy-1/jobcron-worker-glm-easy-2/g' -e 's/implementation worker easy-1/implementation worker easy-2/g' /Users/chanbla11mit/.hermes/profiles/jobcron-worker-glm-easy-1/SOUL.md > /Users/chanbla11mit/.hermes/profiles/jobcron-worker-glm-easy-2/SOUL.md
+        sed -e 's/jobcron-worker-glm-medium-1/jobcron-worker-glm-medium-2/g' -e 's/implementation worker medium-1/implementation worker medium-2/g' /Users/chanbla11mit/.hermes/profiles/jobcron-worker-glm-medium-1/SOUL.md > /Users/chanbla11mit/.hermes/profiles/jobcron-worker-glm-medium-2/SOUL.md
+        sed -e 's/jobcron-worker-glm-hard-1/jobcron-worker-glm-hard-2/g' -e 's/implementation worker hard-1/implementation worker hard-2/g' /Users/chanbla11mit/.hermes/profiles/jobcron-worker-glm-hard-1/SOUL.md > /Users/chanbla11mit/.hermes/profiles/jobcron-worker-glm-hard-2/SOUL.md
+
+3. Check the plugins of each copy against its source:
+
+        hermes -p <new profile> plugins list --plain --no-bundled
+        hermes -p <source profile> plugins list --plain --no-bundled
+        ls -a /Users/chanbla11mit/.hermes/profiles/<new profile>/plugins /Users/chanbla11mit/.hermes/profiles/<source profile>/plugins
+
+   Do not install the `jev` plugin of the integrated commit in this step; D8 does that.
+
+- Check: the two `plugins list` outputs have the same lines, with `jev` `enabled`, and the two directory listings are equal. `ls /Users/chanbla11mit/.hermes/profiles/<new profile>/plugins/model-providers/claude-subscription` lists the plugin files. `test -e /Users/chanbla11mit/.hermes/profiles/<new profile>/auth.json || echo absent` prints `absent`. The `.env` check of D3 prints `<profile> 1 1 1 0 600` for each copy. `shasum -a 256` of each copied SOUL with a tracked source equals that of its source; for each Jobcron copy `diff` against its source profile's SOUL shows only the two replacements.
+- Rollback: `hermes profile delete <new profile>` for each copy. The command asks `Type '<new profile>' to confirm:` (`hermes_cli/profiles.py`, `delete_profile`, lines 1845 to 1863); type the name. If D6 has already added the name to the dispatch list, run the D6 rollback for it first.
+
+### D5. Owner: Z.ai login of the 15 new profiles
+
+The owner runs these commands. Nobody else runs them or handles the key:
+
+    hermes -p jobcron-worker-glm-easy-2 auth add zai
+    hermes -p jobcron-worker-glm-medium-2 auth add zai
+    hermes -p jobcron-worker-glm-hard-2 auth add zai
+    hermes -p chapt-worker-glm-easy-2 auth add zai
+    hermes -p chapt-worker-glm-medium-2 auth add zai
+    hermes -p chapt-worker-glm-hard-2 auth add zai
+    hermes -p harness-worker-glm-easy-2 auth add zai
+    hermes -p harness-worker-glm-medium-2 auth add zai
+    hermes -p harness-worker-glm-hard-2 auth add zai
+    hermes -p jss-worker-glm-easy-2 auth add zai
+    hermes -p jss-worker-glm-medium-2 auth add zai
+    hermes -p jss-worker-glm-hard-2 auth add zai
+    hermes -p anki-worker-glm-easy-2 auth add zai
+    hermes -p anki-worker-glm-medium-2 auth add zai
+    hermes -p anki-worker-glm-hard-2 auth add zai
+
+The 15 renamed profiles keep their login, because `auth.json` moved with the directory (D2).
+
+- Check: `ls /Users/chanbla11mit/.hermes/profiles/<new profile>/auth.json` prints the path for all 15 (no value is read). The owner then makes one model call on each new profile, `hermes -p <new profile> chat -q "Reply with exactly READY. Do not call any tools." --oneshot -Q`, which returns `READY`.
+- Rollback: deleting the profile (D4 rollback) removes its login.
+
+### D6. `fallback_providers`, helper fallback chains and `kanban.dispatch_profiles`
+
+Before the first command of this step, D5 is complete for all 15 new profiles and D7 step 1 is done: a card that D2a moved starts as soon as its new name is in the list, and its review then needs a reviewer SOUL that names the new name.
+
+`--apply-fallbacks` writes the `fallback_providers` and the `auxiliary.<task>.fallback_chain` of every helper task that card R2 declares in `/Users/chanbla11mit/hermes-local-harness/roster.yaml`, and refuses an invalid declaration without writing anything (`scripts/switch-profile-model` lines 181 to 189). By the owner's answer to Q1 the declaration gives each light helper task `claude-subscription` `claude-haiku-5-5` and each other helper task the profile's own fallback model. Preview each command with `--dry-run` added first; the script backs up each profile's `config.yaml`. For the 30 GLM workers, in the order of `kanban.dispatch_profiles` of `/Users/chanbla11mit/hermes-local-harness/snapshots/sanitized-current-state.yaml`; each command adds the name at the end of the list:
+
+    python3 /Users/chanbla11mit/hermes-local-harness/scripts/switch-profile-model --profile jobcron-worker-glm-easy-1 --to glm --dispatch add --apply-fallbacks
+    python3 /Users/chanbla11mit/hermes-local-harness/scripts/switch-profile-model --profile jobcron-worker-glm-easy-2 --to glm --dispatch add --apply-fallbacks
+    python3 /Users/chanbla11mit/hermes-local-harness/scripts/switch-profile-model --profile jobcron-worker-glm-medium-1 --to glm --dispatch add --apply-fallbacks
+    python3 /Users/chanbla11mit/hermes-local-harness/scripts/switch-profile-model --profile jobcron-worker-glm-medium-2 --to glm --dispatch add --apply-fallbacks
+    python3 /Users/chanbla11mit/hermes-local-harness/scripts/switch-profile-model --profile jobcron-worker-glm-hard-1 --to glm --dispatch add --apply-fallbacks
+    python3 /Users/chanbla11mit/hermes-local-harness/scripts/switch-profile-model --profile jobcron-worker-glm-hard-2 --to glm --dispatch add --apply-fallbacks
+    python3 /Users/chanbla11mit/hermes-local-harness/scripts/switch-profile-model --profile chapt-worker-glm-easy-1 --to glm --dispatch add --apply-fallbacks
+    python3 /Users/chanbla11mit/hermes-local-harness/scripts/switch-profile-model --profile chapt-worker-glm-easy-2 --to glm --dispatch add --apply-fallbacks
+    python3 /Users/chanbla11mit/hermes-local-harness/scripts/switch-profile-model --profile chapt-worker-glm-medium-1 --to glm --dispatch add --apply-fallbacks
+    python3 /Users/chanbla11mit/hermes-local-harness/scripts/switch-profile-model --profile chapt-worker-glm-medium-2 --to glm --dispatch add --apply-fallbacks
+    python3 /Users/chanbla11mit/hermes-local-harness/scripts/switch-profile-model --profile chapt-worker-glm-hard-1 --to glm --dispatch add --apply-fallbacks
+    python3 /Users/chanbla11mit/hermes-local-harness/scripts/switch-profile-model --profile chapt-worker-glm-hard-2 --to glm --dispatch add --apply-fallbacks
+    python3 /Users/chanbla11mit/hermes-local-harness/scripts/switch-profile-model --profile harness-worker-glm-easy-1 --to glm --dispatch add --apply-fallbacks
+    python3 /Users/chanbla11mit/hermes-local-harness/scripts/switch-profile-model --profile harness-worker-glm-easy-2 --to glm --dispatch add --apply-fallbacks
+    python3 /Users/chanbla11mit/hermes-local-harness/scripts/switch-profile-model --profile harness-worker-glm-medium-1 --to glm --dispatch add --apply-fallbacks
+    python3 /Users/chanbla11mit/hermes-local-harness/scripts/switch-profile-model --profile harness-worker-glm-medium-2 --to glm --dispatch add --apply-fallbacks
+    python3 /Users/chanbla11mit/hermes-local-harness/scripts/switch-profile-model --profile harness-worker-glm-hard-1 --to glm --dispatch add --apply-fallbacks
+    python3 /Users/chanbla11mit/hermes-local-harness/scripts/switch-profile-model --profile harness-worker-glm-hard-2 --to glm --dispatch add --apply-fallbacks
+    python3 /Users/chanbla11mit/hermes-local-harness/scripts/switch-profile-model --profile jss-worker-glm-easy-1 --to glm --dispatch add --apply-fallbacks
+    python3 /Users/chanbla11mit/hermes-local-harness/scripts/switch-profile-model --profile jss-worker-glm-easy-2 --to glm --dispatch add --apply-fallbacks
+    python3 /Users/chanbla11mit/hermes-local-harness/scripts/switch-profile-model --profile jss-worker-glm-medium-1 --to glm --dispatch add --apply-fallbacks
+    python3 /Users/chanbla11mit/hermes-local-harness/scripts/switch-profile-model --profile jss-worker-glm-medium-2 --to glm --dispatch add --apply-fallbacks
+    python3 /Users/chanbla11mit/hermes-local-harness/scripts/switch-profile-model --profile jss-worker-glm-hard-1 --to glm --dispatch add --apply-fallbacks
+    python3 /Users/chanbla11mit/hermes-local-harness/scripts/switch-profile-model --profile jss-worker-glm-hard-2 --to glm --dispatch add --apply-fallbacks
+    python3 /Users/chanbla11mit/hermes-local-harness/scripts/switch-profile-model --profile anki-worker-glm-easy-1 --to glm --dispatch add --apply-fallbacks
+    python3 /Users/chanbla11mit/hermes-local-harness/scripts/switch-profile-model --profile anki-worker-glm-easy-2 --to glm --dispatch add --apply-fallbacks
+    python3 /Users/chanbla11mit/hermes-local-harness/scripts/switch-profile-model --profile anki-worker-glm-medium-1 --to glm --dispatch add --apply-fallbacks
+    python3 /Users/chanbla11mit/hermes-local-harness/scripts/switch-profile-model --profile anki-worker-glm-medium-2 --to glm --dispatch add --apply-fallbacks
+    python3 /Users/chanbla11mit/hermes-local-harness/scripts/switch-profile-model --profile anki-worker-glm-hard-1 --to glm --dispatch add --apply-fallbacks
+    python3 /Users/chanbla11mit/hermes-local-harness/scripts/switch-profile-model --profile anki-worker-glm-hard-2 --to glm --dispatch add --apply-fallbacks
+
+For the five GLM reviewers, which are already in the list:
+
+    python3 /Users/chanbla11mit/hermes-local-harness/scripts/switch-profile-model --profile jobcron-reviewer-glm --apply-fallbacks
+    python3 /Users/chanbla11mit/hermes-local-harness/scripts/switch-profile-model --profile chapt-reviewer-glm --apply-fallbacks
+    python3 /Users/chanbla11mit/hermes-local-harness/scripts/switch-profile-model --profile harness-reviewer-glm --apply-fallbacks
+    python3 /Users/chanbla11mit/hermes-local-harness/scripts/switch-profile-model --profile jss-reviewer-glm --apply-fallbacks
+    python3 /Users/chanbla11mit/hermes-local-harness/scripts/switch-profile-model --profile anki-reviewer-glm --apply-fallbacks
+
+From this step until D8 the installed `jev` configuration of every profile still names the old names, so a new card can be routed to an old name (D8 step 4 moves it), and the plugin in a new profile does not clear the model override at the review handoff, because its own name is not in its installed lists.
+
+- Check: `hermes -p <profile> config get --json fallback_providers` prints the entry of card R2 for each of the 35 profiles; `hermes -p <profile> config get --json auxiliary.title_generation.fallback_chain` prints one entry with provider `claude-subscription` and model `claude-haiku-5-5`, and `hermes -p <profile> config get --json auxiliary.compression.fallback_chain` prints one entry with provider `claude-subscription` and the model of the profile's own `fallback_providers` entry. The dispatch list equals the snapshot, entry for entry; this command prints `True 50 50`:
+
+      python3 -c 'import json, re; text = open("/Users/chanbla11mit/.hermes/config.yaml").read(); block = re.search(r"^  dispatch_profiles:\n((?:    - .*\n)*)", text, re.M).group(1); live = [line.strip()[2:] for line in block.splitlines()]; want = json.load(open("/Users/chanbla11mit/hermes-local-harness/snapshots/sanitized-current-state.yaml"))["kanban"]["dispatch_profiles"]; print(live == want, len(live), len(want))'
+
+  The command reads the list in the same way as `set_dispatch` of `scripts/switch-profile-model` (the expression `DISPATCH`, line 62), and not with `hermes config get`, which reads the active profile.
+- Rollback: for each of the 30 GLM workers, `python3 /Users/chanbla11mit/hermes-local-harness/scripts/switch-profile-model --profile <profile> --to glm --dispatch remove --clear-fallbacks`; for each GLM reviewer, `python3 /Users/chanbla11mit/hermes-local-harness/scripts/switch-profile-model --profile <reviewer> --clear-fallbacks` (`scripts/verify-state` then reports `fallback drift` until the R2 declarations are reverted). With the D2 rollback, `cp -p /Users/chanbla11mit/.hermes/backups/<card id>/config.yaml /Users/chanbla11mit/.hermes/config.yaml` restores the dispatch list of D1.
+
+### D7. Reviewer SOULs, orchestrator SOULs and orchestrator skills
+
+The owner approved these files (Q3). The 30 GLM worker SOULs are deployed in D2 and D4. A reviewer with an old SOUL does not accept a card from an implementation profile that its SOUL does not name ("Creating the third GLM worker profile of each board", step 8).
+
+1. Before the first command of D6, the five Opus reviewer SOULs and the five GLM reviewer SOULs:
+
+        for p in jobcron-reviewer chapt-reviewer harness-reviewer jss-reviewer anki-reviewer jobcron-reviewer-glm chapt-reviewer-glm harness-reviewer-glm jss-reviewer-glm anki-reviewer-glm; do
+          mkdir -p /Users/chanbla11mit/.hermes/backups/<card id>/$p && cp -p /Users/chanbla11mit/.hermes/profiles/$p/SOUL.md /Users/chanbla11mit/.hermes/backups/<card id>/$p/SOUL.md
+          cp /Users/chanbla11mit/hermes-local-harness/policies/profile-souls/$p/SOUL.md /Users/chanbla11mit/.hermes/profiles/$p/SOUL.md
+        done
+
+2. After D6, the five orchestrator SOULs and the orchestrator skills of `anki`, `chapt`, `jobcron` and `jss`:
+
+        for p in jobcron-orchestrator chapt-orchestrator harness-orchestrator jss-orchestrator anki-orchestrator; do
+          mkdir -p /Users/chanbla11mit/.hermes/backups/<card id>/$p && cp -p /Users/chanbla11mit/.hermes/profiles/$p/SOUL.md /Users/chanbla11mit/.hermes/backups/<card id>/$p/SOUL.md
+          cp /Users/chanbla11mit/hermes-local-harness/policies/profile-souls/$p/SOUL.md /Users/chanbla11mit/.hermes/profiles/$p/SOUL.md
+        done
+        for p in anki-orchestrator chapt-orchestrator jobcron-orchestrator jss-orchestrator; do
+          cp -p /Users/chanbla11mit/.hermes/profiles/$p/skills/autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md /Users/chanbla11mit/.hermes/backups/<card id>/$p/SKILL.md
+          cp /Users/chanbla11mit/hermes-local-harness/policies/profile-skills/$p/autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md /Users/chanbla11mit/.hermes/profiles/$p/skills/autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md
+        done
+
+- Check: `shasum -a 256` of each live file equals that of its tracked source.
+- Rollback: `cp -p /Users/chanbla11mit/.hermes/backups/<card id>/<profile>/SOUL.md /Users/chanbla11mit/.hermes/profiles/<profile>/SOUL.md` and `cp -p /Users/chanbla11mit/.hermes/backups/<card id>/<profile>/SKILL.md /Users/chanbla11mit/.hermes/profiles/<profile>/skills/autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md` for each changed file.
+
+### D8. `jev` install of the integrated commit, and the repeated card check
+
+1. Record the install metadata of each of the 56 `jev` profiles as the rollback reference (the 15 copies have the metadata of their source profile):
+
+        for p in jobcron-worker-glm-easy-1 jobcron-worker-glm-easy-2 jobcron-worker-glm-medium-1 jobcron-worker-glm-medium-2 jobcron-worker-glm-hard-1 jobcron-worker-glm-hard-2 chapt-worker-glm-easy-1 chapt-worker-glm-easy-2 chapt-worker-glm-medium-1 chapt-worker-glm-medium-2 chapt-worker-glm-hard-1 chapt-worker-glm-hard-2 harness-worker-glm-easy-1 harness-worker-glm-easy-2 harness-worker-glm-medium-1 harness-worker-glm-medium-2 harness-worker-glm-hard-1 harness-worker-glm-hard-2 jss-worker-glm-easy-1 jss-worker-glm-easy-2 jss-worker-glm-medium-1 jss-worker-glm-medium-2 jss-worker-glm-hard-1 jss-worker-glm-hard-2 anki-worker-glm-easy-1 anki-worker-glm-easy-2 anki-worker-glm-medium-1 anki-worker-glm-medium-2 anki-worker-glm-hard-1 anki-worker-glm-hard-2 jobcron-reviewer chapt-reviewer harness-reviewer jss-reviewer anki-reviewer jobcron-reviewer-glm chapt-reviewer-glm harness-reviewer-glm jss-reviewer-glm anki-reviewer-glm advisor jobcron-worker jobcron-worker-2 chapt-worker chapt-worker-2 harness-worker harness-worker-2 jss-worker jss-worker-2 anki-worker anki-worker-2 jobcron-orchestrator chapt-orchestrator harness-orchestrator jss-orchestrator anki-orchestrator; do
+          mkdir -p /Users/chanbla11mit/.hermes/backups/<card id>/$p && cp -p /Users/chanbla11mit/.hermes/profiles/$p/plugins/.install-metadata.json /Users/chanbla11mit/.hermes/backups/<card id>/$p/install-metadata.json
+        done
+
+2. Install the integrated commit from the local source, one profile at a time, by the method of "Creating the third GLM worker profile of each board", step 7, in this order: first the 30 GLM workers and the ten reviewers, which need the new `config.json` before a card reaches a new name (`handle_request_review` and `handle_request_changes`), then `advisor` and the ten Claude workers, and the five orchestrators last:
+
+        for p in jobcron-worker-glm-easy-1 jobcron-worker-glm-easy-2 jobcron-worker-glm-medium-1 jobcron-worker-glm-medium-2 jobcron-worker-glm-hard-1 jobcron-worker-glm-hard-2 chapt-worker-glm-easy-1 chapt-worker-glm-easy-2 chapt-worker-glm-medium-1 chapt-worker-glm-medium-2 chapt-worker-glm-hard-1 chapt-worker-glm-hard-2 harness-worker-glm-easy-1 harness-worker-glm-easy-2 harness-worker-glm-medium-1 harness-worker-glm-medium-2 harness-worker-glm-hard-1 harness-worker-glm-hard-2 jss-worker-glm-easy-1 jss-worker-glm-easy-2 jss-worker-glm-medium-1 jss-worker-glm-medium-2 jss-worker-glm-hard-1 jss-worker-glm-hard-2 anki-worker-glm-easy-1 anki-worker-glm-easy-2 anki-worker-glm-medium-1 anki-worker-glm-medium-2 anki-worker-glm-hard-1 anki-worker-glm-hard-2 jobcron-reviewer chapt-reviewer harness-reviewer jss-reviewer anki-reviewer jobcron-reviewer-glm chapt-reviewer-glm harness-reviewer-glm jss-reviewer-glm anki-reviewer-glm advisor jobcron-worker jobcron-worker-2 chapt-worker chapt-worker-2 harness-worker harness-worker-2 jss-worker jss-worker-2 anki-worker anki-worker-2 jobcron-orchestrator chapt-orchestrator harness-orchestrator jss-orchestrator anki-orchestrator; do
+          hermes -p $p plugins install file:///Users/chanbla11mit/hermes-local-harness#plugins/jev --ref <integrated commit> --enable --force 2>&1 | tee /Users/chanbla11mit/.hermes/backups/<card id>/$p/jev-install.log
+          if grep -q -i -E 'caution|dangerous' /Users/chanbla11mit/.hermes/backups/<card id>/$p/jev-install.log; then echo "stop: scan verdict on $p"; break; fi
+        done
+
+   `--force` lets a plugin scan verdict `caution` pass without a question, so the loop itself stops after an install whose output names `caution` or `dangerous`. Then report the findings to the owner before any further install. The list holds the profiles in the order above.
+3. Check that local `main` is still the integrated commit: `git -C /Users/chanbla11mit/hermes-local-harness rev-parse HEAD` prints `<integrated commit>` and `git -C /Users/chanbla11mit/hermes-local-harness status --porcelain` prints nothing. R1 to R4 were integrated into local `main` before D0 (see the paragraph about merge commit `c91e172f9a19adb6a5964852ec10c2397d231f8a` above), so the `com.nous.hermes-jev-peak-hold` LaunchAgent already reads the new `config.json`.
+4. Repeat D2a steps 1 and 2 on the cards of the five boards: run the program with `<step>` `d8`, move each listed card that is assigned to an old name and is not `running` or in `review`, and comment where `renamed_comment` is false. This moves a card that was created during the deployment and routed to an old name, and a card that a change request returned to an old name.
+
+- Check: no install output names a `caution` or `dangerous` verdict. `hermes -p <profile> plugins list --plain --no-bundled` prints `jev` as `enabled` on all 56 profiles. `shasum -a 256 /Users/chanbla11mit/.hermes/profiles/<profile>/plugins/jev/config.json` is the same on all 56 profiles and equals `git -C /Users/chanbla11mit/hermes-local-harness show <integrated commit>:plugins/jev/config.json | shasum -a 256`. `tail -3 /Users/chanbla11mit/.hermes/jev/logs/peak-hold.out.log` and `tail -3 /Users/chanbla11mit/.hermes/jev/logs/peak-hold.err.log` show no new error. The program of step 4 prints `assigned to an old name: []` after the moves.
+- Rollback: on each profile, install the commit recorded in `/Users/chanbla11mit/.hermes/backups/<card id>/<profile>/install-metadata.json` with the same command and `--ref <previous commit>`. A revert of local `main` needs the owner's authorization.
+
+### D9. harness-orchestrator skill copy
+
+The owner approved this copy (decision 5 of the specification). It is made in the same way as card `t_fb1a44e4` (`procedures/manual-apply.md`):
+
+    mkdir -p /Users/chanbla11mit/.hermes/backups/<card id>/harness-orchestrator && cp -p /Users/chanbla11mit/.hermes/profiles/harness-orchestrator/skills/autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md /Users/chanbla11mit/.hermes/backups/<card id>/harness-orchestrator/SKILL.md
+    cp /Users/chanbla11mit/hermes-local-harness/policies/profile-skills/harness-orchestrator/autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md /Users/chanbla11mit/.hermes/profiles/harness-orchestrator/skills/autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md
+
+- Check: `shasum -a 256` of the live file equals that of the tracked source.
+- Rollback: `cp -p /Users/chanbla11mit/.hermes/backups/<card id>/harness-orchestrator/SKILL.md /Users/chanbla11mit/.hermes/profiles/harness-orchestrator/skills/autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md`.
+
+### D10. Verifier and the last card check
+
+    python3 /Users/chanbla11mit/hermes-local-harness/scripts/verify-state
+
+- Check: none of the failure kinds listed in "Creating the third GLM worker profile of each board", step 8, is printed for any of the 30 GLM worker names or the five GLM reviewers, and no `fallback drift` line is printed for them. The output has no new line compared with the last recorded live run. Then repeat D2a steps 1 and 2 with `<step>` `d10`: the program prints `assigned to an old name: []`. While a card of the program's list is not `done` or archived, the deployment card records it in its handoff, and the check of D2a step 3 continues, after the deployment, after each change request on such a card.
+- Rollback: none; the verifier writes nothing.
+
 ## Attachment and diff procedure of the GLM workers
 
 Card `t_ac454595` (GLM routing request of 2026-11-13, Part 6.3) added an exact procedure for attaching a file to a card and for producing the diff that the reviewer reads to the instructions of the ten GLM workers. On card `t_7097923f` a GLM worker had four failed `kanban_attach` and `kanban_attach_url` calls, and the reviewer rejected a malformed diff. The procedure rests on these facts of the installed Hermes source `/Users/chanbla11mit/.hermes/hermes-agent`:
