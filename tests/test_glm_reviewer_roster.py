@@ -101,8 +101,13 @@ class Roster(unittest.TestCase):
                 self.assertIsNone(entry["credential_present"])
                 self.assertEqual(entry["required_plugins"], ["jev"])
                 self.assertEqual(entry["installed_disabled_plugins"], [])
-                for field in ("auxiliary_models", "fallback_providers", "auxiliary_fallback_chain"):
-                    self.assertNotIn(field, entry)
+                self.assertNotIn("auxiliary_models", entry)
+                # Card t_50fd66f2 (owner decision of 2026-11-16): the Claude subscription fallback
+                # claude-sonnet-5-5 (tests/test_glm_claude_fallback.py checks the helper chains).
+                self.assertEqual(entry["fallback_providers"],
+                                 [{"provider": "claude-subscription", "model": "claude-sonnet-5-5"}])
+                self.assertEqual({item["provider"] for chain in entry["auxiliary_fallback_chain"].values()
+                                  for item in chain}, {"claude-subscription"})
 
     def test_entry_placement(self):
         # Each GLM reviewer is listed directly after the last GLM worker of its board: since card

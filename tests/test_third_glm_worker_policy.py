@@ -35,6 +35,7 @@ from glm_route_worker_names_edits import (board_glm_workers, reverse_glm_route_w
                                           six_or as six_or_names)
 from hard_route_policy_edits import reverse_hard_route_policy_edits
 from test_card_split_rule_policy import reverse_card_split_rule_edits
+from test_glm_claude_fallback import reverse_glm_claude_fallback_edits
 
 ROOT = Path(__file__).resolve().parents[1]
 BASELINE = "aec198aad4abba35209eaf95f715c2622105d471"
@@ -213,8 +214,9 @@ class PolicySources(unittest.TestCase):
 
     def test_other_paths_are_returned_unchanged(self):
         # Card t_18a2dc93 moved anki-worker-glm-1 to anki-worker-glm-easy-1 and added anki-worker-glm-easy-2.
+        # Card t_50fd66f2 added one sentence to anki-worker-glm-easy-2; the text without it is used here.
         for path in (soul("harness-worker"), soul("anki-worker-glm-easy-2"), "procedures/jev-plugin.md"):
-            data = (ROOT / path).read_bytes()
+            data = reverse_glm_claude_fallback_edits(path, (ROOT / path).read_bytes())
             with self.subTest(path=path):
                 self.assertIs(reverse_third_glm_worker_edits(path, data), data)
 

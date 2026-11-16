@@ -194,9 +194,11 @@ class DeclarationTests(unittest.TestCase):
     def test_repository_roster_declarations(self):
         """t_731d4476 and t_875f53f3: exactly the four Jobcron entries and the 18 other claude-subscription
         entries declare the Anthropic API fallback, with the identifiers chosen from the live model list;
-        their primary provider and model are unchanged. GLM (zai) and retired entries declare none.
+        their primary provider and model are unchanged. Retired entries declare none.
         t_c69fd1c8: the five project orchestrators declare three main fallback entries; every other
-        declaring profile, default included, keeps one anthropic entry."""
+        declaring profile, default included, keeps one anthropic entry.
+        t_50fd66f2: the 35 GLM (zai) entries in service declare a claude-subscription fallback and no
+        anthropic entry (tests/test_glm_claude_fallback.py checks their values)."""
         roster = json.loads((ROOT / "roster.yaml").read_text())
         errors = []
         with redirect_stdout(io.StringIO()):
@@ -205,16 +207,23 @@ class DeclarationTests(unittest.TestCase):
         self.assertEqual(set(JOBCRON_CHAIN), set(self.verifier.HELPER_TASKS))
         self.assertEqual(len(OTHER_PROFILES), 18)
         self.assertFalse(set(OTHER_PROFILES) & set(JOBCRON_PROFILES))
-        declared = {profile["name"]: profile for profile in roster["profiles"]
-                    if "fallback_providers" in profile or "auxiliary_fallback_chain" in profile}
+        all_declared = {profile["name"]: profile for profile in roster["profiles"]
+                        if "fallback_providers" in profile or "auxiliary_fallback_chain" in profile}
+        glm_declared = {name for name, profile in all_declared.items() if profile["provider"] == "zai"}
+        self.assertEqual(sorted(glm_declared), sorted(
+            (*self.verifier.glm_worker_profiles(), *self.verifier.glm_reviewer_profiles())))
+        for name in glm_declared:
+            self.assertNotIn("anthropic", json.dumps(all_declared[name]))
+        declared = {name: profile for name, profile in all_declared.items() if name not in glm_declared}
         self.assertEqual(sorted(declared), sorted(JOBCRON_PROFILES + OTHER_PROFILES))
-        # The declared set is every non-retired claude-subscription profile and nothing else.
+        # Apart from the GLM entries, the declared set is every non-retired claude-subscription
+        # profile and nothing else.
         self.assertEqual(sorted(declared), sorted(
             profile["name"] for profile in roster["profiles"]
             if profile["provider"] == "claude-subscription" and profile.get("lifecycle") != "retired"))
         for profile in roster["profiles"]:
-            if profile["provider"] == "zai" or profile.get("lifecycle") == "retired":
-                self.assertNotIn(profile["name"], declared)
+            if profile.get("lifecycle") == "retired":
+                self.assertNotIn(profile["name"], all_declared)
         for name in JOBCRON_PROFILES:
             with self.subTest(profile=name):
                 profile = declared[name]

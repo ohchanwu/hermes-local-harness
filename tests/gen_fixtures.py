@@ -306,6 +306,16 @@ def fallback_drift(d):
 write("fallback-drift.yaml", delta(fallback_drift))
 
 
+def glm_fallback_anthropic(d):
+    # Card t_50fd66f2: one GLM worker falls back to the provider anthropic (the paid Console
+    # key) instead of its roster fallback claude-subscription / claude-sonnet-5-5.
+    d["profile_fallback_settings"]["harness-worker-glm-medium-1"]["fallback_providers"] = [
+        {"provider": "anthropic", "model": "claude-sonnet-5-5"}]
+
+
+write("glm-fallback-anthropic.yaml", delta(glm_fallback_anthropic))
+
+
 def auxiliary_model_drift(d):
     # One profile still has a light task on the other-task model (helpers not switched yet);
     # another has a light task on a different provider; a third has an unset other-task model;
