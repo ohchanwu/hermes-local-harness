@@ -16,6 +16,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -514,6 +515,170 @@ class CardTokenTests(unittest.TestCase):
                           "total 2100, input 840, output 210, cache read 840, cache write 210\n", text)
             self.assertIn("    GLM tokens per card (average over 1 cards with sessions): "
                           "total 5000, input 2000, output 500, cache read 2000, cache write 500\n", text)
+            self.assertNotIn(SENTINEL, text)
+
+
+class PreviousNameTests(unittest.TestCase):
+    """R3: a run whose profile is a previous name of the session profile also
+    matches, through the key previous_names of the session profile's
+    profile.yaml. Every case redirects report.PROFILES_DIR to a temporary
+    directory, so no live profile is read.
+    """
+
+    OLD_NAME = "worker-old"
+
+    def make_databases(self, tmp, session_profile, yaml_text, task_id="t_x"):
+        """(kanban_db, state_db) of one card: one run under the old name and
+        one kanban session under session_profile in the card workspace, with
+        100 Claude tokens in the ratio 4:1:4:1. yaml_text written when given.
+        """
+        kanban_db = os.path.join(tmp, "kanban.db")
+        state_db = os.path.join(tmp, "state.db")
+        conn = sqlite3.connect(kanban_db)
+        conn.executescript(
+            "CREATE TABLE IF NOT EXISTS tasks (id TEXT PRIMARY KEY, title TEXT NOT NULL,"
+            " body TEXT, status TEXT, workspace_path TEXT);"
+            "CREATE TABLE IF NOT EXISTS task_runs (id INTEGER PRIMARY KEY AUTOINCREMENT,"
+            " task_id TEXT NOT NULL, profile TEXT, status TEXT NOT NULL,"
+            " started_at INTEGER NOT NULL, ended_at INTEGER, outcome TEXT, summary TEXT);")
+        conn.execute("INSERT INTO tasks VALUES (?, ?, ?, 'done', ?)",
+                     (task_id, SENTINEL, SENTINEL, f"/ws/{task_id}"))
+        conn.execute("INSERT INTO task_runs (task_id, profile, status, started_at, ended_at,"
+                     " outcome, summary) VALUES (?, ?, 'done', ?, ?, 'completed', ?)",
+                     (task_id, self.OLD_NAME, NOW - 5000, NOW - 4000, SENTINEL))
+        conn.commit()
+        conn.close()
+        conn = sqlite3.connect(state_db)
+        conn.executescript(
+            "CREATE TABLE IF NOT EXISTS sessions (id TEXT PRIMARY KEY, source TEXT NOT NULL,"
+            " started_at REAL NOT NULL, profile_name TEXT, cwd TEXT, parent_session_id TEXT,"
+            " model TEXT, input_tokens INTEGER, output_tokens INTEGER,"
+            " cache_read_tokens INTEGER, cache_write_tokens INTEGER, title TEXT,"
+            " system_prompt TEXT);"
+            "CREATE TABLE IF NOT EXISTS session_model_usage (session_id TEXT NOT NULL,"
+            " model TEXT NOT NULL, task TEXT, input_tokens INTEGER, output_tokens INTEGER,"
+            " cache_read_tokens INTEGER, cache_write_tokens INTEGER);")
+        SavingsFixture.session(conn, "s_" + task_id, NOW - 4990, session_profile,
+                               f"/ws/{task_id}", [("claude-opus-5-5", 100)])
+        conn.commit()
+        conn.close()
+        if yaml_text is not None:
+            self.write_profile_yaml(tmp, session_profile, yaml_text)
+        return kanban_db, state_db
+
+    def write_profile_yaml(self, tmp, session_profile, yaml_text):
+        folder = os.path.join(tmp, "profiles", session_profile)
+        os.makedirs(folder, exist_ok=True)
+        with open(os.path.join(folder, "profile.yaml"), "w", encoding="utf-8") as handle:
+            handle.write(yaml_text)
+
+    def tokens_of(self, tmp, session_profile, yaml_text):
+        """(card_tokens, sessions) of card t_x with PROFILES_DIR in tmp."""
+        kanban_db, state_db = self.make_databases(tmp, session_profile, yaml_text)
+        cards = report.load_runs([kanban_db], {"t_x"})
+        sessions = report.load_sessions([state_db])
+        with mock.patch.object(report, "PROFILES_DIR", os.path.join(tmp, "profiles")):
+            return report.card_tokens(cards["t_x"], sessions, NOW), sessions
+
+    def test_run_under_the_previous_name_matches_the_session_of_the_new_name(self):
+        # The block list as the writer of hermes profile rename produces it.
+        yaml_text = "description: renamed worker\nrole: worker\nprevious_names:\n- worker-old\n"
+        with tempfile.TemporaryDirectory() as tmp:
+            tokens, _sessions = self.tokens_of(tmp, "worker-new", yaml_text)
+            self.assertIsNotNone(tokens)
+            self.assertEqual(report.token_sum(tokens, "claude"), 100)
+            self.assertEqual(report.token_sum(tokens, "glm"), 0)
+            self.assertEqual(report.token_sum(tokens, "other"), 0)
+
+    def test_session_profile_without_profile_yaml_does_not_match(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tokens, sessions = self.tokens_of(tmp, "worker-noyaml", None)
+            self.assertIsNone(tokens)
+            self.assertEqual(sessions["previous_names"].get("worker-noyaml"), [])
+
+    def test_malformed_or_unreadable_profile_yaml_does_not_match(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            # A value that is not a list of strings, in text that is not a
+            # mapping: no previous names, no exception.
+            tokens, _sessions = self.tokens_of(tmp, "worker-badyaml",
+                                               "previous_names: [worker-old\ndescription:")
+            self.assertIsNone(tokens)
+            # profile.yaml is a directory: open() raises OSError, treated as
+            # no previous names.
+            kanban_db, state_db = self.make_databases(tmp, "worker-diryaml", None,
+                                                      task_id="t_dir")
+            os.makedirs(os.path.join(tmp, "profiles", "worker-diryaml", "profile.yaml"))
+            cards = report.load_runs([kanban_db], {"t_dir"})
+            sessions = report.load_sessions([state_db])
+            with mock.patch.object(report, "PROFILES_DIR", os.path.join(tmp, "profiles")):
+                tokens = report.card_tokens(cards["t_dir"], sessions, NOW)
+            self.assertIsNone(tokens)
+
+    def test_previous_names_from_text_accepts_the_written_forms_only(self):
+        self.assertEqual(report.previous_names_from_text(
+            "description: renamed\nrole: worker\nprevious_names:\n- old-one\n- old-two\n"),
+            ["old-one", "old-two"])
+        self.assertEqual(report.previous_names_from_text(
+            "previous_names:\n  - old-one\n  - old-two\n"), ["old-one", "old-two"])
+        self.assertEqual(report.previous_names_from_text(
+            "previous_names: [old-one, old-two]\n"), ["old-one", "old-two"])
+        self.assertEqual(report.previous_names_from_text("previous_names:\n- 'old-one'\n"),
+                         ["old-one"])
+        for text in ("", "description: only\n", "previous_names:\n",
+                     "previous_names: old-one\n", "previous_names: {a: b\n",
+                     "names_previous:\n- old-one\n", "previous_names: []\n"):
+            self.assertEqual(report.previous_names_from_text(text), [], text)
+
+    def test_previous_names_never_read_outside_the_profiles_directory(self):
+        for name in ("../default", "", "a/b", None, "."):
+            with self.subTest(name=name):
+                self.assertEqual(report.profile_previous_names(name), [])
+
+    def test_each_profile_file_is_read_at_most_once_per_report(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            self.write_profile_yaml(tmp, "worker-new", "previous_names:\n- worker-old\n")
+            self.write_profile_yaml(tmp, "worker-badyaml", "previous_names: [worker-old\n")
+            for profile, task_id in (("worker-new", "t_new"), ("worker-noyaml", "t_noyaml"),
+                                     ("worker-badyaml", "t_badyaml")):
+                self.make_databases(tmp, profile, None, task_id=task_id)
+            kanban_db = os.path.join(tmp, "kanban.db")
+            state_db = os.path.join(tmp, "state.db")
+            cards = report.load_runs([kanban_db], {"t_new", "t_noyaml", "t_badyaml"})
+            sessions = report.load_sessions([state_db])
+            original = report.previous_names_from_text
+            calls = []
+
+            def counting(text):
+                calls.append(text)
+                return original(text)
+
+            with mock.patch.object(report, "PROFILES_DIR", os.path.join(tmp, "profiles")), \
+                    mock.patch.object(report, "previous_names_from_text", counting):
+                for task_id in ("t_new", "t_noyaml", "t_badyaml"):
+                    report.card_tokens(cards[task_id], sessions, NOW)
+            # Three cards, each with one run under worker-old and three
+            # sessions: the two existing files were parsed once each, the
+            # missing file was never parsed, and the second and third cards
+            # reused the cache.
+            self.assertEqual(len(calls), 2)
+            self.assertEqual(sorted(sessions["previous_names"]),
+                             ["worker-badyaml", "worker-new", "worker-noyaml"])
+            self.assertIsNone(report.card_tokens(cards["t_noyaml"], sessions, NOW))
+
+    def test_report_counts_the_session_of_a_renamed_profile(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            logs = os.path.join(tmp, "logs")
+            os.makedirs(logs)
+            write_jsonl(os.path.join(logs, "decisions.jsonl"),
+                        [route("t_x", "easy", True, 1)])
+            kanban_db, state_db = self.make_databases(
+                tmp, "worker-new", "previous_names:\n- worker-old\n")
+            with mock.patch.object(report, "PROFILES_DIR", os.path.join(tmp, "profiles")):
+                text = report.build_report(logs, 30, [kanban_db], [state_db], now=NOW)
+            self.assertIn("  route easy applied=yes: cards 1\n", text)
+            self.assertIn("    tokens per card (average over 1 cards with sessions): "
+                          "total 100, input 40, output 10, cache read 40, cache write 10\n",
+                          text)
             self.assertNotIn(SENTINEL, text)
 
 
