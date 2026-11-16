@@ -19,9 +19,12 @@ ORCHESTRATOR_GLM_REVIEW_EDITS lists the exact (new text, old text) pairs of each
 order in which the card applied them. reverse_orchestrator_glm_review_edits() reverses them byte
 for byte. hard_route_policy_edits.reverse_hard_route_policy_edits calls it first, so every test
 that recovers the bytes of an earlier commit reverses this card's edits before the edits of the
-earlier cards. This module imports no other test module, so any test module can import it
-without a circular import.
+earlier cards. The later edits of card t_cf518fd0 (test_jev_easy_medium_worker_split) are
+reversed first. This module imports only test_jev_easy_medium_worker_split, which imports no
+other test module at module level, so any test module can import it without a circular import.
 """
+
+from test_jev_easy_medium_worker_split import reverse_easy_medium_split_edits
 
 BASELINE = "e18997b7e2d27c69ed1e7af2ce4fc6e73ba88875"
 PASS_REASON = "jev-glm-review-pass"
@@ -125,7 +128,8 @@ def reverse_orchestrator_glm_review_edits(relative_path, text):
     the card did not change, and a text that contains none of the new texts, is returned as
     the same object, so a caller may apply it to a text that another caller already reversed.
     A text that contains some of the new texts but not each of them exactly once raises
-    AssertionError."""
+    AssertionError. The later edits of card t_cf518fd0 are reversed first."""
+    text = reverse_easy_medium_split_edits(relative_path, text)
     edits = ORCHESTRATOR_GLM_REVIEW_EDITS.get(relative_path)
     if not edits:
         return text

@@ -533,7 +533,7 @@ class RoleContracts(unittest.TestCase):
 
     def test_skill_version_size_and_sections(self):
         # Raised by the jev plugin policy change (t_71b4ef4a).
-        self.assertRegex(self.skill_raw, r"(?m)^version: 0\.6\.7-jss\.17$")  # raised by t_ac454595, t_46b5e63e, t_89838618, t_f4ce916d, t_c7cc3830, t_a8884510, t_e14a6d6a and t_35874d04
+        self.assertRegex(self.skill_raw, r"(?m)^version: 0\.6\.7-jss\.18$")  # raised by t_ac454595, t_46b5e63e, t_89838618, t_f4ce916d, t_c7cc3830, t_a8884510, t_e14a6d6a, t_35874d04 and t_cf518fd0
         # 260 lines plus the 4-line Pitfalls section (t_bd860536), the 9 lines of
         # repair_history candidate rules and example (t_6436ac1c), the 6-line
         # Skill Changes section (t_0a8674fe) and the one-line Hard Scope read-only
@@ -1313,7 +1313,7 @@ class DownloadAndInstallOwnerDecision(unittest.TestCase):
     def test_skill_version_line(self):
         # Card t_f4ce916d raised the version by one more step, card t_c7cc3830 by one more, card
         # t_a8884510 by one more, and card t_e14a6d6a by one more.
-        self.assertEqual(re.findall(r"(?m)^version: (.+)$", self.skill_raw), ["0.6.7-jss.17"])
+        self.assertEqual(re.findall(r"(?m)^version: (.+)$", self.skill_raw), ["0.6.7-jss.18"])
 
     def test_no_source_keeps_the_removed_wording(self):
         for path, text in self.raw.items():

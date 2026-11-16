@@ -52,6 +52,7 @@ from opus_reviewer_glm_review_edits import reverse_opus_reviewer_glm_review_edit
 from orchestrator_glm_review_edits import reverse_orchestrator_glm_review_edits
 from orchestrator_opus_5_5_edits import reverse_opus_5_5_orchestrator_edits
 from test_card_split_rule_policy import NEW_RULE, PASSAGE_EDITS
+from test_jev_easy_medium_worker_split import reverse_easy_medium_split_edits, split_sentence
 from test_stale_test_rule_policy import reverse_stale_test_rule_edits
 from test_third_glm_worker_policy import with_third_glm_worker
 
@@ -447,17 +448,21 @@ class RoutingPolicyText(unittest.TestCase):
                 # the jss version by one more step, card t_f4ce916d each version by one more step, card
                 # t_c7cc3830 each version by one more step, card t_a8884510 the jss version by one more
                 # step, card t_e14a6d6a each version by one more step, and card t_d3bb0983 the chapt and
-                # jobcron versions by one more step.
-                current = {"harness": "0.6.7-harness.13", "chapt": "0.6.7-chapt.15", "jobcron": "0.6.9-jobcron.16",
-                           "jss": "0.6.7-jss.17", "anki": "0.6.10-anki.11"}[prefix]
+                # jobcron versions by one more step; cards t_35874d04 and t_cf518fd0 each version by one more
+                # step.
+                current = {"harness": "0.6.7-harness.14", "chapt": "0.6.7-chapt.16", "jobcron": "0.6.9-jobcron.17",
+                           "jss": "0.6.7-jss.18", "anki": "0.6.10-anki.12"}[prefix]
                 self.assertRegex(text, rf"(?m)^version: {re.escape(current)}$")
                 # Card t_c7cc3830 replaced the Part 5 rule text with the card split rule.
                 self.assertEqual(text.count(NEW_RULE), 1)
                 self.assertNotIn(SPLIT_RULE, text)
-                # Card t_e14a6d6a, items a.1 to a.5: each new text once, no old text.
+                # Card t_e14a6d6a, items a.1 to a.5: each new text once, no old text. Card t_cf518fd0
+                # later replaced part of the `jev` bullet, so the new texts are counted in the text with
+                # the t_cf518fd0 edits reversed.
+                before_split = reverse_easy_medium_split_edits(skill(prefix), text)
                 for new, old in hard_route_skill_texts(key):
                     if new:
-                        self.assertEqual(text.count(new), 1)
+                        self.assertEqual(before_split.count(new), 1)
                     self.assertNotIn(old, text)
                 self.assertNotIn("taking the three in turn", text)
                 self.assertNotIn("routing.max_glm_change_requests", text)
@@ -480,7 +485,9 @@ class RoutingPolicyText(unittest.TestCase):
                 self.assertEqual(text.count(current_route_reference(key)), 1)
                 # The rules follow the jev worker selection text and precede the next section.
                 selection = text.index(GLM_LINE_END)
-                self.assertLess(text.index(hard_route_worker_selection_text(key)[0]), selection)
+                # Card t_cf518fd0 replaced the text of item a.1 with the sentence that names the worker of
+                # `easy` and the worker of `medium`.
+                self.assertLess(text.index(split_sentence(prefix)), selection)
                 self.assertLess(selection, text.index(current_route_reference(key)))
                 self.assertLess(text.index(current_route_reference(key)), text.index(escalation))
                 self.assertLess(text.index(escalation), text.index(CURRENT_ROUTE_DISABLING_RULE))

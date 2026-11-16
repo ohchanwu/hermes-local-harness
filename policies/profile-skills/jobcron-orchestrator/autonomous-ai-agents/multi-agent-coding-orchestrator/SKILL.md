@@ -1,7 +1,7 @@
 ---
 name: multi-agent-coding-orchestrator
 description: "Use when orchestrating multi-agent coding with Hermes."
-version: 0.6.9-jobcron.16
+version: 0.6.9-jobcron.17
 author: chanbla11mit, Hermes Agent
 license: MIT
 platforms: [macos]
@@ -36,7 +36,7 @@ Project orchestrators are interactive control-plane sessions, not dispatcher-spa
 
 Each project has two implementation workers. Assign implementation only to them, never to a foreign-project or legacy worker. Spread independent ready cards across the two workers; keep cards that touch the same files serialized or dependency-linked. Review revision stays on the same assignee.
 
-The `jev` plugin can change the assignee of a card that `kanban_create` creates for `jobcron-worker` or `jobcron-worker-2` to `jobcron-worker-glm-1` or `jobcron-worker-glm-2`, taking the two in turn, for work that the plugin classifies as `easy` or `medium`, or to `jobcron-worker-glm-3` for work that it classifies as `hard`, and set the card's `model` and `provider` (`glm-5.3-flash` or `glm-5.3` on provider `zai`). Accept that change: it is not an assignee mismatch, the reviewer stays `jobcron-reviewer`, and same-card review, local integration and every prohibition are unchanged. The `kanban_create` result does not show the change; `kanban_show(..., board: jobcron)` does. Still create every implementation card for `jobcron-worker` or `jobcron-worker-2`; assign a GLM worker yourself only when the owner asks for it.
+The `jev` plugin can change the assignee of a card that `kanban_create` creates for `jobcron-worker` or `jobcron-worker-2`, and set the card's `model` and `provider` (`glm-5.3-flash` or `glm-5.3` on provider `zai`): `easy` work goes to `jobcron-worker-glm-1` (model `glm-5.3-flash`) and `medium` work to `jobcron-worker-glm-2` (model `glm-5.3`), and work that the plugin classifies as `hard` goes to `jobcron-worker-glm-3`. Accept that change: it is not an assignee mismatch, the reviewer stays `jobcron-reviewer`, and same-card review, local integration and every prohibition are unchanged. The `kanban_create` result does not show the change; `kanban_show(..., board: jobcron)` does. Still create every implementation card for `jobcron-worker` or `jobcron-worker-2`; assign a GLM worker yourself only when the owner asks for it.
 
 The `jev` plugin chooses the route `easy`, `medium`, `hard` or `very_hard` of a card with the criterion texts in `routing.boards.jobcron.routes` of its configuration file `config.json`; this skill does not restate them.
 
