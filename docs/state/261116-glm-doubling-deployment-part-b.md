@@ -137,3 +137,34 @@ Check, `shasum -a 256`:
     EQUAL
 
 Rollback: `cp -p /Users/chanbla11mit/.hermes/backups/t_fb32c24a/harness-orchestrator/SKILL.md /Users/chanbla11mit/.hermes/profiles/harness-orchestrator/skills/autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md`.
+
+## D10: verifier (20:46:34 to 21:02:07)
+
+Command: `python3 /Users/chanbla11mit/hermes-local-harness/scripts/verify-state`, run from `/Users/chanbla11mit/hermes-local-harness` in the terminal environment of the worker, which keeps `HERMES_KANBAN_DB` (`/Users/chanbla11mit/.hermes/kanban/boards/harness/kanban.db`) as the card requires. Output: `verify-d10.txt` (8 lines), `verify-d10.stderr.txt` (empty), `verify-d10.exit.txt` (`verify exit 1 end 21:02:07`). A first start at 20:39 was stopped when the terminal call reached its 400-second limit and wrote no output; run 600's start at 19:24 (`verify-before-part-b.txt`) is also empty.
+
+    FAIL: multi-board gateway is still pinned to one database via HERMES_KANBAN_DB: /Users/chanbla11mit/.hermes/kanban/boards/harness/kanban.db
+    FAIL: unable to read open Cha PT card list
+    FAIL: unable to read open project card list jobcron
+    FAIL: unable to read open project card list cha-pt
+    FAIL: unable to read open project card list harness
+    FAIL: unable to read open project card list jss-genr
+    FAIL: unable to read open project card list anki
+    FAIL: deployed skill hash mismatch: multi-agent-coding-orchestrator default/SKILL.md
+
+Comparison with the last recorded live run, the run of `harness-reviewer` for card `t_e61ee47c` at 07:19 (`/Users/chanbla11mit/.hermes/profiles/harness-reviewer/cache/scratch/t_e61ee47c/verify-review.txt`, copy `verify-last-recorded-live-t_e61ee47c-0719.txt`, `rc=1`): `comm` of the two sorted line sets prints no new line and no removed line; the 8 lines are the same.
+
+Lines that name one of the 30 GLM workers or the five GLM reviewers: none. Lines `fallback drift`: none (`grep -cE 'worker-glm|reviewer-glm|fallback drift' verify-d10.txt` prints 0). There is no new failure for these 35 profiles.
+
+The card check of D10 (D2a steps 1 and 2 with `<step>` `d10`) is run by `harness-orchestrator` after the review request (comment `Controller D10`).
+
+Rollback: none; the verifier writes nothing.
+
+## Tests
+
+- D6 dispatch list program: `True 50 50` (20:20:23); `grep -c -- '-worker-glm-[123]$' /Users/chanbla11mit/.hermes/config.yaml`: `0`.
+- `hermes -p <profile> config get --json fallback_providers` for the 35 profiles of D6: the entry of card R2 on all 35 (`d6-checks.txt`: `profiles 35; different 0; with an anthropic entry 0`).
+- `shasum -a 256` checks of D7 and D9: `equal 10 of 10` (D7 step 1), `equal 9 of 9` (D7 step 2), `EQUAL` (D9).
+- `jev` checks of D8: `profiles 56; jev enabled 56; config.json equal 56`.
+- `python3 /Users/chanbla11mit/hermes-local-harness/scripts/verify-state`: exit 1, the same 8 lines as the last recorded live run, none for the 35 GLM profiles (D10 above).
+- From the worktree, `python3 scripts/verify-state --fixture tests/fixtures/clean.yaml`: `OK: desired state matches observed state`, exit 0.
+- The git checks of the card from the worktree: see the review request of card `t_653b7074`, run after the last commit of this file.
