@@ -4,7 +4,7 @@ Date: 2026-11-16 (all times KST, UTC+09:00).
 Card: `t_653b7074` on board `harness`. Runs 600 and 601 of profile `harness-worker` (see "Runs 600 and 601" below).
 Repository baseline and integrated commit of the procedure: `a34f62497cc135ed02f79341940bf7d6e75dc35b` (local `main`; holds cards R1 to R4 and the merge of the part A record of card `t_fb32c24a`). `plugins/jev/config.json` at this commit has SHA-256 `e38270e61aef43a76e68a1b41b27ba7e39930a1798490908198cae589a47ac00`.
 Specification: `procedures/jev-plugin.md` at the baseline, section "Renaming the GLM worker profiles and creating the second worker of each route", steps D6, D7, D8 steps 1 to 3, D9 and D10, with `<card id>` = `t_fb32c24a` for every backup path, and with the order and changes of the card body.
-Backup directory: `/Users/chanbla11mit/.hermes/backups/t_fb32c24a` (mode 0700, the directory of part A). The output files of this card are in its subdirectory `/Users/chanbla11mit/.hermes/backups/t_fb32c24a/part-b` (mode 0700); every output file named below is there unless a full path is given. The scripts that ran the loops are in `/Users/chanbla11mit/.hermes/profiles/harness-worker/cache/scratch/t_653b7074/` (`d6.sh`, `d6_check.py`, `d7_2.sh`, `d8.sh`).
+Backup directory: `/Users/chanbla11mit/.hermes/backups/t_fb32c24a` (mode 0700, the directory of part A). The output files of this card are in its subdirectory `/Users/chanbla11mit/.hermes/backups/t_fb32c24a/part-b` (mode 0700); every output file named below is there unless a full path is given. The scripts that ran the loops are in `/Users/chanbla11mit/.hermes/profiles/harness-worker/cache/scratch/t_653b7074/` (`d6.sh`, `d6_check.py`, `d7_2.sh`, `d8.sh`, `d8_check.sh`, `d9.sh`).
 
 No `auth.json` was opened. No `.env` file was opened or printed. No `hermes kanban` command against a board other than `harness` was run by the worker, and the worker did not run the program of "Reading the cards of the old names". No gateway restart. No model call. `security.protected_instruction_files` was read only.
 
@@ -102,3 +102,38 @@ Check (20:26:15), `shasum -a 256` of each live file against its tracked source i
     equal 9 of 9
 
 Rollback: `cp -p /Users/chanbla11mit/.hermes/backups/t_fb32c24a/<profile>/SOUL.md /Users/chanbla11mit/.hermes/profiles/<profile>/SOUL.md` and `cp -p /Users/chanbla11mit/.hermes/backups/t_fb32c24a/<profile>/SKILL.md /Users/chanbla11mit/.hermes/profiles/<profile>/skills/autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md` for each changed file.
+
+## D8 steps 1 to 3: `jev` install of the integrated commit (20:27 to 20:38)
+
+Step 1 (20:27): `d8.sh metadata` ran the loop of D8 step 1 with `<card id>` = `t_fb32c24a` for the 56 profiles, in the order of the procedure (no `FAIL` line; output `d8-metadata.txt` is empty). Backups: `/Users/chanbla11mit/.hermes/backups/t_fb32c24a/<profile>/install-metadata.json` for the 56 profiles. In all 56 the `jev` entry is `revision` `85f06a1d7829460aa7bdb7aa935ed90de833ff42`, `pinned` `true`, `source` `file:///Users/chanbla11mit/hermes-local-harness#plugins/jev`; this is the rollback reference. Before step 2, `/Users/chanbla11mit/.hermes/jev/logs/peak-hold.out.log` had 37933 lines (`peak-hold.out.lines.before-d8-run601`) and `/Users/chanbla11mit/.hermes/jev/logs/peak-hold.err.log` had 0 lines.
+
+Step 2 (20:28:04 to 20:35:08): `d8.sh install` ran, for each of the 56 profiles in the order of the procedure, `hermes -p <profile> plugins install file:///Users/chanbla11mit/hermes-local-harness#plugins/jev --ref a34f62497cc135ed02f79341940bf7d6e75dc35b --enable --force` with standard input from `/dev/null`, wrote the output to `/Users/chanbla11mit/.hermes/backups/t_fb32c24a/<profile>/jev-install.log`, and would have stopped after an output that names `caution` or `dangerous` or after a non-zero exit. Output `d8-install-summary.txt`: 56 lines `<time> <profile> exit 0 reloaded 1`, no `stop` line. No install log names `caution` or `dangerous` (`grep -ciE 'caution|dangerous'` over the 56 logs: 0). Each log has the two warnings about a custom source and a local URL scheme, the `Installed` panel with the profile's plugin location, `Replacement installed; plugin selection was not changed.` and `Gateway reloaded plugins — active in the running gateway now: gateway_transforms, hooks.`; the logs differ only in the profile name and in the line wrapping of the location. The reload of plugins is part of the install command; no gateway was restarted.
+
+Step 3 and the checks (20:36:33 to 20:38:48): `/Users/chanbla11mit/.hermes/profiles/harness-worker/cache/scratch/t_653b7074/d8_check.sh`. Output `d8-checks.txt` (one line per profile):
+
+    step 3: HEAD a34f62497cc135ed02f79341940bf7d6e75dc35b main a34f62497cc135ed02f79341940bf7d6e75dc35b status lines 0
+    tracked config.json e38270e61aef43a76e68a1b41b27ba7e39930a1798490908198cae589a47ac00   (git show a34f62497cc135ed02f79341940bf7d6e75dc35b:plugins/jev/config.json | shasum -a 256)
+    56 x: enabled git pinned@a34f6249 0.1.0 jev | config.json e38270e61aef43a76e68a1b41b27ba7e39930a1798490908198cae589a47ac00 | revision a34f62497cc135ed02f79341940bf7d6e75dc35b
+    profiles 56; jev enabled 56; config.json equal 56
+    peak-hold.out.log lines 38051 (before D8 in run 601: 37933)
+    peak-hold.err.log lines 0
+
+The `jev` line is from `hermes -p <profile> plugins list --plain --no-bundled`; `revision` is from `/Users/chanbla11mit/.hermes/profiles/<profile>/plugins/.install-metadata.json`. Read at 20:40, the lines of `peak-hold.out.log` after line 37933 are 60 lines `nothing to hold or release` and 60 lines `no card to pass to the Opus reviewer` (two lines more than at the check, written after it); `tail -3` of the two logs shows these lines and no error.
+
+Step 4 and the card program of the D8 check are run by `harness-orchestrator` after the review request (comment `Controller D8`).
+
+Rollback: on each profile, `hermes -p <profile> plugins install file:///Users/chanbla11mit/hermes-local-harness#plugins/jev --ref 85f06a1d7829460aa7bdb7aa935ed90de833ff42 --enable --force` (the revision of `/Users/chanbla11mit/.hermes/backups/t_fb32c24a/<profile>/install-metadata.json`).
+
+## D9: harness-orchestrator skill copy (20:39)
+
+Commands: the two commands of D9 with `<card id>` = `t_fb32c24a`, run by `/Users/chanbla11mit/.hermes/profiles/harness-worker/cache/scratch/t_653b7074/d9.sh` (copy exit 0). Output `d9.txt`.
+
+Backup: `/Users/chanbla11mit/.hermes/backups/t_fb32c24a/harness-orchestrator/SKILL.md` (SHA-256 `a2f69024a1492f4848b1c1f27eab9ff0e97bf9a7ecafec1d8b94e69ea4b0e2c3`, the live file before the copy; no backup file was there before).
+
+Check, `shasum -a 256`:
+
+    live   /Users/chanbla11mit/.hermes/profiles/harness-orchestrator/skills/autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md                     818bd5f382885c823fcbc3a20c9fa5fdb7ce4fe882408c5fafd5e7a24d440244
+    source /Users/chanbla11mit/hermes-local-harness/policies/profile-skills/harness-orchestrator/autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md  818bd5f382885c823fcbc3a20c9fa5fdb7ce4fe882408c5fafd5e7a24d440244
+    EQUAL
+
+Rollback: `cp -p /Users/chanbla11mit/.hermes/backups/t_fb32c24a/harness-orchestrator/SKILL.md /Users/chanbla11mit/.hermes/profiles/harness-orchestrator/skills/autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md`.
