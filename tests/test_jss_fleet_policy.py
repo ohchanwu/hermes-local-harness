@@ -18,6 +18,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
+from glm_route_worker_names_edits import before_card, board_glm_workers, path_after_card, text_before_card
 from hard_route_policy_edits import reverse_hard_route_policy_edits
 from incident_recovery_verify_fixture import LocalReads, ROOT, load_verifier, resolved_fixture
 from jss_download_install_edits import reverse_download_install_edits
@@ -34,7 +35,11 @@ WORKERS = (WORKER, WORKER2)
 # Back in service for the jev plugin since 2026-11-12 (card t_71b4ef4a); their SOULs are
 # tracked sources too.
 GLM_WORKERS = ("jss-worker-glm-1", "jss-worker-glm-2", "jss-worker-glm-3")
-NON_ORCH_SOULS = (WORKER, WORKER2, REVIEWER, *GLM_WORKERS)
+# Card t_18a2dc93 (owner decision of 2026-11-16) gave the GLM workers the names of their routes and
+# added the second worker of each route; GLM_WORKERS keeps the names of the cards before it, which the
+# checks of those cards' text use, and CURRENT_GLM_WORKERS holds the six profiles after it.
+CURRENT_GLM_WORKERS = tuple(board_glm_workers("jss"))
+NON_ORCH_SOULS = (WORKER, WORKER2, REVIEWER, *CURRENT_GLM_WORKERS)
 SITE = "/Users/chanbla11mit/mystuff/projects/ohchanwu.dev"
 FLEETS = {"jobcron", "cha-pt", "harness", "jss-genr", "anki"}
 RELATIVE = "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md"
@@ -150,6 +155,12 @@ REVIEWER_FIRST_LINE = (
     "implemented by one of the five jss-genr implementation profiles `jss-worker`, `jss-worker-2`, "
     "`jss-worker-glm-1`, `jss-worker-glm-2` or `jss-worker-glm-3`, and pinned to repository "
     "`/Users/chanbla11mit/projects/jss-genr`.")
+# Card t_18a2dc93: the first line names the eight implementation profiles of the board.
+CURRENT_REVIEWER_FIRST_LINE = (
+    "You are the independent jss-genr reviewer. Accept review only for a card on board `jss-genr`, "
+    "implemented by one of the eight jss-genr implementation profiles `jss-worker`, `jss-worker-2`, "
+    + ", ".join(f"`{name}`" for name in CURRENT_GLM_WORKERS[:5]) + f" or `{CURRENT_GLM_WORKERS[5]}`, "
+    "and pinned to repository `/Users/chanbla11mit/projects/jss-genr`.")
 # Sentences that limit access to other repositories name the exception instead of contradicting it.
 ACCESS_LIMIT = re.compile(r"(?i)never access|or access jobcron|may not probe|operate only on|use only `")
 EXCEPTION_REFERENCE = "the reads that the read-only repository exception"
@@ -324,11 +335,14 @@ class FleetDesiredState(unittest.TestCase):
         for listing in (self.roster["project_dispatch_allowlist"], self.snapshot["kanban"]["dispatch_profiles"]):
             # The second worker was appended after the reviewer in the live dispatch order; the
             # GLM workers were appended for the jev plugin (card t_71b4ef4a), then the GLM
-            # reviewer of the board (card t_cca306ca).
+            # reviewer of the board (card t_cca306ca). Card t_18a2dc93 put the six GLM workers
+            # after the GLM reviewers.
             self.assertEqual([name for name in listing if name.startswith("jss-")],
-                             [WORKER, REVIEWER, WORKER2, *GLM_WORKERS, "jss-reviewer-glm"])
+                             [WORKER, REVIEWER, WORKER2, "jss-reviewer-glm", *CURRENT_GLM_WORKERS])
             self.assertNotIn(ORCH, listing)
-        for name in GLM_WORKERS:
+            for name in GLM_WORKERS:
+                self.assertNotIn(name, listing)
+        for name in CURRENT_GLM_WORKERS:
             with self.subTest(glm_worker=name):
                 profile = self.profiles[name]
                 self.assertEqual((profile["model"], profile["provider"], profile["toolsets"]),
@@ -533,7 +547,7 @@ class RoleContracts(unittest.TestCase):
 
     def test_skill_version_size_and_sections(self):
         # Raised by the jev plugin policy change (t_71b4ef4a).
-        self.assertRegex(self.skill_raw, r"(?m)^version: 0\.6\.7-jss\.18$")  # raised by t_ac454595, t_46b5e63e, t_89838618, t_f4ce916d, t_c7cc3830, t_a8884510, t_e14a6d6a, t_35874d04 and t_cf518fd0
+        self.assertRegex(self.skill_raw, r"(?m)^version: 0\.6\.7-jss\.19$")  # raised by t_ac454595, t_46b5e63e, t_89838618, t_f4ce916d, t_c7cc3830, t_a8884510, t_e14a6d6a, t_35874d04, t_cf518fd0 and t_18a2dc93
         # 260 lines plus the 4-line Pitfalls section (t_bd860536), the 9 lines of
         # repair_history candidate rules and example (t_6436ac1c), the 6-line
         # Skill Changes section (t_0a8674fe) and the one-line Hard Scope read-only
@@ -741,7 +755,7 @@ class StandingExceptions(unittest.TestCase):
                 self.assertNotIn("beyond the company slug", body)
                 if profile != REVIEWER:
                     self.assertIn(worker_paragraph, soul_path(profile).read_text())
-        for profile in GLM_WORKERS:
+        for profile in CURRENT_GLM_WORKERS:
             with self.subTest(profile=profile):
                 body = self.others[profile]
                 self.assertIn("Accept only a dispatcher-assigned card on board `jss-genr`", body)
@@ -924,7 +938,9 @@ class ReadOnlyRepositoryException(unittest.TestCase):
 
     def test_reviewer_exception_adds_no_review_authority(self):
         raw = self.raw[REVIEWER_SOUL_RELATIVE]
-        self.assertEqual(raw.splitlines()[0], REVIEWER_FIRST_LINE)
+        # The first line of card t_f4ce916d is checked with the later edits of card t_18a2dc93 reversed.
+        self.assertEqual(text_before_card(ROOT, REVIEWER_SOUL_RELATIVE).splitlines()[0], REVIEWER_FIRST_LINE)
+        self.assertEqual(raw.splitlines()[0], CURRENT_REVIEWER_FIRST_LINE)
         line = exception_line(raw)
         self.assertTrue(line.startswith(
             f"{EXCEPTION_LEAD}: only to check citations in the card under review, you may read "))
@@ -990,11 +1006,13 @@ class ReadOnlyRepositoryException(unittest.TestCase):
         # tests/test_third_glm_worker_policy.py checks; it has no bytes at this card's baseline.
         for profile in (*WORKERS, *GLM_WORKERS[:2]):
             relative = f"policies/profile-souls/{profile}/SOUL.md"
-            text = soul_path(profile).read_text()
+            # Card t_18a2dc93 moved the GLM worker SOUL sources to the names of their routes.
+            text = (ROOT / path_after_card(relative)).read_text()
             with self.subTest(profile=profile):
                 # The jev plugin policy change (t_71b4ef4a) changed the GLM worker SOULs only. The later
-                # download and install change (t_89838618) changed all four and is reversed first.
-                current = reverse_download_install_edits(relative, soul_path(profile).read_bytes())
+                # edits of card t_18a2dc93 and the later download and install change (t_89838618), which
+                # changed all four, are reversed first.
+                current = reverse_download_install_edits(relative, text_before_card(ROOT, relative, as_bytes=True))
                 current = reverse_jev_policy_edits(relative, current)
                 self.assertEqual(hashlib.sha256(current).hexdigest(), BASELINE_SHA256[relative])
                 self.assertNotIn(EXCEPTION_LEAD, text)
@@ -1154,14 +1172,16 @@ class HarnessRepositoryInReadOnlyException(unittest.TestCase):
         self.assertIn("jss-genr card contract drift t_jss: isolated worktree mismatch", errors)
 
     def test_five_worker_souls_carry_no_exception_and_no_harness_path(self):
-        for profile in (*WORKERS, *GLM_WORKERS):
-            relative = f"policies/profile-souls/{profile}/SOUL.md"
-            data = (ROOT / relative).read_bytes()
+        # Card t_18a2dc93 gave the GLM workers the names of their routes and added the second worker of
+        # each route; each SOUL source is compared as the source at its path before that card.
+        for profile in (*WORKERS, *CURRENT_GLM_WORKERS):
+            data = soul_path(profile).read_bytes()
             text = data.decode()
+            relative, before = before_card(f"policies/profile-souls/{profile}/SOUL.md", data)
             with self.subTest(profile=profile):
                 # Card t_e14a6d6a later changed the route of the cards that reach `jss-worker-glm-3`;
                 # that change is reversed first.
-                self.assertEqual(reverse_hard_route_policy_edits(relative, data), baseline_bytes(relative, self.BASELINE))
+                self.assertEqual(reverse_hard_route_policy_edits(relative, before), baseline_bytes(relative, self.BASELINE))
                 self.assertNotIn(EXCEPTION_LEAD, text)
                 self.assertNotIn("read-only repository exception", text.lower())
                 self.assertNotIn("hermes-local-harness", text)
@@ -1170,7 +1190,8 @@ class HarnessRepositoryInReadOnlyException(unittest.TestCase):
         self.assertEqual(harness_edits.BASELINE, self.BASELINE)
         self.assertEqual(harness_edits.BASELINE_SHA256, self.BASELINE_SHA256)
         for path, want in self.BASELINE_SHA256.items():
-            data = (ROOT / path).read_bytes()
+            # The later edits of card t_18a2dc93 are reversed first.
+            data = text_before_card(ROOT, path, as_bytes=True)
             original = reverse_harness_repository_edits(path, data)
             with self.subTest(path=path):
                 self.assertEqual(hashlib.sha256(original).hexdigest(), want)
@@ -1181,8 +1202,9 @@ class HarnessRepositoryInReadOnlyException(unittest.TestCase):
                 self.assertIs(reverse_harness_repository_edits(path, original), original)
                 self.assertEqual(harness_edits.apply_harness_repository_edits(path, original.decode()),
                                  reverse_hard_route_policy_edits(path, data).decode())
+        # Card t_18a2dc93 later changed the anki orchestrator SOUL; its text before that card is used.
         for path in (soul_path(WORKER), ROOT / "policies/profile-souls/anki-orchestrator/SOUL.md"):
-            data = path.read_bytes()
+            data = text_before_card(ROOT, str(path.relative_to(ROOT)), as_bytes=True)
             self.assertIs(reverse_harness_repository_edits(str(path.relative_to(ROOT)), data), data)
 
 
@@ -1262,7 +1284,9 @@ class DownloadAndInstallOwnerDecision(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.raw = {path: (ROOT / path).read_text() for path in cls.BASELINE_SHA256}
+        # Card t_18a2dc93 later moved the GLM worker SOUL sources and changed the names of the GLM
+        # workers; each source is read as its text before that card.
+        cls.raw = {path: text_before_card(ROOT, path) for path in cls.BASELINE_SHA256}
         cls.orch = cls.raw[ORCH_SOUL_RELATIVE]
         cls.skill_raw = cls.raw[SKILL_RELATIVE]
 
@@ -1312,8 +1336,9 @@ class DownloadAndInstallOwnerDecision(unittest.TestCase):
 
     def test_skill_version_line(self):
         # Card t_f4ce916d raised the version by one more step, card t_c7cc3830 by one more, card
-        # t_a8884510 by one more, and card t_e14a6d6a by one more.
-        self.assertEqual(re.findall(r"(?m)^version: (.+)$", self.skill_raw), ["0.6.7-jss.18"])
+        # t_a8884510 by one more, and card t_e14a6d6a by one more; card t_18a2dc93 by one more, so the
+        # current version is read from the file after that card.
+        self.assertEqual(re.findall(r"(?m)^version: (.+)$", SKILL.read_text()), ["0.6.7-jss.19"])
 
     def test_no_source_keeps_the_removed_wording(self):
         for path, text in self.raw.items():
@@ -1365,7 +1390,8 @@ class DownloadAndInstallOwnerDecision(unittest.TestCase):
     def test_reversal_returns_the_baseline_bytes_of_each_changed_source(self):
         for path, want in self.BASELINE_SHA256.items():
             with self.subTest(path=path):
-                data = (ROOT / path).read_bytes()
+                # The later edits of card t_18a2dc93 are reversed first.
+                data = text_before_card(ROOT, path, as_bytes=True)
                 original = reverse_download_install_edits(path, data)
                 self.assertEqual(hashlib.sha256(original).hexdigest(), want)
                 self.assertEqual(reverse_download_install_edits(path, data.decode()), original.decode())

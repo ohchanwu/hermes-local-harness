@@ -13,7 +13,10 @@ version raised by one) and the procedures.
 THIRD_GLM_WORKER_EDITS lists the exact (new, old, count) text that the card changed in
 each existing policy source. reverse_third_glm_worker_edits() reverses the change; it
 leaves a text that has none of the new texts unchanged, so a caller may apply it to a text
-that another caller already reversed. jss_download_install_edits.py and
+that another caller already reversed. Card t_18a2dc93 later gave the GLM workers the
+names of their routes and added the second worker of each route; the tests below check
+the text of this card after that card's edits are reversed (glm_route_worker_names_edits),
+and check the current names where they state the current state. jss_download_install_edits.py and
 test_stale_test_rule_policy.py call it first, so the reversal functions of the earlier
 cards receive the bytes from before this card. This module imports only
 test_card_split_rule_policy (the later card split rule change, t_c7cc3830, reversed
@@ -28,6 +31,8 @@ from pathlib import Path
 import subprocess
 import unittest
 
+from glm_route_worker_names_edits import (board_glm_workers, reverse_glm_route_worker_name_edits,
+                                          six_or as six_or_names)
 from hard_route_policy_edits import reverse_hard_route_policy_edits
 from test_card_split_rule_policy import reverse_card_split_rule_edits
 
@@ -52,8 +57,8 @@ VERSIONS = {"harness": ("0.6.7-harness.9", "0.6.7-harness.10"), "chapt": ("0.6.7
 # The current skill versions: card t_c7cc3830 raised each last number by one more step, card
 # t_a8884510 raised the jss version by one more step, card t_e14a6d6a raised each version by one
 # more step, and card t_d3bb0983 raised the chapt and jobcron versions by one more step.
-CURRENT_VERSIONS = {"harness": "0.6.7-harness.14", "chapt": "0.6.7-chapt.16",
-                    "jobcron": "0.6.9-jobcron.17", "jss": "0.6.7-jss.18", "anki": "0.6.10-anki.12"}
+CURRENT_VERSIONS = {"harness": "0.6.7-harness.15", "chapt": "0.6.7-chapt.17",
+                    "jobcron": "0.6.9-jobcron.18", "jss": "0.6.7-jss.19", "anki": "0.6.10-anki.13"}
 
 
 def soul(profile):
@@ -207,14 +212,23 @@ class PolicySources(unittest.TestCase):
                                  reverse_card_split_rule_edits(path, data).decode())
 
     def test_other_paths_are_returned_unchanged(self):
-        for path in (soul("harness-worker"), soul("anki-worker-glm-1"), "procedures/jev-plugin.md"):
+        # Card t_18a2dc93 moved anki-worker-glm-1 to anki-worker-glm-easy-1 and added anki-worker-glm-easy-2.
+        for path in (soul("harness-worker"), soul("anki-worker-glm-easy-2"), "procedures/jev-plugin.md"):
             data = (ROOT / path).read_bytes()
             with self.subTest(path=path):
                 self.assertIs(reverse_third_glm_worker_edits(path, data), data)
 
     def test_each_reviewer_names_exactly_the_five_implementation_profiles_of_its_board(self):
         for prefix in PREFIXES:
-            text = self.text[soul(f"{prefix}-reviewer")]
+            current = self.text[soul(f"{prefix}-reviewer")]
+            # Card t_18a2dc93: the reviewer now names the eight implementation profiles of its board.
+            eight = {f"{prefix}-worker", f"{prefix}-worker-2", *board_glm_workers(prefix)}
+            self.assertEqual(implementation_profiles(current.split("\n\n", 1)[0], prefix), eight)
+            self.assertEqual(current.count(REVIEWER_LIST_LEAD[prefix].format("eight") + f"`{prefix}-worker`, "
+                                           f"`{prefix}-worker-2`, " + six_or_names(prefix)), 1)
+            self.assertNotIn(three_or(prefix), current)
+            # This card's text is checked with the edits of card t_18a2dc93 reversed.
+            text = reverse_glm_route_worker_name_edits(soul(f"{prefix}-reviewer"), current)
             want = {f"{prefix}-worker", f"{prefix}-worker-2", *(f"{prefix}-worker-glm-{n}" for n in (1, 2, 3))}
             with self.subTest(prefix=prefix):
                 self.assertEqual(text.count(reviewer_list(prefix, "five")), 1)
@@ -226,16 +240,22 @@ class PolicySources(unittest.TestCase):
 
     def test_orchestrator_souls_and_skills_name_the_three_glm_workers(self):
         for prefix in PREFIXES:
-            orchestrator = self.text[soul(f"{prefix}-orchestrator")]
-            text = self.text[skill(prefix)]
+            # Card t_18a2dc93 later named the six GLM workers of the board; this card's text is checked
+            # with those edits reversed, and the current version is checked on the current text.
+            current_orchestrator = self.text[soul(f"{prefix}-orchestrator")]
+            self.assertNotIn(three_or(prefix), current_orchestrator)
+            self.assertIn(six_or_names(prefix), current_orchestrator)
+            orchestrator = reverse_glm_route_worker_name_edits(soul(f"{prefix}-orchestrator"), current_orchestrator)
+            self.assertRegex(self.text[skill(prefix)], rf"(?m)^version: {re.escape(CURRENT_VERSIONS[prefix])}$")
+            text = reverse_glm_route_worker_name_edits(skill(prefix), self.text[skill(prefix)])
             with self.subTest(prefix=prefix):
                 self.assertEqual(orchestrator.count(
                     f"The `jev` plugin can change the assignee of a new card from `{prefix}-worker` or "
                     f"`{prefix}-worker-2` to {three_or(prefix)}, and set the card's model and provider, inside "
                     "`kanban_create`;"), 1)
                 self.assertNotIn(two_or(prefix), orchestrator)
-                # Card t_c7cc3830 raised each version by one step after this card.
-                self.assertRegex(text, rf"(?m)^version: {re.escape(CURRENT_VERSIONS[prefix])}$")
+                # Card t_c7cc3830 raised each version by one step after this card; the current version is
+                # checked above, before the edits of card t_18a2dc93 are reversed.
                 # Card t_e14a6d6a later replaced the worker selection sentence and the change request
                 # sentence; the two sentences of this card are checked after that change is reversed.
                 original = reverse_hard_route_policy_edits(skill(prefix), text)
@@ -257,28 +277,40 @@ class PolicySources(unittest.TestCase):
 
     def test_third_glm_worker_souls_follow_the_first(self):
         for prefix in GLM_SOUL_PREFIXES:
-            first = (ROOT / soul(f"{prefix}-worker-glm-1")).read_text()
+            # Card t_18a2dc93 moved the SOUL sources of the first and third GLM workers to
+            # `<prefix>-worker-glm-easy-1` and `<prefix>-worker-glm-hard-1` and changed them; this
+            # card's text is checked with those edits reversed.
+            first_path, third_path = soul(f"{prefix}-worker-glm-easy-1"), soul(f"{prefix}-worker-glm-hard-1")
+            first = reverse_glm_route_worker_name_edits(first_path, (ROOT / first_path).read_text())
             want = first.replace(f"{prefix}-worker-glm-1", f"{prefix}-worker-glm-3")
             lines = want.split("\n", 1)
             lines[0] = lines[0].replace("GLM implementation worker 1", "GLM implementation worker 3")
             want = "\n".join(lines)
-            third = (ROOT / soul(f"{prefix}-worker-glm-3")).read_text()
+            current_third = (ROOT / third_path).read_text()
+            third = reverse_glm_route_worker_name_edits(third_path, current_third)
             with self.subTest(prefix=prefix):
                 # Card t_e14a6d6a later changed the route of the cards that reach the Harness and jss-genr
                 # third GLM workers; that change is reversed first.
                 self.assertEqual(reverse_hard_route_policy_edits(soul(f"{prefix}-worker-glm-3"), third), want)
                 self.assertNotIn(f"{prefix}-worker-glm-1", third)
                 self.assertIn(f"/Users/chanbla11mit/.hermes/profiles/{prefix}-worker-glm-3/cache/scratch", third)
-                self.assertIn(f"board: {BOARD_OF[prefix]})`", third)
+                self.assertIn(f"/Users/chanbla11mit/.hermes/profiles/{prefix}-worker-glm-hard-1/cache/scratch",
+                              current_third)
+                self.assertIn(f"board: {BOARD_OF[prefix]})`", current_third)
         # The Jobcron GLM worker SOULs stay untracked.
-        for number in (1, 2, 3):
-            self.assertFalse((ROOT / soul(f"jobcron-worker-glm-{number}")).exists())
+        for name in (*(f"jobcron-worker-glm-{number}" for number in (1, 2, 3)), *board_glm_workers("jobcron")):
+            self.assertFalse((ROOT / soul(name)).exists())
 
     def test_existing_glm_and_claude_worker_souls_are_unchanged(self):
+        # Card t_18a2dc93 later moved the SOUL sources of `<prefix>-worker-glm-1` and `-glm-2` to
+        # `-glm-easy-1` and `-glm-medium-1` and changed them; they are compared with those edits reversed.
         for prefix in GLM_SOUL_PREFIXES:
-            for profile in (f"{prefix}-worker", f"{prefix}-worker-2", f"{prefix}-worker-glm-1", f"{prefix}-worker-glm-2"):
+            for profile, current in ((f"{prefix}-worker", f"{prefix}-worker"), (f"{prefix}-worker-2", f"{prefix}-worker-2"),
+                                     (f"{prefix}-worker-glm-1", f"{prefix}-worker-glm-easy-1"),
+                                     (f"{prefix}-worker-glm-2", f"{prefix}-worker-glm-medium-1")):
                 with self.subTest(profile=profile):
-                    self.assertEqual((ROOT / soul(profile)).read_bytes(), baseline_bytes(soul(profile)))
+                    data = reverse_glm_route_worker_name_edits(soul(current), (ROOT / soul(current)).read_bytes())
+                    self.assertEqual(data, baseline_bytes(soul(profile)))
 
 
 class DesiredState(unittest.TestCase):
@@ -339,13 +371,23 @@ class DesiredState(unittest.TestCase):
             for route in entry["routes"]:
                 if route["name"] in ("easy", "medium"):
                     route["assignee_from"] = f"{route['name']}_route_workers"
+        # Card t_18a2dc93 (owner decision of 2026-11-16): the GLM workers have the names of their
+        # routes and every route has a second worker; no other value changed.
+        for prefix, board in BOARD_OF.items():
+            entry = expected["routing"]["boards"][board]
+            easy, medium, hard = (board_glm_workers(prefix)[i:i + 2] for i in (0, 2, 4))
+            entry["glm_workers"] = easy + medium
+            entry["glm_max_workers"] = hard
+            entry["easy_route_workers"] = easy
+            entry["medium_route_workers"] = medium
         self.assertEqual(config, expected)
 
     def test_roster_entries_of_the_third_glm_workers_equal_the_second(self):
         roster = json.loads((ROOT / "roster.yaml").read_text())
         profiles = {p["name"]: p for p in roster["profiles"]}
         for prefix in PREFIXES:
-            second, third = f"{prefix}-worker-glm-2", f"{prefix}-worker-glm-3"
+            # Card t_18a2dc93 renamed the second and third GLM workers to `-glm-medium-1` and `-glm-hard-1`.
+            second, third = f"{prefix}-worker-glm-medium-1", f"{prefix}-worker-glm-hard-1"
             with self.subTest(prefix=prefix):
                 self.assertEqual(dict(profiles[third], name=second), profiles[second])
                 entry = profiles[third]
@@ -359,9 +401,10 @@ class DesiredState(unittest.TestCase):
         # No GLM worker SOUL is listed in profile_souls, as at the baseline.
         self.assertFalse([name for name in roster["profile_souls"] if "-glm-" in name])
 
-    # The two dispatch lists hold the third GLM workers at the end, in the order in which the
-    # switch script added them to the live list (card t_55432326); every other list names each
-    # third GLM worker directly after the second GLM worker of its board.
+    # The two dispatch lists hold the GLM workers at the end (card t_18a2dc93 moved them there, in
+    # the order of section 1 of docs/specs/261116-glm-worker-profiles-by-route-and-claude-fallback.md);
+    # every other list names the first `hard` worker (the third GLM worker of this card, renamed by
+    # card t_18a2dc93) directly after the second `medium` worker of its board.
     DISPATCH_LISTS = ("roster.yaml/project_dispatch_allowlist",
                       "snapshots/sanitized-current-state.yaml/kanban/dispatch_profiles")
 
@@ -376,32 +419,36 @@ class DesiredState(unittest.TestCase):
                 elif isinstance(node, list):
                     names = [item for item in node if isinstance(item, str)]
                     for prefix in PREFIXES:
-                        if f"{prefix}-worker-glm-2" in names:
+                        if f"{prefix}-worker-glm-medium-1" in names:
                             with self.subTest(where=where, prefix=prefix):
+                                self.assertNotIn(f"{prefix}-worker-glm-2", names)
                                 if where in self.DISPATCH_LISTS:
-                                    self.assertIn(f"{prefix}-worker-glm-3", names)
+                                    self.assertIn(f"{prefix}-worker-glm-hard-1", names)
                                     continue
-                                index = names.index(f"{prefix}-worker-glm-2")
-                                self.assertEqual(names[index + 1], f"{prefix}-worker-glm-3")
+                                index = names.index(f"{prefix}-worker-glm-medium-2")
+                                self.assertEqual(names[index + 1], f"{prefix}-worker-glm-hard-1")
                     stack.extend((item, f"{where}[]") for item in node if not isinstance(item, str))
 
     def test_dispatch_lists_end_with_the_third_glm_workers_in_the_order_they_were_added(self):
         snapshot = json.loads((ROOT / "snapshots/sanitized-current-state.yaml").read_text())
         roster = json.loads((ROOT / "roster.yaml").read_text())
         dispatch = snapshot["kanban"]["dispatch_profiles"]
-        # Card t_cca306ca appended the five GLM reviewers after the third GLM workers.
-        self.assertEqual(dispatch[-10:], ["harness-worker-glm-3", "chapt-worker-glm-3", "jobcron-worker-glm-3",
-                                          "jss-worker-glm-3", "anki-worker-glm-3",
-                                          "jobcron-reviewer-glm", "chapt-reviewer-glm",
-                                          "harness-reviewer-glm", "jss-reviewer-glm", "anki-reviewer-glm"])
-        self.assertEqual(len(dispatch), 35)
+        # Card t_cca306ca appended the five GLM reviewers after the third GLM workers. Card t_18a2dc93
+        # keeps the 20 other names in their order and puts the 30 GLM workers after them, board by board.
+        self.assertEqual(dispatch[15:20], ["jobcron-reviewer-glm", "chapt-reviewer-glm",
+                                           "harness-reviewer-glm", "jss-reviewer-glm", "anki-reviewer-glm"])
+        self.assertEqual(dispatch[20:], [name for prefix in ("jobcron", "chapt", "harness", "jss", "anki")
+                                         for name in board_glm_workers(prefix)])
+        self.assertEqual(len(dispatch), 50)
         self.assertEqual(roster["project_dispatch_allowlist"], dispatch)
 
-    def test_verifier_pools_have_three_glm_workers_per_board(self):
+    def test_verifier_pools_have_six_glm_workers_per_board(self):
+        # Card t_18a2dc93: six names per board, four on the first line and two on the second.
         text = (ROOT / "scripts/verify-state").read_text()
         for prefix, board in BOARD_OF.items():
-            names = ", ".join(f"\"{prefix}-worker-glm-{n}\"" for n in (1, 2, 3))
-            self.assertIn(f"    \"{board}\": [{names}],\n", text)
+            names = [f"\"{name}\"" for name in board_glm_workers(prefix)]
+            self.assertIn(f"    \"{board}\": [\n        {', '.join(names[:4])},\n        {', '.join(names[4:])},\n    ],\n",
+                          text)
 
 
 class Procedures(unittest.TestCase):
@@ -414,14 +461,16 @@ class Procedures(unittest.TestCase):
 
     def test_install_list_and_board_table(self):
         install = self.text.split("## Install on a profile\n", 1)[1].split("\n## ", 1)[0]
-        self.assertIn("Profiles (36 in total;", install)
-        self.assertIn("The fifteen GLM worker profiles that the routes use, three for each board:", install)
+        # Card t_18a2dc93: 51 profiles, of which thirty GLM workers, six for each board.
+        self.assertIn("Profiles (51 in total;", install)
+        self.assertIn("The thirty GLM worker profiles that the routes use, six for each board:", install)
         for prefix in PREFIXES:
-            for number in (1, 2, 3):
-                self.assertIn(f"`{prefix}-worker-glm-{number}`", install)
+            for name in board_glm_workers(prefix):
+                self.assertIn(f"`{name}`", install)
         for prefix, board in BOARD_OF.items():
-            row = (f"| `{board}` | `{prefix}-worker`, `{prefix}-worker-2` | `{prefix}-worker-glm-1`, "
-                   f"`{prefix}-worker-glm-2` | `{prefix}-worker-glm-3` | `easy`, `medium`, `hard`, `very_hard` |")
+            names = [f"`{name}`" for name in board_glm_workers(prefix)]
+            row = (f"| `{board}` | `{prefix}-worker`, `{prefix}-worker-2` | {', '.join(names[:4])} | "
+                   f"{', '.join(names[4:])} | `easy`, `medium`, `hard`, `very_hard` |")
             self.assertEqual(self.text.count(row), 1)
         self.assertIn("(the two workers of `glm_workers` take turns;", self.text)
         self.assertNotIn("(the three take turns;", self.text)
@@ -429,12 +478,13 @@ class Procedures(unittest.TestCase):
         # Statements about earlier cards stay as history.
         self.assertIn("on the same 31 profiles on 2026-11-13", self.text)
 
-    def test_tracked_soul_sources_paragraph_names_twelve_sources(self):
+    def test_tracked_soul_sources_paragraph_names_twenty_four_sources(self):
+        # Card t_18a2dc93: six GLM worker SOUL sources for each of the four prefixes that have them.
         paragraph = next(p for p in self.text.split("\n\n") if p.startswith("The tracked SOUL sources of the"))
-        self.assertTrue(paragraph.startswith("The tracked SOUL sources of the twelve GLM workers"))
+        self.assertTrue(paragraph.startswith("The tracked SOUL sources of the twenty-four GLM workers"))
         sources = re.findall(r"`/Users/chanbla11mit/hermes-local-harness/policies/profile-souls/([a-z0-9-]+)/SOUL.md`",
                              paragraph)
-        self.assertEqual(sorted(sources), sorted(f"{p}-worker-glm-{n}" for p in GLM_SOUL_PREFIXES for n in (1, 2, 3)))
+        self.assertEqual(sorted(sources), sorted(name for p in GLM_SOUL_PREFIXES for name in board_glm_workers(p)))
 
     def test_creation_section(self):
         self.assertEqual(self.text.count(self.HEADING), 1)
@@ -491,12 +541,14 @@ class Procedures(unittest.TestCase):
             self.assertNotIn("~/", text)
             self.assertNotIn("$HOME", text)
 
-    def test_switching_procedure_counts_fifteen_glm_workers(self):
+    def test_switching_procedure_counts_thirty_glm_workers(self):
         text = (ROOT / "procedures/switching-hermes-models.md").read_text()
         self.assertIn("Card `t_f4ce916d` added a third GLM worker to every board on 2026-11-14", text)
         self.assertIn("card `t_55432326` created these five profiles on 2026-11-14", text)
-        self.assertIn("declares each of the fifteen with", text)
-        self.assertIn("for the fifteen GLM workers in service", text)
+        # Card t_18a2dc93 gave every board six GLM workers.
+        self.assertIn("declares each of the thirty with", text)
+        self.assertIn("for the thirty GLM workers in service", text)
+        self.assertNotIn("each of the fifteen", text)
         self.assertNotIn("each of the ten", text)
         self.assertNotIn("the ten GLM workers in service", text)
 

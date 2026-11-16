@@ -17,6 +17,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
+from glm_route_worker_names_edits import board_glm_workers
 from incident_recovery_verify_fixture import LocalReads, ROOT, load_verifier
 
 # The owner model policy as verify-state records it; the roster is checked against it, not copied.
@@ -27,12 +28,14 @@ POLICY_ORCHESTRATOR = _POLICY.MODEL_POLICY_BY_ROLE["advisor"]
 # default, the advisor and the five project orchestrators moved from Fable to Opus).
 FABLE = "claude-fable-5-2"
 CLAUDE = _POLICY.MODEL_POLICY_PROVIDER
-GLM = tuple(f"{prefix}-worker-glm-{n}" for prefix in ("jobcron", "chapt", "harness", "jss", "anki")
-            for n in (1, 2, 3))
+# Card t_18a2dc93 (owner decision of 2026-11-16): six GLM workers per board, with the names of
+# their routes, listed board by board.
+GLM = tuple(name for prefix in ("jobcron", "chapt", "harness", "jss", "anki") for name in board_glm_workers(prefix))
 # Owner decisions of 2026-11-12: the GLM workers of jobcron, cha-pt and harness are back in
 # service for the jev plugin (card t_4f7740d0); the GLM workers of jss-genr and anki joined
 # them (card t_71b4ef4a); every board has a third GLM worker (owner request of 2026-11-14,
-# card t_f4ce916d). Every project fleet GLM worker is in service.
+# card t_f4ce916d); card t_18a2dc93 renamed them and added the second worker of each route.
+# Every project fleet GLM worker is in service.
 GLM_IN_SERVICE = GLM
 # The generic GLM profiles stay retired; they are the RETIRED_PROFILES floor of verify-state.
 GLM_RETIRED = ("worker-flash-1", "worker-flash-2", "worker-flash-3", "worker-glm-full")
@@ -43,15 +46,11 @@ PROJECT_DISPATCH = ["jobcron-worker", "jobcron-reviewer", "chapt-worker", "chapt
                     "harness-worker", "harness-reviewer", "jss-worker", "jss-reviewer",
                     "harness-worker-2", "chapt-worker-2", "jobcron-worker-2", "jss-worker-2",
                     "anki-worker", "anki-worker-2", "anki-reviewer",
-                    # The first and second GLM worker of each board, then the five third GLM
-                    # workers in the order in which the switch script added them to the live
-                    # list (card t_55432326).
-                    *(name for name in GLM_IN_SERVICE if not name.endswith("-glm-3")),
-                    "harness-worker-glm-3", "chapt-worker-glm-3", "jobcron-worker-glm-3",
-                    "jss-worker-glm-3", "anki-worker-glm-3",
                     # The five GLM reviewer profiles of card t_cca306ca.
                     "jobcron-reviewer-glm", "chapt-reviewer-glm", "harness-reviewer-glm",
-                    "jss-reviewer-glm", "anki-reviewer-glm"]
+                    "jss-reviewer-glm", "anki-reviewer-glm",
+                    # The thirty GLM workers, board by board (card t_18a2dc93).
+                    *GLM_IN_SERVICE]
 HARNESS = "/Users/chanbla11mit/hermes-local-harness"
 
 
@@ -118,9 +117,9 @@ class ModelPolicy(Base):
 
     def test_glm_worker_on_another_model_fails(self):
         roster = copy.deepcopy(self.roster)
-        next(p for p in roster["profiles"] if p["name"] == "chapt-worker-glm-1").update(model=OPUS, provider=CLAUDE)
+        next(p for p in roster["profiles"] if p["name"] == "chapt-worker-glm-easy-1").update(model=OPUS, provider=CLAUDE)
         self.assertEqual(quiet(self.verifier.check_model_policy, roster), [
-            f"roster model policy drift chapt-worker-glm-1: expected glm-5.3 on zai, declared {OPUS} on {CLAUDE}"])
+            f"roster model policy drift chapt-worker-glm-easy-1: expected glm-5.3 on zai, declared {OPUS} on {CLAUDE}"])
 
     def test_out_of_policy_declaration_fails(self):
         roster = copy.deepcopy(self.roster)
@@ -185,11 +184,12 @@ class RetiredProfiles(Base):
                 self.assertTrue(entry["in_dispatch_pool"])
         self.assertEqual(quiet(self.verifier.check_glm_worker_profiles, self.roster), [])
         roster = copy.deepcopy(self.roster)
-        entry = next(p for p in roster["profiles"] if p["name"] == "harness-worker-glm-2")
+        entry = next(p for p in roster["profiles"] if p["name"] == "harness-worker-glm-medium-1")
         entry.update(lifecycle="retired", in_dispatch_pool=False)
         self.assertEqual(quiet(self.verifier.check_glm_worker_profiles, roster), [
-            "GLM worker lifecycle drift harness-worker-glm-2: expected project-active, declared 'retired'",
-            "GLM worker not dispatchable harness-worker-glm-2: dispatch_eligible and in_dispatch_pool must be true"])
+            "GLM worker lifecycle drift harness-worker-glm-medium-1: expected project-active, declared 'retired'",
+            "GLM worker not dispatchable harness-worker-glm-medium-1: dispatch_eligible and in_dispatch_pool must be "
+            "true"])
 
     def test_no_retired_profile_in_any_pool(self):
         retired = set(GLM_RETIRED) | set(GPT_ERA)

@@ -213,9 +213,10 @@ write("retired-glm-dispatch-drift.yaml", delta(retired_glm_dispatch))
 
 def glm_worker_dispatch_missing(d):
     # Two of the GLM workers in service are missing from the dispatch list: one of card
-    # t_4f7740d0 and one third GLM worker of card t_f4ce916d.
-    d["dispatch_profiles"].remove("chapt-worker-glm-2")
-    d["dispatch_profiles"].remove("anki-worker-glm-3")
+    # t_4f7740d0 (renamed by card t_18a2dc93) and one second worker of a route that card
+    # t_18a2dc93 added.
+    d["dispatch_profiles"].remove("chapt-worker-glm-medium-1")
+    d["dispatch_profiles"].remove("anki-worker-glm-hard-2")
 
 
 write("glm-worker-dispatch-missing.yaml", delta(glm_worker_dispatch_missing))
@@ -264,7 +265,7 @@ write("launch-agent-not-loaded.yaml", delta(launch_agent_not_loaded))
 def jev_plugin_missing(d):
     # jev is absent on one Claude profile and disabled on one GLM worker that require it.
     del d["plugins"]["harness-reviewer"][JEV]
-    d["plugins"]["jobcron-worker-glm-1"][JEV] = "disabled     user     0.1.0    jev"
+    d["plugins"]["jobcron-worker-glm-easy-1"][JEV] = "disabled     user     0.1.0    jev"
 
 
 write("jev-plugin-missing.yaml", delta(jev_plugin_missing))

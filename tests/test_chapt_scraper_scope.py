@@ -15,6 +15,7 @@ import types
 import unittest
 from unittest.mock import patch
 
+from glm_route_worker_names_edits import path_before_card, reverse_glm_route_worker_name_edits
 from incident_recovery_verify_fixture import ROOT, load_verifier
 from rule_text import assert_rule
 from test_chapt_policy_reconciliation import CARD_CREATION_EDITS
@@ -452,12 +453,17 @@ class PushHelper(GitSandbox):
         self.assertIn("REFUSED: dispatched Kanban tasks", result.stdout)
 
 
+# Card t_18a2dc93 later moved the SOUL sources of chapt-worker-glm-1 and chapt-worker-glm-2 to
+# chapt-worker-glm-easy-1 and chapt-worker-glm-medium-1; baseline_text reads the path before that move.
 SOULS = {name: ROOT / f"policies/profile-souls/{name}/SOUL.md" for name in (
-    "chapt-orchestrator", "chapt-worker", "chapt-worker-2", "chapt-worker-glm-1", "chapt-worker-glm-2",
+    "chapt-orchestrator", "chapt-worker", "chapt-worker-2", "chapt-worker-glm-easy-1", "chapt-worker-glm-medium-1",
     "chapt-reviewer")}
-# The SOUL of the third Cha PT GLM worker (card t_f4ce916d) is a copy of the first one and states the same
-# rules; it has no bytes at this card's baseline, so the check against the baseline leaves it out.
-CURRENT_SOULS = {**SOULS, "chapt-worker-glm-3": ROOT / "policies/profile-souls/chapt-worker-glm-3/SOUL.md"}
+# The SOUL of the third Cha PT GLM worker (card t_f4ce916d, now chapt-worker-glm-hard-1) is a copy of the
+# first one and states the same rules, as do the three SOUL sources of the second worker of each route
+# (card t_18a2dc93); they have no bytes at this card's baseline, so the check against the baseline leaves
+# them out.
+CURRENT_SOULS = {**SOULS, **{name: ROOT / f"policies/profile-souls/{name}/SOUL.md" for name in (
+    "chapt-worker-glm-hard-1", "chapt-worker-glm-easy-2", "chapt-worker-glm-medium-2", "chapt-worker-glm-hard-2")}}
 SKILLS = (ROOT / "skills/multi-agent-coding-orchestrator/SKILL.md",
           ROOT / "policies/profile-skills/chapt-orchestrator/autonomous-ai-agents/"
                  "multi-agent-coding-orchestrator/SKILL.md")
@@ -469,7 +475,8 @@ class PolicyText(unittest.TestCase):
         return path.read_text()
 
     def baseline_text(self, path):
-        return subprocess.run(("git", "-C", str(ROOT), "show", f"{BASELINE}:{path.relative_to(ROOT)}"),
+        before = path_before_card(str(path.relative_to(ROOT)))
+        return subprocess.run(("git", "-C", str(ROOT), "show", f"{BASELINE}:{before}"),
                               check=True, text=True, stdout=subprocess.PIPE).stdout
 
     def test_three_repository_allowlist_and_declaration(self):
@@ -521,6 +528,9 @@ class PolicyText(unittest.TestCase):
             base = self.baseline_text(path).split("\n\n")
             current = self.text(path)
             relative = str(path.relative_to(ROOT))
+            # Reverse the later route name change (t_18a2dc93) first, then use the path before it.
+            current = reverse_glm_route_worker_name_edits(relative, current)
+            relative = path_before_card(relative)
             # Reverse the later declared Fable model change (t_a6bbe808), the repair_history
             # candidate rule change (t_6436ac1c), the owner shell command path change
             # (t_bd860536) and the repair_history format and repository line change (t_a4dccec1),

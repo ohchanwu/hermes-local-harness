@@ -27,7 +27,8 @@ SETTINGS = {
 FIXTURES = ROOT / "tests/fixtures"
 # The second managed settings group (t_0a8674fe); tests/test_orchestrator_profile_settings.py
 # checks it. The third group (t_2d357ca0) covers the ten Claude worker profiles. The fourth
-# group (t_e483301c) covers the reasoning effort of the five <board>-worker-glm-3 profiles.
+# group (t_e483301c) covers the reasoning effort of the hard route GLM workers: since card
+# t_18a2dc93 the ten <board>-worker-glm-hard-1 and <board>-worker-glm-hard-2 profiles.
 # The fifth group (t_cca306ca) covers the reasoning effort of the five <board>-reviewer-glm
 # profiles; tests/test_glm_reviewer_roster.py checks it.
 # Fixtures carry every group merged per profile.
@@ -37,8 +38,8 @@ WORKER_PROFILES = ["jobcron-worker", "jobcron-worker-2", "chapt-worker", "chapt-
                    "harness-worker", "harness-worker-2", "jss-worker", "jss-worker-2",
                    "anki-worker", "anki-worker-2"]
 WORKER_SETTINGS = {"compression.threshold_tokens": 300000}
-GLM_EFFORT_PROFILES = ["jobcron-worker-glm-3", "chapt-worker-glm-3", "harness-worker-glm-3",
-                       "jss-worker-glm-3", "anki-worker-glm-3"]
+GLM_EFFORT_PROFILES = [f"{prefix}-worker-glm-hard-{number}"
+                       for prefix in ("jobcron", "chapt", "harness", "jss", "anki") for number in (1, 2)]
 GLM_EFFORT_SETTINGS = {"agent.reasoning_effort": "max"}
 DRIFT_FIXTURES = ("compression-drift.yaml", "orchestrator-skill-settings-drift.yaml")
 DRIFT_MESSAGES = [
@@ -198,21 +199,21 @@ class FixtureVerifierTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix="managed-settings-") as directory:
             path = Path(directory) / "observation.yaml"
             wrong = json.loads(json.dumps(clean))
-            wrong["profile_managed_settings"]["harness-worker-glm-3"]["agent.reasoning_effort"] = "high"
+            wrong["profile_managed_settings"]["harness-worker-glm-hard-1"]["agent.reasoning_effort"] = "high"
             path.write_text(json.dumps(wrong))
             code, output, guard = fixture_result(path)
             self.assertEqual(code, 1, output)
             self.assertEqual(fail_lines(output), [
-                "FAIL: managed setting drift harness-worker-glm-3 agent.reasoning_effort: "
+                "FAIL: managed setting drift harness-worker-glm-hard-1 agent.reasoning_effort: "
                 "expected 'max', actual 'high'"])
             self.assert_isolated(guard)
             missing = json.loads(json.dumps(clean))
-            del missing["profile_managed_settings"]["harness-worker-glm-3"]["agent.reasoning_effort"]
+            del missing["profile_managed_settings"]["harness-worker-glm-hard-1"]["agent.reasoning_effort"]
             path.write_text(json.dumps(missing))
             code, output, guard = fixture_result(path)
             self.assertEqual(code, 1, output)
             self.assertEqual(fail_lines(output), [
-                "FAIL: managed setting drift harness-worker-glm-3 agent.reasoning_effort: "
+                "FAIL: managed setting drift harness-worker-glm-hard-1 agent.reasoning_effort: "
                 "expected 'max', actual <unreadable>"])
             self.assert_isolated(guard)
 
@@ -291,7 +292,7 @@ class CheckFunctionTests(unittest.TestCase):
         def fake_run(*args):
             calls.append(args)
             profile = args[2]
-            output = '"high"' if profile == "harness-worker-glm-3" else '"max"'
+            output = '"high"' if profile == "harness-worker-glm-hard-1" else '"max"'
             return subprocess.CompletedProcess(args, 0, output, "")
 
         with patch.dict(self.verifier.__dict__, {"run": fake_run}):
@@ -299,7 +300,7 @@ class CheckFunctionTests(unittest.TestCase):
         self.assertEqual(calls, [("hermes", "-p", profile, "config", "get", "--json",
                                   "agent.reasoning_effort") for profile in GLM_EFFORT_PROFILES])
         self.assertEqual(errors, [
-            "managed setting drift harness-worker-glm-3 agent.reasoning_effort: expected 'max', actual 'high'"])
+            "managed setting drift harness-worker-glm-hard-1 agent.reasoning_effort: expected 'max', actual 'high'"])
 
 
 if __name__ == "__main__":

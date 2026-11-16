@@ -1104,13 +1104,30 @@ PROJECT_WORKER_POOLS = {
 # are in kanban.dispatch_profiles and may be the assignee of an implementation card.
 # Card t_71b4ef4a (owner approval of 2026-11-12 for every board) added the GLM workers
 # of the jss-genr and anki boards. Card t_f4ce916d (owner request of 2026-11-14) added
-# a third GLM worker to every board.
+# a third GLM worker to every board. Card t_18a2dc93 (owner decision of 2026-11-16) renamed
+# the three GLM workers of every board to <prefix>-worker-glm-easy-1, -medium-1 and -hard-1
+# and added a second worker for each route: -easy-2, -medium-2 and -hard-2.
 PROJECT_GLM_WORKER_POOLS = {
-    "jobcron": ["jobcron-worker-glm-1", "jobcron-worker-glm-2", "jobcron-worker-glm-3"],
-    "cha-pt": ["chapt-worker-glm-1", "chapt-worker-glm-2", "chapt-worker-glm-3"],
-    "harness": ["harness-worker-glm-1", "harness-worker-glm-2", "harness-worker-glm-3"],
-    "jss-genr": ["jss-worker-glm-1", "jss-worker-glm-2", "jss-worker-glm-3"],
-    "anki": ["anki-worker-glm-1", "anki-worker-glm-2", "anki-worker-glm-3"],
+    "jobcron": [
+        "jobcron-worker-glm-easy-1", "jobcron-worker-glm-easy-2", "jobcron-worker-glm-medium-1", "jobcron-worker-glm-medium-2",
+        "jobcron-worker-glm-hard-1", "jobcron-worker-glm-hard-2",
+    ],
+    "cha-pt": [
+        "chapt-worker-glm-easy-1", "chapt-worker-glm-easy-2", "chapt-worker-glm-medium-1", "chapt-worker-glm-medium-2",
+        "chapt-worker-glm-hard-1", "chapt-worker-glm-hard-2",
+    ],
+    "harness": [
+        "harness-worker-glm-easy-1", "harness-worker-glm-easy-2", "harness-worker-glm-medium-1", "harness-worker-glm-medium-2",
+        "harness-worker-glm-hard-1", "harness-worker-glm-hard-2",
+    ],
+    "jss-genr": [
+        "jss-worker-glm-easy-1", "jss-worker-glm-easy-2", "jss-worker-glm-medium-1", "jss-worker-glm-medium-2",
+        "jss-worker-glm-hard-1", "jss-worker-glm-hard-2",
+    ],
+    "anki": [
+        "anki-worker-glm-easy-1", "anki-worker-glm-easy-2", "anki-worker-glm-medium-1", "anki-worker-glm-medium-2",
+        "anki-worker-glm-hard-1", "anki-worker-glm-hard-2",
+    ],
 }
 # GLM reviewers (owner request of 2026-11-14, card t_cca306ca): one per board, the role
 # `project GLM reviewer` of roster.yaml; PROJECT_GLM_REVIEWERS itself is the mapping
@@ -2318,7 +2335,8 @@ def check_managed_setting_groups(errors, roster, fleets, roster_profiles, read):
     skill settings of every project orchestrator named in the snapshot's project_isolation;
     claude_worker_profile_settings covers the compression threshold of the ten Claude
     worker profiles; glm_worker_reasoning_effort_settings covers the reasoning effort of the
-    five <board>-worker-glm-3 profiles; glm_reviewer_profile_settings covers the reasoning
+    ten <prefix>-worker-glm-hard-1 and <prefix>-worker-glm-hard-2 profiles;
+    glm_reviewer_profile_settings covers the reasoning
     effort of the five <board>-reviewer-glm profiles."""
     groups = (("managed profile settings", roster.get("managed_profile_settings")),
               ("orchestrator profile settings", roster.get("orchestrator_profile_settings")),

@@ -201,10 +201,12 @@ class DerivedExpectations(unittest.TestCase):
                 f"profile-local skill override drift: harness-orchestrator/{RELATIVE}",
             })
             # card t_31846ed4: 24 entries remain (31 minus the 7 harness profiles it removed
-            # from the production-deployment list); 10 of them are retired roster profiles and
-            # jobcron-orchestrator's SKILL.md is owned by its profile-local override, so
-            # 24 - 10 - 1 = 13.
-            self.assertEqual(len(stale), 13)
+            # from the production-deployment list); card t_18a2dc93 replaced the three GLM workers
+            # of jobcron and of cha-pt with six each, so 30 entries; 10 of them are retired roster
+            # profiles and jobcron-orchestrator's SKILL.md is owned by its profile-local override,
+            # so 30 - 10 - 1 = 19.
+            self.assertEqual(len(entry["deploy_profiles"]), 30)
+            self.assertEqual(len(stale), 19)
             # Redeploying the changed sources (new observation, still no pin edit) is green.
             code, fails, output = run_main(root, redeployed(tree_verifier(root), self.clean))
             self.assertEqual((code, fails), (0, set()), output)

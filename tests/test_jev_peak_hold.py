@@ -42,15 +42,15 @@ SATURDAY_16 = "2026-11-14T16:00:00+09:00"
 MARK = "jev-peak-hold until 2026-11-11T19:00:00+09:00"
 
 CARDS = [
-    ("t_glm_ready", "ready", "harness-worker-glm-1"),
-    ("t_glm_todo", "todo", "harness-worker-glm-2"),
-    ("t_glm_running", "running", "harness-worker-glm-1"),
+    ("t_glm_ready", "ready", "harness-worker-glm-easy-1"),
+    ("t_glm_todo", "todo", "harness-worker-glm-medium-1"),
+    ("t_glm_running", "running", "harness-worker-glm-easy-1"),
     ("t_claude_ready", "ready", "harness-worker"),
-    ("t_other_blocked", "blocked", "harness-worker-glm-1"),
-    ("t_other_sched", "scheduled", "harness-worker-glm-2", "waiting for the owner's release window"),
-    ("t_lookalike", "scheduled", "harness-worker-glm-2", "not jev-peak-hold"),
+    ("t_other_blocked", "blocked", "harness-worker-glm-easy-1"),
+    ("t_other_sched", "scheduled", "harness-worker-glm-medium-1", "waiting for the owner's release window"),
+    ("t_lookalike", "scheduled", "harness-worker-glm-medium-1", "not jev-peak-hold"),
     # IDs of the Hermes form `t_<hexadecimal digits>` for the kanban_unblock middleware, which uses only such IDs.
-    ("t_0b10c4ed", "blocked", "harness-worker-glm-2"),
+    ("t_0b10c4ed", "blocked", "harness-worker-glm-medium-1"),
     ("t_c1a0de00", "blocked", "harness-worker"),
 ]
 USR_BIN_PYTHON3 = "/usr/bin/python3"
@@ -58,13 +58,18 @@ USR_BIN_PYTHON3 = "/usr/bin/python3"
 
 def two_list_config():
     """A deep copy of the shipped configuration changed for board ``harness`` only:
-    ``harness-worker-glm-3`` moves from ``glm_workers`` to the new list
-    ``glm_max_workers``, and the route ``hard`` names that list in
+    ``glm_workers`` names ``harness-worker-glm-easy-1`` and
+    ``harness-worker-glm-medium-1``, the lists ``easy_route_workers`` and
+    ``medium_route_workers`` name one of them each (as before card t_18a2dc93
+    added the second worker of each route), the list ``glm_max_workers`` names
+    ``harness-worker-glm-hard-1``, and the route ``hard`` names that list in
     ``assignee_from`` with ``model`` ``glm-5.3`` and ``provider`` ``zai``."""
     config = json.loads(json.dumps(CONFIG))
     board = config["routing"]["boards"]["harness"]
-    board["glm_workers"] = ["harness-worker-glm-1", "harness-worker-glm-2"]
-    board["glm_max_workers"] = ["harness-worker-glm-3"]
+    board["glm_workers"] = ["harness-worker-glm-easy-1", "harness-worker-glm-medium-1"]
+    board["easy_route_workers"] = ["harness-worker-glm-easy-1"]
+    board["medium_route_workers"] = ["harness-worker-glm-medium-1"]
+    board["glm_max_workers"] = ["harness-worker-glm-hard-1"]
     route = next(r for r in board["routes"] if r["name"] == "hard")
     route["assignee_from"] = "glm_max_workers"
     route["model"] = "glm-5.3"
@@ -77,23 +82,25 @@ class GlmWorkerListsTests(unittest.TestCase):
     worker lists (the second list that a route names in ``assignee_from``)."""
 
     def test_shipped_configuration_returns_the_glm_workers_of_every_board(self):
-        # Card t_3c7a581d: every board has the two names of `glm_workers` and the
-        # one name of `glm_max_workers` (named by the route `hard`); the result
-        # is the same set of fifteen names as before the change.
+        # Card t_3c7a581d: every board has the names of `glm_workers` and the
+        # names of `glm_max_workers` (named by the route `hard`). Since card
+        # t_18a2dc93 these are the six GLM workers of the board, thirty in total.
         expected = {board: entry["glm_workers"] + entry["glm_max_workers"]
                     for board, entry in CONFIG["routing"]["boards"].items()}
         self.assertEqual(peak_hold.glm_workers_by_board(CONFIG), expected)
         self.assertEqual(expected["jss-genr"],
-                         ["jss-worker-glm-1", "jss-worker-glm-2", "jss-worker-glm-3"])
+                         [f"jss-worker-glm-{suffix}"
+                          for suffix in ("easy-1", "easy-2", "medium-1", "medium-2", "hard-1", "hard-2")])
+        self.assertEqual(len(peak_hold.all_glm_workers(CONFIG)), 30)
 
     def test_two_list_configuration_adds_the_second_list_after_the_first(self):
         result = peak_hold.glm_workers_by_board(two_list_config())
         self.assertEqual(result["harness"],
-                         ["harness-worker-glm-1", "harness-worker-glm-2", "harness-worker-glm-3"])
+                         ["harness-worker-glm-easy-1", "harness-worker-glm-medium-1", "harness-worker-glm-hard-1"])
         for board, workers in peak_hold.glm_workers_by_board(CONFIG).items():
             if board != "harness":
                 self.assertEqual(result[board], workers, board)
-        self.assertIn("harness-worker-glm-3", peak_hold.all_glm_workers(two_list_config()))
+        self.assertIn("harness-worker-glm-hard-1", peak_hold.all_glm_workers(two_list_config()))
 
     def test_the_rules_of_the_route_entrys_of_the_worker_lists(self):
         # A route with enabled false still adds its list: a card that is already
@@ -101,33 +108,33 @@ class GlmWorkerListsTests(unittest.TestCase):
         config = two_list_config()
         config["routing"]["boards"]["harness"]["routes"][2]["enabled"] = False
         self.assertEqual(peak_hold.glm_workers_by_board(config)["harness"],
-                         ["harness-worker-glm-1", "harness-worker-glm-2", "harness-worker-glm-3"])
+                         ["harness-worker-glm-easy-1", "harness-worker-glm-medium-1", "harness-worker-glm-hard-1"])
         # A name that is in both lists appears once.
         config = two_list_config()
-        config["routing"]["boards"]["harness"]["glm_max_workers"] = ["harness-worker-glm-3", "harness-worker-glm-1"]
+        config["routing"]["boards"]["harness"]["glm_max_workers"] = ["harness-worker-glm-hard-1", "harness-worker-glm-easy-1"]
         self.assertEqual(peak_hold.glm_workers_by_board(config)["harness"],
-                         ["harness-worker-glm-1", "harness-worker-glm-2", "harness-worker-glm-3"])
+                         ["harness-worker-glm-easy-1", "harness-worker-glm-medium-1", "harness-worker-glm-hard-1"])
         # A route whose assignee_from is implementation_workers adds no name.
         config = two_list_config()
         config["routing"]["boards"]["harness"]["routes"][2]["assignee_from"] = "implementation_workers"
         self.assertEqual(peak_hold.glm_workers_by_board(config)["harness"],
-                         ["harness-worker-glm-1", "harness-worker-glm-2"])
+                         ["harness-worker-glm-easy-1", "harness-worker-glm-medium-1"])
         # routes absent raises nothing.
         config = two_list_config()
         del config["routing"]["boards"]["harness"]["routes"]
         self.assertEqual(peak_hold.glm_workers_by_board(config)["harness"],
-                         ["harness-worker-glm-1", "harness-worker-glm-2"])
+                         ["harness-worker-glm-easy-1", "harness-worker-glm-medium-1"])
         # A route entry that is a string raises nothing.
         config = two_list_config()
         board = config["routing"]["boards"]["harness"]
         board["routes"] = ["easy"] + board["routes"]
         self.assertEqual(peak_hold.glm_workers_by_board(config)["harness"],
-                         ["harness-worker-glm-1", "harness-worker-glm-2", "harness-worker-glm-3"])
+                         ["harness-worker-glm-easy-1", "harness-worker-glm-medium-1", "harness-worker-glm-hard-1"])
         # A route that names an absent list raises nothing.
         config = two_list_config()
         config["routing"]["boards"]["harness"]["routes"][2]["assignee_from"] = "absent_worker_list"
         self.assertEqual(peak_hold.glm_workers_by_board(config)["harness"],
-                         ["harness-worker-glm-1", "harness-worker-glm-2"])
+                         ["harness-worker-glm-easy-1", "harness-worker-glm-medium-1"])
 
 
 class WindowTests(unittest.TestCase):
@@ -240,7 +247,7 @@ class PeakHoldScriptTests(_BoardCase):
         self.save_config()
         conn = sqlite3.connect(self.db)
         conn.execute("INSERT INTO tasks (id, title, status, assignee) VALUES "
-                     "('t_3a5e0001', 'synthetic', 'ready', 'harness-worker-glm-3')")
+                     "('t_3a5e0001', 'synthetic', 'ready', 'harness-worker-glm-hard-1')")
         conn.commit()
         conn.close()
         self.script("--apply")
@@ -255,7 +262,7 @@ class PeakHoldScriptTests(_BoardCase):
         self.assertEqual((holds[0]["event"], holds[0]["board"], holds[0]["original_assignee"],
                           holds[0]["new_assignee"], holds[0]["applied"], holds[0]["held_until"],
                           holds[0]["error_class"]),
-                         ("hold", "harness", "harness-worker-glm-3", "harness-worker-glm-3", True,
+                         ("hold", "harness", "harness-worker-glm-hard-1", "harness-worker-glm-hard-1", True,
                           "2026-11-11T19:00:00+09:00", None))
 
     def test_hold_is_idempotent(self):
@@ -576,7 +583,7 @@ class CreationHoldTests(_BoardCase):
         # and is held at creation like the other GLM cards.
         sent = self.create("hard", WEDNESDAY_16)
         self.assertEqual(sent["initial_status"], "blocked")
-        self.assertEqual(sent["assignee"], "harness-worker-glm-3")
+        self.assertEqual(sent["assignee"], "harness-worker-glm-hard-1")
         self.assertEqual((sent["model"], sent["provider"]), ("glm-5.3", "zai"))
         self.assertEqual(self.statuses()["t_new1"], "scheduled")
 
@@ -596,7 +603,7 @@ class CreationHoldTests(_BoardCase):
         self.config["kanban"]["hermes_command"] = self.hermes
         sent = self.create("hard", WEDNESDAY_16)
         self.assertEqual(sent["initial_status"], "blocked")
-        self.assertEqual(sent["assignee"], "harness-worker-glm-3")
+        self.assertEqual(sent["assignee"], "harness-worker-glm-hard-1")
         self.assertEqual((sent["model"], sent["provider"]), ("glm-5.3", "zai"))
         self.assertEqual(self.statuses()["t_new1"], "scheduled")
         hold = self.decisions("hold")[-1]
@@ -604,7 +611,7 @@ class CreationHoldTests(_BoardCase):
                          ("t_new1", True, "2026-11-11T19:00:00+09:00"))
         route = self.decisions("route")[-1]
         self.assertEqual((route["task_id"], route["applied_route"], route["new_assignee"]),
-                         ("t_new1", "hard", "harness-worker-glm-3"))
+                         ("t_new1", "hard", "harness-worker-glm-hard-1"))
         self.script("--apply", now=WEDNESDAY_19)
         self.assertEqual(self.statuses()["t_new1"], "ready")
 
@@ -634,7 +641,7 @@ class CreationHoldTests(_BoardCase):
         # Hermes returns the existing card for a known key. A card blocked for an
         # owner decision and a running GLM card must keep their status.
         self.set_existing("t_0dec1de0", "blocked", "harness-worker")
-        self.set_existing("t_0a11ce00", "running", "harness-worker-glm-1")
+        self.set_existing("t_0a11ce00", "running", "harness-worker-glm-easy-1")
         for existing, status in (("t_0dec1de0", "blocked"), ("t_0a11ce00", "running")):
             with self.subTest(existing=existing):
                 sent = self.create("easy", WEDNESDAY_16, existing=existing, idempotency_key="key-1")
@@ -655,7 +662,7 @@ class CreationHoldTests(_BoardCase):
     def test_result_status_other_than_blocked_is_not_scheduled(self):
         # The plugin set initial_status, but Hermes reports another status
         # (for example an existing card): nothing is scheduled.
-        self.set_existing("t_0a11ce01", "running", "harness-worker-glm-2")
+        self.set_existing("t_0a11ce01", "running", "harness-worker-glm-medium-1")
         sent = self.create("easy", WEDNESDAY_16, existing="t_0a11ce01")
         self.assertEqual(sent["initial_status"], "blocked")
         self.assertEqual(self.statuses()["t_0a11ce01"], "running")
@@ -667,7 +674,7 @@ class CreationHoldTests(_BoardCase):
         with mock.patch.dict(os.environ, {"HERMES_KANBAN_TASK": "t_feedc0de"}):
             sent = self.create("easy", WEDNESDAY_16)
         self.assertNotIn("initial_status", sent)
-        self.assertEqual(sent["assignee"], "harness-worker-glm-1")
+        self.assertEqual(sent["assignee"], "harness-worker-glm-easy-1")
         self.assertEqual(self.statuses()["t_new1"], "ready")
         self.assertEqual(fake_hermes_calls(self.calls_log), [])
         self.script("--apply")
@@ -725,7 +732,7 @@ class UnblockHoldTests(_BoardCase):
         task_id = "t_3b7f0002"
         conn = sqlite3.connect(self.db)
         conn.execute("INSERT INTO tasks (id, title, status, assignee) VALUES "
-                     "(?, 'synthetic', 'blocked', 'harness-worker-glm-3')", (task_id,))
+                     "(?, 'synthetic', 'blocked', 'harness-worker-glm-hard-1')", (task_id,))
         conn.commit()
         conn.close()
         calls, result = self.unblock(task_id)
@@ -787,7 +794,7 @@ class EscalatedCardHoldTests(_BoardCase):
     def setUp(self):
         super().setUp()
         conn = sqlite3.connect(self.db)
-        conn.execute("INSERT INTO tasks (id, title, status, assignee) VALUES (?, ?, 'ready', 'harness-worker-glm-1')",
+        conn.execute("INSERT INTO tasks (id, title, status, assignee) VALUES (?, ?, 'ready', 'harness-worker-glm-easy-1')",
                      (self.ESCALATED, "synthetic card"))
         conn.commit()
         conn.close()

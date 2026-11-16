@@ -77,7 +77,7 @@ class ReviewChoiceTests(unittest.TestCase):
 
     # --- helpers ---------------------------------------------------------------
 
-    def build_db(self, board, task_id=CARD, assignee="harness-worker-glm-1", events=()):
+    def build_db(self, board, task_id=CARD, assignee="harness-worker-glm-easy-1", events=()):
         """A temporary board database with one card and changes_requested events.
 
         events: iterable of (reviewer, payload) pairs; a payload of None writes
@@ -135,28 +135,28 @@ class ReviewChoiceTests(unittest.TestCase):
         self.build_db("harness")
         args = {"task_id": CARD, "board": "harness"}
         frozen = dict(args)
-        calls, result = self.review("harness-worker-glm-1", args)
+        calls, result = self.review("harness-worker-glm-easy-1", args)
         self.assertEqual(result, "tool result")
         self.assertEqual(calls, [{"task_id": CARD, "board": "harness", "reviewer": "harness-reviewer-glm"}])
         self.assertEqual(args, frozen)  # the original args object is unchanged
         [record] = self.choice_records()
         self.assertEqual({k: record[k] for k in RECORD_FIELDS},
-                         {"board": "harness", "task_id": CARD, "original_assignee": "harness-worker-glm-1",
+                         {"board": "harness", "task_id": CARD, "original_assignee": "harness-worker-glm-easy-1",
                           "reviewer": "harness-reviewer-glm", "opus_change_requests": 0,
                           "glm_change_requests": 0, "switch": True, "applied": True,
                           "not_applied_reason": None})
 
     def test_switch_on_second_board_jobcron_passes_its_glm_reviewer(self):
-        self.build_db("jobcron", assignee="jobcron-worker-glm-1")
-        calls, _ = self.review("jobcron-worker-glm-2", {"task_id": CARD, "board": "jobcron"},
+        self.build_db("jobcron", assignee="jobcron-worker-glm-easy-1")
+        calls, _ = self.review("jobcron-worker-glm-medium-1", {"task_id": CARD, "board": "jobcron"},
                                board="jobcron")
         self.assertEqual(calls, [{"task_id": CARD, "board": "jobcron", "reviewer": "jobcron-reviewer-glm"}])
         [record] = self.choice_records()
         self.assertEqual((record["board"], record["reviewer"]), ("jobcron", "jobcron-reviewer-glm"))
 
     def test_switch_on_second_board_cha_pt_passes_its_glm_reviewer(self):
-        self.build_db("cha-pt", assignee="chapt-worker-glm-1")
-        calls, _ = self.review("chapt-worker-glm-1", {"task_id": CARD, "board": "cha-pt"}, board="cha-pt")
+        self.build_db("cha-pt", assignee="chapt-worker-glm-easy-1")
+        calls, _ = self.review("chapt-worker-glm-easy-1", {"task_id": CARD, "board": "cha-pt"}, board="cha-pt")
         self.assertEqual(calls[0]["reviewer"], "chapt-reviewer-glm")
         self.assertEqual(calls[0]["board"], "cha-pt")
 
@@ -165,7 +165,7 @@ class ReviewChoiceTests(unittest.TestCase):
     def test_switch_on_one_glm_change_request_still_passes_the_glm_reviewer(self):
         self.build_db("harness")
         self.add_events("harness", CARD, ["harness-reviewer-glm"])
-        calls, _ = self.review("harness-worker-glm-1", {"task_id": CARD, "board": "harness"})
+        calls, _ = self.review("harness-worker-glm-easy-1", {"task_id": CARD, "board": "harness"})
         self.assertEqual(calls[0]["reviewer"], "harness-reviewer-glm")
         [record] = self.choice_records()
         self.assertEqual((record["opus_change_requests"], record["glm_change_requests"]), (0, 1))
@@ -173,7 +173,7 @@ class ReviewChoiceTests(unittest.TestCase):
     def test_switch_on_two_glm_change_requests_pass_the_opus_reviewer(self):
         self.build_db("harness")
         self.add_events("harness", CARD, ["harness-reviewer-glm", "harness-reviewer-glm"])
-        calls, _ = self.review("harness-worker-glm-1", {"task_id": CARD, "board": "harness"})
+        calls, _ = self.review("harness-worker-glm-easy-1", {"task_id": CARD, "board": "harness"})
         self.assertEqual(calls[0]["reviewer"], "harness-reviewer")
         [record] = self.choice_records()
         self.assertEqual((record["opus_change_requests"], record["glm_change_requests"]), (0, 2))
@@ -181,20 +181,20 @@ class ReviewChoiceTests(unittest.TestCase):
     def test_switch_on_limit_zero_passes_the_opus_reviewer(self):
         self.build_db("harness")
         config = switch_config(True, max_glm_review_change_requests=0)
-        calls, _ = self.review("harness-worker-glm-1", {"task_id": CARD, "board": "harness"}, config=config)
+        calls, _ = self.review("harness-worker-glm-easy-1", {"task_id": CARD, "board": "harness"}, config=config)
         self.assertEqual(calls[0]["reviewer"], "harness-reviewer")
 
     def test_switch_on_limit_missing_passes_the_opus_reviewer(self):
         self.build_db("harness")
         config = switch_config(True)
         del config["routing"]["glm_review"]["max_glm_review_change_requests"]
-        calls, _ = self.review("harness-worker-glm-1", {"task_id": CARD, "board": "harness"}, config=config)
+        calls, _ = self.review("harness-worker-glm-easy-1", {"task_id": CARD, "board": "harness"}, config=config)
         self.assertEqual(calls[0]["reviewer"], "harness-reviewer")
 
     def test_switch_on_one_opus_change_request_passes_the_opus_reviewer(self):
         self.build_db("harness")
         self.add_events("harness", CARD, ["harness-reviewer"])
-        calls, _ = self.review("harness-worker-glm-1", {"task_id": CARD, "board": "harness"})
+        calls, _ = self.review("harness-worker-glm-easy-1", {"task_id": CARD, "board": "harness"})
         self.assertEqual(calls[0]["reviewer"], "harness-reviewer")
         [record] = self.choice_records()
         self.assertEqual((record["opus_change_requests"], record["glm_change_requests"]), (1, 0))
@@ -203,7 +203,7 @@ class ReviewChoiceTests(unittest.TestCase):
         self.build_db("harness")
         self.add_events("harness", CARD, ["harness-reviewer-glm", "harness-reviewer",
                                           "harness-reviewer-glm"])
-        calls, _ = self.review("harness-worker-glm-1", {"task_id": CARD, "board": "harness"})
+        calls, _ = self.review("harness-worker-glm-easy-1", {"task_id": CARD, "board": "harness"})
         self.assertEqual(calls[0]["reviewer"], "harness-reviewer")
         [record] = self.choice_records()
         self.assertEqual((record["opus_change_requests"], record["glm_change_requests"]), (1, 2))
@@ -213,7 +213,7 @@ class ReviewChoiceTests(unittest.TestCase):
         # reviewer nor one of its glm_reviewers counts towards neither A nor G.
         self.build_db("harness")
         self.add_events("harness", CARD, ["jobcron-reviewer", "jss-reviewer-glm"])
-        calls, _ = self.review("harness-worker-glm-1", {"task_id": CARD, "board": "harness"})
+        calls, _ = self.review("harness-worker-glm-easy-1", {"task_id": CARD, "board": "harness"})
         self.assertEqual(calls[0]["reviewer"], "harness-reviewer-glm")
         [record] = self.choice_records()
         self.assertEqual((record["opus_change_requests"], record["glm_change_requests"]), (0, 0))
@@ -222,7 +222,7 @@ class ReviewChoiceTests(unittest.TestCase):
 
     def test_switch_on_a_given_reviewer_argument_is_replaced(self):
         self.build_db("harness")
-        calls, _ = self.review("harness-worker-glm-1",
+        calls, _ = self.review("harness-worker-glm-easy-1",
                                {"task_id": CARD, "board": "harness", "reviewer": "harness-reviewer"})
         self.assertEqual(calls[0]["reviewer"], "harness-reviewer-glm")
 
@@ -250,7 +250,7 @@ class ReviewChoiceTests(unittest.TestCase):
         self.build_db("harness")
         config = switch_config(True)
         config["routing"]["enabled"] = False
-        calls, _ = self.review("harness-worker-glm-1", {"task_id": CARD, "board": "harness"}, config=config)
+        calls, _ = self.review("harness-worker-glm-easy-1", {"task_id": CARD, "board": "harness"}, config=config)
         self.assertEqual(calls, [None])
         self.assertEqual(self.choice_records(), [])
         self.assertEqual(self.clear_records(), [])
@@ -261,7 +261,7 @@ class ReviewChoiceTests(unittest.TestCase):
         self.build_db("harness")
         config = switch_config(True)
         del config["routing"]["boards"]["harness"]["opus_reviewer"]
-        calls, _ = self.review("harness-worker-glm-1", {"task_id": CARD, "board": "harness"}, config=config)
+        calls, _ = self.review("harness-worker-glm-easy-1", {"task_id": CARD, "board": "harness"}, config=config)
         self.assertEqual(calls, [None])
         [record] = self.choice_records()
         self.assertEqual((record["applied"], record["not_applied_reason"]), (False, "reviewer_not_configured"))
@@ -270,21 +270,21 @@ class ReviewChoiceTests(unittest.TestCase):
         self.build_db("harness")
         config = switch_config(True)
         del config["routing"]["boards"]["harness"]["glm_reviewers"]
-        calls, _ = self.review("harness-worker-glm-1", {"task_id": CARD, "board": "harness"}, config=config)
+        calls, _ = self.review("harness-worker-glm-easy-1", {"task_id": CARD, "board": "harness"}, config=config)
         self.assertEqual(calls, [None])
         [record] = self.choice_records()
         self.assertEqual((record["applied"], record["not_applied_reason"]), (False, "reviewer_not_configured"))
 
     def test_switch_on_unknown_board_keeps_arguments_unchanged(self):
         self.build_db("harness")
-        calls, _ = self.review("harness-worker-glm-1", {"task_id": CARD, "board": "not-a-board"})
+        calls, _ = self.review("harness-worker-glm-easy-1", {"task_id": CARD, "board": "not-a-board"})
         self.assertEqual(calls, [None])
         [record] = self.choice_records()
         self.assertEqual((record["applied"], record["not_applied_reason"]), (False, "board_not_configured"))
 
     def test_switch_on_unrecognized_task_id_keeps_arguments_unchanged(self):
         self.build_db("harness")
-        calls, _ = self.review("harness-worker-glm-1", {"task_id": "not-a-task-id", "board": "harness"})
+        calls, _ = self.review("harness-worker-glm-easy-1", {"task_id": "not-a-task-id", "board": "harness"})
         self.assertEqual(calls, [None])
         [record] = self.choice_records()
         self.assertEqual((record["applied"], record["not_applied_reason"]),
@@ -293,7 +293,7 @@ class ReviewChoiceTests(unittest.TestCase):
     def test_switch_on_database_read_error_keeps_arguments_unchanged(self):
         self.build_db("harness")
         (self.db_dir / "harness" / "kanban.db").unlink()
-        calls, _ = self.review("harness-worker-glm-1", {"task_id": CARD, "board": "harness"})
+        calls, _ = self.review("harness-worker-glm-easy-1", {"task_id": CARD, "board": "harness"})
         self.assertEqual(calls, [None])
         [record] = self.choice_records()
         self.assertEqual((record["applied"], record["not_applied_reason"]), (False, "read_error"))
@@ -302,7 +302,7 @@ class ReviewChoiceTests(unittest.TestCase):
 
     def test_switch_off_no_change_requests_and_no_reviewer_argument_is_unchanged(self):
         self.build_db("harness")
-        calls, _ = self.review("harness-worker-glm-1", {"task_id": CARD, "board": "harness"},
+        calls, _ = self.review("harness-worker-glm-easy-1", {"task_id": CARD, "board": "harness"},
                                config=switch_config(False))
         self.assertEqual(calls, [None])
         [record] = self.choice_records()
@@ -313,14 +313,14 @@ class ReviewChoiceTests(unittest.TestCase):
         self.build_db("harness")
         config = switch_config(False)
         del config["routing"]["glm_review"]
-        calls, _ = self.review("harness-worker-glm-1", {"task_id": CARD, "board": "harness"}, config=config)
+        calls, _ = self.review("harness-worker-glm-easy-1", {"task_id": CARD, "board": "harness"}, config=config)
         self.assertEqual(calls, [None])
         [record] = self.choice_records()
         self.assertEqual(record["switch"], False)
 
     def test_switch_off_reviewer_argument_naming_the_glm_reviewer_passes_the_opus_reviewer(self):
         self.build_db("harness")
-        calls, _ = self.review("harness-worker-glm-1",
+        calls, _ = self.review("harness-worker-glm-easy-1",
                                {"task_id": CARD, "board": "harness", "reviewer": "harness-reviewer-glm"},
                                config=switch_config(False))
         self.assertEqual(calls[0]["reviewer"], "harness-reviewer")
@@ -330,7 +330,7 @@ class ReviewChoiceTests(unittest.TestCase):
     def test_switch_off_latest_change_request_by_the_glm_reviewer_passes_the_opus_reviewer(self):
         self.build_db("harness")
         self.add_events("harness", CARD, ["harness-reviewer", "harness-reviewer-glm"])
-        calls, _ = self.review("harness-worker-glm-1", {"task_id": CARD, "board": "harness"},
+        calls, _ = self.review("harness-worker-glm-easy-1", {"task_id": CARD, "board": "harness"},
                                config=switch_config(False))
         self.assertEqual(calls[0]["reviewer"], "harness-reviewer")
         [record] = self.choice_records()
@@ -339,7 +339,7 @@ class ReviewChoiceTests(unittest.TestCase):
     def test_switch_off_latest_change_request_by_the_opus_reviewer_is_unchanged(self):
         self.build_db("harness")
         self.add_events("harness", CARD, ["harness-reviewer-glm", "harness-reviewer"])
-        calls, _ = self.review("harness-worker-glm-1", {"task_id": CARD, "board": "harness"},
+        calls, _ = self.review("harness-worker-glm-easy-1", {"task_id": CARD, "board": "harness"},
                                config=switch_config(False))
         self.assertEqual(calls, [None])
         [record] = self.choice_records()
@@ -347,7 +347,7 @@ class ReviewChoiceTests(unittest.TestCase):
 
     def test_switch_off_reviewer_argument_naming_the_opus_reviewer_is_unchanged(self):
         self.build_db("harness")
-        calls, _ = self.review("harness-worker-glm-1",
+        calls, _ = self.review("harness-worker-glm-easy-1",
                                {"task_id": CARD, "board": "harness", "reviewer": "harness-reviewer"},
                                config=switch_config(False))
         self.assertEqual(calls, [None])
@@ -356,7 +356,7 @@ class ReviewChoiceTests(unittest.TestCase):
 
     def test_the_clear_override_step_still_runs_once_and_writes_its_record(self):
         self.build_db("harness")
-        calls, _ = self.review("harness-worker-glm-1", {"task_id": CARD, "board": "harness"})
+        calls, _ = self.review("harness-worker-glm-easy-1", {"task_id": CARD, "board": "harness"})
         self.assertEqual(fake_hermes_calls(self.calls_log),
                          [["kanban", "--board", "harness", "set-model", CARD, "none"]])
         [record] = self.clear_records()
@@ -365,7 +365,7 @@ class ReviewChoiceTests(unittest.TestCase):
 
     def test_switch_off_still_clears_the_override(self):
         self.build_db("harness")
-        self.review("harness-worker-glm-1", {"task_id": CARD, "board": "harness"},
+        self.review("harness-worker-glm-easy-1", {"task_id": CARD, "board": "harness"},
                     config=switch_config(False))
         self.assertEqual(fake_hermes_calls(self.calls_log),
                          [["kanban", "--board", "harness", "set-model", CARD, "none"]])
@@ -377,7 +377,7 @@ class ReviewChoiceTests(unittest.TestCase):
         # The record holds ts and profile (added by the log writer), event, the
         # fields of the card and the unused fields of the decisions stream as null.
         self.build_db("harness")
-        self.review("harness-worker-glm-1", {"task_id": CARD, "board": "harness"})
+        self.review("harness-worker-glm-easy-1", {"task_id": CARD, "board": "harness"})
         [record] = self.choice_records()
         self.assertEqual(set(record), {"ts", "profile", "event", *RECORD_FIELDS, *STREAM_NULL_FIELDS})
         self.assertEqual(record["event"], "review_choice")
@@ -385,7 +385,7 @@ class ReviewChoiceTests(unittest.TestCase):
 
     def test_no_other_argument_value_is_written(self):
         self.build_db("harness")
-        self.review("harness-worker-glm-1",
+        self.review("harness-worker-glm-easy-1",
                     {"task_id": CARD, "board": "harness", "summary": "SUMMARY-SENTINEL",
                      "metadata": {"a": "METADATA-SENTINEL"}, "artifacts": ["ARTIFACT-SENTINEL"]})
         logged = "\n".join(path.read_text(encoding="utf-8") for path in self.log_dir.rglob("*.jsonl"))
@@ -399,14 +399,14 @@ class ReviewChoiceTests(unittest.TestCase):
         for config in (switch_config(True), switch_config(False)):
             with self.subTest(switch=config["routing"]["glm_review"]["enabled"]):
                 self.calls_log.unlink(missing_ok=True)
-                calls, _ = self.review("harness-worker-glm-1", {"task_id": CARD, "board": "harness"},
+                calls, _ = self.review("harness-worker-glm-easy-1", {"task_id": CARD, "board": "harness"},
                                        config=config)
                 self.assertEqual(len(calls), 1)
 
     def test_next_call_runs_once_with_unchanged_arguments_when_the_new_code_raises(self):
         self.build_db("harness")
         with mock.patch.object(routing, "_review_payload", side_effect=RuntimeError("boom")):
-            calls, result = self.review("harness-worker-glm-1", {"task_id": CARD, "board": "harness"})
+            calls, result = self.review("harness-worker-glm-easy-1", {"task_id": CARD, "board": "harness"})
         self.assertEqual(calls, [None])
         self.assertEqual(result, "tool result")
         [record] = self.choice_records()

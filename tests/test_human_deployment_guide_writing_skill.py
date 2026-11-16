@@ -18,18 +18,22 @@ README = ROOT / "docs/README.md"
 NAME = "human-deployment-guide-writing"
 VERSION = "1.0.0"
 TRIGGER = "Use when writing steps a person runs against production."
-# Card t_f4ce916d added the third GLM worker of each board.
-DEPLOY_PROFILES = ["jobcron-orchestrator", "jobcron-worker", "jobcron-worker-2", "jobcron-worker-glm-1",
-                   "jobcron-worker-glm-2", "jobcron-worker-glm-3", "jobcron-reviewer",
-                   "chapt-orchestrator", "chapt-worker", "chapt-worker-2", "chapt-worker-glm-1",
-                   "chapt-worker-glm-2", "chapt-worker-glm-3", "chapt-reviewer"]
+# Card t_f4ce916d added the third GLM worker of each board. Card t_18a2dc93 renamed the GLM workers
+# of each board to the names of their routes and added the second worker of each route.
+GLM_SUFFIXES = ("easy-1", "easy-2", "medium-1", "medium-2", "hard-1", "hard-2")
+DEPLOY_PROFILES = ["jobcron-orchestrator", "jobcron-worker", "jobcron-worker-2",
+                   *(f"jobcron-worker-glm-{suffix}" for suffix in GLM_SUFFIXES), "jobcron-reviewer",
+                   "chapt-orchestrator", "chapt-worker", "chapt-worker-2",
+                   *(f"chapt-worker-glm-{suffix}" for suffix in GLM_SUFFIXES), "chapt-reviewer"]
 README_LINE = (
     "- [Human deployment guide writing](../skills/devops/human-deployment-guide-writing/SKILL.md) — "
     "shared skill `human-deployment-guide-writing` (version 1.0.0): twelve rules for a guide that a "
     "person runs against production; declared for jobcron-orchestrator, jobcron-worker, "
-    "jobcron-worker-2, jobcron-worker-glm-1, jobcron-worker-glm-2, jobcron-worker-glm-3, jobcron-reviewer, "
-    "chapt-orchestrator, chapt-worker, chapt-worker-2, chapt-worker-glm-1, chapt-worker-glm-2, "
-    "chapt-worker-glm-3 and chapt-reviewer; live deployment is a separate card.")
+    "jobcron-worker-2, jobcron-worker-glm-easy-1, jobcron-worker-glm-easy-2, jobcron-worker-glm-medium-1, "
+    "jobcron-worker-glm-medium-2, jobcron-worker-glm-hard-1, jobcron-worker-glm-hard-2, jobcron-reviewer, "
+    "chapt-orchestrator, chapt-worker, chapt-worker-2, chapt-worker-glm-easy-1, chapt-worker-glm-easy-2, "
+    "chapt-worker-glm-medium-1, chapt-worker-glm-medium-2, chapt-worker-glm-hard-1, chapt-worker-glm-hard-2 "
+    "and chapt-reviewer; live deployment is a separate card.")
 
 # For each of the twelve owner-approved rules (2026-10-31), phrases that the rule text must contain.
 RULE_PHRASES = {

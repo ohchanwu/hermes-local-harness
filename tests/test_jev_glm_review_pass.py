@@ -43,12 +43,15 @@ SATURDAY_16 = "2026-11-14T16:00:00+09:00"
 BOARD = "harness"
 GLM_REVIEWER = "harness-reviewer-glm"
 OPUS_REVIEWER = "harness-reviewer"
-GLM_WORKER = "harness-worker-glm-1"
+GLM_WORKER = "harness-worker-glm-easy-1"
 PASS_REASON = "jev-glm-review-pass no findings"
 OTHER_REASON = "waiting for the owner"
 MARK = "jev-peak-hold until 2026-11-11T19:00:00+09:00"
 # The empty database of the card's test contract (python3 scripts/jev-peak-hold
-# run --dry-run --board harness --kanban-db ... --hermes /usr/bin/false).
+# run --dry-run --board harness --kanban-db ... --hermes /usr/bin/false). The path is the one that
+# contract of card t_64f37437 names, in the scratch directory of the live profile
+# harness-worker-glm-2; card t_18a2dc93 renames that profile only in the repository, so the path
+# keeps the live name.
 CONTRACT_EMPTY_DB = Path("/Users/chanbla11mit/.hermes/profiles/harness-worker-glm-2/cache/scratch/"
                          "t_64f37437-empty.db")
 

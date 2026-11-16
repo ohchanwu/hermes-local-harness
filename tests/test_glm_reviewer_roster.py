@@ -105,10 +105,10 @@ class Roster(unittest.TestCase):
                     self.assertNotIn(field, entry)
 
     def test_entry_placement(self):
-        # Each GLM reviewer is listed directly after the third GLM worker of its board,
-        # and the third GLM worker is the last GLM worker of the board.
+        # Each GLM reviewer is listed directly after the last GLM worker of its board: since card
+        # t_18a2dc93 the second worker of the route `hard`.
         for board, prefix in FLEETS.items():
-            anchor = f"{prefix}-worker-glm-3"
+            anchor = f"{prefix}-worker-glm-hard-2"
             with self.subTest(prefix=prefix):
                 self.assertEqual(self.names[self.names.index(anchor) + 1], f"{prefix}-reviewer-glm")
 
@@ -118,7 +118,11 @@ class Roster(unittest.TestCase):
         for name in GLM_REVIEWERS:
             self.assertIn(name, self.roster["approval_policy"]["profiles"])
             self.assertIn(name, allowlist)
-        self.assertEqual(allowlist[-5:], list(GLM_REVIEWERS_IN_DISPATCH_ORDER))
+        # Card t_18a2dc93: the 15 Claude profiles and the five GLM reviewers come first, then the
+        # 30 GLM workers (section 1 of docs/specs/261116-glm-worker-profiles-by-route-and-claude-fallback.md).
+        self.assertEqual(allowlist[15:20], list(GLM_REVIEWERS_IN_DISPATCH_ORDER))
+        self.assertEqual(len(allowlist), 50)
+        self.assertTrue(all("-worker-glm-" in name for name in allowlist[20:]))
 
     def test_glm_reviewer_profile_settings(self):
         groups = list(self.roster)
@@ -188,9 +192,9 @@ class Verifier(unittest.TestCase):
             "harness-reviewer, declared ['project-isolated', 'harness', 'extra']"])
 
     def test_the_glm_reviewers_are_jev_profiles(self):
-        # 41 profiles: the 21 Claude subscription profiles, the 15 GLM workers and the
-        # five GLM reviewers (card t_cca306ca).
-        self.assertEqual(len(set(self.verifier.jev_required_profiles())), 41)
+        # 56 profiles: the 21 Claude subscription profiles, the 30 GLM workers (card t_18a2dc93) and
+        # the five GLM reviewers (card t_cca306ca).
+        self.assertEqual(len(set(self.verifier.jev_required_profiles())), 56)
         self.assertEqual(set(self.verifier.glm_reviewer_profiles()), set(GLM_REVIEWERS))
         self.assertEqual(quiet(self.verifier.check_jev_plugin_declarations, self.roster), [])
 
@@ -245,7 +249,7 @@ class Verifier(unittest.TestCase):
             return {"id": "t_gr", "board": "harness", "body": body, "assignee": assignee,
                     "workspace_kind": "worktree",
                     "workspace_path": "/Users/chanbla11mit/hermes-local-harness/.worktrees/t_gr"}
-        for assignee in ("harness-reviewer-glm", "harness-worker-glm-1", "harness-worker"):
+        for assignee in ("harness-reviewer-glm", "harness-worker-glm-easy-1", "harness-worker"):
             with self.subTest(assignee=assignee):
                 self.assertEqual(
                     quiet(self.verifier.check_harness_card_contract, [harness_card(assignee)]), [])

@@ -11,12 +11,16 @@ sources), one paragraph that names `<prefix>-reviewer-glm`, `<prefix>-reviewer` 
 <task id> <prefix>-reviewer` and `hermes kanban --board <board> unblock <task id>` for its own
 board, and states that the GLM reviewer cannot approve a card. Reversing the card's edits gives
 the bytes of each source at the card's baseline, so the card changed nothing else in the text.
+Card t_18a2dc93 later changed the names of the GLM workers in these sources and raised each
+version by one more step; the checks read each source with the edits of that card reversed,
+and the version check also reads the current version line.
 """
 import hashlib
 import re
 import unittest
 from pathlib import Path
 
+from glm_route_worker_names_edits import VERSIONS as ROUTE_NAMES_VERSIONS, text_before_card
 from orchestrator_glm_review_edits import (
     BASELINE_SHA256, ORCHESTRATOR_GLM_REVIEW_EDITS, PASS_REASON, PREFIXES, VERSIONS, added_paragraph, approval_sentence,
     reverse_orchestrator_glm_review_edits, skill)
@@ -49,7 +53,8 @@ SHARED = "skills/multi-agent-coding-orchestrator/SKILL.md"
 
 
 def source_bytes(prefix):
-    return (ROOT / skill(prefix)).read_bytes()
+    """The bytes of the source with the later edits of card t_18a2dc93 reversed."""
+    return text_before_card(ROOT, skill(prefix), as_bytes=True)
 
 
 def section(text, heading):
@@ -75,6 +80,10 @@ class OrchestratorGlmReviewText(unittest.TestCase):
             version = SPLIT_VERSIONS[prefix][1]
             with self.subTest(prefix=prefix):
                 self.assertEqual(re.findall(r"(?m)^version: (.+)$", self.text(prefix)), [version])
+                # Card t_18a2dc93 raised each version by one more step.
+                self.assertEqual(ROUTE_NAMES_VERSIONS[prefix][0], version)
+                self.assertEqual(re.findall(r"(?m)^version: (.+)$", (ROOT / skill(prefix)).read_text()),
+                                 [ROUTE_NAMES_VERSIONS[prefix][1]])
 
     def test_names_both_reviewers_and_the_pass_reason(self):
         for prefix in PREFIXES:

@@ -44,6 +44,7 @@ from pathlib import Path
 import subprocess
 import unittest
 
+from glm_route_worker_names_edits import board_glm_workers, path_after_card, text_before_card
 from hard_route_policy_edits import (HARD_ROUTE_POLICY_EDITS, apply_hard_route_policy_edits,
                                      reverse_hard_route_policy_edits)
 import hard_route_policy_edits
@@ -428,15 +429,21 @@ def policy_files():
 class RoutingPolicyText(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.text = {path: (ROOT / path).read_text() for path in ROUTING_POLICY_EDITS}
+        # Card t_18a2dc93 later moved the GLM worker SOUL sources to the names of their routes and
+        # changed the names of the GLM workers in these files. cls.text holds the text of each path of
+        # this card before that card (read at the path after it, with its edits reversed), so the checks
+        # of this card's sentences use the names of their time; cls.current holds the text after it.
+        cls.text = {path: text_before_card(ROOT, path) for path in ROUTING_POLICY_EDITS}
+        cls.current = {path: (ROOT / path_after_card(path)).read_text() for path in ROUTING_POLICY_EDITS}
         cls.procedure = (ROOT / "procedures/jev-plugin.md").read_text()
 
     def test_reversing_the_edits_recovers_the_baseline_bytes(self):
         self.assertEqual(set(BASELINE_SHA256), set(ROUTING_POLICY_EDITS))
         for path, want in BASELINE_SHA256.items():
             with self.subTest(path=path):
-                # The later edits of card t_89838618 and then those of card t_46b5e63e are reversed first.
-                current = reverse_download_install_edits(path, (ROOT / path).read_bytes())
+                # The later edits of card t_18a2dc93, then those of card t_89838618 and then those of card
+                # t_46b5e63e are reversed first.
+                current = reverse_download_install_edits(path, text_before_card(ROOT, path, as_bytes=True))
                 original = reverse_jev_routing_policy_edits(path, reverse_stale_test_rule_edits(path, current))
                 self.assertEqual(hashlib.sha256(original).hexdigest(), want)
 
@@ -448,11 +455,11 @@ class RoutingPolicyText(unittest.TestCase):
                 # the jss version by one more step, card t_f4ce916d each version by one more step, card
                 # t_c7cc3830 each version by one more step, card t_a8884510 the jss version by one more
                 # step, card t_e14a6d6a each version by one more step, and card t_d3bb0983 the chapt and
-                # jobcron versions by one more step; cards t_35874d04 and t_cf518fd0 each version by one more
+                # jobcron versions by one more step; cards t_35874d04, t_cf518fd0 and t_18a2dc93 each version by one more
                 # step.
-                current = {"harness": "0.6.7-harness.14", "chapt": "0.6.7-chapt.16", "jobcron": "0.6.9-jobcron.17",
-                           "jss": "0.6.7-jss.18", "anki": "0.6.10-anki.12"}[prefix]
-                self.assertRegex(text, rf"(?m)^version: {re.escape(current)}$")
+                current = {"harness": "0.6.7-harness.15", "chapt": "0.6.7-chapt.17", "jobcron": "0.6.9-jobcron.18",
+                           "jss": "0.6.7-jss.19", "anki": "0.6.10-anki.13"}[prefix]
+                self.assertRegex(self.current[skill(prefix)], rf"(?m)^version: {re.escape(current)}$")
                 # Card t_c7cc3830 replaced the Part 5 rule text with the card split rule.
                 self.assertEqual(text.count(NEW_RULE), 1)
                 self.assertNotIn(SPLIT_RULE, text)
@@ -539,7 +546,8 @@ class RoutingPolicyText(unittest.TestCase):
     def test_harness_and_jss_third_glm_worker_souls_name_the_hard_route(self):
         # Card t_e14a6d6a, item a.6.
         for profile, (new, old) in THIRD_GLM_WORKER_ROUTE.items():
-            text = (ROOT / soul(profile)).read_text()
+            # Card t_18a2dc93 moved this SOUL source to `<prefix>-worker-glm-hard-1`; its text before that card.
+            text = text_before_card(ROOT, soul(profile))
             with self.subTest(profile=profile):
                 self.assertEqual(text.count(new), 1)
                 self.assertNotIn(old, text)
@@ -547,10 +555,19 @@ class RoutingPolicyText(unittest.TestCase):
                 self.assertNotIn("`medium`", text)
         # The SOUL files of the Cha PT and anki third GLM workers name no route.
         for profile in ("chapt-worker-glm-3", "anki-worker-glm-3"):
-            text = (ROOT / soul(profile)).read_text()
+            text = text_before_card(ROOT, soul(profile))
             with self.subTest(profile=profile):
                 for word in ("easy", "medium", "`hard`", "very_hard"):
                     self.assertNotIn(word, text)
+        # Card t_18a2dc93: the first sentence of every GLM worker SOUL source names the route of the
+        # worker and its model; the Harness and jss-genr `hard` workers keep the sentence of item a.6.
+        for prefix in ("harness", "chapt", "jss", "anki"):
+            for name in board_glm_workers(prefix):
+                route = name.split("-worker-glm-")[1].split("-")[0]
+                model = "glm-5.3-flash" if route == "easy" else "glm-5.3"
+                with self.subTest(profile=name):
+                    first = (ROOT / soul(name)).read_text().split("\n", 1)[0]
+                    self.assertIn(f", a worker of the `jev` route `{route}` with model `{model}`.", first)
 
     def test_reversing_the_hard_route_edits_recovers_the_baseline_bytes(self):
         # Card t_e14a6d6a changed twelve policy files; reversing its edits gives the bytes at its baseline.
@@ -562,7 +579,7 @@ class RoutingPolicyText(unittest.TestCase):
             # The later edits of cards t_35874d04, t_be416943 and t_d3bb0983 are reversed first.
             data = reverse_opus_5_5_orchestrator_edits(
                 path, reverse_opus_reviewer_glm_review_edits(
-                    path, reverse_orchestrator_glm_review_edits(path, (ROOT / path).read_bytes())))
+                    path, reverse_orchestrator_glm_review_edits(path, text_before_card(ROOT, path, as_bytes=True))))
             with self.subTest(path=path):
                 baseline = subprocess.run(["git", "-C", str(ROOT), "show", f"{HARD_ROUTE_BASELINE}:{path}"],
                                           stdout=subprocess.PIPE, check=True).stdout
@@ -580,7 +597,7 @@ class RoutingPolicyText(unittest.TestCase):
                     reverse_hard_route_policy_edits(path, data.decode() + new)
         # A file that the card did not change is returned unchanged.
         for path in (soul("harness-worker"), soul("chapt-worker-glm-3"), "procedures/jev-plugin.md"):
-            data = (ROOT / path).read_bytes()
+            data = text_before_card(ROOT, path, as_bytes=True)
             self.assertIs(reverse_hard_route_policy_edits(path, data), data)
 
     def test_every_glm_worker_soul_has_the_attachment_procedure(self):
@@ -589,8 +606,9 @@ class RoutingPolicyText(unittest.TestCase):
         block += "\n" + (ROOT / "policies/stale-test-rule.md").read_text()
         for key in GLM_SOUL_KEYS:
             board = BOARDS[key][0]
-            # The third GLM worker (card t_f4ce916d) has the same procedure with its own name.
-            for profile in (*BOARDS[key][3], f"{BOARDS[key][1]}-worker-glm-3"):
+            # The third GLM worker (card t_f4ce916d) has the same procedure with its own name, and so do
+            # the six GLM workers of card t_18a2dc93.
+            for profile in board_glm_workers(BOARDS[key][1]):
                 text = (ROOT / soul(profile)).read_text()
                 with self.subTest(profile=profile):
                     self.assertEqual(text.count(attachment_procedure(board, profile)), 1)
@@ -613,12 +631,17 @@ class RoutingPolicyText(unittest.TestCase):
                 self.assertEqual(section.count(attachment_procedure("jobcron", profile)), 1)
                 self.assertFalse((ROOT / soul(profile)).exists())
         for key in GLM_SOUL_KEYS:
-            for profile in (*BOARDS[key][3], f"{BOARDS[key][1]}-worker-glm-3"):
+            # Card t_18a2dc93: the 24 SOUL sources of the GLM workers that have one.
+            for profile in board_glm_workers(BOARDS[key][1]):
                 self.assertIn(f"`/Users/chanbla11mit/hermes-local-harness/policies/profile-souls/{profile}/SOUL.md`",
                               section)
         # The Jobcron GLM worker SOULs, also the third one (card t_f4ce916d), have no repository source.
         self.assertFalse((ROOT / soul("jobcron-worker-glm-3")).exists())
         self.assertIn("`jobcron-worker-glm-3` has no SOUL source in this repository either.", section)
+        for profile in board_glm_workers("jobcron"):
+            self.assertFalse((ROOT / soul(profile)).exists())
+        self.assertIn("The six Jobcron GLM workers of card `t_18a2dc93`, `jobcron-worker-glm-easy-1` to "
+                      "`jobcron-worker-glm-hard-2`, have no SOUL source in this repository either.", section)
 
     def test_procedure_report_section_and_route_rule(self):
         self.assertEqual(self.procedure.count(REPORT_HEADING), 1)

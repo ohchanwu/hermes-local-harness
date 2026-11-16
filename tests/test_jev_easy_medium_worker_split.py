@@ -10,6 +10,14 @@ name) to each board of `plugins/jev/config.json`, made the two routes name them 
 `assignee_from`, and kept `glm_workers` with both names for the peak-hours hold, the report and
 the change request rules.
 
+Card t_18a2dc93 (owner decision of 2026-11-16) then renamed `<prefix>-worker-glm-1` to
+`<prefix>-worker-glm-easy-1`, `-glm-2` to `-glm-medium-1` and `-glm-3` to `-glm-hard-1`, and added the
+second worker of each route: `easy_route_workers` names `-glm-easy-1` and `-glm-easy-2`,
+`medium_route_workers` names `-glm-medium-1` and `-glm-medium-2`, `glm_workers` names these four and
+`glm_max_workers` names `-glm-hard-1` and `-glm-hard-2`. The tests of the shipped configuration and
+of the routing check that state, so each profile still runs one model; the tests of the policy text
+check this card's text after the edits of card t_18a2dc93 are reversed.
+
 Offline checks only: the Jev answer comes from the local fake TypeSafe server of
 tests/test_jev_client.py (no model call), and nothing is written under /Users/chanbla11mit/.hermes.
 
@@ -17,9 +25,11 @@ This module also records the card's edits in the five project orchestrator skill
 (EASY_MEDIUM_SPLIT_EDITS) so that they can be reversed byte for byte.
 orchestrator_glm_review_edits.reverse_orchestrator_glm_review_edits calls
 reverse_easy_medium_split_edits first, so every test that recovers the bytes of an earlier commit
-reverses this card's edits before the edits of the earlier cards. At module level this module
-imports only the standard library, so any test module can import it without a circular import;
-the routing test helpers and the plugin modules are imported when the tests run.
+reverses this card's edits before the edits of the earlier cards. The later edits of card
+t_18a2dc93 (glm_route_worker_names_edits) are reversed first. At module level this module imports
+only the standard library and glm_route_worker_names_edits, which imports only the standard
+library, so any test module can import it without a circular import; the routing test helpers and
+the plugin modules are imported when the tests run.
 """
 import functools
 import json
@@ -32,6 +42,8 @@ from datetime import datetime
 from pathlib import Path
 from unittest import mock
 from zoneinfo import ZoneInfo
+
+from glm_route_worker_names_edits import reverse_glm_route_worker_name_edits
 
 ROOT = Path(__file__).resolve().parents[1]
 BASELINE = "e7d7583f02e669a4bf79896c1e169ebb31d6b77f"
@@ -90,7 +102,9 @@ def reverse_easy_medium_split_edits(relative_path, text):
     """Return text with the t_cf518fd0 edits reversed; text may be str or bytes. A path that the
     card did not change, and a text that contains none of the new texts, is returned as the same
     object, so a caller may apply it to a text that another caller already reversed. A text that
-    contains some of the new texts but not each of them exactly once raises AssertionError."""
+    contains some of the new texts but not each of them exactly once raises AssertionError. The
+    later edits of card t_18a2dc93 are reversed first."""
+    text = reverse_glm_route_worker_name_edits(relative_path, text)
     edits = EASY_MEDIUM_SPLIT_EDITS.get(relative_path)
     if not edits:
         return text
@@ -138,18 +152,23 @@ class FakeCreate:
         return json.dumps({"ok": True, "task_id": "t_0a1b2c3d", "status": "ready"})
 
 
+def route_names(prefix, route):
+    """The two GLM workers of a route of a board after card t_18a2dc93."""
+    return [f"{prefix}-worker-glm-{route}-1", f"{prefix}-worker-glm-{route}-2"]
+
+
 class ShippedConfiguration(unittest.TestCase):
-    def test_each_board_names_one_worker_for_easy_and_one_for_medium(self):
+    def test_each_board_names_two_workers_for_each_glm_route(self):
         boards = shipped_config()["routing"]["boards"]
         self.assertEqual(set(boards), set(BOARDS.values()))
         for prefix, board in BOARDS.items():
             entry = boards[board]
             routes = {route["name"]: route for route in entry["routes"]}
             with self.subTest(board=board):
-                self.assertEqual(entry["glm_workers"], [f"{prefix}-worker-glm-1", f"{prefix}-worker-glm-2"])
-                self.assertEqual(entry["easy_route_workers"], [entry["glm_workers"][0]])
-                self.assertEqual(entry["medium_route_workers"], [entry["glm_workers"][1]])
-                self.assertEqual(entry["glm_max_workers"], [f"{prefix}-worker-glm-3"])
+                self.assertEqual(entry["glm_workers"], route_names(prefix, "easy") + route_names(prefix, "medium"))
+                self.assertEqual(entry["easy_route_workers"], route_names(prefix, "easy"))
+                self.assertEqual(entry["medium_route_workers"], route_names(prefix, "medium"))
+                self.assertEqual(entry["glm_max_workers"], route_names(prefix, "hard"))
                 self.assertEqual(list(routes), ["easy", "medium", "hard", "very_hard"])
                 self.assertEqual((routes["easy"]["assignee_from"], routes["easy"]["model"], routes["easy"]["provider"]),
                                  ("easy_route_workers", "glm-5.3-flash", "zai"))
@@ -158,14 +177,14 @@ class ShippedConfiguration(unittest.TestCase):
                 self.assertEqual(routes["hard"]["assignee_from"], "glm_max_workers")
                 self.assertNotIn("assignee_from", routes["very_hard"])
 
-    def test_peak_hold_covers_the_three_glm_workers_once_each(self):
+    def test_peak_hold_covers_the_six_glm_workers_once_each(self):
         _jev_client, peak_hold, _routing, _helpers = _plugin_modules()
         by_board = peak_hold.glm_workers_by_board(shipped_config())
         self.assertEqual(set(by_board), set(BOARDS.values()))
         for prefix, board in BOARDS.items():
             with self.subTest(board=board):
-                self.assertEqual(by_board[board], [f"{prefix}-worker-glm-1", f"{prefix}-worker-glm-2",
-                                                   f"{prefix}-worker-glm-3"])
+                self.assertEqual(by_board[board], route_names(prefix, "easy") + route_names(prefix, "medium")
+                                 + route_names(prefix, "hard"))
 
 
 class Routing(unittest.TestCase):
@@ -199,26 +218,30 @@ class Routing(unittest.TestCase):
         self.routing.handle_create(args, next_call, config=self.config, ask=ask, now=SATURDAY)
         return next_call.calls[0]
 
-    def test_easy_cards_go_to_the_first_and_medium_cards_to_the_second_glm_worker(self):
-        cases = (("easy", 0, "glm-5.3-flash"), ("medium", 1, "glm-5.3"))
+    def test_easy_and_medium_cards_take_the_two_workers_of_their_route_in_turn(self):
+        cases = (("easy", "glm-5.3-flash"), ("medium", "glm-5.3"))
         for prefix, board in BOARDS.items():
-            glm_workers = self.config["routing"]["boards"][board]["glm_workers"]
-            for route, index, model in cases:
+            for route, model in cases:
                 self.fake.choice(route, {"easy": 0.0, "medium": 0.0, "hard": 0.0, "very_hard": 0.0, route: 0.9})
                 with self.subTest(board=board, route=route):
-                    # Two calls in a row get the same worker.
-                    for _call in range(2):
+                    # Two calls in a row get the two workers of the route (card t_18a2dc93), each with
+                    # the model of the route.
+                    for worker in route_names(prefix, route):
                         sent = self.create(prefix, board)
-                        self.assertEqual(sent["assignee"], glm_workers[index])
+                        self.assertEqual(sent["assignee"], worker)
                         self.assertEqual((sent["model"], sent["provider"]), (model, "zai"))
-                        self.assertIn(f"\nAssigned worker EXACT {glm_workers[index]}.\n", sent["body"])
+                        self.assertIn(f"\nAssigned worker EXACT {worker}.\n", sent["body"])
         self.assertEqual(len(self.fake.requests), 2 * len(cases) * len(BOARDS))
 
 
 class PolicyText(unittest.TestCase):
     def test_each_orchestrator_skill_states_the_split_and_the_raised_version(self):
         for prefix in PREFIXES:
-            text = (ROOT / skill(prefix)).read_text(encoding="utf-8")
+            current = (ROOT / skill(prefix)).read_text(encoding="utf-8")
+            # Card t_18a2dc93 later replaced the split sentence; this card's text is checked with
+            # those edits reversed.
+            self.assertNotIn(split_sentence(prefix), current)
+            text = reverse_glm_route_worker_name_edits(skill(prefix), current)
             with self.subTest(prefix=prefix):
                 self.assertEqual(text.count(split_sentence(prefix)), 1)
                 self.assertEqual(text.count(new_bullet_text(prefix)), 1)
@@ -248,9 +271,12 @@ class PolicyText(unittest.TestCase):
         text = (ROOT / PROCEDURE).read_text(encoding="utf-8")
         self.assertNotIn("`easy` and `medium` take the two workers of `glm_workers` in turn", text)
         self.assertNotIn("assignee from the board's `glm_workers`", text)
-        self.assertIn("`easy` goes to the first worker of `glm_workers`, `<board>-worker-glm-1` with model "
-                      "`glm-5.3-flash`, through the list `easy_route_workers`; `medium` goes to the second, "
-                      "`<board>-worker-glm-2` with model `glm-5.3`, through the list `medium_route_workers`", text)
+        # Card t_18a2dc93 replaced the sentence of this card with the two workers of each route.
+        self.assertNotIn("`easy` goes to the first worker of `glm_workers`", text)
+        self.assertIn("`easy` goes to the two workers of the list `easy_route_workers`, "
+                      "`<board>-worker-glm-easy-1` and `<board>-worker-glm-easy-2`, with model `glm-5.3-flash`; "
+                      "`medium` goes to the two workers of the list `medium_route_workers`, "
+                      "`<board>-worker-glm-medium-1` and `<board>-worker-glm-medium-2`, with model `glm-5.3`", text)
         self.assertEqual(text.count("Card `t_cf518fd0`"), 1)
         self.assertIn("on the owner's decision of 2026-11-16", text)
         self.assertIn("Hermes has one `fallback_providers` list per profile", text)

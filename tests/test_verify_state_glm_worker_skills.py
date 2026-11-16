@@ -17,6 +17,9 @@ is exercised under that guard by tests/test_verify_fixture_isolation.py and
 tests/test_verify_state_derived_expectations.py, which fail under /usr/bin/python3
 3.9 for a reason that predates this card (the guard rejects the opener argument of
 that Python version's pathlib); this file must pass under both interpreters.
+
+Card t_18a2dc93 gave the GLM workers the names of their routes and added the second worker of
+each route; the cases use the current names, and every board has six GLM workers in the lists.
 """
 from contextlib import redirect_stdout
 import io
@@ -28,13 +31,14 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+from glm_route_worker_names_edits import board_glm_workers
 from incident_recovery_verify_fixture import ROOT, load_verifier
 
 SNAPSHOT = ROOT / "snapshots/sanitized-current-state.yaml"
 ROSTER = ROOT / "roster.yaml"
 CLEAN = ROOT / "tests/fixtures/clean.yaml"
 SKILL = "minimal-implementation"
-GLM_WORKER = "harness-worker-glm-1"
+GLM_WORKER = "harness-worker-glm-easy-1"
 FILE = "SKILL.md"
 
 
@@ -116,10 +120,10 @@ class GLMWorkerSkillDeployment(unittest.TestCase):
         snapshot = json.loads(SNAPSHOT.read_text())
         entry = next(e for e in snapshot["skill"]["shared_skills"]
                      if e["name"] == "production-deployment")
-        entry["deploy_profiles"].append("anki-worker-glm-1")
+        entry["deploy_profiles"].append("anki-worker-glm-easy-1")
 
         def mutate(clean):  # the observed copy goes with the declaration
-            clean["skill_files"]["production-deployment"]["anki-worker-glm-1"] = {
+            clean["skill_files"]["production-deployment"]["anki-worker-glm-easy-1"] = {
                 rel: "tracked-source" for rel in entry["files"]}
         fixture = with_clean(mutate)
         with tempfile.TemporaryDirectory(prefix="glm-worker-skills-") as directory:
@@ -129,7 +133,7 @@ class GLMWorkerSkillDeployment(unittest.TestCase):
         self.assertEqual(code, 1, output)
         self.assertEqual(fail_lines(output),
                          {"unexpected GLM worker in shared skill deploy_profiles: "
-                          "production-deployment anki-worker-glm-1"})
+                          "production-deployment anki-worker-glm-easy-1"})
 
     def test_declaration_rule_covers_every_board_and_skill_pair(self):
         roster = json.loads(ROSTER.read_text())
@@ -140,18 +144,18 @@ class GLMWorkerSkillDeployment(unittest.TestCase):
             for fleet in roster["project_fleets"].values():
                 worker1 = fleet["worker"]
                 prefix = worker1[: -len("-worker")]
-                for number in (1, 2):
-                    profile = f"{prefix}-worker-glm-{number}"
-                    if profile in deploy or worker1 in deploy:
+                for profile in board_glm_workers(prefix):
+                    self.assertEqual(profile in deploy, worker1 in deploy, (entry["name"], profile))
+                    if profile in deploy:
                         pairs.add((entry["name"], profile))
-        # Boards and skills: every board's two GLM workers are in the lists of
-        # minimal-implementation and simplification-review (2 skills x 10 GLM workers
-        # = 20); production-deployment-planning still covers jobcron/chapt/harness
-        # (1 skill x 6 = 6), while production-deployment covers jobcron/chapt only since
-        # card t_31846ed4 removed its seven harness profiles (1 skill x 4 = 4), and
-        # human-deployment-guide-writing stays on jobcron/chapt (1 skill x 4 = 4):
-        # 20 + 6 + 4 + 4 = 34 (skill, GLM worker) pairs.
-        self.assertEqual(len(pairs), 34)
+        # Boards and skills: every board's six GLM workers (card t_18a2dc93) are in the lists of
+        # minimal-implementation and simplification-review (2 skills x 30 GLM workers
+        # = 60); production-deployment-planning still covers jobcron/chapt/harness
+        # (1 skill x 18 = 18), while production-deployment covers jobcron/chapt only since
+        # card t_31846ed4 removed its seven harness profiles (1 skill x 12 = 12), and
+        # human-deployment-guide-writing stays on jobcron/chapt (1 skill x 12 = 12):
+        # 60 + 18 + 12 + 12 = 102 (skill, GLM worker) pairs.
+        self.assertEqual(len(pairs), 102)
         verifier = load_verifier()
         errors = []
         with redirect_stdout(io.StringIO()):

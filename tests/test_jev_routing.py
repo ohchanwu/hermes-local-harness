@@ -60,13 +60,13 @@ def glm_workers_route_config():
 
 def two_list_config():
     """A deep copy of the configuration of ``glm_workers_route_config`` changed for
-    board ``harness`` only: ``harness-worker-glm-3`` moves from ``glm_workers`` to
+    board ``harness`` only: ``harness-worker-glm-hard-1`` moves from ``glm_workers`` to
     the new list ``glm_max_workers``, and the route ``hard`` names that list in
     ``assignee_from`` with ``model`` ``glm-5.3`` and ``provider`` ``zai``."""
     config = glm_workers_route_config()
     board = config["routing"]["boards"]["harness"]
-    board["glm_workers"] = ["harness-worker-glm-1", "harness-worker-glm-2"]
-    board["glm_max_workers"] = ["harness-worker-glm-3"]
+    board["glm_workers"] = ["harness-worker-glm-easy-1", "harness-worker-glm-medium-1"]
+    board["glm_max_workers"] = ["harness-worker-glm-hard-1"]
     route = next(r for r in board["routes"] if r["name"] == "hard")
     route["assignee_from"] = "glm_max_workers"
     route["model"] = "glm-5.3"
@@ -133,11 +133,11 @@ class RoutingTests(unittest.TestCase):
         self.fake.choice("easy", probs(easy=0.9, medium=0.08, hard=0.01, very_hard=0.01))
         create, _ = self.create(self.card())
         sent = create.calls[0]
-        self.assertEqual(sent["assignee"], "harness-worker-glm-1")
+        self.assertEqual(sent["assignee"], "harness-worker-glm-easy-1")
         self.assertEqual((sent["model"], sent["provider"]), ("glm-5.3-flash", "zai"))
         record = self.last_decision()
         self.assertEqual((record["event"], record["route"], record["applied"]), ("route", "easy", True))
-        self.assertEqual((record["original_assignee"], record["new_assignee"]), ("harness-worker", "harness-worker-glm-1"))
+        self.assertEqual((record["original_assignee"], record["new_assignee"]), ("harness-worker", "harness-worker-glm-easy-1"))
         self.assertEqual(record["task_id"], "t_0a1b2c3d")
         self.assertEqual(record["board"], "harness")
         self.assertEqual(record["jev_input_tokens"], 321)
@@ -152,24 +152,25 @@ class RoutingTests(unittest.TestCase):
         create, _ = self.create(self.card(board="jobcron", assignee="jobcron-worker-2"))
         sent = create.calls[0]
         # Card t_cf518fd0: a `medium` card goes to the second GLM worker of the board.
-        self.assertEqual(sent["assignee"], "jobcron-worker-glm-2")
+        self.assertEqual(sent["assignee"], "jobcron-worker-glm-medium-1")
         self.assertEqual((sent["model"], sent["provider"]), ("glm-5.3", "zai"))
         self.assertTrue(self.last_decision()["applied"])
 
     def test_hard_route_applies_the_worker_of_glm_max_workers(self):
-        # Card t_3c7a581d: a `hard` card goes to the one profile of the board's
-        # `glm_max_workers` list, with model `glm-5.3` and provider `zai`.
+        # Card t_3c7a581d: a `hard` card goes to the profile of the board's
+        # `glm_max_workers` list, with model `glm-5.3` and provider `zai`. Card
+        # t_18a2dc93 gave that list two names; the first card gets the first name.
         self.fake.choice("hard", probs(hard=0.95, medium=0.05))
         args = self.card(board="cha-pt", assignee="chapt-worker")
         create, _ = self.create(args)
         sent = create.calls[0]
-        self.assertEqual(sent["assignee"], "chapt-worker-glm-3")
+        self.assertEqual(sent["assignee"], "chapt-worker-glm-hard-1")
         self.assertEqual((sent["model"], sent["provider"]), ("glm-5.3", "zai"))
         record = self.last_decision()
         self.assertEqual((record["route"], record["applied"], record["applied_route"], record["new_assignee"]),
-                         ("hard", True, "hard", "chapt-worker-glm-3"))
+                         ("hard", True, "hard", "chapt-worker-glm-hard-1"))
         state = json.loads((self.log_dir / "routing-state.json").read_text(encoding="utf-8"))
-        self.assertEqual(state["counters"], {"cha-pt:glm_max_workers": 0})
+        self.assertEqual(state["counters"], {"cha-pt:glm_max_workers": 1})
 
     def test_very_hard_route_changes_nothing(self):
         # A `very_hard` card is created exactly as the orchestrator asked: the
@@ -191,11 +192,11 @@ class RoutingTests(unittest.TestCase):
         self.fake.choice("hard", probs(hard=0.95, medium=0.05))
         create, _ = self.create(self.card(), config=config)
         sent = create.calls[0]
-        self.assertEqual(sent["assignee"], "harness-worker-glm-3")
+        self.assertEqual(sent["assignee"], "harness-worker-glm-hard-1")
         self.assertEqual((sent["model"], sent["provider"]), ("glm-5.3", "zai"))
         record = self.last_decision()
         self.assertEqual((record["event"], record["applied"], record["applied_route"], record["new_assignee"]),
-                         ("route", True, "hard", "harness-worker-glm-3"))
+                         ("route", True, "hard", "harness-worker-glm-hard-1"))
         state = json.loads((self.log_dir / "routing-state.json").read_text(encoding="utf-8"))
         self.assertEqual(state["counters"], {"harness:glm_max_workers": 0})
 
@@ -208,8 +209,8 @@ class RoutingTests(unittest.TestCase):
         for route, probabilities in answers:
             self.fake.choice(route, probabilities)
             assignees.append(self.create(self.card(), config=config)[0].calls[0]["assignee"])
-        self.assertEqual(assignees, ["harness-worker-glm-1", "harness-worker-glm-3",
-                                     "harness-worker-glm-2", "harness-worker-glm-1"])
+        self.assertEqual(assignees, ["harness-worker-glm-easy-1", "harness-worker-glm-hard-1",
+                                     "harness-worker-glm-medium-1", "harness-worker-glm-easy-1"])
         state = json.loads((self.log_dir / "routing-state.json").read_text(encoding="utf-8"))
         self.assertEqual(state["counters"], {"harness": 1, "harness:glm_max_workers": 0})
 
@@ -217,10 +218,10 @@ class RoutingTests(unittest.TestCase):
         config = two_list_config()
         config["jev"] = self.fake.settings()
         self.fake.choice("easy", probs(easy=0.9))
-        create, _ = self.create(self.card(assignee="harness-worker-glm-3"), config=config)
+        create, _ = self.create(self.card(assignee="harness-worker-glm-hard-1"), config=config)
         record = self.assert_unchanged(create, "assignee_not_listed")
         self.assertEqual((record["original_assignee"], record["new_assignee"]),
-                         ("harness-worker-glm-3", "harness-worker-glm-3"))
+                         ("harness-worker-glm-hard-1", "harness-worker-glm-hard-1"))
 
     def test_state_is_title_and_body_cut_at_limit(self):
         self.fake.choice("hard", probs(hard=1.0))
@@ -239,7 +240,7 @@ class RoutingTests(unittest.TestCase):
         create, _ = self.create(self.card())
         sent = create.calls[0]
         # Card t_cf518fd0: a `medium` card goes to the second GLM worker of the board.
-        self.assertEqual(sent["assignee"], "harness-worker-glm-2")
+        self.assertEqual(sent["assignee"], "harness-worker-glm-medium-1")
         self.assertEqual((sent["model"], sent["provider"]), ("glm-5.3", "zai"))
         record = self.last_decision()
         self.assertEqual((record["route"], record["applied"], record["not_applied_reason"]),
@@ -265,9 +266,9 @@ class RoutingTests(unittest.TestCase):
         self.fake.choice("very_hard", probs(medium=0.31, hard=0.31, very_hard=0.38))
         create, _ = self.create(self.card())
         sent = create.calls[0]
-        self.assertEqual(sent["assignee"], "harness-worker-glm-3")
+        self.assertEqual(sent["assignee"], "harness-worker-glm-hard-1")
         self.assertEqual((sent["model"], sent["provider"]), ("glm-5.3", "zai"))
-        self.assertIn("\nAssigned worker EXACT harness-worker-glm-3.\n", sent["body"])
+        self.assertIn("\nAssigned worker EXACT harness-worker-glm-hard-1.\n", sent["body"])
         record = self.last_decision()
         self.assertEqual((record["route"], record["applied"], record["not_applied_reason"]),
                          ("very_hard", True, None))
@@ -282,7 +283,7 @@ class RoutingTests(unittest.TestCase):
         self.fake.choice("very_hard", probs(medium=0.25, hard=0.36, very_hard=0.39))
         create, _ = self.create(self.card())
         sent = create.calls[0]
-        self.assertEqual(sent["assignee"], "harness-worker-glm-3")
+        self.assertEqual(sent["assignee"], "harness-worker-glm-hard-1")
         record = self.last_decision()
         self.assertEqual(record["applied_route"], "hard")
         self.assertEqual(record["glm_probability_sum"], 0.61)
@@ -292,7 +293,7 @@ class RoutingTests(unittest.TestCase):
         self.fake.choice("easy", probs(easy=0.45, medium=0.2, very_hard=0.35))
         create, _ = self.create(self.card())
         sent = create.calls[0]
-        self.assertEqual(sent["assignee"], "harness-worker-glm-1")
+        self.assertEqual(sent["assignee"], "harness-worker-glm-easy-1")
         self.assertEqual((sent["model"], sent["provider"]), ("glm-5.3-flash", "zai"))
         record = self.last_decision()
         self.assertEqual((record["route"], record["applied"], record["applied_route"]),
@@ -319,7 +320,7 @@ class RoutingTests(unittest.TestCase):
         self.fake.choice("very_hard", probs(medium=0.31, hard=0.31, very_hard=0.38))
         first, _ = self.create(self.card())
         second, _ = self.create(self.card())
-        self.assertEqual(first.calls[0]["assignee"], "harness-worker-glm-3")
+        self.assertEqual(first.calls[0]["assignee"], "harness-worker-glm-hard-1")
         self.assertIsNone(second.calls[0])  # the control card is created exactly as asked
         record = self.last_decision()
         self.assertEqual((record["route"], record["applied"], record["not_applied_reason"]),
@@ -327,8 +328,9 @@ class RoutingTests(unittest.TestCase):
         self.assertEqual(record["applied_route"], "hard")
         self.assertEqual(record["glm_probability_sum"], 0.62)
         self.assertEqual(self.control_state()["control_group_counters"], {"harness": {"hard": 0}})
-        # The `glm_max_workers` alternation advanced once (for the first card) only.
-        self.assertEqual(self.control_state()["counters"], {"harness:glm_max_workers": 0})
+        # The `glm_max_workers` alternation advanced once (for the first card) only; since card
+        # t_18a2dc93 the list has two names, so the next card gets the second.
+        self.assertEqual(self.control_state()["counters"], {"harness:glm_max_workers": 1})
 
     def test_records_that_do_not_apply_have_the_new_fields(self):
         # g: model_set and assignee_not_listed carry the GLM sum; a jev_error
@@ -358,7 +360,7 @@ class RoutingTests(unittest.TestCase):
         self.fake.choice("very_hard", probs(easy=0.25, medium=0.2, very_hard=0.55))
         create, _ = self.create(self.card(), config=config)
         sent = create.calls[0]
-        self.assertEqual(sent["assignee"], "harness-worker-glm-1")
+        self.assertEqual(sent["assignee"], "harness-worker-glm-easy-1")
         self.assertEqual((sent["model"], sent["provider"]), ("glm-5.3-flash", "zai"))
         record = self.last_decision()
         self.assertEqual((record["route"], record["applied"], record["applied_route"]),
@@ -423,17 +425,19 @@ class RoutingTests(unittest.TestCase):
         # as the other three boards. Card t_f4ce916d named three GLM worker
         # profiles per board; card t_3c7a581d moved the third of each board into
         # the new list `glm_max_workers` and gave `hard` that list in
-        # `assignee_from` with model `glm-5.3` and provider `zai`.
+        # `assignee_from` with model `glm-5.3` and provider `zai`. Card t_18a2dc93
+        # gave the GLM workers the names of their routes and added the second
+        # worker of each route: `glm_workers` names the four `easy` and `medium`
+        # workers and `glm_max_workers` the two `hard` workers.
         boards = self.config["routing"]["boards"]
         self.assertEqual(sorted(boards), ["anki", "cha-pt", "harness", "jobcron", "jss-genr"])
-        glm_workers = {"jobcron": ["jobcron-worker-glm-1", "jobcron-worker-glm-2"],
-                       "cha-pt": ["chapt-worker-glm-1", "chapt-worker-glm-2"],
-                       "harness": ["harness-worker-glm-1", "harness-worker-glm-2"],
-                       "jss-genr": ["jss-worker-glm-1", "jss-worker-glm-2"],
-                       "anki": ["anki-worker-glm-1", "anki-worker-glm-2"]}
-        glm_max_workers = {"jobcron": ["jobcron-worker-glm-3"], "cha-pt": ["chapt-worker-glm-3"],
-                           "harness": ["harness-worker-glm-3"], "jss-genr": ["jss-worker-glm-3"],
-                           "anki": ["anki-worker-glm-3"]}
+        prefixes = {"jobcron": "jobcron", "cha-pt": "chapt", "harness": "harness", "jss-genr": "jss",
+                    "anki": "anki"}
+        glm_workers = {board: [f"{prefix}-worker-glm-{suffix}"
+                               for suffix in ("easy-1", "easy-2", "medium-1", "medium-2")]
+                       for board, prefix in prefixes.items()}
+        glm_max_workers = {board: [f"{prefix}-worker-glm-hard-1", f"{prefix}-worker-glm-hard-2"]
+                           for board, prefix in prefixes.items()}
         reference = boards["harness"]["routes"]
         for board, entry in boards.items():
             with self.subTest(board=board):
@@ -444,8 +448,8 @@ class RoutingTests(unittest.TestCase):
                                  {"easy": True, "medium": True, "hard": True, "very_hard": True})
 
     def test_jss_and_anki_routes_applied(self):
-        cases = (("jss-genr", "jss-worker", "easy", "jss-worker-glm-1", "glm-5.3-flash"),
-                 ("anki", "anki-worker-2", "medium", "anki-worker-glm-2", "glm-5.3"))  # glm-2: card t_cf518fd0
+        cases = (("jss-genr", "jss-worker", "easy", "jss-worker-glm-easy-1", "glm-5.3-flash"),
+                 ("anki", "anki-worker-2", "medium", "anki-worker-glm-medium-1", "glm-5.3"))  # glm-2: card t_cf518fd0
         for board, assignee, route, glm_worker, model in cases:
             with self.subTest(board=board):
                 self.fake.choice(route, probs(**{route: 0.9, "hard": 0.1}))
@@ -468,7 +472,7 @@ class RoutingTests(unittest.TestCase):
         self.fake.choice("easy", probs(easy=0.9))
         with mock.patch.dict(os.environ, {"HERMES_KANBAN_BOARD": "harness"}):
             create, _ = self.create(self.card(board=None))
-        self.assertEqual(create.calls[0]["assignee"], "harness-worker-glm-1")
+        self.assertEqual(create.calls[0]["assignee"], "harness-worker-glm-easy-1")
 
     # --- Jev failures leave the arguments unchanged -------------------------------------
 
@@ -553,19 +557,18 @@ class RoutingTests(unittest.TestCase):
         return json.loads((self.log_dir / "routing-state.json").read_text(encoding="utf-8"))
 
     def test_tenth_qualifying_card_is_the_control_group(self):
-        # Card t_3c7a581d: the two workers of `glm_workers` take turns for the
+        # Card t_3c7a581d: the workers of `glm_workers` take turns for the
         # `easy` cards of the board. Card t_cf518fd0 gave the shipped `easy`
-        # route one worker, so this test uses the configuration in which `easy`
+        # route its own list, so this test uses the configuration in which `easy`
         # still names `glm_workers`, to show that the control card does not
-        # advance the turns.
+        # advance the turns. Since card t_18a2dc93 `glm_workers` has four names.
         self.config = glm_workers_route_config()
         self.config["jev"] = self.fake.settings()
         self.fake.choice("easy", probs(easy=0.9, medium=0.05, hard=0.05))
         sent = [self.create(self.card())[0].calls[0] for _ in range(10)]
-        self.assertEqual([s["assignee"] for s in sent[:9]],
-                         ["harness-worker-glm-1", "harness-worker-glm-2", "harness-worker-glm-1",
-                          "harness-worker-glm-2", "harness-worker-glm-1", "harness-worker-glm-2",
-                          "harness-worker-glm-1", "harness-worker-glm-2", "harness-worker-glm-1"])
+        four = ["harness-worker-glm-easy-1", "harness-worker-glm-easy-2", "harness-worker-glm-medium-1",
+                "harness-worker-glm-medium-2"]
+        self.assertEqual([s["assignee"] for s in sent[:9]], four + four + four[:1])
         self.assertIsNone(sent[9])  # the tenth card is created exactly as the orchestrator asked
         record = self.last_decision()
         self.assertEqual((record["event"], record["applied"], record["not_applied_reason"], record["route"]),
@@ -573,9 +576,10 @@ class RoutingTests(unittest.TestCase):
         self.assertAlmostEqual(record["probabilities"]["easy"], 0.9)
         self.assertEqual((record["original_assignee"], record["new_assignee"]), ("harness-worker", "harness-worker"))
         self.assertEqual(record["task_id"], "t_0a1b2c3d")
-        # The alternation counter did not advance for the control card: the eleventh card gets glm-2.
+        # The alternation counter did not advance for the control card: the eleventh card gets the
+        # second name of `glm_workers`.
         self.assertEqual(self.control_state()["counters"], {"harness": 1})
-        self.assertEqual(self.create(self.card())[0].calls[0]["assignee"], "harness-worker-glm-2")
+        self.assertEqual(self.create(self.card())[0].calls[0]["assignee"], "harness-worker-glm-easy-2")
         decisions = read_records(self.log_dir, "decisions")
         self.assertEqual([r["not_applied_reason"] for r in decisions], [None] * 9 + ["control_group", None])
 
@@ -641,53 +645,55 @@ class RoutingTests(unittest.TestCase):
     # --- alternation and body rewrite -----------------------------------------------
 
     def test_alternation_between_glm_workers(self):
-        # Card t_cf518fd0 gave the shipped `easy` route one worker; the turns of a
-        # route that names the two-name list `glm_workers` are tested with the
-        # configuration in which `easy` still names that list.
+        # Card t_cf518fd0 gave the shipped `easy` route its own list; the turns of a
+        # route that names the list `glm_workers` (four names since card
+        # t_18a2dc93) are tested with the configuration in which `easy` still
+        # names that list.
         self.config = glm_workers_route_config()
         self.config["jev"] = self.fake.settings()
         self.fake.choice("easy", probs(easy=0.9))
         chosen = [self.create(self.card())[0].calls[0]["assignee"] for _ in range(3)]
-        # The two workers of `glm_workers` take turns (card t_3c7a581d; the third
-        # profile of each board is in `glm_max_workers`).
-        self.assertEqual(chosen, ["harness-worker-glm-1", "harness-worker-glm-2", "harness-worker-glm-1"])
+        # The workers of `glm_workers` take turns in the order of the list (card
+        # t_3c7a581d; the `hard` profiles of each board are in `glm_max_workers`).
+        self.assertEqual(chosen, ["harness-worker-glm-easy-1", "harness-worker-glm-easy-2", "harness-worker-glm-medium-1"])
         other = self.create(self.card(board="cha-pt", assignee="chapt-worker"))[0].calls[0]["assignee"]
-        self.assertEqual(other, "chapt-worker-glm-1")
+        self.assertEqual(other, "chapt-worker-glm-easy-1")
         state = json.loads((self.log_dir / "routing-state.json").read_text(encoding="utf-8"))
-        self.assertEqual(state["counters"], {"harness": 1, "cha-pt": 1})
+        self.assertEqual(state["counters"], {"harness": 3, "cha-pt": 1})
         self.assertEqual(state["control_group_counters"], {"harness": {"easy": 3}, "cha-pt": {"easy": 1}})
 
     def test_next_glm_worker_returns_each_worker_once_per_list_in_order(self):
-        # Card t_3c7a581d: every board has the list `glm_workers` with two names
-        # and the list `glm_max_workers` with one name; each list has its own
-        # counter under the section `counters` of routing-state.json.
+        # Card t_3c7a581d: every board has the list `glm_workers` and the list
+        # `glm_max_workers`; each list has its own counter under the section
+        # `counters` of routing-state.json. Since card t_18a2dc93 `glm_workers`
+        # has four names and `glm_max_workers` two.
         for board, entry in CONFIG["routing"]["boards"].items():
             with self.subTest(board=board), tempfile.TemporaryDirectory(prefix="jev-rotation-") as directory:
                 workers = entry["glm_workers"]
                 max_workers = entry["glm_max_workers"]
-                self.assertEqual(len(workers), 2)
-                self.assertEqual(len(max_workers), 1)
-                chosen = [routing.next_glm_worker(board, workers, Path(directory)) for _ in range(2)]
+                self.assertEqual(len(workers), 4)
+                self.assertEqual(len(max_workers), 2)
+                chosen = [routing.next_glm_worker(board, workers, Path(directory)) for _ in range(4)]
                 self.assertEqual(chosen, workers)
-                # The third call with `glm_workers` starts the next turn with the first worker.
+                # The fifth call with `glm_workers` starts the next turn with the first worker.
                 self.assertEqual(routing.next_glm_worker(board, workers, Path(directory)), workers[0])
-                # The one-worker list returns its single name every time, under its own counter.
+                # The list `glm_max_workers` takes its turns under its own counter.
                 self.assertEqual(routing.next_glm_worker(board, max_workers, Path(directory), "glm_max_workers"),
                                  max_workers[0])
                 self.assertEqual(routing.next_glm_worker(board, max_workers, Path(directory), "glm_max_workers"),
-                                 max_workers[0])
+                                 max_workers[1])
                 # The `glm_workers` turn continued where it was.
                 self.assertEqual(routing.next_glm_worker(board, workers, Path(directory)), workers[1])
                 state = json.loads((Path(directory) / "routing-state.json").read_text(encoding="utf-8"))
-                self.assertEqual(state["counters"], {board: 0, f"{board}:glm_max_workers": 0})
+                self.assertEqual(state["counters"], {board: 2, f"{board}:glm_max_workers": 0})
 
     def test_next_glm_worker_with_three_arguments_uses_the_key_of_the_board_name(self):
         # Three positional arguments keep the counter under the board name alone,
         # so the live state files written before the second list existed stay valid.
         with tempfile.TemporaryDirectory(prefix="jev-rotation-") as directory:
-            workers = ["harness-worker-glm-1", "harness-worker-glm-2"]
+            workers = ["harness-worker-glm-easy-1", "harness-worker-glm-medium-1"]
             self.assertEqual(routing.next_glm_worker("harness", workers, Path(directory)),
-                             "harness-worker-glm-1")
+                             "harness-worker-glm-easy-1")
             state = json.loads((Path(directory) / "routing-state.json").read_text(encoding="utf-8"))
             self.assertEqual(state["counters"], {"harness": 1})
 
@@ -698,7 +704,7 @@ class RoutingTests(unittest.TestCase):
         create, _ = self.create(self.card(body=body, reviewer="harness-reviewer"))
         sent = create.calls[0]
         # Card t_cf518fd0: a `medium` card goes to the second GLM worker of the board.
-        self.assertIn("\nAssigned worker EXACT harness-worker-glm-2.\n", sent["body"])
+        self.assertIn("\nAssigned worker EXACT harness-worker-glm-medium-1.\n", sent["body"])
         self.assertIn("\nReviewer EXACT harness-reviewer.\n", sent["body"])
         self.assertIn("mentions Assigned worker EXACT harness-worker inside", sent["body"])
         self.assertEqual(sent["reviewer"], "harness-reviewer")
@@ -735,7 +741,7 @@ class RoutingTests(unittest.TestCase):
             {"task_id": "t_feedc0de", "board": SENTINEL, "summary": SENTINEL},
             {"summary": SENTINEL, "board": f"harness {SENTINEL}"},
         ]
-        with mock.patch.dict(os.environ, {"HERMES_PROFILE": "harness-worker-glm-1", "FAKE_HERMES_LOG": str(calls_log),
+        with mock.patch.dict(os.environ, {"HERMES_PROFILE": "harness-worker-glm-easy-1", "FAKE_HERMES_LOG": str(calls_log),
                                           "HERMES_KANBAN_TASK": "t_feedc0de"}):
             for args in review_args:
                 routing.handle_request_review(args, lambda payload=None: '{"ok": true}', config=self.config,
@@ -785,7 +791,7 @@ class ReviewHandoffTests(unittest.TestCase):
         return calls
 
     def test_glm_worker_clears_override_before_review(self):
-        calls = self.review("harness-worker-glm-2")
+        calls = self.review("harness-worker-glm-medium-1")
         self.assertEqual(calls, [None])
         self.assertEqual(fake_hermes_calls(self.calls_log),
                          [["kanban", "--board", "harness", "set-model", "t_feedc0de", "none"]])
@@ -800,7 +806,7 @@ class ReviewHandoffTests(unittest.TestCase):
         # Two-list configuration: a session of the second list (glm_max_workers)
         # clears the model override too.
         self.config = two_list_config()
-        calls = self.review("harness-worker-glm-3")
+        calls = self.review("harness-worker-glm-hard-1")
         self.assertEqual(calls, [None])
         self.assertEqual(fake_hermes_calls(self.calls_log),
                          [["kanban", "--board", "harness", "set-model", "t_feedc0de", "none"]])
@@ -814,7 +820,7 @@ class ReviewHandoffTests(unittest.TestCase):
 
     def test_board_not_configured_is_not_used_or_logged(self):
         calls = []
-        with mock.patch.dict(os.environ, {"HERMES_PROFILE": "harness-worker-glm-1"}):
+        with mock.patch.dict(os.environ, {"HERMES_PROFILE": "harness-worker-glm-easy-1"}):
             routing.handle_request_review({"board": "not-a-configured-board"}, lambda p=None: calls.append(p),
                                           config=self.config, command=self.hermes)
         self.assertEqual(calls, [None])
@@ -825,7 +831,7 @@ class ReviewHandoffTests(unittest.TestCase):
 
     def test_failed_clear_still_requests_review(self):
         with mock.patch.dict(os.environ, {"FAKE_HERMES_EXIT": "3"}):
-            calls = self.review("jobcron-worker-glm-1")
+            calls = self.review("jobcron-worker-glm-easy-1")
         self.assertEqual(calls, [None])
         # Card t_b668f19c: the review_choice record is the last record of the
         # call, so the clear_override record is selected by its event.
@@ -854,8 +860,8 @@ class RequestChangesTests(unittest.TestCase):
         self.dir = Path(self.tmp.name)
         env = isolated_env(self.dir)
         self.db = Path(env["HERMES_KANBAN_HOME"]) / "kanban" / "boards" / "harness" / "kanban.db"
-        build_board_db(self.db, [(GLM_CARD, "ready", "harness-worker-glm-1"),
-                                 ("t_5a1e0002", "ready", "harness-worker-glm-2"),
+        build_board_db(self.db, [(GLM_CARD, "ready", "harness-worker-glm-easy-1"),
+                                 ("t_5a1e0002", "ready", "harness-worker-glm-medium-1"),
                                  (CLAUDE_CARD, "ready", "harness-worker")])
         self.hermes = write_fake_hermes(self.dir)
         self.calls_log = self.dir / "hermes-calls.jsonl"
@@ -912,7 +918,7 @@ class RequestChangesTests(unittest.TestCase):
     def escalations(self):
         return [r for r in read_records(self.log_dir, "decisions") if r["event"] == "escalate"]
 
-    def route_record(self, task_id, route, new_assignee="harness-worker-glm-1",
+    def route_record(self, task_id, route, new_assignee="harness-worker-glm-easy-1",
                      original_assignee="harness-worker-2", applied=True):
         """One `route` record, written as `test_claude_worker_from_the_route_record` writes it."""
         routing.jev_log.write("decisions", {"event": "route", "board": "harness", "task_id": task_id,
@@ -932,7 +938,7 @@ class RequestChangesTests(unittest.TestCase):
         self.assertEqual({k: record[k] for k in ("board", "task_id", "original_assignee", "new_assignee",
                                                   "change_requests", "applied", "applied_route",
                                                   "max_glm_change_requests", "error_class")},
-                         {"board": "harness", "task_id": GLM_CARD, "original_assignee": "harness-worker-glm-1",
+                         {"board": "harness", "task_id": GLM_CARD, "original_assignee": "harness-worker-glm-easy-1",
                           "new_assignee": "harness-worker", "change_requests": 5, "applied": True,
                           "applied_route": None, "max_glm_change_requests": 5, "error_class": None})
 
@@ -949,7 +955,7 @@ class RequestChangesTests(unittest.TestCase):
         # is moved to a Claude worker at the third change request (card
         # t_52be75ab: the `hard` route carries its own limit 3).
         task_id = "t_3c9d0003"
-        self.insert_card(task_id, "harness-worker-glm-3", "glm-5.3")
+        self.insert_card(task_id, "harness-worker-glm-hard-1", "glm-5.3")
         self.add_change_requests(task_id, 3)
         self.request_changes({"task_id": task_id, "reason": "again"}, config=two_list_config())
         self.assertEqual(fake_hermes_calls(self.calls_log), [
@@ -964,22 +970,22 @@ class RequestChangesTests(unittest.TestCase):
         self.assertEqual((record["change_requests"], record["applied_route"], record["max_glm_change_requests"]),
                          (3, None, 3))
         self.assertEqual((record["event"], record["task_id"], record["original_assignee"], record["applied"]),
-                         ("escalate", task_id, "harness-worker-glm-3", True))
+                         ("escalate", task_id, "harness-worker-glm-hard-1", True))
 
     def test_second_list_card_below_the_limit_stays(self):
         task_id = "t_3c9d0004"
-        self.insert_card(task_id, "harness-worker-glm-3")
+        self.insert_card(task_id, "harness-worker-glm-hard-1")
         self.add_change_requests(task_id, 2)
         self.request_changes({"task_id": task_id, "reason": "again"}, config=two_list_config())
         self.assertEqual(fake_hermes_calls(self.calls_log), [])
-        self.assertEqual(self.card(task_id)[1], "harness-worker-glm-3")
+        self.assertEqual(self.card(task_id)[1], "harness-worker-glm-hard-1")
         self.assertEqual(self.escalations(), [])
 
     def test_fourth_change_request_changes_nothing(self):
         self.add_change_requests(GLM_CARD, 4)
         self.request_changes()
         self.assertEqual(fake_hermes_calls(self.calls_log), [])
-        self.assertEqual(self.card(GLM_CARD)[1], "harness-worker-glm-1")
+        self.assertEqual(self.card(GLM_CARD)[1], "harness-worker-glm-easy-1")
         self.assertEqual(self.escalations(), [])
 
     def test_claude_implemented_card_is_never_reassigned(self):
@@ -1015,7 +1021,7 @@ class RequestChangesTests(unittest.TestCase):
     def test_claude_worker_from_the_route_record(self):
         routing.jev_log.write("decisions", {"event": "route", "board": "harness", "task_id": GLM_CARD,
                                             "original_assignee": "harness-worker-2",
-                                            "new_assignee": "harness-worker-glm-1", "applied": True})
+                                            "new_assignee": "harness-worker-glm-easy-1", "applied": True})
         self.add_change_requests(GLM_CARD, 5)
         self.request_changes()
         self.assertEqual(self.card(GLM_CARD)[1], "harness-worker-2")
@@ -1030,18 +1036,18 @@ class RequestChangesTests(unittest.TestCase):
                 record["applied"], record["new_assignee"])
 
     def glm3_card(self, model_override="glm-5.3"):
-        """A card of `harness-worker-glm-3`, inserted like the second-list tests insert it."""
+        """A card of `harness-worker-glm-hard-1`, inserted like the second-list tests insert it."""
         task_id = "t_5a1e0003"
-        self.insert_card(task_id, "harness-worker-glm-3", model_override)
+        self.insert_card(task_id, "harness-worker-glm-hard-1", model_override)
         return task_id
 
     def test_hard_card_of_the_glm3_profile_goes_at_the_third_change_request(self):
         task_id = self.glm3_card()
-        self.route_record(task_id, "hard", new_assignee="harness-worker-glm-3")
+        self.route_record(task_id, "hard", new_assignee="harness-worker-glm-hard-1")
         self.add_change_requests(task_id, 2)
         self.request_changes({"task_id": task_id, "reason": "again"})
         self.assertEqual(fake_hermes_calls(self.calls_log), [])  # nothing happens
-        self.assertEqual(self.card(task_id)[1], "harness-worker-glm-3")
+        self.assertEqual(self.card(task_id)[1], "harness-worker-glm-hard-1")
         self.add_change_requests(task_id, 1)
         self.request_changes({"task_id": task_id, "reason": "again"})
         self.assertEqual(fake_hermes_calls(self.calls_log), [
@@ -1056,7 +1062,7 @@ class RequestChangesTests(unittest.TestCase):
         # route record; its worker is now the `-glm-3` profile, but the route
         # record decides and `medium` has no limit of its own.
         task_id = self.glm3_card()
-        self.route_record(task_id, "medium", new_assignee="harness-worker-glm-3")
+        self.route_record(task_id, "medium", new_assignee="harness-worker-glm-hard-1")
         self.add_change_requests(task_id, 4)
         self.request_changes({"task_id": task_id, "reason": "again"})
         self.assertEqual(fake_hermes_calls(self.calls_log), [])  # nothing happens
@@ -1066,7 +1072,7 @@ class RequestChangesTests(unittest.TestCase):
 
     def test_glm3_card_without_a_route_record_goes_at_the_third(self):
         # The worker list of the assignee: only the `hard` route names a list
-        # that contains `harness-worker-glm-3`, so its limit 3 applies.
+        # that contains `harness-worker-glm-hard-1`, so its limit 3 applies.
         task_id = self.glm3_card()
         self.add_change_requests(task_id, 2)
         self.request_changes({"task_id": task_id, "reason": "again"})
@@ -1076,7 +1082,7 @@ class RequestChangesTests(unittest.TestCase):
         self.assertEqual(self.result_tuple(), (3, None, 3, True, "harness-worker"))
 
     def test_first_list_card_without_a_route_record_keeps_the_limit_five(self):
-        # `harness-worker-glm-1` is named by `easy` and `medium`, which have no
+        # `harness-worker-glm-easy-1` is named by `easy` and `medium`, which have no
         # limit of their own, so the general value 5 applies.
         self.add_change_requests(GLM_CARD, 4)
         self.request_changes()
@@ -1096,7 +1102,7 @@ class RequestChangesTests(unittest.TestCase):
 
     def test_route_own_limit_that_is_zero_or_invalid_falls_back_to_the_general_value(self):
         task_id = self.glm3_card()
-        self.route_record(task_id, "hard", new_assignee="harness-worker-glm-3")
+        self.route_record(task_id, "hard", new_assignee="harness-worker-glm-hard-1")
         self.add_change_requests(task_id, 4)
         for value in (0, "3", -1, True, "absent"):
             with self.subTest(value=value):
@@ -1122,7 +1128,7 @@ class RequestChangesTests(unittest.TestCase):
 
     def test_general_value_zero_turns_the_reassignment_off_for_every_route(self):
         task_id = self.glm3_card()
-        self.route_record(task_id, "hard", new_assignee="harness-worker-glm-3")
+        self.route_record(task_id, "hard", new_assignee="harness-worker-glm-hard-1")
         self.add_change_requests(task_id, 9)
         config = json.loads(json.dumps(self.config))
         config["routing"]["max_glm_change_requests"] = 0
@@ -1132,7 +1138,7 @@ class RequestChangesTests(unittest.TestCase):
 
     def test_route_record_with_a_name_the_board_does_not_have_uses_the_worker_list(self):
         task_id = self.glm3_card()
-        self.route_record(task_id, "gone", new_assignee="harness-worker-glm-3")
+        self.route_record(task_id, "gone", new_assignee="harness-worker-glm-hard-1")
         self.add_change_requests(task_id, 3)
         self.request_changes({"task_id": task_id, "reason": "again"})
         self.assertEqual(self.result_tuple(), (3, None, 3, True, "harness-worker-2"))
@@ -1141,10 +1147,10 @@ class RequestChangesTests(unittest.TestCase):
         task_id = self.glm3_card()
         # Only these three records: another board, `applied` false, another task.
         routing.jev_log.write("decisions", {"event": "route", "board": "cha-pt", "task_id": task_id,
-                                            "original_assignee": "chapt-worker", "new_assignee": "chapt-worker-glm-3",
+                                            "original_assignee": "chapt-worker", "new_assignee": "chapt-worker-glm-hard-1",
                                             "applied": True, "route": "medium", "applied_route": "medium"})
-        self.route_record(task_id, "medium", new_assignee="harness-worker-glm-3", applied=False)
-        self.route_record("t_5a1e0004", "medium", new_assignee="harness-worker-glm-3")
+        self.route_record(task_id, "medium", new_assignee="harness-worker-glm-hard-1", applied=False)
+        self.route_record("t_5a1e0004", "medium", new_assignee="harness-worker-glm-hard-1")
         self.add_change_requests(task_id, 3)
         self.request_changes({"task_id": task_id, "reason": "again"})
         self.assertEqual(self.result_tuple()[:4], (3, None, 3, True))
@@ -1153,23 +1159,23 @@ class RequestChangesTests(unittest.TestCase):
         config = json.loads(json.dumps(self.config))
         route = next(r for r in config["routing"]["boards"]["harness"]["routes"] if r["name"] == "medium")
         route["max_glm_change_requests"] = 2
-        # `harness-worker-glm-1` is named by `easy` (limit 5) and `medium`
+        # `harness-worker-glm-easy-1` is named by `easy` (limit 5) and `medium`
         # (limit 2); the limits differ, so the general value 5 applies.
         self.add_change_requests(GLM_CARD, 4)
         self.request_changes(config=config)
         self.assertEqual(fake_hermes_calls(self.calls_log), [])  # nothing happens
         self.assertEqual(self.escalations(), [])
-        # `harness-worker-glm-2` has a `medium` route record, so the first rule
+        # `harness-worker-glm-medium-1` has a `medium` route record, so the first rule
         # gives the limit 2 of `medium`.
-        self.route_record("t_5a1e0002", "medium", new_assignee="harness-worker-glm-2")
+        self.route_record("t_5a1e0002", "medium", new_assignee="harness-worker-glm-medium-1")
         self.add_change_requests("t_5a1e0002", 2)
         self.request_changes({"task_id": "t_5a1e0002", "reason": "again"}, config=config)
         self.assertEqual(self.result_tuple(), (2, "medium", 2, True, "harness-worker-2"))
 
     def test_last_route_record_decides(self):
         task_id = self.glm3_card()
-        self.route_record(task_id, "hard", new_assignee="harness-worker-glm-3")
-        self.route_record(task_id, "medium", new_assignee="harness-worker-glm-3")
+        self.route_record(task_id, "hard", new_assignee="harness-worker-glm-hard-1")
+        self.route_record(task_id, "medium", new_assignee="harness-worker-glm-hard-1")
         self.add_change_requests(task_id, 3)
         self.request_changes({"task_id": task_id, "reason": "again"})
         self.assertEqual(fake_hermes_calls(self.calls_log), [])  # nothing happens
@@ -1182,7 +1188,7 @@ class RequestChangesTests(unittest.TestCase):
         self.log_dir.mkdir(parents=True, exist_ok=True)
         with open(self.log_dir / "decisions.jsonl", "a", encoding="utf-8") as handle:
             handle.write(json.dumps({"event": "route", "board": "harness", "task_id": task_id,
-                                     "original_assignee": "harness-worker", "new_assignee": "harness-worker-glm-3",
+                                     "original_assignee": "harness-worker", "new_assignee": "harness-worker-glm-hard-1",
                                      "applied": True, "route": "medium"}) + "\n")
         self.add_change_requests(task_id, 4)
         self.request_changes({"task_id": task_id, "reason": "again"})
@@ -1202,11 +1208,11 @@ class RequestChangesTests(unittest.TestCase):
         task_id = "t_5a1e0005"
         conn.execute("INSERT INTO tasks (id, title, status, assignee, model_override, workspace_kind, workspace_path,"
                      " branch_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                     (task_id, "synthetic card", "ready", "harness-worker-glm-3", "glm-5.3", "worktree",
+                     (task_id, "synthetic card", "ready", "harness-worker-glm-hard-1", "glm-5.3", "worktree",
                       f"/Users/chanbla11mit/hermes-local-harness/.worktrees/{task_id}", f"wt/{task_id}"))
         conn.commit()
         conn.close()
-        self.route_record(task_id, "hard", new_assignee="harness-worker-glm-3")
+        self.route_record(task_id, "hard", new_assignee="harness-worker-glm-hard-1")
         self.add_change_requests(task_id, 3)
         self.request_changes({"task_id": task_id, "reason": "again"})
         self.assertEqual(fake_hermes_calls(self.calls_log), [
@@ -1250,10 +1256,10 @@ class RequestChangesTests(unittest.TestCase):
         with mock.patch.dict(os.environ, {"FAKE_HERMES_EXIT": "3"}):
             self.request_changes()
         self.assertEqual([c[3] for c in fake_hermes_calls(self.calls_log)], ["set-model"])  # no reassign
-        self.assertEqual(self.card(GLM_CARD)[1], "harness-worker-glm-1")
+        self.assertEqual(self.card(GLM_CARD)[1], "harness-worker-glm-easy-1")
         [record] = self.escalations()
         self.assertEqual((record["applied"], record["error_class"], record["new_assignee"]),
-                         (False, "CommandFailed", "harness-worker-glm-1"))
+                         (False, "CommandFailed", "harness-worker-glm-easy-1"))
 
     def test_failed_reassign_is_logged_and_result_unchanged(self):
         self.add_change_requests(GLM_CARD, 5)
@@ -1269,7 +1275,7 @@ class RequestChangesTests(unittest.TestCase):
         routing.handle_request_changes({}, lambda payload=None: '{"ok": true}', config=self.config,
                                        command=str(self.dir / "no-such-hermes"), state_dir=self.log_dir)
         self.assertEqual(self.escalations()[0]["error_class"], "CommandNotFound")
-        self.assertEqual(self.card(GLM_CARD)[1], "harness-worker-glm-1")
+        self.assertEqual(self.card(GLM_CARD)[1], "harness-worker-glm-easy-1")
 
     def test_failed_call_changes_nothing(self):
         self.add_change_requests(GLM_CARD, 5)
@@ -1309,7 +1315,7 @@ class RequestChangesTests(unittest.TestCase):
 
     def test_fifth_change_request_names_the_claude_worker_on_the_assigned_worker_line(self):
         self.set_card(GLM_CARD, model_override="glm-5.3-flash",
-                      body="Repository /tmp/x ONLY.\nAssigned worker EXACT harness-worker-glm-1.\n"
+                      body="Repository /tmp/x ONLY.\nAssigned worker EXACT harness-worker-glm-easy-1.\n"
                            "Reviewer EXACT harness-reviewer.\n")
         self.add_change_requests(GLM_CARD, 5)
         self.request_changes()
@@ -1324,22 +1330,22 @@ class RequestChangesTests(unittest.TestCase):
                           record["assigned_worker_line_error_class"]), (True, "rewritten", None))
 
     def test_mention_inside_another_line_and_other_profiles_are_unchanged(self):
-        body = ("Note: the plugin wrote Assigned worker EXACT harness-worker-glm-1 at creation.\n"
-                "Assigned worker EXACT harness-worker-glm-1.\n"
+        body = ("Note: the plugin wrote Assigned worker EXACT harness-worker-glm-easy-1 at creation.\n"
+                "Assigned worker EXACT harness-worker-glm-easy-1.\n"
                 "Assigned worker EXACT harness-worker-glm-10 (other card).\n"
-                "  Assigned worker EXACT harness-worker-glm-1 (indented).\n")
+                "  Assigned worker EXACT harness-worker-glm-easy-1 (indented).\n")
         self.set_card(GLM_CARD, body=body)
         self.add_change_requests(GLM_CARD, 5)
         self.request_changes()
         self.assertEqual(self.body(GLM_CARD), body.replace(
-            "\nAssigned worker EXACT harness-worker-glm-1.\n", "\nAssigned worker EXACT harness-worker.\n"))
+            "\nAssigned worker EXACT harness-worker-glm-easy-1.\n", "\nAssigned worker EXACT harness-worker.\n"))
 
     def test_card_without_the_line_gets_no_edit_command(self):
         for body in (None, "Repository /tmp/x ONLY.\nAssigned worker EXACT harness-worker-2.\n"):
             with self.subTest(body=body):
                 self.calls_log.unlink(missing_ok=True)
                 (self.log_dir / "decisions.jsonl").unlink(missing_ok=True)
-                self.set_card(GLM_CARD, assignee="harness-worker-glm-1", body=body)
+                self.set_card(GLM_CARD, assignee="harness-worker-glm-easy-1", body=body)
                 self.add_change_requests(GLM_CARD, 5)
                 self.request_changes()
                 self.assertEqual([c[3] for c in fake_hermes_calls(self.calls_log)], ["set-model", "reassign"])
@@ -1348,7 +1354,7 @@ class RequestChangesTests(unittest.TestCase):
                 self.assertEqual((record["applied"], record["assigned_worker_line"]), (True, "no_line"))
 
     def test_failed_edit_is_logged_and_result_and_card_unchanged(self):
-        body = f"{SENTINEL}\nAssigned worker EXACT harness-worker-glm-1.\n"
+        body = f"{SENTINEL}\nAssigned worker EXACT harness-worker-glm-easy-1.\n"
         self.set_card(GLM_CARD, body=body)
         self.add_change_requests(GLM_CARD, 5)
         real_run = routing.peak_hold.run_kanban
@@ -1368,7 +1374,7 @@ class RequestChangesTests(unittest.TestCase):
         self.assertNotIn(SENTINEL, all_text_under(self.log_dir))
 
     def test_body_too_long_for_one_argument_is_not_sent(self):
-        body = "Assigned worker EXACT harness-worker-glm-1.\n" + "x" * routing.MAX_BODY_ARGUMENT_BYTES
+        body = "Assigned worker EXACT harness-worker-glm-easy-1.\n" + "x" * routing.MAX_BODY_ARGUMENT_BYTES
         self.set_card(GLM_CARD, body=body)
         self.add_change_requests(GLM_CARD, 5)
         self.request_changes()
@@ -1380,17 +1386,17 @@ class RequestChangesTests(unittest.TestCase):
 
     def test_read_error_and_exception_return_failed_without_raising(self):
         with mock.patch.object(routing.peak_hold, "kanban_db_path", side_effect=OSError("unreadable")):
-            out = routing.rewrite_body_after_escalation(self.config, "harness", GLM_CARD, "harness-worker-glm-1",
+            out = routing.rewrite_body_after_escalation(self.config, "harness", GLM_CARD, "harness-worker-glm-easy-1",
                                                         "harness-worker", self.hermes)
         self.assertEqual(out, {"assigned_worker_line": "failed", "assigned_worker_line_error_class": "OSError"})
         with mock.patch.object(routing, "rewrite_assigned_worker", side_effect=RuntimeError("x")):
-            out = routing.rewrite_body_after_escalation(self.config, "harness", GLM_CARD, "harness-worker-glm-1",
+            out = routing.rewrite_body_after_escalation(self.config, "harness", GLM_CARD, "harness-worker-glm-easy-1",
                                                         "harness-worker", self.hermes)
         self.assertEqual(out["assigned_worker_line_error_class"], "RuntimeError")
         self.assertEqual(fake_hermes_calls(self.calls_log), [])
 
     def test_body_with_sentinel_never_reaches_a_log_file(self):
-        self.set_card(GLM_CARD, body=f"{SENTINEL} intro\n-{SENTINEL}\nAssigned worker EXACT harness-worker-glm-1.\n")
+        self.set_card(GLM_CARD, body=f"{SENTINEL} intro\n-{SENTINEL}\nAssigned worker EXACT harness-worker-glm-easy-1.\n")
         self.add_change_requests(GLM_CARD, 5)
         self.request_changes()
         self.assertEqual(self.body(GLM_CARD),

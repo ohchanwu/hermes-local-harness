@@ -29,7 +29,10 @@ ANKI = (ORCH, WORKER, WORKER2, REVIEWER)
 WORKERS = (WORKER, WORKER2)
 # GLM workers added for the jev plugin (card t_71b4ef4a). They are not fleet workers: the
 # fleet `workers` list and the shared skill deployment lists do not name them.
-GLM_WORKERS = ("anki-worker-glm-1", "anki-worker-glm-2", "anki-worker-glm-3")
+# The six anki GLM workers (card t_18a2dc93 renamed the three of cards t_71b4ef4a and t_f4ce916d and
+# added the second worker of each route).
+GLM_WORKERS = ("anki-worker-glm-easy-1", "anki-worker-glm-easy-2", "anki-worker-glm-medium-1",
+               "anki-worker-glm-medium-2", "anki-worker-glm-hard-1", "anki-worker-glm-hard-2")
 FLEETS = {"jobcron", "cha-pt", "harness", "jss-genr", "anki"}
 BASELINE = "00453fee8fdd4438c185eb97c1279255c7170132"
 RELATIVE = "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md"
@@ -176,7 +179,7 @@ class FleetDesiredState(unittest.TestCase):
         self.assertEqual(self.snapshot["profiles"], list(self.profiles))
         for listing in (self.roster["project_dispatch_allowlist"], self.snapshot["kanban"]["dispatch_profiles"]):
             self.assertEqual([name for name in listing if name.startswith("anki-")],
-                             [WORKER, WORKER2, REVIEWER, *GLM_WORKERS, "anki-reviewer-glm"])
+                             [WORKER, WORKER2, REVIEWER, "anki-reviewer-glm", *GLM_WORKERS])
             self.assertNotIn(ORCH, listing)
         for name in GLM_WORKERS:
             with self.subTest(glm_worker=name):
@@ -377,7 +380,7 @@ class RoleContracts(unittest.TestCase):
 
     def test_skill_version_scope_and_board_pinning(self):
         # Raised by the jev plugin policy change (t_71b4ef4a).
-        self.assertRegex(self.skill_raw, r"(?m)^version: 0\.6\.10-anki\.12$")  # raised by t_ac454595, t_46b5e63e, t_f4ce916d, t_c7cc3830, t_e14a6d6a, t_35874d04 and t_cf518fd0
+        self.assertRegex(self.skill_raw, r"(?m)^version: 0\.6\.10-anki\.13$")  # raised by t_ac454595, t_46b5e63e, t_f4ce916d, t_c7cc3830, t_e14a6d6a, t_35874d04, t_cf518fd0 and t_18a2dc93
         history = "This caused the 2026-10-20 stalls of the JSS and Jobcron orchestrators."
         self.assertEqual(self.skill_raw.count(history), 1)
         rest = self.skill_raw.replace(history, "")

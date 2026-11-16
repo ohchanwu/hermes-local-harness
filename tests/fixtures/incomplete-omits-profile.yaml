@@ -28,29 +28,44 @@
     "jss-worker": "claude-opus-5-5",
     "jss-worker-2": "claude-opus-5-5",
     "jss-reviewer": "claude-opus-5-5",
-    "jobcron-worker-glm-1": "glm-5.3",
-    "jobcron-worker-glm-2": "glm-5.3",
-    "jobcron-worker-glm-3": "glm-5.3",
+    "jobcron-worker-glm-easy-1": "glm-5.3",
+    "jobcron-worker-glm-easy-2": "glm-5.3",
+    "jobcron-worker-glm-medium-1": "glm-5.3",
+    "jobcron-worker-glm-medium-2": "glm-5.3",
+    "jobcron-worker-glm-hard-1": "glm-5.3",
+    "jobcron-worker-glm-hard-2": "glm-5.3",
     "jobcron-reviewer-glm": "glm-5.3",
-    "chapt-worker-glm-1": "glm-5.3",
-    "chapt-worker-glm-2": "glm-5.3",
-    "chapt-worker-glm-3": "glm-5.3",
+    "chapt-worker-glm-easy-1": "glm-5.3",
+    "chapt-worker-glm-easy-2": "glm-5.3",
+    "chapt-worker-glm-medium-1": "glm-5.3",
+    "chapt-worker-glm-medium-2": "glm-5.3",
+    "chapt-worker-glm-hard-1": "glm-5.3",
+    "chapt-worker-glm-hard-2": "glm-5.3",
     "chapt-reviewer-glm": "glm-5.3",
-    "harness-worker-glm-1": "glm-5.3",
-    "harness-worker-glm-2": "glm-5.3",
-    "harness-worker-glm-3": "glm-5.3",
+    "harness-worker-glm-easy-1": "glm-5.3",
+    "harness-worker-glm-easy-2": "glm-5.3",
+    "harness-worker-glm-medium-1": "glm-5.3",
+    "harness-worker-glm-medium-2": "glm-5.3",
+    "harness-worker-glm-hard-1": "glm-5.3",
+    "harness-worker-glm-hard-2": "glm-5.3",
     "harness-reviewer-glm": "glm-5.3",
-    "jss-worker-glm-1": "glm-5.3",
-    "jss-worker-glm-2": "glm-5.3",
-    "jss-worker-glm-3": "glm-5.3",
+    "jss-worker-glm-easy-1": "glm-5.3",
+    "jss-worker-glm-easy-2": "glm-5.3",
+    "jss-worker-glm-medium-1": "glm-5.3",
+    "jss-worker-glm-medium-2": "glm-5.3",
+    "jss-worker-glm-hard-1": "glm-5.3",
+    "jss-worker-glm-hard-2": "glm-5.3",
     "jss-reviewer-glm": "glm-5.3",
     "anki-orchestrator": "claude-opus-5-5",
     "anki-worker": "claude-opus-5-5",
     "anki-worker-2": "claude-opus-5-5",
     "anki-reviewer": "claude-opus-5-5",
-    "anki-worker-glm-1": "glm-5.3",
-    "anki-worker-glm-2": "glm-5.3",
-    "anki-worker-glm-3": "glm-5.3",
+    "anki-worker-glm-easy-1": "glm-5.3",
+    "anki-worker-glm-easy-2": "glm-5.3",
+    "anki-worker-glm-medium-1": "glm-5.3",
+    "anki-worker-glm-medium-2": "glm-5.3",
+    "anki-worker-glm-hard-1": "glm-5.3",
+    "anki-worker-glm-hard-2": "glm-5.3",
     "anki-reviewer-glm": "glm-5.3"
   },
   "profile_providers": {
@@ -83,29 +98,44 @@
     "jss-worker": "claude-subscription",
     "jss-worker-2": "claude-subscription",
     "jss-reviewer": "claude-subscription",
-    "jobcron-worker-glm-1": "zai",
-    "jobcron-worker-glm-2": "zai",
-    "jobcron-worker-glm-3": "zai",
+    "jobcron-worker-glm-easy-1": "zai",
+    "jobcron-worker-glm-easy-2": "zai",
+    "jobcron-worker-glm-medium-1": "zai",
+    "jobcron-worker-glm-medium-2": "zai",
+    "jobcron-worker-glm-hard-1": "zai",
+    "jobcron-worker-glm-hard-2": "zai",
     "jobcron-reviewer-glm": "zai",
-    "chapt-worker-glm-1": "zai",
-    "chapt-worker-glm-2": "zai",
-    "chapt-worker-glm-3": "zai",
+    "chapt-worker-glm-easy-1": "zai",
+    "chapt-worker-glm-easy-2": "zai",
+    "chapt-worker-glm-medium-1": "zai",
+    "chapt-worker-glm-medium-2": "zai",
+    "chapt-worker-glm-hard-1": "zai",
+    "chapt-worker-glm-hard-2": "zai",
     "chapt-reviewer-glm": "zai",
-    "harness-worker-glm-1": "zai",
-    "harness-worker-glm-2": "zai",
-    "harness-worker-glm-3": "zai",
+    "harness-worker-glm-easy-1": "zai",
+    "harness-worker-glm-easy-2": "zai",
+    "harness-worker-glm-medium-1": "zai",
+    "harness-worker-glm-medium-2": "zai",
+    "harness-worker-glm-hard-1": "zai",
+    "harness-worker-glm-hard-2": "zai",
     "harness-reviewer-glm": "zai",
-    "jss-worker-glm-1": "zai",
-    "jss-worker-glm-2": "zai",
-    "jss-worker-glm-3": "zai",
+    "jss-worker-glm-easy-1": "zai",
+    "jss-worker-glm-easy-2": "zai",
+    "jss-worker-glm-medium-1": "zai",
+    "jss-worker-glm-medium-2": "zai",
+    "jss-worker-glm-hard-1": "zai",
+    "jss-worker-glm-hard-2": "zai",
     "jss-reviewer-glm": "zai",
     "anki-orchestrator": "claude-subscription",
     "anki-worker": "claude-subscription",
     "anki-worker-2": "claude-subscription",
     "anki-reviewer": "claude-subscription",
-    "anki-worker-glm-1": "zai",
-    "anki-worker-glm-2": "zai",
-    "anki-worker-glm-3": "zai",
+    "anki-worker-glm-easy-1": "zai",
+    "anki-worker-glm-easy-2": "zai",
+    "anki-worker-glm-medium-1": "zai",
+    "anki-worker-glm-medium-2": "zai",
+    "anki-worker-glm-hard-1": "zai",
+    "anki-worker-glm-hard-2": "zai",
     "anki-reviewer-glm": "zai"
   },
   "plugins": {
@@ -229,49 +259,85 @@
       "hermes-terminal-outcome-notification": "disabled     git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification",
       "jev": "enabled      user     0.1.0    jev"
     },
-    "jobcron-worker-glm-1": {
+    "jobcron-worker-glm-easy-1": {
       "jev": "enabled      user     0.1.0    jev"
     },
-    "jobcron-worker-glm-2": {
+    "jobcron-worker-glm-easy-2": {
       "jev": "enabled      user     0.1.0    jev"
     },
-    "jobcron-worker-glm-3": {
+    "jobcron-worker-glm-medium-1": {
+      "jev": "enabled      user     0.1.0    jev"
+    },
+    "jobcron-worker-glm-medium-2": {
+      "jev": "enabled      user     0.1.0    jev"
+    },
+    "jobcron-worker-glm-hard-1": {
+      "jev": "enabled      user     0.1.0    jev"
+    },
+    "jobcron-worker-glm-hard-2": {
       "jev": "enabled      user     0.1.0    jev"
     },
     "jobcron-reviewer-glm": {
       "jev": "enabled      user     0.1.0    jev"
     },
-    "chapt-worker-glm-1": {
+    "chapt-worker-glm-easy-1": {
       "jev": "enabled      user     0.1.0    jev"
     },
-    "chapt-worker-glm-2": {
+    "chapt-worker-glm-easy-2": {
       "jev": "enabled      user     0.1.0    jev"
     },
-    "chapt-worker-glm-3": {
+    "chapt-worker-glm-medium-1": {
+      "jev": "enabled      user     0.1.0    jev"
+    },
+    "chapt-worker-glm-medium-2": {
+      "jev": "enabled      user     0.1.0    jev"
+    },
+    "chapt-worker-glm-hard-1": {
+      "jev": "enabled      user     0.1.0    jev"
+    },
+    "chapt-worker-glm-hard-2": {
       "jev": "enabled      user     0.1.0    jev"
     },
     "chapt-reviewer-glm": {
       "jev": "enabled      user     0.1.0    jev"
     },
-    "harness-worker-glm-1": {
+    "harness-worker-glm-easy-1": {
       "jev": "enabled      user     0.1.0    jev"
     },
-    "harness-worker-glm-2": {
+    "harness-worker-glm-easy-2": {
       "jev": "enabled      user     0.1.0    jev"
     },
-    "harness-worker-glm-3": {
+    "harness-worker-glm-medium-1": {
+      "jev": "enabled      user     0.1.0    jev"
+    },
+    "harness-worker-glm-medium-2": {
+      "jev": "enabled      user     0.1.0    jev"
+    },
+    "harness-worker-glm-hard-1": {
+      "jev": "enabled      user     0.1.0    jev"
+    },
+    "harness-worker-glm-hard-2": {
       "jev": "enabled      user     0.1.0    jev"
     },
     "harness-reviewer-glm": {
       "jev": "enabled      user     0.1.0    jev"
     },
-    "jss-worker-glm-1": {
+    "jss-worker-glm-easy-1": {
       "jev": "enabled      user     0.1.0    jev"
     },
-    "jss-worker-glm-2": {
+    "jss-worker-glm-easy-2": {
       "jev": "enabled      user     0.1.0    jev"
     },
-    "jss-worker-glm-3": {
+    "jss-worker-glm-medium-1": {
+      "jev": "enabled      user     0.1.0    jev"
+    },
+    "jss-worker-glm-medium-2": {
+      "jev": "enabled      user     0.1.0    jev"
+    },
+    "jss-worker-glm-hard-1": {
+      "jev": "enabled      user     0.1.0    jev"
+    },
+    "jss-worker-glm-hard-2": {
       "jev": "enabled      user     0.1.0    jev"
     },
     "jss-reviewer-glm": {
@@ -295,13 +361,22 @@
       "hermes-terminal-outcome-notification": "disabled     git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification",
       "jev": "enabled      user     0.1.0    jev"
     },
-    "anki-worker-glm-1": {
+    "anki-worker-glm-easy-1": {
       "jev": "enabled      user     0.1.0    jev"
     },
-    "anki-worker-glm-2": {
+    "anki-worker-glm-easy-2": {
       "jev": "enabled      user     0.1.0    jev"
     },
-    "anki-worker-glm-3": {
+    "anki-worker-glm-medium-1": {
+      "jev": "enabled      user     0.1.0    jev"
+    },
+    "anki-worker-glm-medium-2": {
+      "jev": "enabled      user     0.1.0    jev"
+    },
+    "anki-worker-glm-hard-1": {
+      "jev": "enabled      user     0.1.0    jev"
+    },
+    "anki-worker-glm-hard-2": {
       "jev": "enabled      user     0.1.0    jev"
     },
     "anki-reviewer-glm": {
@@ -324,26 +399,41 @@
     "anki-worker",
     "anki-worker-2",
     "anki-reviewer",
-    "jobcron-worker-glm-1",
-    "jobcron-worker-glm-2",
-    "chapt-worker-glm-1",
-    "chapt-worker-glm-2",
-    "harness-worker-glm-1",
-    "harness-worker-glm-2",
-    "jss-worker-glm-1",
-    "jss-worker-glm-2",
-    "anki-worker-glm-1",
-    "anki-worker-glm-2",
-    "harness-worker-glm-3",
-    "chapt-worker-glm-3",
-    "jobcron-worker-glm-3",
-    "jss-worker-glm-3",
-    "anki-worker-glm-3",
     "jobcron-reviewer-glm",
     "chapt-reviewer-glm",
     "harness-reviewer-glm",
     "jss-reviewer-glm",
-    "anki-reviewer-glm"
+    "anki-reviewer-glm",
+    "jobcron-worker-glm-easy-1",
+    "jobcron-worker-glm-easy-2",
+    "jobcron-worker-glm-medium-1",
+    "jobcron-worker-glm-medium-2",
+    "jobcron-worker-glm-hard-1",
+    "jobcron-worker-glm-hard-2",
+    "chapt-worker-glm-easy-1",
+    "chapt-worker-glm-easy-2",
+    "chapt-worker-glm-medium-1",
+    "chapt-worker-glm-medium-2",
+    "chapt-worker-glm-hard-1",
+    "chapt-worker-glm-hard-2",
+    "harness-worker-glm-easy-1",
+    "harness-worker-glm-easy-2",
+    "harness-worker-glm-medium-1",
+    "harness-worker-glm-medium-2",
+    "harness-worker-glm-hard-1",
+    "harness-worker-glm-hard-2",
+    "jss-worker-glm-easy-1",
+    "jss-worker-glm-easy-2",
+    "jss-worker-glm-medium-1",
+    "jss-worker-glm-medium-2",
+    "jss-worker-glm-hard-1",
+    "jss-worker-glm-hard-2",
+    "anki-worker-glm-easy-1",
+    "anki-worker-glm-easy-2",
+    "anki-worker-glm-medium-1",
+    "anki-worker-glm-medium-2",
+    "anki-worker-glm-hard-1",
+    "anki-worker-glm-hard-2"
   ],
   "kanban": {
     "max_in_progress": null,
@@ -415,13 +505,22 @@
       "jobcron-worker-2": {
         "SKILL.md": "tracked-source"
       },
-      "jobcron-worker-glm-1": {
+      "jobcron-worker-glm-easy-1": {
         "SKILL.md": "tracked-source"
       },
-      "jobcron-worker-glm-2": {
+      "jobcron-worker-glm-easy-2": {
         "SKILL.md": "tracked-source"
       },
-      "jobcron-worker-glm-3": {
+      "jobcron-worker-glm-medium-1": {
+        "SKILL.md": "tracked-source"
+      },
+      "jobcron-worker-glm-medium-2": {
+        "SKILL.md": "tracked-source"
+      },
+      "jobcron-worker-glm-hard-1": {
+        "SKILL.md": "tracked-source"
+      },
+      "jobcron-worker-glm-hard-2": {
         "SKILL.md": "tracked-source"
       },
       "chapt-worker": {
@@ -430,13 +529,22 @@
       "chapt-worker-2": {
         "SKILL.md": "tracked-source"
       },
-      "chapt-worker-glm-1": {
+      "chapt-worker-glm-easy-1": {
         "SKILL.md": "tracked-source"
       },
-      "chapt-worker-glm-2": {
+      "chapt-worker-glm-easy-2": {
         "SKILL.md": "tracked-source"
       },
-      "chapt-worker-glm-3": {
+      "chapt-worker-glm-medium-1": {
+        "SKILL.md": "tracked-source"
+      },
+      "chapt-worker-glm-medium-2": {
+        "SKILL.md": "tracked-source"
+      },
+      "chapt-worker-glm-hard-1": {
+        "SKILL.md": "tracked-source"
+      },
+      "chapt-worker-glm-hard-2": {
         "SKILL.md": "tracked-source"
       },
       "harness-worker": {
@@ -445,13 +553,22 @@
       "harness-worker-2": {
         "SKILL.md": "tracked-source"
       },
-      "harness-worker-glm-1": {
+      "harness-worker-glm-easy-1": {
         "SKILL.md": "tracked-source"
       },
-      "harness-worker-glm-2": {
+      "harness-worker-glm-easy-2": {
         "SKILL.md": "tracked-source"
       },
-      "harness-worker-glm-3": {
+      "harness-worker-glm-medium-1": {
+        "SKILL.md": "tracked-source"
+      },
+      "harness-worker-glm-medium-2": {
+        "SKILL.md": "tracked-source"
+      },
+      "harness-worker-glm-hard-1": {
+        "SKILL.md": "tracked-source"
+      },
+      "harness-worker-glm-hard-2": {
         "SKILL.md": "tracked-source"
       },
       "jss-worker": {
@@ -460,13 +577,22 @@
       "jss-worker-2": {
         "SKILL.md": "tracked-source"
       },
-      "jss-worker-glm-1": {
+      "jss-worker-glm-easy-1": {
         "SKILL.md": "tracked-source"
       },
-      "jss-worker-glm-2": {
+      "jss-worker-glm-easy-2": {
         "SKILL.md": "tracked-source"
       },
-      "jss-worker-glm-3": {
+      "jss-worker-glm-medium-1": {
+        "SKILL.md": "tracked-source"
+      },
+      "jss-worker-glm-medium-2": {
+        "SKILL.md": "tracked-source"
+      },
+      "jss-worker-glm-hard-1": {
+        "SKILL.md": "tracked-source"
+      },
+      "jss-worker-glm-hard-2": {
         "SKILL.md": "tracked-source"
       },
       "anki-worker": {
@@ -475,13 +601,22 @@
       "anki-worker-2": {
         "SKILL.md": "tracked-source"
       },
-      "anki-worker-glm-1": {
+      "anki-worker-glm-easy-1": {
         "SKILL.md": "tracked-source"
       },
-      "anki-worker-glm-2": {
+      "anki-worker-glm-easy-2": {
         "SKILL.md": "tracked-source"
       },
-      "anki-worker-glm-3": {
+      "anki-worker-glm-medium-1": {
+        "SKILL.md": "tracked-source"
+      },
+      "anki-worker-glm-medium-2": {
+        "SKILL.md": "tracked-source"
+      },
+      "anki-worker-glm-hard-1": {
+        "SKILL.md": "tracked-source"
+      },
+      "anki-worker-glm-hard-2": {
         "SKILL.md": "tracked-source"
       }
     },
@@ -522,13 +657,22 @@
       "jobcron-worker-2": {
         "SKILL.md": "tracked-source"
       },
-      "jobcron-worker-glm-1": {
+      "jobcron-worker-glm-easy-1": {
         "SKILL.md": "tracked-source"
       },
-      "jobcron-worker-glm-2": {
+      "jobcron-worker-glm-easy-2": {
         "SKILL.md": "tracked-source"
       },
-      "jobcron-worker-glm-3": {
+      "jobcron-worker-glm-medium-1": {
+        "SKILL.md": "tracked-source"
+      },
+      "jobcron-worker-glm-medium-2": {
+        "SKILL.md": "tracked-source"
+      },
+      "jobcron-worker-glm-hard-1": {
+        "SKILL.md": "tracked-source"
+      },
+      "jobcron-worker-glm-hard-2": {
         "SKILL.md": "tracked-source"
       },
       "chapt-worker": {
@@ -537,13 +681,22 @@
       "chapt-worker-2": {
         "SKILL.md": "tracked-source"
       },
-      "chapt-worker-glm-1": {
+      "chapt-worker-glm-easy-1": {
         "SKILL.md": "tracked-source"
       },
-      "chapt-worker-glm-2": {
+      "chapt-worker-glm-easy-2": {
         "SKILL.md": "tracked-source"
       },
-      "chapt-worker-glm-3": {
+      "chapt-worker-glm-medium-1": {
+        "SKILL.md": "tracked-source"
+      },
+      "chapt-worker-glm-medium-2": {
+        "SKILL.md": "tracked-source"
+      },
+      "chapt-worker-glm-hard-1": {
+        "SKILL.md": "tracked-source"
+      },
+      "chapt-worker-glm-hard-2": {
         "SKILL.md": "tracked-source"
       },
       "harness-worker": {
@@ -552,13 +705,22 @@
       "harness-worker-2": {
         "SKILL.md": "tracked-source"
       },
-      "harness-worker-glm-1": {
+      "harness-worker-glm-easy-1": {
         "SKILL.md": "tracked-source"
       },
-      "harness-worker-glm-2": {
+      "harness-worker-glm-easy-2": {
         "SKILL.md": "tracked-source"
       },
-      "harness-worker-glm-3": {
+      "harness-worker-glm-medium-1": {
+        "SKILL.md": "tracked-source"
+      },
+      "harness-worker-glm-medium-2": {
+        "SKILL.md": "tracked-source"
+      },
+      "harness-worker-glm-hard-1": {
+        "SKILL.md": "tracked-source"
+      },
+      "harness-worker-glm-hard-2": {
         "SKILL.md": "tracked-source"
       },
       "jss-worker": {
@@ -567,13 +729,22 @@
       "jss-worker-2": {
         "SKILL.md": "tracked-source"
       },
-      "jss-worker-glm-1": {
+      "jss-worker-glm-easy-1": {
         "SKILL.md": "tracked-source"
       },
-      "jss-worker-glm-2": {
+      "jss-worker-glm-easy-2": {
         "SKILL.md": "tracked-source"
       },
-      "jss-worker-glm-3": {
+      "jss-worker-glm-medium-1": {
+        "SKILL.md": "tracked-source"
+      },
+      "jss-worker-glm-medium-2": {
+        "SKILL.md": "tracked-source"
+      },
+      "jss-worker-glm-hard-1": {
+        "SKILL.md": "tracked-source"
+      },
+      "jss-worker-glm-hard-2": {
         "SKILL.md": "tracked-source"
       },
       "anki-worker": {
@@ -582,13 +753,22 @@
       "anki-worker-2": {
         "SKILL.md": "tracked-source"
       },
-      "anki-worker-glm-1": {
+      "anki-worker-glm-easy-1": {
         "SKILL.md": "tracked-source"
       },
-      "anki-worker-glm-2": {
+      "anki-worker-glm-easy-2": {
         "SKILL.md": "tracked-source"
       },
-      "anki-worker-glm-3": {
+      "anki-worker-glm-medium-1": {
+        "SKILL.md": "tracked-source"
+      },
+      "anki-worker-glm-medium-2": {
+        "SKILL.md": "tracked-source"
+      },
+      "anki-worker-glm-hard-1": {
+        "SKILL.md": "tracked-source"
+      },
+      "anki-worker-glm-hard-2": {
         "SKILL.md": "tracked-source"
       }
     },
@@ -653,17 +833,32 @@
         "references/live-state-reconciliation.md": "tracked-source",
         "references/release-ci-portability.md": "tracked-source"
       },
-      "jobcron-worker-glm-1": {
+      "jobcron-worker-glm-easy-1": {
         "SKILL.md": "tracked-source",
         "references/live-state-reconciliation.md": "tracked-source",
         "references/release-ci-portability.md": "tracked-source"
       },
-      "jobcron-worker-glm-2": {
+      "jobcron-worker-glm-easy-2": {
         "SKILL.md": "tracked-source",
         "references/live-state-reconciliation.md": "tracked-source",
         "references/release-ci-portability.md": "tracked-source"
       },
-      "jobcron-worker-glm-3": {
+      "jobcron-worker-glm-medium-1": {
+        "SKILL.md": "tracked-source",
+        "references/live-state-reconciliation.md": "tracked-source",
+        "references/release-ci-portability.md": "tracked-source"
+      },
+      "jobcron-worker-glm-medium-2": {
+        "SKILL.md": "tracked-source",
+        "references/live-state-reconciliation.md": "tracked-source",
+        "references/release-ci-portability.md": "tracked-source"
+      },
+      "jobcron-worker-glm-hard-1": {
+        "SKILL.md": "tracked-source",
+        "references/live-state-reconciliation.md": "tracked-source",
+        "references/release-ci-portability.md": "tracked-source"
+      },
+      "jobcron-worker-glm-hard-2": {
         "SKILL.md": "tracked-source",
         "references/live-state-reconciliation.md": "tracked-source",
         "references/release-ci-portability.md": "tracked-source"
@@ -688,17 +883,32 @@
         "references/live-state-reconciliation.md": "tracked-source",
         "references/release-ci-portability.md": "tracked-source"
       },
-      "chapt-worker-glm-1": {
+      "chapt-worker-glm-easy-1": {
         "SKILL.md": "tracked-source",
         "references/live-state-reconciliation.md": "tracked-source",
         "references/release-ci-portability.md": "tracked-source"
       },
-      "chapt-worker-glm-2": {
+      "chapt-worker-glm-easy-2": {
         "SKILL.md": "tracked-source",
         "references/live-state-reconciliation.md": "tracked-source",
         "references/release-ci-portability.md": "tracked-source"
       },
-      "chapt-worker-glm-3": {
+      "chapt-worker-glm-medium-1": {
+        "SKILL.md": "tracked-source",
+        "references/live-state-reconciliation.md": "tracked-source",
+        "references/release-ci-portability.md": "tracked-source"
+      },
+      "chapt-worker-glm-medium-2": {
+        "SKILL.md": "tracked-source",
+        "references/live-state-reconciliation.md": "tracked-source",
+        "references/release-ci-portability.md": "tracked-source"
+      },
+      "chapt-worker-glm-hard-1": {
+        "SKILL.md": "tracked-source",
+        "references/live-state-reconciliation.md": "tracked-source",
+        "references/release-ci-portability.md": "tracked-source"
+      },
+      "chapt-worker-glm-hard-2": {
         "SKILL.md": "tracked-source",
         "references/live-state-reconciliation.md": "tracked-source",
         "references/release-ci-portability.md": "tracked-source"
@@ -775,17 +985,32 @@
         "references/temporary-cloud-bootstrap-iam.md": "tracked-source",
         "references/frontend-origin-separation.md": "tracked-source"
       },
-      "jobcron-worker-glm-1": {
+      "jobcron-worker-glm-easy-1": {
         "SKILL.md": "tracked-source",
         "references/temporary-cloud-bootstrap-iam.md": "tracked-source",
         "references/frontend-origin-separation.md": "tracked-source"
       },
-      "jobcron-worker-glm-2": {
+      "jobcron-worker-glm-easy-2": {
         "SKILL.md": "tracked-source",
         "references/temporary-cloud-bootstrap-iam.md": "tracked-source",
         "references/frontend-origin-separation.md": "tracked-source"
       },
-      "jobcron-worker-glm-3": {
+      "jobcron-worker-glm-medium-1": {
+        "SKILL.md": "tracked-source",
+        "references/temporary-cloud-bootstrap-iam.md": "tracked-source",
+        "references/frontend-origin-separation.md": "tracked-source"
+      },
+      "jobcron-worker-glm-medium-2": {
+        "SKILL.md": "tracked-source",
+        "references/temporary-cloud-bootstrap-iam.md": "tracked-source",
+        "references/frontend-origin-separation.md": "tracked-source"
+      },
+      "jobcron-worker-glm-hard-1": {
+        "SKILL.md": "tracked-source",
+        "references/temporary-cloud-bootstrap-iam.md": "tracked-source",
+        "references/frontend-origin-separation.md": "tracked-source"
+      },
+      "jobcron-worker-glm-hard-2": {
         "SKILL.md": "tracked-source",
         "references/temporary-cloud-bootstrap-iam.md": "tracked-source",
         "references/frontend-origin-separation.md": "tracked-source"
@@ -800,17 +1025,32 @@
         "references/temporary-cloud-bootstrap-iam.md": "tracked-source",
         "references/frontend-origin-separation.md": "tracked-source"
       },
-      "chapt-worker-glm-1": {
+      "chapt-worker-glm-easy-1": {
         "SKILL.md": "tracked-source",
         "references/temporary-cloud-bootstrap-iam.md": "tracked-source",
         "references/frontend-origin-separation.md": "tracked-source"
       },
-      "chapt-worker-glm-2": {
+      "chapt-worker-glm-easy-2": {
         "SKILL.md": "tracked-source",
         "references/temporary-cloud-bootstrap-iam.md": "tracked-source",
         "references/frontend-origin-separation.md": "tracked-source"
       },
-      "chapt-worker-glm-3": {
+      "chapt-worker-glm-medium-1": {
+        "SKILL.md": "tracked-source",
+        "references/temporary-cloud-bootstrap-iam.md": "tracked-source",
+        "references/frontend-origin-separation.md": "tracked-source"
+      },
+      "chapt-worker-glm-medium-2": {
+        "SKILL.md": "tracked-source",
+        "references/temporary-cloud-bootstrap-iam.md": "tracked-source",
+        "references/frontend-origin-separation.md": "tracked-source"
+      },
+      "chapt-worker-glm-hard-1": {
+        "SKILL.md": "tracked-source",
+        "references/temporary-cloud-bootstrap-iam.md": "tracked-source",
+        "references/frontend-origin-separation.md": "tracked-source"
+      },
+      "chapt-worker-glm-hard-2": {
         "SKILL.md": "tracked-source",
         "references/temporary-cloud-bootstrap-iam.md": "tracked-source",
         "references/frontend-origin-separation.md": "tracked-source"
@@ -825,17 +1065,32 @@
         "references/temporary-cloud-bootstrap-iam.md": "tracked-source",
         "references/frontend-origin-separation.md": "tracked-source"
       },
-      "harness-worker-glm-1": {
+      "harness-worker-glm-easy-1": {
         "SKILL.md": "tracked-source",
         "references/temporary-cloud-bootstrap-iam.md": "tracked-source",
         "references/frontend-origin-separation.md": "tracked-source"
       },
-      "harness-worker-glm-2": {
+      "harness-worker-glm-easy-2": {
         "SKILL.md": "tracked-source",
         "references/temporary-cloud-bootstrap-iam.md": "tracked-source",
         "references/frontend-origin-separation.md": "tracked-source"
       },
-      "harness-worker-glm-3": {
+      "harness-worker-glm-medium-1": {
+        "SKILL.md": "tracked-source",
+        "references/temporary-cloud-bootstrap-iam.md": "tracked-source",
+        "references/frontend-origin-separation.md": "tracked-source"
+      },
+      "harness-worker-glm-medium-2": {
+        "SKILL.md": "tracked-source",
+        "references/temporary-cloud-bootstrap-iam.md": "tracked-source",
+        "references/frontend-origin-separation.md": "tracked-source"
+      },
+      "harness-worker-glm-hard-1": {
+        "SKILL.md": "tracked-source",
+        "references/temporary-cloud-bootstrap-iam.md": "tracked-source",
+        "references/frontend-origin-separation.md": "tracked-source"
+      },
+      "harness-worker-glm-hard-2": {
         "SKILL.md": "tracked-source",
         "references/temporary-cloud-bootstrap-iam.md": "tracked-source",
         "references/frontend-origin-separation.md": "tracked-source"
@@ -871,13 +1126,22 @@
       "jobcron-worker-2": {
         "SKILL.md": "tracked-source"
       },
-      "jobcron-worker-glm-1": {
+      "jobcron-worker-glm-easy-1": {
         "SKILL.md": "tracked-source"
       },
-      "jobcron-worker-glm-2": {
+      "jobcron-worker-glm-easy-2": {
         "SKILL.md": "tracked-source"
       },
-      "jobcron-worker-glm-3": {
+      "jobcron-worker-glm-medium-1": {
+        "SKILL.md": "tracked-source"
+      },
+      "jobcron-worker-glm-medium-2": {
+        "SKILL.md": "tracked-source"
+      },
+      "jobcron-worker-glm-hard-1": {
+        "SKILL.md": "tracked-source"
+      },
+      "jobcron-worker-glm-hard-2": {
         "SKILL.md": "tracked-source"
       },
       "jobcron-reviewer": {
@@ -892,13 +1156,22 @@
       "chapt-worker-2": {
         "SKILL.md": "tracked-source"
       },
-      "chapt-worker-glm-1": {
+      "chapt-worker-glm-easy-1": {
         "SKILL.md": "tracked-source"
       },
-      "chapt-worker-glm-2": {
+      "chapt-worker-glm-easy-2": {
         "SKILL.md": "tracked-source"
       },
-      "chapt-worker-glm-3": {
+      "chapt-worker-glm-medium-1": {
+        "SKILL.md": "tracked-source"
+      },
+      "chapt-worker-glm-medium-2": {
+        "SKILL.md": "tracked-source"
+      },
+      "chapt-worker-glm-hard-1": {
+        "SKILL.md": "tracked-source"
+      },
+      "chapt-worker-glm-hard-2": {
         "SKILL.md": "tracked-source"
       },
       "chapt-reviewer": {
@@ -1118,29 +1391,44 @@
     "jss-worker": "off",
     "jss-worker-2": "off",
     "jss-reviewer": "off",
-    "jobcron-worker-glm-1": "off",
-    "jobcron-worker-glm-2": "off",
-    "jobcron-worker-glm-3": "off",
+    "jobcron-worker-glm-easy-1": "off",
+    "jobcron-worker-glm-easy-2": "off",
+    "jobcron-worker-glm-medium-1": "off",
+    "jobcron-worker-glm-medium-2": "off",
+    "jobcron-worker-glm-hard-1": "off",
+    "jobcron-worker-glm-hard-2": "off",
     "jobcron-reviewer-glm": "off",
-    "chapt-worker-glm-1": "off",
-    "chapt-worker-glm-2": "off",
-    "chapt-worker-glm-3": "off",
+    "chapt-worker-glm-easy-1": "off",
+    "chapt-worker-glm-easy-2": "off",
+    "chapt-worker-glm-medium-1": "off",
+    "chapt-worker-glm-medium-2": "off",
+    "chapt-worker-glm-hard-1": "off",
+    "chapt-worker-glm-hard-2": "off",
     "chapt-reviewer-glm": "off",
-    "harness-worker-glm-1": "off",
-    "harness-worker-glm-2": "off",
-    "harness-worker-glm-3": "off",
+    "harness-worker-glm-easy-1": "off",
+    "harness-worker-glm-easy-2": "off",
+    "harness-worker-glm-medium-1": "off",
+    "harness-worker-glm-medium-2": "off",
+    "harness-worker-glm-hard-1": "off",
+    "harness-worker-glm-hard-2": "off",
     "harness-reviewer-glm": "off",
-    "jss-worker-glm-1": "off",
-    "jss-worker-glm-2": "off",
-    "jss-worker-glm-3": "off",
+    "jss-worker-glm-easy-1": "off",
+    "jss-worker-glm-easy-2": "off",
+    "jss-worker-glm-medium-1": "off",
+    "jss-worker-glm-medium-2": "off",
+    "jss-worker-glm-hard-1": "off",
+    "jss-worker-glm-hard-2": "off",
     "jss-reviewer-glm": "off",
     "anki-orchestrator": "off",
     "anki-worker": "off",
     "anki-worker-2": "off",
     "anki-reviewer": "off",
-    "anki-worker-glm-1": "off",
-    "anki-worker-glm-2": "off",
-    "anki-worker-glm-3": "off",
+    "anki-worker-glm-easy-1": "off",
+    "anki-worker-glm-easy-2": "off",
+    "anki-worker-glm-medium-1": "off",
+    "anki-worker-glm-medium-2": "off",
+    "anki-worker-glm-hard-1": "off",
+    "anki-worker-glm-hard-2": "off",
     "anki-reviewer-glm": "off"
   },
   "profile_soul_hashes": {
@@ -1297,19 +1585,34 @@
     "anki-worker-2": {
       "compression.threshold_tokens": 300000
     },
-    "jobcron-worker-glm-3": {
+    "jobcron-worker-glm-hard-1": {
       "agent.reasoning_effort": "max"
     },
-    "chapt-worker-glm-3": {
+    "jobcron-worker-glm-hard-2": {
       "agent.reasoning_effort": "max"
     },
-    "harness-worker-glm-3": {
+    "chapt-worker-glm-hard-1": {
       "agent.reasoning_effort": "max"
     },
-    "jss-worker-glm-3": {
+    "chapt-worker-glm-hard-2": {
       "agent.reasoning_effort": "max"
     },
-    "anki-worker-glm-3": {
+    "harness-worker-glm-hard-1": {
+      "agent.reasoning_effort": "max"
+    },
+    "harness-worker-glm-hard-2": {
+      "agent.reasoning_effort": "max"
+    },
+    "jss-worker-glm-hard-1": {
+      "agent.reasoning_effort": "max"
+    },
+    "jss-worker-glm-hard-2": {
+      "agent.reasoning_effort": "max"
+    },
+    "anki-worker-glm-hard-1": {
+      "agent.reasoning_effort": "max"
+    },
+    "anki-worker-glm-hard-2": {
       "agent.reasoning_effort": "max"
     },
     "jobcron-reviewer-glm": {
@@ -3845,15 +4148,27 @@
         }
       }
     },
-    "jobcron-worker-glm-1": {
+    "jobcron-worker-glm-easy-1": {
       "fallback_providers": [],
       "auxiliary": {}
     },
-    "jobcron-worker-glm-2": {
+    "jobcron-worker-glm-easy-2": {
       "fallback_providers": [],
       "auxiliary": {}
     },
-    "jobcron-worker-glm-3": {
+    "jobcron-worker-glm-medium-1": {
+      "fallback_providers": [],
+      "auxiliary": {}
+    },
+    "jobcron-worker-glm-medium-2": {
+      "fallback_providers": [],
+      "auxiliary": {}
+    },
+    "jobcron-worker-glm-hard-1": {
+      "fallback_providers": [],
+      "auxiliary": {}
+    },
+    "jobcron-worker-glm-hard-2": {
       "fallback_providers": [],
       "auxiliary": {}
     },
@@ -3861,15 +4176,27 @@
       "fallback_providers": [],
       "auxiliary": {}
     },
-    "chapt-worker-glm-1": {
+    "chapt-worker-glm-easy-1": {
       "fallback_providers": [],
       "auxiliary": {}
     },
-    "chapt-worker-glm-2": {
+    "chapt-worker-glm-easy-2": {
       "fallback_providers": [],
       "auxiliary": {}
     },
-    "chapt-worker-glm-3": {
+    "chapt-worker-glm-medium-1": {
+      "fallback_providers": [],
+      "auxiliary": {}
+    },
+    "chapt-worker-glm-medium-2": {
+      "fallback_providers": [],
+      "auxiliary": {}
+    },
+    "chapt-worker-glm-hard-1": {
+      "fallback_providers": [],
+      "auxiliary": {}
+    },
+    "chapt-worker-glm-hard-2": {
       "fallback_providers": [],
       "auxiliary": {}
     },
@@ -3877,15 +4204,27 @@
       "fallback_providers": [],
       "auxiliary": {}
     },
-    "harness-worker-glm-1": {
+    "harness-worker-glm-easy-1": {
       "fallback_providers": [],
       "auxiliary": {}
     },
-    "harness-worker-glm-2": {
+    "harness-worker-glm-easy-2": {
       "fallback_providers": [],
       "auxiliary": {}
     },
-    "harness-worker-glm-3": {
+    "harness-worker-glm-medium-1": {
+      "fallback_providers": [],
+      "auxiliary": {}
+    },
+    "harness-worker-glm-medium-2": {
+      "fallback_providers": [],
+      "auxiliary": {}
+    },
+    "harness-worker-glm-hard-1": {
+      "fallback_providers": [],
+      "auxiliary": {}
+    },
+    "harness-worker-glm-hard-2": {
       "fallback_providers": [],
       "auxiliary": {}
     },
@@ -3893,15 +4232,27 @@
       "fallback_providers": [],
       "auxiliary": {}
     },
-    "jss-worker-glm-1": {
+    "jss-worker-glm-easy-1": {
       "fallback_providers": [],
       "auxiliary": {}
     },
-    "jss-worker-glm-2": {
+    "jss-worker-glm-easy-2": {
       "fallback_providers": [],
       "auxiliary": {}
     },
-    "jss-worker-glm-3": {
+    "jss-worker-glm-medium-1": {
+      "fallback_providers": [],
+      "auxiliary": {}
+    },
+    "jss-worker-glm-medium-2": {
+      "fallback_providers": [],
+      "auxiliary": {}
+    },
+    "jss-worker-glm-hard-1": {
+      "fallback_providers": [],
+      "auxiliary": {}
+    },
+    "jss-worker-glm-hard-2": {
       "fallback_providers": [],
       "auxiliary": {}
     },
@@ -4469,15 +4820,27 @@
         }
       }
     },
-    "anki-worker-glm-1": {
+    "anki-worker-glm-easy-1": {
       "fallback_providers": [],
       "auxiliary": {}
     },
-    "anki-worker-glm-2": {
+    "anki-worker-glm-easy-2": {
       "fallback_providers": [],
       "auxiliary": {}
     },
-    "anki-worker-glm-3": {
+    "anki-worker-glm-medium-1": {
+      "fallback_providers": [],
+      "auxiliary": {}
+    },
+    "anki-worker-glm-medium-2": {
+      "fallback_providers": [],
+      "auxiliary": {}
+    },
+    "anki-worker-glm-hard-1": {
+      "fallback_providers": [],
+      "auxiliary": {}
+    },
+    "anki-worker-glm-hard-2": {
       "fallback_providers": [],
       "auxiliary": {}
     },

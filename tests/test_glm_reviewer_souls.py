@@ -73,8 +73,10 @@ class GlmReviewerSoulSources(unittest.TestCase):
             with self.subTest(prefix=prefix):
                 self.assertTrue(text.startswith(f"You are the independent GLM reviewer of board `{board}`"))
                 self.assertIn("model `glm-5.3` with provider `zai`", text)
-                for number in (1, 2, 3):
-                    self.assertIn(f"`{prefix}-worker-glm-{number}`", text)
+                # The six GLM workers of the board (card t_18a2dc93).
+                for suffix in ("easy-1", "easy-2", "medium-1", "medium-2", "hard-1", "hard-2"):
+                    self.assertIn(f"`{prefix}-worker-glm-{suffix}`", text)
+                self.assertNotRegex(text, rf"`{prefix}-worker-glm-[0-9]")
                 self.assertIn(f"Only the board's Opus reviewer `{prefix}-reviewer` approves a card.", text)
                 self.assertIn(f"The card's `Reviewer EXACT` line names the Opus reviewer `{prefix}-reviewer`; "
                               "that is not a mismatch.", text)

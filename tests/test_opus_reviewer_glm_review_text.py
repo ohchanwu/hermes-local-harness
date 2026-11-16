@@ -11,12 +11,15 @@ an earlier run of `<prefix>-reviewer-glm` on the card is not a mismatch (a run w
 events whose `reviewer` is the GLM reviewer), that the GLM reviewer cannot approve a card,
 and that the other boundary checks are unchanged. The approval with `kanban_complete` and
 the existing mismatch rule of each source are kept, and reversing the card's edits gives the
-bytes of each source at the card's baseline.
+bytes of each source at the card's baseline. Card t_18a2dc93 later changed the names and the
+number of the implementation profiles in these sources; the checks read each source with the
+edits of that card reversed, and one check reads the current number.
 """
 import hashlib
 import unittest
 from pathlib import Path
 
+from glm_route_worker_names_edits import text_before_card
 from opus_reviewer_glm_review_edits import (
     APPROVAL_SENTENCE, BASELINE_SHA256, PASS_REASON, PREFIXES, UNCHANGED_CHECKS_SENTENCE, added_text,
     glm_review_run_sentences, implementing_profile_sentence, reverse_opus_reviewer_glm_review_edits, soul)
@@ -37,7 +40,8 @@ KEPT = {
 
 
 def source_bytes(prefix):
-    return (ROOT / soul(f"{prefix}-reviewer")).read_bytes()
+    """The bytes of the source with the later edits of card t_18a2dc93 reversed."""
+    return text_before_card(ROOT, soul(f"{prefix}-reviewer"), as_bytes=True)
 
 
 def paragraphs(text):
@@ -71,6 +75,11 @@ class OpusReviewerGlmReviewText(unittest.TestCase):
             with self.subTest(prefix=prefix):
                 self.assertIn(implementing_profile_sentence(prefix), text)
                 self.assertIn("the card's latest `review_requested` event names as implementer", text)
+                # Card t_18a2dc93: the board has eight implementation profiles.
+                current = (ROOT / soul(f"{prefix}-reviewer")).read_text()
+                eight = implementing_profile_sentence(prefix).replace("one of the five ", "one of the eight ")
+                self.assertNotEqual(eight, implementing_profile_sentence(prefix))
+                self.assertIn(eight, current)
 
     def test_the_glm_reviewer_cannot_approve_and_the_standard_is_unchanged(self):
         for prefix in PREFIXES:
