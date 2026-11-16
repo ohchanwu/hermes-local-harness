@@ -52,8 +52,8 @@ VERSIONS = {"harness": ("0.6.7-harness.9", "0.6.7-harness.10"), "chapt": ("0.6.7
 # The current skill versions: card t_c7cc3830 raised each last number by one more step, card
 # t_a8884510 raised the jss version by one more step, card t_e14a6d6a raised each version by one
 # more step, and card t_d3bb0983 raised the chapt and jobcron versions by one more step.
-CURRENT_VERSIONS = {"harness": "0.6.7-harness.13", "chapt": "0.6.7-chapt.15",
-                    "jobcron": "0.6.9-jobcron.16", "jss": "0.6.7-jss.17", "anki": "0.6.10-anki.11"}
+CURRENT_VERSIONS = {"harness": "0.6.7-harness.14", "chapt": "0.6.7-chapt.16",
+                    "jobcron": "0.6.9-jobcron.17", "jss": "0.6.7-jss.18", "anki": "0.6.10-anki.12"}
 
 
 def soul(profile):
@@ -328,6 +328,17 @@ class DesiredState(unittest.TestCase):
         expected["routing"]["control_group_every"] = 10
         # Card t_e61ee47c turned GLM review on (owner approval of 2026-11-15).
         expected["routing"]["glm_review"] = {"enabled": True, "max_glm_review_change_requests": 2}
+        # Card t_cf518fd0 (owner decision of 2026-11-16): every board names the first worker of
+        # `glm_workers` in the new list `easy_route_workers` and the second in the new list
+        # `medium_route_workers`, and the routes `easy` and `medium` name these lists in
+        # `assignee_from`.
+        for prefix, board in BOARD_OF.items():
+            entry = expected["routing"]["boards"][board]
+            entry["easy_route_workers"] = [f"{prefix}-worker-glm-1"]
+            entry["medium_route_workers"] = [f"{prefix}-worker-glm-2"]
+            for route in entry["routes"]:
+                if route["name"] in ("easy", "medium"):
+                    route["assignee_from"] = f"{route['name']}_route_workers"
         self.assertEqual(config, expected)
 
     def test_roster_entries_of_the_third_glm_workers_equal_the_second(self):

@@ -33,6 +33,7 @@ from orchestrator_glm_review_edits import (VERSIONS as GLM_REVIEW_VERSIONS, reve
                                            skill as glm_review_skill)
 from orchestrator_opus_5_5_edits import (BASELINE_SHA256 as OPUS_5_5_BASELINE_SHA256, VERSIONS as OPUS_5_5_VERSIONS,
                                           reverse_opus_5_5_orchestrator_edits)
+from test_jev_easy_medium_worker_split import VERSIONS as SPLIT_VERSIONS
 from test_jev_policy_sources import reverse_jev_policy_edits
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -150,8 +151,11 @@ class FableDeclaredModel(unittest.TestCase):
                 self.assertIs(reverse_opus_5_5_orchestrator_edits(path, original), original)
 
     def test_skill_copies_name_no_fable_model_and_have_the_raised_versions(self):
-        # Card t_35874d04 raised the versions of the Jobcron and Cha PT copies by one more step.
-        current = {glm_review_skill(prefix): new for prefix, (_old, new) in GLM_REVIEW_VERSIONS.items()}
+        # Card t_35874d04 raised the versions of the Jobcron and Cha PT copies by one more step, and
+        # card t_cf518fd0 by one more.
+        current = {glm_review_skill(prefix): new for prefix, (_old, new) in SPLIT_VERSIONS.items()}
+        self.assertEqual({prefix: old for prefix, (old, _new) in SPLIT_VERSIONS.items()},
+                         {prefix: new for prefix, (_old, new) in GLM_REVIEW_VERSIONS.items()})
         for path, (_old, new) in OPUS_5_5_VERSIONS.items():
             new = current.get(path, new)
             text = (ROOT / path).read_text()

@@ -20,6 +20,7 @@ from pathlib import Path
 from orchestrator_glm_review_edits import (
     BASELINE_SHA256, ORCHESTRATOR_GLM_REVIEW_EDITS, PASS_REASON, PREFIXES, VERSIONS, added_paragraph, approval_sentence,
     reverse_orchestrator_glm_review_edits, skill)
+from test_jev_easy_medium_worker_split import VERSIONS as SPLIT_VERSIONS
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -69,7 +70,9 @@ class OrchestratorGlmReviewText(unittest.TestCase):
 
     def test_version_line_is_raised(self):
         for prefix in PREFIXES:
-            version = EXPECTED[prefix][0]
+            # Card t_cf518fd0 raised each version by one more step.
+            self.assertEqual(SPLIT_VERSIONS[prefix][0], EXPECTED[prefix][0])
+            version = SPLIT_VERSIONS[prefix][1]
             with self.subTest(prefix=prefix):
                 self.assertEqual(re.findall(r"(?m)^version: (.+)$", self.text(prefix)), [version])
 

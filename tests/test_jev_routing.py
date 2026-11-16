@@ -43,12 +43,27 @@ def probs(**values):
     return {**ALL_ROUTES, **values}
 
 
-def two_list_config():
-    """A deep copy of the shipped configuration changed for board ``harness`` only:
-    ``harness-worker-glm-3`` moves from ``glm_workers`` to the new list
-    ``glm_max_workers``, and the route ``hard`` names that list in
-    ``assignee_from`` with ``model`` ``glm-5.3`` and ``provider`` ``zai``."""
+def glm_workers_route_config():
+    """A deep copy of the shipped configuration in which the routes ``easy`` and
+    ``medium`` of every board name ``glm_workers`` in ``assignee_from``, as they
+    did before card t_cf518fd0, so that the two workers of ``glm_workers`` take
+    turns. Card t_cf518fd0 gave ``easy`` the list ``easy_route_workers`` and
+    ``medium`` the list ``medium_route_workers``; the turns of a two-name list
+    are still code that the plugin runs for any list that a route names."""
     config = json.loads(json.dumps(CONFIG))
+    for board in config["routing"]["boards"].values():
+        for route in board["routes"]:
+            if route["name"] in ("easy", "medium"):
+                route["assignee_from"] = "glm_workers"
+    return config
+
+
+def two_list_config():
+    """A deep copy of the configuration of ``glm_workers_route_config`` changed for
+    board ``harness`` only: ``harness-worker-glm-3`` moves from ``glm_workers`` to
+    the new list ``glm_max_workers``, and the route ``hard`` names that list in
+    ``assignee_from`` with ``model`` ``glm-5.3`` and ``provider`` ``zai``."""
+    config = glm_workers_route_config()
     board = config["routing"]["boards"]["harness"]
     board["glm_workers"] = ["harness-worker-glm-1", "harness-worker-glm-2"]
     board["glm_max_workers"] = ["harness-worker-glm-3"]
@@ -136,7 +151,8 @@ class RoutingTests(unittest.TestCase):
         self.fake.choice("medium", probs(medium=0.7, hard=0.3))
         create, _ = self.create(self.card(board="jobcron", assignee="jobcron-worker-2"))
         sent = create.calls[0]
-        self.assertEqual(sent["assignee"], "jobcron-worker-glm-1")
+        # Card t_cf518fd0: a `medium` card goes to the second GLM worker of the board.
+        self.assertEqual(sent["assignee"], "jobcron-worker-glm-2")
         self.assertEqual((sent["model"], sent["provider"]), ("glm-5.3", "zai"))
         self.assertTrue(self.last_decision()["applied"])
 
@@ -222,7 +238,8 @@ class RoutingTests(unittest.TestCase):
         self.fake.choice("medium", probs(easy=0.2, medium=0.3, hard=0.1, very_hard=0.4))
         create, _ = self.create(self.card())
         sent = create.calls[0]
-        self.assertEqual(sent["assignee"], "harness-worker-glm-1")
+        # Card t_cf518fd0: a `medium` card goes to the second GLM worker of the board.
+        self.assertEqual(sent["assignee"], "harness-worker-glm-2")
         self.assertEqual((sent["model"], sent["provider"]), ("glm-5.3", "zai"))
         record = self.last_decision()
         self.assertEqual((record["route"], record["applied"], record["not_applied_reason"]),
@@ -428,7 +445,7 @@ class RoutingTests(unittest.TestCase):
 
     def test_jss_and_anki_routes_applied(self):
         cases = (("jss-genr", "jss-worker", "easy", "jss-worker-glm-1", "glm-5.3-flash"),
-                 ("anki", "anki-worker-2", "medium", "anki-worker-glm-1", "glm-5.3"))
+                 ("anki", "anki-worker-2", "medium", "anki-worker-glm-2", "glm-5.3"))  # glm-2: card t_cf518fd0
         for board, assignee, route, glm_worker, model in cases:
             with self.subTest(board=board):
                 self.fake.choice(route, probs(**{route: 0.9, "hard": 0.1}))
@@ -537,7 +554,12 @@ class RoutingTests(unittest.TestCase):
 
     def test_tenth_qualifying_card_is_the_control_group(self):
         # Card t_3c7a581d: the two workers of `glm_workers` take turns for the
-        # `easy` cards of the board.
+        # `easy` cards of the board. Card t_cf518fd0 gave the shipped `easy`
+        # route one worker, so this test uses the configuration in which `easy`
+        # still names `glm_workers`, to show that the control card does not
+        # advance the turns.
+        self.config = glm_workers_route_config()
+        self.config["jev"] = self.fake.settings()
         self.fake.choice("easy", probs(easy=0.9, medium=0.05, hard=0.05))
         sent = [self.create(self.card())[0].calls[0] for _ in range(10)]
         self.assertEqual([s["assignee"] for s in sent[:9]],
@@ -619,6 +641,11 @@ class RoutingTests(unittest.TestCase):
     # --- alternation and body rewrite -----------------------------------------------
 
     def test_alternation_between_glm_workers(self):
+        # Card t_cf518fd0 gave the shipped `easy` route one worker; the turns of a
+        # route that names the two-name list `glm_workers` are tested with the
+        # configuration in which `easy` still names that list.
+        self.config = glm_workers_route_config()
+        self.config["jev"] = self.fake.settings()
         self.fake.choice("easy", probs(easy=0.9))
         chosen = [self.create(self.card())[0].calls[0]["assignee"] for _ in range(3)]
         # The two workers of `glm_workers` take turns (card t_3c7a581d; the third
@@ -670,7 +697,8 @@ class RoutingTests(unittest.TestCase):
                 "Text that mentions Assigned worker EXACT harness-worker inside a line.\n")
         create, _ = self.create(self.card(body=body, reviewer="harness-reviewer"))
         sent = create.calls[0]
-        self.assertIn("\nAssigned worker EXACT harness-worker-glm-1.\n", sent["body"])
+        # Card t_cf518fd0: a `medium` card goes to the second GLM worker of the board.
+        self.assertIn("\nAssigned worker EXACT harness-worker-glm-2.\n", sent["body"])
         self.assertIn("\nReviewer EXACT harness-reviewer.\n", sent["body"])
         self.assertIn("mentions Assigned worker EXACT harness-worker inside", sent["body"])
         self.assertEqual(sent["reviewer"], "harness-reviewer")

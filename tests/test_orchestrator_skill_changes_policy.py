@@ -46,11 +46,11 @@ PROFILES = {HARNESS: "harness-orchestrator", JOBCRON: "jobcron-orchestrator", CH
 # policy change raised the Harness, Jobcron and Cha PT versions (t_b722c617) and
 # the jss-genr and anki versions (t_71b4ef4a).
 VERSIONS = {
-    HARNESS: "0.6.7-harness.13",  # raised by t_ac454595, t_46b5e63e, t_f4ce916d, t_c7cc3830, t_e14a6d6a and t_35874d04
-    JOBCRON: "0.6.9-jobcron.16",  # raised by t_ac454595, t_46b5e63e, t_f4ce916d, t_c7cc3830, t_e14a6d6a, t_d3bb0983 and t_35874d04
-    CHAPT: "0.6.7-chapt.15",  # raised by t_ac454595, t_46b5e63e, t_f4ce916d, t_c7cc3830, t_e14a6d6a, t_d3bb0983 and t_35874d04
-    JSS: "0.6.7-jss.17",  # raised by t_ac454595, t_46b5e63e, t_89838618, t_f4ce916d, t_c7cc3830, t_a8884510, t_e14a6d6a and t_35874d04
-    ANKI: "0.6.10-anki.11",  # raised by t_ac454595, t_46b5e63e, t_f4ce916d, t_c7cc3830, t_e14a6d6a and t_35874d04
+    HARNESS: "0.6.7-harness.14",  # raised by t_ac454595, t_46b5e63e, t_f4ce916d, t_c7cc3830, t_e14a6d6a, t_35874d04 and t_cf518fd0
+    JOBCRON: "0.6.9-jobcron.17",  # raised by t_ac454595, t_46b5e63e, t_f4ce916d, t_c7cc3830, t_e14a6d6a, t_d3bb0983, t_35874d04 and t_cf518fd0
+    CHAPT: "0.6.7-chapt.16",  # raised by t_ac454595, t_46b5e63e, t_f4ce916d, t_c7cc3830, t_e14a6d6a, t_d3bb0983, t_35874d04 and t_cf518fd0
+    JSS: "0.6.7-jss.18",  # raised by t_ac454595, t_46b5e63e, t_89838618, t_f4ce916d, t_c7cc3830, t_a8884510, t_e14a6d6a, t_35874d04 and t_cf518fd0
+    ANKI: "0.6.10-anki.12",  # raised by t_ac454595, t_46b5e63e, t_f4ce916d, t_c7cc3830, t_e14a6d6a, t_35874d04 and t_cf518fd0
 }
 
 # Bytes of each file at baseline a391e38a1d20ac14022a20189363931440cf22c9,
