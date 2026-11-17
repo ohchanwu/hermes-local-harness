@@ -466,6 +466,13 @@ class ClientTests(unittest.TestCase):
         return self.c.chat.completions.create(model=MODEL,
                 messages=[{"role": "system", "content": "Synthetic system"}, {"role": "user", "content": text}], **kwargs)
 
+    def followup(self, text, **kwargs):
+        # A next user input to the runtime that is already running: no startup inside its deadline.
+        # The client arms a request's deadline before startup, and startup launches two interpreters
+        # that each import this file, which under load can take longer than a small deadline.
+        messages = copy.deepcopy(self.c._history.messages) + [{"role": "user", "content": text}]
+        return self.c.create(model=MODEL, messages=messages, **kwargs)
+
     def continuation(self, response, result="OWNER RESULT\n", *, stream=False):
         messages = copy.deepcopy(self.c._history.messages)
         messages.append({"role": "tool", "tool_call_id": response.choices[0].message.tool_calls[0].id, "content": result})
@@ -708,9 +715,10 @@ class ClientTests(unittest.TestCase):
         self.assertEqual(streamed.choices[0].message.content, 'FOLLOWUP')  # complete, not a stream
 
     def test_real_sleeping_child_timeout_cleanup_and_no_relaunch(self):
+        self.request()  # the 0.2 s deadline below must expire in the sleeping child, not in startup
         started = time.monotonic()
         with self.assertRaisesRegex(client.ProviderError, "timed out"):
-            self.request("__sleep__", timeout=0.2)
+            self.followup("__sleep__", timeout=0.2)
         self.assertLess(time.monotonic() - started, 3)
         self.assertTrue(self.c._runtime.cleanup["reaped"])
         self.assertTrue(self.c._runtime.cleanup["group_absent"])
@@ -877,9 +885,10 @@ class ClientTests(unittest.TestCase):
         self.assertTrue(self.c._runtime.cleanup['group_absent'])
 
     def test_stubborn_owned_child_is_killed_within_five_second_cleanup_grace(self):
+        self.request()  # the 0.2 s deadline below must expire in the stubborn child, not in startup
         started=time.monotonic()
         with self.assertRaises(client.ProviderError):
-            self.request('__stubborn__', timeout=.2)
+            self.followup('__stubborn__', timeout=.2)
         self.assertLess(time.monotonic()-started, 5)
         self.assertTrue(self.c._runtime.cleanup['reaped'])
         self.assertTrue(self.c._runtime.cleanup['group_absent'])
@@ -1283,6 +1292,14 @@ class ClientTests(unittest.TestCase):
 
     def test_response_deadline_includes_real_version_startup(self):
         self.version_mode = 'sleep'
+        # The deadline must expire while the version child sleeps. Under load the child can need more
+        # than 0.2 s to write its ready file and would be killed before it, so its launch waits for
+        # that file; the wait still counts against the deadline, which was armed before startup.
+        def wait_until_version_child_ready():
+            end = time.monotonic() + 10  # bounds only a broken child; an idle child is ready in about 0.1 s
+            while not (self.directory/'version-ready').exists() and time.monotonic() < end:
+                time.sleep(.01)
+        self.after_version_launch = wait_until_version_child_ready
         thread, errors = self.startup_request(timeout=.2)
         thread.join(.8)
         self.assert_startup_reaped(thread, errors)
@@ -1293,7 +1310,8 @@ class ClientTests(unittest.TestCase):
             self.request()
 
     def test_idle_timeout_spares_an_active_slow_response(self):
-        response = self.request('__slow__', timeout=.5)
+        self.request()  # the 0.5 s idle deadline below must measure the slow response, not startup
+        response = self.followup('__slow__', timeout=.5)
         self.assertEqual(response.choices[0].message.content, 'SLOW')
 
     def test_long_serial_tool_loop_is_not_capped(self):
@@ -1376,8 +1394,19 @@ class ClientTests(unittest.TestCase):
 
     def test_response_deadline_also_bounds_backpressured_input_pipe(self):
         self.sleep_before_input = True
-        thread, errors = self.startup_request(text='x' * 1_000_000, timeout=.2)
-        thread.join(1)
+        # The runtime never reads input, so no first request can start it. The 0.2 s deadline instead
+        # starts once _start() has launched the runtime: under load it could expire in the version
+        # check and kill the version child before it is ready, which is not what this test is about.
+        start = client.ClaudeSubscriptionClient._start
+        def start_then_arm_deadline(c):
+            with c._lifecycle:
+                c._request_deadline = None
+            start(c)
+            with c._lifecycle:
+                c._request_deadline = time.monotonic() + .2
+        with patch.object(client.ClaudeSubscriptionClient, '_start', start_then_arm_deadline):
+            thread, errors = self.startup_request(text='x' * 1_000_000, timeout=.2)
+            thread.join(1)
         self.assertFalse(thread.is_alive(), 'response deadline cannot interrupt a full input pipe')
         self.assertEqual(len(errors), 1)
         self.assertIsInstance(errors[0], client.ProviderError)
