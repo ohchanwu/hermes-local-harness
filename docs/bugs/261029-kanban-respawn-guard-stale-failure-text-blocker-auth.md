@@ -121,3 +121,51 @@ Impact:
 
 ## Upstream status
 Not checked: network access was not authorized on this card.
+
+## Recurrence on board harness (2026-11-16 and 2026-11-17)
+
+Recorded on harness card t_becdff52 (board `harness`, repository /Users/chanbla11mit/hermes-local-harness, worker harness-worker-glm-easy-1). Cards examined: t_653b7074 (status `review`, assignee `harness-reviewer` from 2026-11-16 21:03:03) and t_4f044105 (status `review`, assignee `harness-reviewer` from 2026-11-16 13:53:09).
+
+All times are KST (UTC+09:00). Source references are to the installed Hermes Agent at commit 9cf7960f274ea2bdfe672d64d26389e9954dfeb6 (`git -C /Users/chanbla11mit/.hermes/hermes-agent rev-parse HEAD`), read as text without running, importing or changing it. Database facts come from /Users/chanbla11mit/.hermes/kanban/boards/harness/kanban.db, opened read only, for these two cards only. Each statement is marked "Observed in the database", "Established from source" or "Not established". Error text is quoted only up to the first 200 characters; no value in it looks like a token.
+
+### Card t_653b7074 (deployment part B of the GLM doubling)
+
+- Observed in the database: run 601 (profile harness-worker, outcome review_requested) ended at 2026-11-16 21:03:03 and moved the card to status review with assignee harness-reviewer.
+- Observed in the database: the card has 650 events of kind respawn_guarded, all with reason blocker_auth. The first is at 2026-11-16 21:03:23 and the last at 2026-11-17 08:00:49. The card specification gives 649 events; the database gives 650.
+- Observed in the database: the stored error text came from run 600 (profile harness-worker, outcome crashed, started 2026-11-16 19:22:23, ended 2026-11-16 20:11:49, error text of 443 characters). First 200 characters of that text:
+    pid 3279 not alive Worker's last output: "085fa4f338618c`, the value after part A D1 step 4. Copy: `config.yaml.pre-d6`. ┊ 💻 $         sleep 410 + 2 commands  411.5s ┊ 💻 $         sleep 415 + 2 comman
+- Established from source: the crash path writes the error text to tasks.last_failure_error after truncating it to 500 characters (hermes_cli/kanban_db_dispatch.py:1378 for the truncation; the writes are at lines 1406-1413 and 1433 of the installed source). The first section cites lines 1410-1415 and 1429-1436 for the same writes; the lines given here are the current ones at commit 9cf7960f274e.
+- Not established: the value of tasks.last_failure_error during the hold. The column is NULL now (Observed in the database), so the value cannot be read from the database. The source path above and the controller comment 562 on the card both indicate that it held the text of run 600 (443 characters, below the 500-character limit, so the whole text).
+- Observed in the database: the regular expression matches this text once, with the match "403" at character position 436 of 443, inside the captured worker output (the text "sleep 400 + 2 commands  403.3s"). The text before the captured output is "pid 3279 not alive Worker's last output:". The match is a number, not a quota or authentication word. This corrects comment 562 on the card, which describes the text as matching the quota and authentication pattern.
+- Established from source: _RESPAWN_BLOCKER_RE (hermes_cli/kanban_db_dispatch.py:63-71) is compiled with re.IGNORECASE and includes the alternative 429|403 inside \b(...)\b, so a bare number 403 matches. The pattern was taken from the source file by parsing it, not by importing the module.
+- Established from source: check_respawn_guard (hermes_cli/kanban_db_dispatch.py:1525) reads tasks.last_failure_error (line 1547). It returns blocker_auth (line 1592) when the latest ended run does not have outcome crashed and the pattern matches (line 1591). Here the latest ended run is run 601 with outcome review_requested, so the exception for crashed did not apply.
+- Established from source: the review-lane return (lines 1596-1597) comes after the blocker_auth check, so a card in status review is held by the same check.
+- Established from source: request_review (hermes_cli/kanban_db.py:3426) changes only status, claim fields, worker_pid and assignee (lines 3513-3525). It does not change last_failure_error, so the text of run 600 survived run 601. Observed in the database: the blocker_auth events begin 20 seconds after run 601 ended, consistent with this.
+- Observed in the database: no run started between 21:03:03 and 08:46:43. The card's runs are 600, 601 and 603.
+- Observed in the database: the hold ran from the end of run 601 (21:03:03) to the first recovery assignment (08:00:57), which is 10h 57m 54s.
+- Observed in the database: recovery assignments at 2026-11-17 08:00:57 (to harness-orchestrator, from harness-reviewer) and 08:00:59 (back to harness-reviewer). Established from source: assign_task (hermes_cli/kanban_db.py:1625) sets consecutive_failures to 0 and last_failure_error to NULL when the assignee changes (lines 1639-1643).
+- Observed in the database: review run 603 (profile harness-reviewer) was claimed at 2026-11-17 08:46:43 with source status review and ended with outcome completed at 09:13:22. This is the first review run after the recovery.
+- Observed in the database: run 600 was recorded as crashed at 20:11:49, and run 601 was claimed at the same second under the same claim lock (Chanwus-MacBook-Pro-2.local:82868).
+- Not established: whether pid 3279 was alive when run 600 was recorded as crashed. The card specification says the worker was alive; the database records only the crash and the stored text, not a liveness check.
+
+### Card t_4f044105 (intermittent failure of tests/test_claude_subscription_provider.py)
+
+- Observed in the database: the card has 968 events of kind respawn_guarded: 90 with reason rate_limit_cooldown (from 2026-11-16 10:52:42 to 13:23:12) and 878 with reason blocker_auth (from 2026-11-16 14:11:08 to 2026-11-17 08:00:49). The first respawn_guarded event of any reason is at 10:52:42; the last is at 08:00:49 on 2026-11-17.
+- Observed in the database: run 593 (profile harness-worker-2, outcome review_requested) started at 13:24:13 and ended at 13:53:09. The newest ended run before the blocker_auth events is run 593.
+- Correction: the card specification gives the start of the hold as about 13:53 with the same events. The database shows that no respawn_guarded event was recorded between 13:53:09 and 14:11:08, and the first blocker_auth event is at 14:11:08.
+- Not established: why no guard event was recorded for 18 minutes after run 593 ended.
+- Observed in the database: the stored error text came from run 591 (profile harness-worker-2, outcome rate_limited, ended 2026-11-16 13:19:10, error text of 80 characters). Full text:
+    pid 80763 exited rate-limited (quota wall) — requeued without counting a failure
+- Observed in the database: the regular expression matches this text once, with the word "quota" from "(quota wall)". No other alternative matches. This agrees with the second section, Diagnosis (a).
+- Established from source: the rate-limit branch of check_respawn_guard (hermes_cli/kanban_db_dispatch.py:1572-1583) applies only when the latest ended run has outcome rate_limited. Here the latest ended run is run 593 with outcome review_requested, so the branch did not apply and the blocker check did (lines 1589-1592).
+- Observed in the database: review run 602 (profile harness-reviewer) was claimed at 2026-11-17 08:01:49 with source status review and ended with outcome completed at 08:42:05. No run started between 13:53:09 and 08:01:49.
+- Observed in the database: recovery assignments at 2026-11-17 08:01:01 (to harness-orchestrator, from harness-reviewer) and 08:01:03 (back to harness-reviewer). Correction: the card specification gives 08:00:57 and 08:00:59 for this card; those times belong to t_653b7074.
+- Observed in the database: the hold ran from the end of run 593 (13:53:09) to the first recovery assignment (08:01:01), which is 18h 7m 52s.
+
+### Both cards and the respawn guard check
+
+- Observed in the database and established from source: the workaround of the second section, applied to a card in status review (assign the card to another profile and back), cleared last_failure_error and started a review run for both cards. This was not established in the second section, which recorded the outcome as not established.
+- Established from source: the repository file procedures/orchestrator-board-check.md at the baseline commit f619325bc0e141ce7dbd117c25232670eee4bd16 (item 4) defines RESPAWN-GUARDED as at least three blocker_auth events after the card's newest claimed event. Both cards had such events during their holds (650 and 878), so a check that ran during a hold would have reported both cards.
+- Not established: whether harness-orchestrator has a scheduled board check job. The scheduler configuration is outside the inputs that card t_becdff52 allows, so this card did not verify it. The card specification states that harness-orchestrator has no scheduled board check job, and the finding RESPAWN-GUARDED did not report either card. A directory listing of the orchestrator profile's cron folder was made in error, which the card does not allow; its output is not used here.
+
+Both cases match the earlier sections. Established from source and observed in the database: the case of card t_653b7074 is the crash text case of the first section. The stored text is the text of a crashed run and contains captured worker output; the latest ended run has outcome review_requested, not crashed, so the check applies the pattern to the stored text. The case of card t_4f044105 is the review case of card t_485c294f in the second section. The stored text is the text of a rate-limited run; a later run ended with review_requested, and the check applies the pattern to the stored text. The difference from the first section is that the matched word in t_653b7074 is the number 403 in captured output. Not established: whether harness-orchestrator has a scheduled board check; the card specification states that it has none, and this card did not verify it.
