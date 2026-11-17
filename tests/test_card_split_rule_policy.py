@@ -38,7 +38,7 @@ VERSIONS = {"harness": "0.6.7-harness.11", "anki": "0.6.10-anki.9", "jss": "0.6.
 # The current skill versions: card t_a8884510 raised the jss version by one more step, card
 # t_e14a6d6a raised each version by one more step, and card t_d3bb0983 raised the chapt and
 # jobcron versions by one more step.
-CURRENT_VERSIONS = {"harness": "0.6.7-harness.15", "anki": "0.6.10-anki.13", "jss": "0.6.7-jss.19",
+CURRENT_VERSIONS = {"harness": "0.6.7-harness.16", "anki": "0.6.10-anki.13", "jss": "0.6.7-jss.19",
                     "chapt": "0.6.7-chapt.17", "jobcron": "0.6.9-jobcron.18"}
 
 NEW_RULE = (

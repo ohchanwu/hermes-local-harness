@@ -410,7 +410,7 @@ BASELINE_SHA256 = {
 }
 # Raised again by cards t_ac454595, t_46b5e63e, t_f4ce916d and t_e14a6d6a, for jss by t_89838618 and t_a8884510,
 # and for chapt and jobcron by t_d3bb0983.
-VERSIONS = {skill("harness"): "0.6.7-harness.15", skill("chapt"): "0.6.7-chapt.17",
+VERSIONS = {skill("harness"): "0.6.7-harness.16", skill("chapt"): "0.6.7-chapt.17",
             skill("jobcron"): "0.6.9-jobcron.18", skill("jss"): "0.6.7-jss.19", skill("anki"): "0.6.10-anki.13"}
 # The GLM worker SOULs in this repository (the jobcron GLM workers have none).
 GLM_WORKER_SOUL_BOARDS = ("harness", "chapt", "jss", "anki")

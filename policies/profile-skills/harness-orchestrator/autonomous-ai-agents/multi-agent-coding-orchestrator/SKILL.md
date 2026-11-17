@@ -1,7 +1,7 @@
 ---
 name: multi-agent-coding-orchestrator
 description: "Use when orchestrating Harness repository work."
-version: 0.6.7-harness.15
+version: 0.6.7-harness.16
 author: chanbla11mit, Hermes Agent
 license: MIT
 platforms: [macos]
@@ -36,6 +36,8 @@ If any board, repository, profile, worktree, baseline, test-contract, or reviewe
 The orchestrator plans, creates and routes cards, validates boundaries, monitors runs, integrates approved local commits, and reports milestones. It does not normally edit implementation code.
 
 Workers implement only the assigned slice in the card's isolated worktree. They may commit locally after required checks and must request same-card review.
+
+A worker that the dispatcher starts can read and change cards of its own board only. When a card that the owner authorized has steps that read or change cards of other boards, harness-orchestrator runs only those authorized steps from its own session and records each in a comment on the card, and the worker does every other step. Owner decision, Telegram direct message to `harness-orchestrator` on 2026-11-16 (verbatim): "You (harness-orchestrator) run the card reads, moves and comments on the five boards from your session. The worker does the renames, policy texts, .env lines and copies. No Hermes limit is removed." This gives no access to another board beyond the steps that the owner authorized for that card.
 
 The reviewer reads the specification, exact candidate commit and diff, repository instructions, tests, and prior findings. It never edits implementation code. Approval uses `kanban_complete(..., board: harness)`; rework uses `kanban_request_changes(..., board: harness)`.
 
@@ -73,6 +75,8 @@ Set up a card without a setup-only hold:
 5. Unblock the card so it becomes `ready`. From Monday to Friday, 15:00 to 19:00 Asia/Seoul, the `jev` plugin moves a card that is assigned to `harness-worker-glm-easy-1`, `harness-worker-glm-easy-2`, `harness-worker-glm-medium-1`, `harness-worker-glm-medium-2`, `harness-worker-glm-hard-1` or `harness-worker-glm-hard-2` to `scheduled` instead of unblocking it, with a reason that starts with the marker `jev-peak-hold` (the tool result has `status` `scheduled` and `held_until`), and the script `/Users/chanbla11mit/hermes-local-harness/scripts/jev-peak-hold` holds such a card the same way when it becomes `ready` by another path. This is expected: the card is released at 19:00 to `ready`, or to `todo` while a parent is open. It is not a blocker and not an owner question; do not unblock it again and do not reassign it to a Claude worker to start it earlier. The owner turns the hold off and on and reads its state with `python3 /Users/chanbla11mit/hermes-local-harness/scripts/jev-peak-hold off`, `python3 /Users/chanbla11mit/hermes-local-harness/scripts/jev-peak-hold on` and `python3 /Users/chanbla11mit/hermes-local-harness/scripts/jev-peak-hold status`.
 
 Never claim a card and `kanban_block` it as a setup hold. The worker's first action verifies `$HERMES_KANBAN_TASK`, worktree path, branch, and baseline, and it blocks only on a real mismatch.
+
+Do not plan a stop at which the worker blocks the card to hand it back to harness-orchestrator. Hermes counts every block of a card, including the kind `needs_input`: `BLOCK_RECURRENCE_LIMIT` is 2 (`/Users/chanbla11mit/.hermes/hermes-agent/hermes_cli/kanban_db.py`, line 114), and the function `_route_block` (lines 3397 to 3407 of the same file) moves the card to `triage`, with the event `block_loop_detected`, at the second block of the same kind after an unblock. When a step must wait for harness-orchestrator, split the work into two cards and link them.
 
 At creation Hermes records `workspace_path` as the repository root; the dispatcher's claim materializes `.worktrees/<ID>` (observed on `t_7d9c0343` events). A root value before claim is expected, not a mismatch; rely on the worker's start check.
 
@@ -233,6 +237,7 @@ Prefer fast-forward; otherwise merge or cherry-pick while preserving the reviewe
 - Keep verification proportional to the changed surfaces and named risks. Do not manufacture deadlines, aggregate credential-read ceilings, redundant review layers, or reusable automation when a bounded direct check answers the decision.
 - Authentication expiry blocks a fresh observation but does not erase previously recorded evidence. Revalidate only affected surfaces after a relevant change or immediately before a dependent authorized mutation.
 - Never modify the installed Hermes source. Use supported Hermes commands and repository-owned policy.
+- A `ready` or `review` card that the dispatcher skips with events `respawn_guarded` and reason `blocker_auth` still stores the failure text of an earlier run, which `kanban_request_review` does not clear. This is the step of the finding RESPAWN-GUARDED of the board check (`/Users/chanbla11mit/hermes-local-harness/deployment/orchestrator-board-check/cron-prompt.md`, line 13), which `harness-orchestrator` does not run. If no run of the card is running, the status is `review`, and the newest ended run has the outcome `review_requested`, run `hermes kanban --board harness assign <card id> none`, then `hermes kanban --board harness assign <card id> <the previous assignee>`, and confirm with `kanban_show(..., board: harness)` that the assignee is that profile again; a change of assignee sets `last_failure_error` to NULL and `consecutive_failures` to 0 (function `assign_task`, lines 1639 to 1644 of `/Users/chanbla11mit/.hermes/hermes-agent/hermes_cli/kanban_db.py`). In every other case report the card to the owner and change nothing.
 
 ## Completion Gate
 

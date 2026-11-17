@@ -23,6 +23,8 @@ import subprocess
 import sys
 import unittest
 
+from harness_orchestrator_recovery_edits import reverse_harness_recovery_edits
+
 ROOT = Path(__file__).resolve().parents[1]
 ROSTER = ROOT / "roster.yaml"
 VERIFY = ROOT / "scripts/verify-state"
@@ -78,6 +80,8 @@ def reverse_glm_claude_fallback_edits(relative_path, text):
     earlier cards. A path that the card did not change, and a text without the sentence, is
     returned as the same object. A text that contains the sentence more than once raises
     AssertionError. This function uses only the standard library."""
+    # The later edits of card t_40028345 in the harness-orchestrator skill are reversed first.
+    text = reverse_harness_recovery_edits(relative_path, text)
     inserted = GLM_CLAUDE_FALLBACK_SOUL_EDITS.get(relative_path)
     if inserted is None:
         return text

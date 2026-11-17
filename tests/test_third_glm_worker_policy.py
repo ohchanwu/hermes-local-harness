@@ -58,7 +58,7 @@ VERSIONS = {"harness": ("0.6.7-harness.9", "0.6.7-harness.10"), "chapt": ("0.6.7
 # The current skill versions: card t_c7cc3830 raised each last number by one more step, card
 # t_a8884510 raised the jss version by one more step, card t_e14a6d6a raised each version by one
 # more step, and card t_d3bb0983 raised the chapt and jobcron versions by one more step.
-CURRENT_VERSIONS = {"harness": "0.6.7-harness.15", "chapt": "0.6.7-chapt.17",
+CURRENT_VERSIONS = {"harness": "0.6.7-harness.16", "chapt": "0.6.7-chapt.17",
                     "jobcron": "0.6.9-jobcron.18", "jss": "0.6.7-jss.19", "anki": "0.6.10-anki.13"}
 
 

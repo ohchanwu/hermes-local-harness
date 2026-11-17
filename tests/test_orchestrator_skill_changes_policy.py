@@ -46,7 +46,7 @@ PROFILES = {HARNESS: "harness-orchestrator", JOBCRON: "jobcron-orchestrator", CH
 # policy change raised the Harness, Jobcron and Cha PT versions (t_b722c617) and
 # the jss-genr and anki versions (t_71b4ef4a).
 VERSIONS = {
-    HARNESS: "0.6.7-harness.15",  # raised by t_ac454595, t_46b5e63e, t_f4ce916d, t_c7cc3830, t_e14a6d6a, t_35874d04, t_cf518fd0 and t_18a2dc93
+    HARNESS: "0.6.7-harness.16",  # raised by t_ac454595, t_46b5e63e, t_f4ce916d, t_c7cc3830, t_e14a6d6a, t_35874d04, t_cf518fd0 and t_18a2dc93
     JOBCRON: "0.6.9-jobcron.18",  # raised by t_ac454595, t_46b5e63e, t_f4ce916d, t_c7cc3830, t_e14a6d6a, t_d3bb0983, t_35874d04, t_cf518fd0 and t_18a2dc93
     CHAPT: "0.6.7-chapt.17",  # raised by t_ac454595, t_46b5e63e, t_f4ce916d, t_c7cc3830, t_e14a6d6a, t_d3bb0983, t_35874d04, t_cf518fd0 and t_18a2dc93
     JSS: "0.6.7-jss.19",  # raised by t_ac454595, t_46b5e63e, t_89838618, t_f4ce916d, t_c7cc3830, t_a8884510, t_e14a6d6a, t_35874d04, t_cf518fd0 and t_18a2dc93
