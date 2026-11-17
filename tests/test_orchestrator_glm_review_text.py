@@ -82,8 +82,9 @@ class OrchestratorGlmReviewText(unittest.TestCase):
                 self.assertEqual(re.findall(r"(?m)^version: (.+)$", self.text(prefix)), [version])
                 # Card t_18a2dc93 raised each version by one more step.
                 self.assertEqual(ROUTE_NAMES_VERSIONS[prefix][0], version)
+                # Card t_40028345 raised the harness version by one more step.
                 self.assertEqual(re.findall(r"(?m)^version: (.+)$", (ROOT / skill(prefix)).read_text()),
-                                 [ROUTE_NAMES_VERSIONS[prefix][1]])
+                                 [{"harness": "0.6.7-harness.16"}.get(prefix, ROUTE_NAMES_VERSIONS[prefix][1])])
 
     def test_names_both_reviewers_and_the_pass_reason(self):
         for prefix in PREFIXES:
