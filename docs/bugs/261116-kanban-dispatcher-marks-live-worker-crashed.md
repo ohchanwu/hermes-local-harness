@@ -91,6 +91,29 @@ source, the database or the logs) or INFERRED.
   report reads the recorded `started_at` values such as `"|179272758315"` as malformed ("a leading `|` and a
   truncated value"); this report identifies them as the normal macOS form of the fingerprint, with an empty epoch
   part, and not as damage.
+- Card `t_653b7074`, run 600, profile harness-worker, started 2026-11-16 19:22:23, closed 20:11:49, pid
+  3279, fingerprint `|179482454823`, last heartbeat 20:11:45; alive afterwards, running the deployment
+  script `d6.sh apply` (child pid 35606), which ended at 20:18:01 with `done ... count 50` and 35 exit
+  lines, all 0; the controller stopped the worker process at 20:19:57 (card comments 557, 558 and 560).
+  Every field value is OBSERVED in the board database (`task_runs` row of run 600; the `claimed`,
+  `spawned`, `crashed` and heartbeat events; the error text begins `pid 3279 not alive`; the fingerprint
+  column of the row is null now and the fingerprint survives in the `spawned` event, as described
+  above); the state afterwards is the controller's observation recorded on the card, as for the nine
+  runs above. INFERRED: the booking is of the same kind as the nine above, a live worker process booked
+  as crashed, observed after this report was written. The `crashed` event carries the worker's last
+  recorded output, which shows shell steps of about 390 to 420 seconds each (OBSERVED). The record file
+  of run 600 was untracked and not committed (comment 558, OBSERVED). Retry run 601 claimed and spawned
+  in the same second, pid 11050, started 2026-11-16 20:11:49 (OBSERVED in the board database).
+  gateway.log line 10668 records the notifier `crashed` event for the card at 20:11:55 (OBSERVED); the
+  filtered read authorized on this card found no other line of gateway.log or gateway-exit-diag.log
+  naming the card, run 600, run 601, pid 3279 or pid 11050.
+
+Host sleep is excluded for this run as well: `pmset -g log` records no sleep or wake entry between
+2026-11-16 19:22:23 and 20:11:49, the window of run 600 (the last sleep and wake entries of 2026-11-16
+are at 18:37:12 and 18:41:14, both before the run; OBSERVED); the gap between the last heartbeat
+(20:11:45) and the close time (20:11:49) is 4 seconds, inside the 2 to 60 second range of the nine
+runs above, larger only than the 2 seconds of run 504 and smaller than the other eight, so the gap is
+not unusually large (INFERRED by subtraction of the two observed times).
 
 ## Impact
 - In each pass a retry run was claimed in the same second and worked on the same card and the same worktree while
