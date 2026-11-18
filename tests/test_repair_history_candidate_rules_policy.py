@@ -37,6 +37,7 @@ from test_jobcron_app_only_deploy_authorization import reverse_app_only_deploy_e
 from test_jss_fleet_policy import reverse_read_only_exception_edits
 from test_fable_5_2_declared_model import reverse_fable_5_2_edits
 from test_jev_policy_sources import reverse_jev_policy_edits
+from test_ponytail_policy_text import reverse_ponytail_policy_text_edits
 
 ROOT = Path(__file__).resolve().parents[1]
 RELATIVE = "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md"
@@ -137,6 +138,7 @@ CANDIDATE_RULE_EDITS = {path: (_version(*VERSIONS[path]), (NEW_BLOCK, OLD_BLOCK)
 
 def reverse_candidate_rule_edits(relative_path, text):
     """Return text with this card's edits reversed; text may be str or bytes."""
+    text = reverse_ponytail_policy_text_edits(relative_path, text)
     as_bytes = isinstance(text, bytes)
     if as_bytes:
         text = text.decode()

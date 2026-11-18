@@ -21,6 +21,7 @@ card. This module imports only hard_route_policy_edits, which imports only test 
 import no other test module, so any test module can import it without a circular import.
 """
 from hard_route_policy_edits import reverse_hard_route_policy_edits
+from test_ponytail_policy_text import reverse_ponytail_policy_text_edits
 
 
 HARNESS = "/Users/chanbla11mit/hermes-local-harness"
@@ -112,6 +113,7 @@ def reverse_harness_repository_edits(relative_path, text):
     that contains none of the new texts of either card, is returned as the same object, so a
     caller may apply it to a text that another caller already reversed. A text that contains
     only some of the new texts of a card raises AssertionError."""
+    text = reverse_ponytail_policy_text_edits(relative_path, text)
     text = reverse_hard_route_policy_edits(relative_path, text)
     edits = HARNESS_REPOSITORY_EDITS.get(relative_path)
     if not edits:

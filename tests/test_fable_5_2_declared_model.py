@@ -36,6 +36,7 @@ from orchestrator_opus_5_5_edits import (BASELINE_SHA256 as OPUS_5_5_BASELINE_SH
 from glm_route_worker_names_edits import VERSIONS as ROUTE_NAMES_VERSIONS
 from test_jev_easy_medium_worker_split import VERSIONS as SPLIT_VERSIONS
 from test_jev_policy_sources import reverse_jev_policy_edits
+from test_ponytail_policy_text import reverse_ponytail_policy_text_edits
 
 ROOT = Path(__file__).resolve().parents[1]
 OLD_MODEL, NEW_MODEL = "claude-fable-5-1", "claude-fable-5-2"
@@ -109,12 +110,14 @@ def _reverse(edits, relative_path, text):
 def reverse_role_model_edits(relative_path, text):
     """Return text with the t_35874d04 edits, the t_d3bb0983 edits and then the t_0faca45d edits reversed;
     text may be str or bytes."""
+    text = reverse_ponytail_policy_text_edits(relative_path, text)
     text = reverse_orchestrator_glm_review_edits(relative_path, text)
     return _reverse(ROLE_MODEL_EDITS, relative_path, reverse_opus_5_5_orchestrator_edits(relative_path, text))
 
 
 def reverse_fable_5_2_edits(relative_path, text):
     """Return text with the t_0faca45d edits and then this card's edits reversed; text may be str or bytes."""
+    text = reverse_ponytail_policy_text_edits(relative_path, text)
     return _reverse(FABLE_5_2_EDITS, relative_path, reverse_role_model_edits(relative_path, text))
 
 
@@ -161,7 +164,7 @@ class FableDeclaredModel(unittest.TestCase):
                          {prefix: new for prefix, (_old, new) in GLM_REVIEW_VERSIONS.items()})
         for path, (_old, new) in OPUS_5_5_VERSIONS.items():
             new = current.get(path, new)
-            text = (ROOT / path).read_text()
+            text = reverse_ponytail_policy_text_edits(path, (ROOT / path).read_text(encoding="utf-8"))
             with self.subTest(path=path):
                 self.assertNotIn("claude-fable", text)
                 self.assertEqual(re.findall(r"(?m)^version: (.+)$", text), [new])

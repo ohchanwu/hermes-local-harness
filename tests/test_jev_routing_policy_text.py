@@ -56,6 +56,7 @@ from test_card_split_rule_policy import NEW_RULE, PASSAGE_EDITS
 from test_jev_easy_medium_worker_split import reverse_easy_medium_split_edits, split_sentence
 from test_stale_test_rule_policy import reverse_stale_test_rule_edits
 from test_third_glm_worker_policy import with_third_glm_worker
+from test_ponytail_policy_text import reverse_ponytail_policy_text_edits
 
 ROOT = Path(__file__).resolve().parents[1]
 RELATIVE = "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md"
@@ -395,6 +396,7 @@ BASELINE_SHA256 = {
 
 def reverse_jev_routing_policy_edits(relative_path, text):
     """Return text with this card's edits reversed; text may be str or bytes."""
+    text = reverse_ponytail_policy_text_edits(relative_path, text)
     as_bytes = isinstance(text, bytes)
     if as_bytes:
         text = text.decode()
@@ -457,8 +459,8 @@ class RoutingPolicyText(unittest.TestCase):
                 # step, card t_e14a6d6a each version by one more step, and card t_d3bb0983 the chapt and
                 # jobcron versions by one more step; cards t_35874d04, t_cf518fd0 and t_18a2dc93 each version by one more
                 # step.
-                current = {"harness": "0.6.7-harness.16", "chapt": "0.6.7-chapt.17", "jobcron": "0.6.9-jobcron.18",
-                           "jss": "0.6.7-jss.19", "anki": "0.6.10-anki.13"}[prefix]
+                current = {"harness": "0.6.7-harness.17", "chapt": "0.6.7-chapt.18", "jobcron": "0.6.9-jobcron.19",
+                           "jss": "0.6.7-jss.20", "anki": "0.6.10-anki.14"}[prefix]
                 self.assertRegex(self.current[skill(prefix)], rf"(?m)^version: {re.escape(current)}$")
                 # Card t_c7cc3830 replaced the Part 5 rule text with the card split rule.
                 self.assertEqual(text.count(NEW_RULE), 1)
@@ -609,7 +611,7 @@ class RoutingPolicyText(unittest.TestCase):
             # The third GLM worker (card t_f4ce916d) has the same procedure with its own name, and so do
             # the six GLM workers of card t_18a2dc93.
             for profile in board_glm_workers(BOARDS[key][1]):
-                text = (ROOT / soul(profile)).read_text()
+                text = reverse_ponytail_policy_text_edits(soul(profile), (ROOT / soul(profile)).read_text(encoding="utf-8"))
                 with self.subTest(profile=profile):
                     self.assertEqual(text.count(attachment_procedure(board, profile)), 1)
                     self.assertEqual(text.count(attach_example(board)), 1)

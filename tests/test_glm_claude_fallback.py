@@ -24,6 +24,7 @@ import sys
 import unittest
 
 from harness_orchestrator_recovery_edits import reverse_harness_recovery_edits
+from test_ponytail_policy_text import reverse_ponytail_policy_text_edits
 
 ROOT = Path(__file__).resolve().parents[1]
 ROSTER = ROOT / "roster.yaml"
@@ -80,6 +81,7 @@ def reverse_glm_claude_fallback_edits(relative_path, text):
     earlier cards. A path that the card did not change, and a text without the sentence, is
     returned as the same object. A text that contains the sentence more than once raises
     AssertionError. This function uses only the standard library."""
+    text = reverse_ponytail_policy_text_edits(relative_path, text)
     # The later edits of card t_40028345 in the harness-orchestrator skill are reversed first.
     text = reverse_harness_recovery_edits(relative_path, text)
     inserted = GLM_CLAUDE_FALLBACK_SOUL_EDITS.get(relative_path)
@@ -330,16 +332,16 @@ class Souls(unittest.TestCase):
                 data = (ROOT / relative).read_bytes()
                 before = subprocess.run(["git", "show", f"{baseline}:{relative}"], cwd=ROOT,
                                         capture_output=True, check=True).stdout
-                original = reverse_glm_claude_fallback_edits(relative, data)
+                original = reverse_glm_claude_fallback_edits(relative, reverse_ponytail_policy_text_edits(relative, data))
                 self.assertEqual(original, before)
-                self.assertEqual(reverse_glm_claude_fallback_edits(relative, data.decode()), before.decode())
+                self.assertEqual(reverse_glm_claude_fallback_edits(relative, reverse_ponytail_policy_text_edits(relative, data.decode())), before.decode())
                 self.assertIs(reverse_glm_claude_fallback_edits(relative, original), original)
                 end = before.decode().index(". ") + 1
-                self.assertEqual(data.decode(), before.decode()[:end] + inserted + before.decode()[end:])
+                self.assertEqual(reverse_ponytail_policy_text_edits(relative, data.decode()), before.decode()[:end] + inserted + before.decode()[end:])
                 with self.assertRaises(AssertionError):
-                    reverse_glm_claude_fallback_edits(relative, data.decode() + inserted)
+                    reverse_glm_claude_fallback_edits(relative, reverse_ponytail_policy_text_edits(relative, data.decode()) + inserted)
         data = (ROOT / "policies/profile-souls/harness-worker/SOUL.md").read_bytes()
-        self.assertIs(reverse_glm_claude_fallback_edits("policies/profile-souls/harness-worker/SOUL.md", data), data)
+        self.assertEqual(reverse_glm_claude_fallback_edits("policies/profile-souls/harness-worker/SOUL.md", data), reverse_ponytail_policy_text_edits("policies/profile-souls/harness-worker/SOUL.md", data))
 
 
 if __name__ == "__main__":

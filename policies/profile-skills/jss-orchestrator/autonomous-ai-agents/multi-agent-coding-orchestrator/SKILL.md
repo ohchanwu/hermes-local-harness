@@ -1,7 +1,7 @@
 ---
 name: multi-agent-coding-orchestrator
 description: "Use when orchestrating jss-genr repository and writing-round work."
-version: 0.6.7-jss.19
+version: 0.6.7-jss.20
 author: chanbla11mit, Hermes Agent
 license: MIT
 platforms: [macos]
@@ -95,7 +95,7 @@ Every card must contain:
 11. A per-run runtime cap with rationale.
 12. The required handoff: the local commit for repository cards; for writing rounds, the new file names with SHA-256 and the drafts listing taken before writing.
 13. The privacy gate and explicit prohibitions on push, PR, deployment, application submission, job-site login, installs from a source that is not reputable, live policy changes, credentials, and other external writes without separate owner authorization.
-14. Skill-policy metadata stating whether `minimal-implementation` is enabled.
+14. Skill-policy metadata naming each forced skill, or stating that no skill is forced.
 
 Item 1 writes the repository line in exactly the form `Repository <exact repository path> ONLY.` `scripts/verify-state` accepts no other repository wording; a repository line that uses `EXACT` instead of `ONLY` fails the card contract check.
 
@@ -141,7 +141,7 @@ A shared checkout, foreign path, missing baseline or kind, existing write target
 
 ## Skills
 
-Attach `minimal-implementation` only to repository cards for dependency choice, suspected overengineering, refactoring, simplification, or shared-function repair where simplification does not weaken required evidence. Never attach it to writing rounds: fidelity to the owner's draft and the hard rules outrank brevity. Record the decision and reason on the card.
+The Ponytail plugin, version 5.3.3 pinned to commit 7801d061243d7b753bad0e0b3c057cd250b11755, is enabled at level `full` on every worker, reviewer and orchestrator profile of the five boards. The line `PONYTAIL_DEFAULT_MODE=full` in each profile's `.env` file sets the level. Do not force `minimal-implementation` on a card. The commands `/ponytail-review` and `/ponytail-audit` are not a review of a card; only same-card review by jss-reviewer approves a card.
 
 Before forcing a skill, run:
 

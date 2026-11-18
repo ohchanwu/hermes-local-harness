@@ -27,6 +27,7 @@ from unittest.mock import patch
 from glm_route_worker_names_edits import text_before_card
 from jss_download_install_edits import reverse_download_install_edits
 from test_third_glm_worker_policy import reverse_third_glm_worker_edits
+from test_ponytail_policy_text import reverse_ponytail_policy_text_edits
 
 ROOT = Path(__file__).resolve().parents[1]
 BASELINE = "d338ca675793238535ade9ef2a02c83488353e67"
@@ -116,6 +117,7 @@ def reverse_stale_test_rule_edits(relative_path, text):
     """Return the bytes of relative_path at BASELINE when text is that file after card
     t_46b5e63e, else text unchanged; text may be str or bytes. The later edits of card
     t_f4ce916d are reversed first."""
+    text = reverse_ponytail_policy_text_edits(relative_path, text)
     text = reverse_third_glm_worker_edits(relative_path, text)
     want = AFTER_SHA256.get(relative_path)
     if want is None:

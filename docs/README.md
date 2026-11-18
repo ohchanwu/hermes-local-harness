@@ -55,8 +55,10 @@ This index is the entry point for durable harness documentation tracked in Git. 
 - [Jobcron over-gating read-only incident assessment stalls autonomous work](bugs/261013-jobcron-over-gating-readonly-incident-assessment.md) — recurrence focused on unnecessary authorization gates and campaign-wide dependency invention.
 - [Cha PT calendar rollout accumulated disproportionate ceremony](bugs/261013-chapt-calendar-rollout-overcomplicated-bootstrap-plan.md) — near miss caused by carrying proof-oriented migration scaffolding into a narrow empty-state transition.
 
-## Scoped Ponytail separation (approved design summary)
+## Ponytail 5.3.3 decision (2026-11-18)
 
-Diagnostic design, including infrastructure diagnostics, now attaches `minimal-implementation` subject to verification/safety precedence. The leave-off categories below continue to govern ordinary production/mutation implementation, not diagnostic design. See the diagnostic-convergence policy above.
+Decision of 2026-11-18: Ponytail 5.3.3 at commit 7801d061243d7b753bad0e0b3c057cd250b11755 is enabled at level `full` on the 56 profiles of the five boards and on `advisor`. The level is set per profile by `PONYTAIL_DEFAULT_MODE=full`, so `/Users/chanbla11mit/.config/ponytail/config.json` stays as it is. The orchestrators no longer force `minimal-implementation` on a card.
 
-Implementation profiles keep the pinned Ponytail plugin (4.8.4 @ 16f29800) installed but `disabled`; minimalism runs as the task-triggered `minimal-implementation` skill attached per card by the orchestrator. Routing: attach for native/platform-alternative, dependency/library-choice, open-ended UI, suspected-overengineering, refactoring/simplification, and shared-function/root-cause work; leave off for acceptance-heavy, security/trust-boundary, migration/data-loss, concurrency/distributed, infrastructure/production, and compliance-sensitive tasks; the orchestrator may also leave it off any otherwise-attach task. Card metadata records `skill_policy_version` and the enabled/disabled decision with reason. `simplification-review` is a separate advisory-only review skill that recommends reductions without editing or weakening tests. Interactive Claude/Codex sessions keep upstream Ponytail installed/enabled with shared `defaultMode: off` (manual activation); see `procedures/manual-apply.md` sections 3/4/4b.
+Owner message to `harness-orchestrator`, Telegram direct message, 2026-11-18, verbatim: "Yes, install the latest version of Ponytail, and yes, do your proposals. As for the decisions, have it always on and put it on all boards."
+
+Owner message approving the plan with level `full` on all workers, reviewers and orchestrators of the five boards and on `advisor`, verbatim: "Yes."

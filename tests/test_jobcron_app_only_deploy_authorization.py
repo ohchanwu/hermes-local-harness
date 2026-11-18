@@ -33,6 +33,7 @@ import unittest
 
 from test_fable_5_2_declared_model import reverse_fable_5_2_edits
 from test_jev_policy_sources import reverse_jev_policy_edits
+from test_ponytail_policy_text import reverse_ponytail_policy_text_edits
 
 ROOT = Path(__file__).resolve().parents[1]
 PROFILE = "jobcron-orchestrator"
@@ -263,11 +264,13 @@ def _reverse(edits, relative_path, text):
 def reverse_app_only_deploy_edits(relative_path, text):
     """Return text with the edits of t_b7455361 reversed; text may be str or bytes. Reverse the
     later deploy campaign change first with reverse_deploy_campaign_edits()."""
+    text = reverse_ponytail_policy_text_edits(relative_path, text)
     return _reverse(APP_ONLY_DEPLOY_EDITS, relative_path, text)
 
 
 def reverse_deploy_campaign_edits(relative_path, text):
     """Return text with the edits of t_90a548ad reversed; text may be str or bytes."""
+    text = reverse_ponytail_policy_text_edits(relative_path, text)
     return _reverse(DEPLOY_CAMPAIGN_EDITS, relative_path, text)
 
 
