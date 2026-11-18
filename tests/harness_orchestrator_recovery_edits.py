@@ -14,6 +14,7 @@ recovers the bytes of an earlier commit reverses this card's edits before the ed
 cards. This module imports only the standard library, so any test module can import it without a
 circular import.
 """
+from test_ponytail_policy_text import reverse_ponytail_policy_text_edits
 
 SKILL = ("policies/profile-skills/harness-orchestrator/"
          "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md")
@@ -68,6 +69,7 @@ def reverse_harness_recovery_edits(relative_path, text):
     did not change, and a text that contains none of the new texts, is returned as the same object, so
     a caller may apply it to a text that another caller already reversed. A text that contains some of
     the new texts but not each of them exactly once raises AssertionError."""
+    text = reverse_ponytail_policy_text_edits(relative_path, text)
     if relative_path != SKILL:
         return text
     as_bytes = isinstance(text, bytes)

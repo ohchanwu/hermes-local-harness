@@ -46,6 +46,7 @@ from jss_download_install_edits import reverse_download_install_edits
 from test_jev_routing_policy_text import reverse_jev_routing_policy_edits
 from test_stale_test_rule_policy import reverse_stale_test_rule_edits
 from test_third_glm_worker_policy import with_third_glm_worker
+from test_ponytail_policy_text import reverse_ponytail_policy_text_edits
 
 ROOT = Path(__file__).resolve().parents[1]
 RELATIVE = "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md"
@@ -239,7 +240,7 @@ def anki_glm_soul_edits(number):
 
 def anki_glm_soul(number):
     """Expected text of policies/profile-souls/anki-worker-glm-<number>/SOUL.md."""
-    text = (ROOT / soul("anki-worker")).read_text()
+    text = reverse_ponytail_policy_text_edits(soul("anki-worker"), (ROOT / soul("anki-worker")).read_text(encoding="utf-8"))
     for new, old in anki_glm_soul_edits(number):
         if text.count(old) != 1:
             raise AssertionError(f"anki-worker SOUL: expected one occurrence of {old[:60]!r}")
@@ -410,8 +411,8 @@ BASELINE_SHA256 = {
 }
 # Raised again by cards t_ac454595, t_46b5e63e, t_f4ce916d and t_e14a6d6a, for jss by t_89838618 and t_a8884510,
 # and for chapt and jobcron by t_d3bb0983.
-VERSIONS = {skill("harness"): "0.6.7-harness.16", skill("chapt"): "0.6.7-chapt.17",
-            skill("jobcron"): "0.6.9-jobcron.18", skill("jss"): "0.6.7-jss.19", skill("anki"): "0.6.10-anki.13"}
+VERSIONS = {skill("harness"): "0.6.7-harness.17", skill("chapt"): "0.6.7-chapt.18",
+            skill("jobcron"): "0.6.9-jobcron.19", skill("jss"): "0.6.7-jss.20", skill("anki"): "0.6.10-anki.14"}
 # The GLM worker SOULs in this repository (the jobcron GLM workers have none).
 GLM_WORKER_SOUL_BOARDS = ("harness", "chapt", "jss", "anki")
 ANKI_GLM_SOULS = (soul("anki-worker-glm-1"), soul("anki-worker-glm-2"))
@@ -420,6 +421,7 @@ ANKI_GLM_SOULS = (soul("anki-worker-glm-1"), soul("anki-worker-glm-2"))
 def reverse_jev_policy_edits(relative_path, text):
     """Return text with the later t_46b5e63e and t_ac454595 edits and then this card's edits reversed;
     text may be str or bytes."""
+    text = reverse_ponytail_policy_text_edits(relative_path, text)
     text = reverse_jev_routing_policy_edits(relative_path, reverse_stale_test_rule_edits(relative_path, text))
     as_bytes = isinstance(text, bytes)
     if as_bytes:

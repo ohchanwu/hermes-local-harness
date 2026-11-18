@@ -26,6 +26,7 @@ import tempfile
 import unittest
 
 from test_jev_policy_sources import reverse_jev_policy_edits
+from test_ponytail_policy_text import reverse_ponytail_policy_text_edits
 
 ROOT = Path(__file__).resolve().parents[1]
 PROFILE = "anki-orchestrator"
@@ -58,6 +59,7 @@ APPLY_TOOL_REFERENCE_EDITS = {
 
 def reverse_apply_tool_reference_edits(relative_path, text):
     """Return text with this card's edits reversed; text may be str or bytes."""
+    text = reverse_ponytail_policy_text_edits(relative_path, text)
     as_bytes = isinstance(text, bytes)
     if as_bytes:
         text = text.decode()

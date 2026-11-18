@@ -22,6 +22,7 @@ any other text as the same object, so a caller may apply it to a text that anoth
 already reversed. This module imports no other test module, so any test module can import it
 without a circular import.
 """
+from test_ponytail_policy_text import reverse_ponytail_policy_text_edits
 
 BASELINE = "2d34fcdb1ff7a146f2d3b61e42be3bd95ed24248"
 OLD_MODEL, NEW_MODEL = "claude-fable-5-2", "claude-opus-5-5"
@@ -75,6 +76,7 @@ def reverse_opus_5_5_orchestrator_edits(relative_path, text):
     the card did not change, and a text without the new version line, is returned as the same
     object. A text with the new version line but not each other new text exactly once raises
     AssertionError."""
+    text = reverse_ponytail_policy_text_edits(relative_path, text)
     edits = OPUS_5_5_ORCHESTRATOR_EDITS.get(relative_path)
     if not edits:
         return text

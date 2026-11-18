@@ -1,7 +1,7 @@
 ---
 name: multi-agent-coding-orchestrator
 description: "Use when orchestrating multi-agent coding with Hermes."
-version: 0.6.9-jobcron.18
+version: 0.6.9-jobcron.19
 author: chanbla11mit, Hermes Agent
 license: MIT
 platforms: [macos]
@@ -83,19 +83,11 @@ Legacy/default-board lanes are retired and inert: the GLM Flash and GLM-full wor
 
 - `advisor`: read/analyze advisor; not a Kanban implementation lane.
 
-Ponytail never runs as a plugin on Hermes profiles. Implementation profiles keep the pinned package installed but `disabled`; the minimalism behavior lives in the per-card `minimal-implementation` skill instead (see Skills). The orchestrator, reviewer, and advisor neither load it nor the simplification skill.
-
 ## Skills
 
-`minimal-implementation` is the task-triggered minimalism skill. The orchestrator attaches it per card (via `skills: ["minimal-implementation"]` on the card) using this policy:
+The Ponytail plugin, version 5.3.3 pinned to commit 7801d061243d7b753bad0e0b3c057cd250b11755, is enabled at level `full` on every worker, reviewer and orchestrator profile of the five boards. The line `PONYTAIL_DEFAULT_MODE=full` in each profile's `.env` file sets the level. Do not force `minimal-implementation` on a card. The commands `/ponytail-review` and `/ponytail-audit` are not a review of a card; only same-card review by jobcron-reviewer approves a card.
 
-- Attach for: native/platform-alternative questions, dependency or library choice, open-ended UI/component work, suspected overengineering, refactoring or simplification, and shared-function or root-cause repair.
-- Attach for diagnostic design, including infrastructure diagnostics; separate any production/mutation implementation slice.
-- Leave off for ordinary implementation of acceptance-heavy, security or trust-boundary, migration or data-loss, concurrency or distributed-systems, infrastructure or production, and compliance-sensitive tasks.
-- Override: the orchestrator may leave the skill off for any attach-category task.
 - `simplification-review` is a separate, optional post-implementation review skill; it recommends reductions only and never edits or weakens tests. It is never a substitute for required verification.
-
-Record the decision in card metadata: `skill_policy_version`, `minimal_implementation: enabled|disabled`, the reason. Reviewer and advisor lanes never load the implementation skill.
 
 ## Skill Changes
 
@@ -269,7 +261,7 @@ Each implementation card must include:
 - Required worktree/branch isolation.
 - Acceptance criteria and test commands.
 - An explicit per-run runtime cap and its rationale.
-- Skill policy metadata (`minimal_implementation` enabled/disabled and reason; see Skills).
+- Skill-policy metadata naming each forced skill, or stating that no skill is forced.
 - Required local commit and structured handoff.
 - The exact board-designated reviewer as same-card reviewer for code changes.
 - Explicit prohibitions on push, PR creation, deployment, and production mutation.

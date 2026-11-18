@@ -20,6 +20,7 @@ import unittest
 from pathlib import Path
 
 from glm_route_worker_names_edits import text_before_card
+from test_ponytail_policy_text import reverse_ponytail_policy_text_edits
 from opus_reviewer_glm_review_edits import (
     APPROVAL_SENTENCE, BASELINE_SHA256, PASS_REASON, PREFIXES, UNCHANGED_CHECKS_SENTENCE, added_text,
     glm_review_run_sentences, implementing_profile_sentence, reverse_opus_reviewer_glm_review_edits, soul)
@@ -124,7 +125,7 @@ class OpusReviewerGlmReviewText(unittest.TestCase):
     def test_reversal_returns_other_paths_unchanged(self):
         relative = soul("harness-reviewer-glm")
         data = (ROOT / relative).read_bytes()
-        self.assertIs(reverse_opus_reviewer_glm_review_edits(relative, data), data)
+        self.assertEqual(reverse_opus_reviewer_glm_review_edits(relative, data), reverse_ponytail_policy_text_edits(relative, data))
 
 
 if __name__ == "__main__":

@@ -1,7 +1,7 @@
 ---
 name: multi-agent-coding-orchestrator
 description: "Use when orchestrating Harness repository work."
-version: 0.6.7-harness.16
+version: 0.6.7-harness.17
 author: chanbla11mit, Hermes Agent
 license: MIT
 platforms: [macos]
@@ -56,7 +56,7 @@ Every implementation card must contain:
 9. A per-run runtime cap with rationale.
 10. Required local commit and structured handoff.
 11. Explicit prohibitions on push, PR creation, deployment, live policy changes, credentials, production/cloud mutations, and other external writes without separate human authorization.
-12. Skill-policy metadata stating whether `minimal-implementation` is enabled.
+12. Skill-policy metadata naming each forced skill, or stating that no skill is forced.
 
 Item 1 writes the repository line in exactly the form `Repository <exact repository path> ONLY.` `scripts/verify-state` accepts no other repository wording; a repository line that uses `EXACT` instead of `ONLY` fails the card contract check.
 
@@ -107,9 +107,7 @@ A shared checkout, foreign path, missing baseline, prose-only test plan, or mism
 
 ## Skills
 
-Attach `minimal-implementation` only for native-alternative questions, dependency choice, open-ended UI/component work, suspected overengineering, refactoring, simplification, shared-function repair, or diagnostic design where simplification does not weaken required evidence.
-
-Leave it off for acceptance-heavy security, trust-boundary, migration, data-loss, concurrency, infrastructure, production, or compliance-sensitive work. Record the decision and reason on the card.
+The Ponytail plugin, version 5.3.3 pinned to commit 7801d061243d7b753bad0e0b3c057cd250b11755, is enabled at level `full` on every worker, reviewer and orchestrator profile of the five boards. The line `PONYTAIL_DEFAULT_MODE=full` in each profile's `.env` file sets the level. Do not force `minimal-implementation` on a card. The commands `/ponytail-review` and `/ponytail-audit` are not a review of a card; only same-card review by harness-reviewer approves a card.
 
 Before forcing a skill, run:
 

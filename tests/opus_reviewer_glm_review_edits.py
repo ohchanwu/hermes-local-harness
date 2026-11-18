@@ -19,6 +19,7 @@ recovers the bytes of an earlier commit reverses this card's edits before the ed
 earlier cards. This module imports no other test module, so any test module can import it
 without a circular import.
 """
+from test_ponytail_policy_text import reverse_ponytail_policy_text_edits
 
 BASELINE = "125624fc72a900aa50496c70d144f5554aacff83"
 PASS_REASON = "jev-glm-review-pass"
@@ -100,6 +101,7 @@ def reverse_opus_reviewer_glm_review_edits(relative_path, text):
     the card did not change, and a text that contains none of the new texts, is returned as
     the same object, so a caller may apply it to a text that another caller already reversed.
     A text that contains a new text more than once raises AssertionError."""
+    text = reverse_ponytail_policy_text_edits(relative_path, text)
     edits = OPUS_REVIEWER_GLM_REVIEW_EDITS.get(relative_path)
     if not edits:
         return text

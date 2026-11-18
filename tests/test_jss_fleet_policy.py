@@ -26,6 +26,7 @@ import jss_harness_repository_edits as harness_edits
 from jss_harness_repository_edits import reverse_harness_repository_edits
 from rule_text import assert_rule
 from test_jev_policy_sources import reverse_jev_policy_edits
+from test_ponytail_policy_text import reverse_ponytail_policy_text_edits
 
 REPO = "/Users/chanbla11mit/projects/jss-genr"
 ORCH, WORKER, WORKER2, REVIEWER = (
@@ -249,6 +250,7 @@ READ_ONLY_EXCEPTION_EDITS = _read_only_exception_edits()
 
 def reverse_read_only_exception_edits(relative_path, text):
     """Return text with the t_3af6293c edits reversed; text may be str or bytes."""
+    text = reverse_ponytail_policy_text_edits(relative_path, text)
     as_bytes = isinstance(text, bytes)
     if as_bytes:
         text = text.decode()
@@ -547,7 +549,7 @@ class RoleContracts(unittest.TestCase):
 
     def test_skill_version_size_and_sections(self):
         # Raised by the jev plugin policy change (t_71b4ef4a).
-        self.assertRegex(self.skill_raw, r"(?m)^version: 0\.6\.7-jss\.19$")  # raised by t_ac454595, t_46b5e63e, t_89838618, t_f4ce916d, t_c7cc3830, t_a8884510, t_e14a6d6a, t_35874d04, t_cf518fd0 and t_18a2dc93
+        self.assertRegex(self.skill_raw, r"(?m)^version: 0\.6\.7-jss\.20$")  # raised by t_ac454595, t_46b5e63e, t_89838618, t_f4ce916d, t_c7cc3830, t_a8884510, t_e14a6d6a, t_35874d04, t_cf518fd0 and t_18a2dc93
         # 260 lines plus the 4-line Pitfalls section (t_bd860536), the 9 lines of
         # repair_history candidate rules and example (t_6436ac1c), the 6-line
         # Skill Changes section (t_0a8674fe) and the one-line Hard Scope read-only
@@ -1338,7 +1340,7 @@ class DownloadAndInstallOwnerDecision(unittest.TestCase):
         # Card t_f4ce916d raised the version by one more step, card t_c7cc3830 by one more, card
         # t_a8884510 by one more, and card t_e14a6d6a by one more; card t_18a2dc93 by one more, so the
         # current version is read from the file after that card.
-        self.assertEqual(re.findall(r"(?m)^version: (.+)$", SKILL.read_text()), ["0.6.7-jss.19"])
+        self.assertEqual(re.findall(r"(?m)^version: (.+)$", SKILL.read_text()), ["0.6.7-jss.20"])
 
     def test_no_source_keeps_the_removed_wording(self):
         for path, text in self.raw.items():
@@ -1400,8 +1402,8 @@ class DownloadAndInstallOwnerDecision(unittest.TestCase):
         for path in (REVIEWER_SOUL_RELATIVE, "policies/profile-souls/anki-orchestrator/SOUL.md"):
             data = (ROOT / path).read_bytes()
             with self.subTest(path=path):
-                self.assertEqual(reverse_download_install_edits(path, data), data)
-                self.assertEqual(reverse_download_install_edits(path, data.decode()), data.decode())
+                self.assertEqual(reverse_download_install_edits(path, data), reverse_ponytail_policy_text_edits(path, data))
+                self.assertEqual(reverse_download_install_edits(path, data.decode()), reverse_ponytail_policy_text_edits(path, data.decode()))
         self.assertNotIn("2026-11-13", soul_path(REVIEWER).read_text())
 
 

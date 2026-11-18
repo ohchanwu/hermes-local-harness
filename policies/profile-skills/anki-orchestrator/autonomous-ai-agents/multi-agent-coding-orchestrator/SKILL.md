@@ -1,7 +1,7 @@
 ---
 name: multi-agent-coding-orchestrator
 description: "Use when orchestrating anki add-on, tooling, and deck change work."
-version: 0.6.10-anki.13
+version: 0.6.10-anki.14
 author: chanbla11mit, Hermes Agent
 license: MIT
 platforms: [macos]
@@ -94,7 +94,7 @@ Every card must contain:
 10. A per-run runtime cap with rationale. Estimate the whole attempt, including discovery, tests, commit, and the review handoff; use an explicit `max_runtime_seconds` when it may exceed one hour, and raise the cap before retrying a timed-out attempt.
 11. The required handoff: the local commit; for deck change cards, also the change set path and its entry counts.
 12. The collection access rules and explicit prohibitions on remotes, push, PR, AnkiWeb sync or publication, installs, live policy changes, credentials, and other external writes without separate owner authorization.
-13. Skill-policy metadata stating whether `minimal-implementation` is enabled.
+13. Skill-policy metadata naming each forced skill, or stating that no skill is forced.
 
 Item 1 writes the repository line in exactly the form `Repository <exact repository path> ONLY.` `scripts/verify-state` accepts no other repository wording; a repository line that uses `EXACT` instead of `ONLY` fails the card contract check.
 
@@ -142,7 +142,7 @@ A shared checkout, foreign path, second repository, missing baseline, mismatched
 
 ## Skills
 
-Attach `minimal-implementation` only for dependency choice, suspected overengineering, refactoring, simplification, or shared-function repair where simplification does not weaken required evidence. Leave it off for deck change cards and for collection-access or add-on install tooling, where exact boundaries outrank brevity. Record the decision and reason on the card.
+The Ponytail plugin, version 5.3.3 pinned to commit 7801d061243d7b753bad0e0b3c057cd250b11755, is enabled at level `full` on every worker, reviewer and orchestrator profile of the five boards. The line `PONYTAIL_DEFAULT_MODE=full` in each profile's `.env` file sets the level. Do not force `minimal-implementation` on a card. The commands `/ponytail-review` and `/ponytail-audit` are not a review of a card; only same-card review by anki-reviewer approves a card.
 
 Before forcing a skill, run:
 
