@@ -166,7 +166,8 @@ class DesiredState(unittest.TestCase):
                 self.assertEqual((profiles[name]["model"], profiles[name]["provider"]), ("glm-5.3", "zai"))
                 self.assertTrue(profiles[name]["dispatch_eligible"])
                 self.assertTrue(profiles[name]["in_dispatch_pool"])
-                self.assertEqual(profiles[name]["required_plugins"], ["jev"])
+                # Card t_9c1b6b2f: Ponytail is required on the 56 target profiles.
+                self.assertEqual(profiles[name]["required_plugins"], ["jev", "ponytail"])
                 self.assertIn(name, self.roster["approval_policy"]["profiles"])
         self.assertEqual([name for name in self.roster["project_dispatch_allowlist"] if name in GLM],
                          list(GLM_IN_DISPATCH_ORDER))
@@ -481,7 +482,13 @@ class PolicyText(unittest.TestCase):
     def test_current_state_docs_list_no_glm_worker(self):
         for rel in CURRENT_STATE_DOCS:
             with self.subTest(path=rel):
-                self.assertIsNone(GLM_NAME.search((ROOT / rel).read_text()))
+                text = (ROOT / rel).read_text()
+                if rel == "procedures/manual-apply.md":
+                    # Section 3 names each of the 56 profiles that require Ponytail, the GLM workers
+                    # included, in its literal commands (card t_9c1b6b2f); the rest names no GLM worker.
+                    head, rest = text.split("\n## 3. Ponytail", 1)
+                    text = head + "\n## " + rest.split("\n## ", 1)[1]
+                self.assertIsNone(GLM_NAME.search(text))
 
     def test_retirement_note(self):
         text = PROCEDURE.read_text()

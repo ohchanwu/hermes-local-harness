@@ -20,16 +20,22 @@ def override_hashes():
     return {profile: dict(files)
             for profile, files in desired["skill"]["profile_local_skill_overrides"].items()}
 
-IMPL = ["worker-flash-1", "worker-flash-2", "worker-flash-3", "worker-luna-1", "worker-luna-2",
-        "worker-terra-1", "worker-terra-2", "worker-glm-full", "worker-sol", "worker-astra",
-        "jobcron-worker", "chapt-worker", "harness-worker", "jss-worker",
-        "jobcron-worker-2", "chapt-worker-2", "harness-worker-2", "jss-worker-2",
-        "anki-worker", "anki-worker-2"]
 NOTIF = "hermes-terminal-outcome-notification"
 ENABLED_NOTIF = f"enabled      git pinned@6ae2bf2d 0.2.0    {NOTIF}"
 DISABLED_NOTIF = f"disabled     git pinned@6ae2bf2d 0.2.0    {NOTIF}"
-DISABLED_PONY = "disabled     git pinned@16f29800 4.8.4    ponytail"
-ENABLED_PONY = "enabled      git pinned@16f29800 4.8.4    ponytail"
+# Observed `plugins list --plain` lines of Ponytail 5.3.3 at commit
+# 7801d061243d7b753bad0e0b3c057cd250b11755, installed by hand with `git clone`, `git checkout --detach`
+# and `plugins adopt` (procedures/manual-apply.md, section 3): Hermes prints `git pinned@<first 8
+# characters of the commit>` (hermes_cli/plugins_cmd_git.py line 100) only for a `plugins install --ref`
+# record (pinned true), so this source column is `git` alone (hermes_cli/plugins_cmd_listing.py:
+# f"{status:12} {source:8} {version:8} {name}").
+DISABLED_PONY = "disabled     git      5.3.3    ponytail"
+ENABLED_PONY = "enabled      git      5.3.3    ponytail"
+PONYTAIL = "ponytail"
+# The install metadata entry that `plugins adopt` writes for that clone
+# (hermes_cli/plugins_cmd_update.py, cmd_adopt).
+PONY_INSTALL_METADATA = {"pinned": False, "revision": "7801d061243d7b753bad0e0b3c057cd250b11755",
+                         "source": "https://github.com/DietrichGebert/ponytail.git"}
 # Observed `plugins list --plain` line of an enabled jev plugin (card t_4f7740d0). The
 # source and version columns are assumed values: no pin is declared for jev, so
 # check_plugins compares only the leading `enabled` status.
@@ -60,8 +66,12 @@ def base_plugins():
                 plugins[name][NOTIF] = ENABLED_NOTIF
             elif NOTIF in roster_profiles[name].get("installed_disabled_plugins", []):
                 plugins[name][NOTIF] = DISABLED_NOTIF
-            if name in IMPL:
-                plugins[name]["ponytail"] = DISABLED_PONY
+        # A profile that requires ponytail has it enabled; a profile that only expects it
+        # installed and disabled (the retired implementation profiles) has it disabled.
+        if PONYTAIL in roster_profiles[name].get("required_plugins", []):
+            plugins[name][PONYTAIL] = ENABLED_PONY
+        elif PONYTAIL in roster_profiles[name].get("installed_disabled_plugins", []):
+            plugins[name][PONYTAIL] = DISABLED_PONY
         if JEV in roster_profiles[name].get("required_plugins", []):
             plugins[name][JEV] = ENABLED_JEV
     return plugins
@@ -180,6 +190,14 @@ if anki_entries:
 else:
     clean["adapters"].append(anki_observation)
 clean["plugins"] = base_plugins()
+# The line PONYTAIL_DEFAULT_MODE=full is present in the .env file of every profile that
+# requires ponytail (one boolean per profile; no other line of the file is recorded).
+clean["ponytail_mode_env"] = {profile["name"]: True for profile in roster["profiles"]
+                              if PONYTAIL in profile.get("required_plugins", [])}
+# The ponytail entry of the install metadata of every profile that requires ponytail
+# (plugins/.install-metadata.json); verify-state reads the full revision and the source from it.
+clean["ponytail_install_metadata"] = {profile["name"]: dict(PONY_INSTALL_METADATA) for profile in roster["profiles"]
+                                      if PONYTAIL in profile.get("required_plugins", [])}
 set_skill_files(clean)
 clean["terminal_retry_policy"] = copy.deepcopy(
     json.loads((Path(__file__).resolve().parents[1] / "roster.yaml").read_text())["terminal_retry"])
@@ -363,6 +381,30 @@ def ponytail_absent(d):
 
 
 write("ponytail-absent-drift.yaml", delta(ponytail_absent))
+
+
+def ponytail_disabled_on_target(d):
+    # Ponytail is installed but disabled on one profile that requires it enabled.
+    d["plugins"]["harness-worker"][PONYTAIL] = DISABLED_PONY
+
+
+write("ponytail-disabled-target-drift.yaml", delta(ponytail_disabled_on_target))
+
+
+def ponytail_mode_line_absent(d):
+    # The line PONYTAIL_DEFAULT_MODE=full is absent from the .env file of one profile.
+    d["ponytail_mode_env"]["harness-worker-glm-medium-1"] = False
+
+
+write("ponytail-mode-line-absent-drift.yaml", delta(ponytail_mode_line_absent))
+
+
+def ponytail_revision_drift(d):
+    # The ponytail clone of one profile that requires ponytail is at another revision.
+    d["ponytail_install_metadata"]["jss-reviewer"]["revision"] = "0" * 40
+
+
+write("ponytail-revision-drift.yaml", delta(ponytail_revision_drift))
 
 
 def skill_divergence(d):

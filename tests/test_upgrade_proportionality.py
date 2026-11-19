@@ -52,7 +52,7 @@ FIXTURE_RESULTS = {
     "auxiliary-model-drift.yaml": (1, "auxiliary model drift harness-worker auxiliary.title_generation.model"),
     "terminal-deployment-pending.yaml": (1, "terminal notification deployment pending"),
     "terminal-notification-rollback.yaml": (1, "terminal notification deployment pending"),
-    "plugin-pin-drift.yaml": (1, "expected pinned 4.8.4@16f29800"),
+    "plugin-pin-drift.yaml": (1, "expected pinned 5.3.3@7801d061243d7b753bad0e0b3c057cd250b11755"),
     "deployed-skill-divergence.yaml": (1, "deployed skill hash mismatch"),
     "project-repair-policy-drift.yaml": (1, "project repair policy observed mapping drift"),
     "project-repair-card-drift.yaml": (1, "project repair contract drift t_fixture_repair: exact authorization missing"),
@@ -64,6 +64,11 @@ FIXTURE_RESULTS = {
     "terminal-retry-missing-human-gate.yaml": (1, "terminal retry policy missing human/infrastructure exclusion"),
     "ponytail-enabled-drift.yaml": (1, "must be disabled"),
     "ponytail-absent-drift.yaml": (1, "required-disabled ponytail absent"),
+    "ponytail-disabled-target-drift.yaml": (1, "plugin drift harness-worker: required ponytail not enabled"),
+    "ponytail-mode-line-absent-drift.yaml": (
+        1, "ponytail mode drift harness-worker-glm-medium-1: PONYTAIL_DEFAULT_MODE=full absent"),
+    "ponytail-revision-drift.yaml": (
+        1, "plugin drift jss-reviewer: ponytail install metadata not at 7801d061243d7b753bad0e0b3c057cd250b11755"),
     "skill-deployment-missing.yaml": (1, "deployed skill copy missing"),
     "deployment-skill-supporting-file-drift.yaml": (1, "deployed skill hash mismatch"),
     "adapter-missing.yaml": (1, "repository adapter missing"),

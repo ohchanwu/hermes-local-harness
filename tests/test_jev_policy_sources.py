@@ -589,11 +589,14 @@ class JevPolicySources(unittest.TestCase):
                        "The owner removes the copied Anthropic API key",
                        "hermes -p <profile> config unset ANTHROPIC_API_KEY",
                        "must list no entry with source `env:ANTHROPIC_API_KEY`",
-                       "hermes -p <profile> plugins remove ponytail",
                        "hermes -p <profile> plugins remove hermes-terminal-outcome-notification",
-                       "`WARN: dormant unexpected plugin <profile>: ponytail`",
+                       "`WARN: dormant unexpected plugin <profile>: hermes-terminal-outcome-notification`",
+                       # The copied ponytail plugin stays (card t_9c1b6b2f): the Ponytail steps of manual-apply.md follow.
+                       "Keep the copied `ponytail` plugin",
+                       "`procedures/manual-apply.md`, section 3b, for the new profile",
                        "`hermes -p <profile> config get --json fallback_providers` must print `[]`"):
             self.assertIn(marker, section)
+        self.assertNotIn("plugins remove ponytail", section)
         switch = ("python3 /Users/chanbla11mit/hermes-local-harness/scripts/switch-profile-model "
                   "--profile <profile> --to glm --dispatch add --clear-fallbacks")
         self.assertIn(switch, section)

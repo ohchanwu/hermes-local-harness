@@ -84,35 +84,832 @@ Verify each profile explicitly:
 
     hermes -p <profile> config get approvals.mode   # expect: off
 
-## 3. Ponytail on the ten implementation profiles (worker-flash-1/2/3, worker-luna-1/2, worker-terra-1/2, worker-glm-full, worker-sol, worker-astra; NOT default/reviewer-sol/advisor)
+## 3. Ponytail 5.3.3: enabled at level `full` on the 56 target profiles, installed and disabled on the ten retired implementation profiles
 
-Desired state: the pinned Ponytail package is installed but `disabled` on every implementation profile. Hermes never runs the Ponytail plugin; minimalism comes from the per-card `minimal-implementation` skill instead (see section 4).
+Desired state (owner decision of 2026-11-18, card `t_9c1b6b2f`): Ponytail 5.3.3 at commit `7801d061243d7b753bad0e0b3c057cd250b11755` is installed and enabled on 56 target profiles, and each of them has the line `PONYTAIL_DEFAULT_MODE=full` in its `.env` file. The 56 target profiles are, for each board prefix `harness`, `chapt`, `jobcron`, `jss` and `anki`, the eleven profiles whose names are the prefix followed by `-orchestrator`, `-reviewer`, `-reviewer-glm`, `-worker`, `-worker-2`, `-worker-glm-easy-1`, `-worker-glm-easy-2`, `-worker-glm-medium-1`, `-worker-glm-medium-2`, `-worker-glm-hard-1` or `-worker-glm-hard-2`, and `advisor`; `roster.yaml` lists `ponytail` in their `required_plugins`. The ten retired implementation profiles (`worker-flash-1`, `worker-flash-2`, `worker-flash-3`, `worker-luna-1`, `worker-luna-2`, `worker-terra-1`, `worker-terra-2`, `worker-glm-full`, `worker-sol`, `worker-astra`) have the same commit installed and disabled (`installed_disabled_plugins`). `default` and every other profile have no Ponytail.
 
-Install pinned from Git without enabling:
+The Hermes plugin of Ponytail chooses its level from the environment variable `PONYTAIL_DEFAULT_MODE` first, then from `defaultMode` in `/Users/chanbla11mit/.config/ponytail/config.json`, and otherwise uses `full` (`__init__.py` lines 35 to 54 at the pinned commit). Hermes loads the profile's `.env` file into the environment, so the `.env` line sets level `full` on each target profile. The shared file `/Users/chanbla11mit/.config/ponytail/config.json` keeps `"defaultMode": "off"` for the owner's Claude Code and Codex sessions (section 4b) and does not change.
 
-    hermes -p worker-flash-1 plugins install https://github.com/DietrichGebert/ponytail.git --ref 16f29800fd2681bdf24f3eb4ccffe38be3baec6b --no-enable
-    hermes -p worker-flash-2 plugins install https://github.com/DietrichGebert/ponytail.git --ref 16f29800fd2681bdf24f3eb4ccffe38be3baec6b --no-enable
-    hermes -p worker-flash-3 plugins install https://github.com/DietrichGebert/ponytail.git --ref 16f29800fd2681bdf24f3eb4ccffe38be3baec6b --no-enable
-    hermes -p worker-luna-1 plugins install https://github.com/DietrichGebert/ponytail.git --ref 16f29800fd2681bdf24f3eb4ccffe38be3baec6b --no-enable
-    hermes -p worker-luna-2 plugins install https://github.com/DietrichGebert/ponytail.git --ref 16f29800fd2681bdf24f3eb4ccffe38be3baec6b --no-enable
-    hermes -p worker-terra-1 plugins install https://github.com/DietrichGebert/ponytail.git --ref 16f29800fd2681bdf24f3eb4ccffe38be3baec6b --no-enable
-    hermes -p worker-terra-2 plugins install https://github.com/DietrichGebert/ponytail.git --ref 16f29800fd2681bdf24f3eb4ccffe38be3baec6b --no-enable
-    hermes -p worker-glm-full plugins install https://github.com/DietrichGebert/ponytail.git --ref 16f29800fd2681bdf24f3eb4ccffe38be3baec6b --no-enable
-    hermes -p worker-sol plugins install https://github.com/DietrichGebert/ponytail.git --ref 16f29800fd2681bdf24f3eb4ccffe38be3baec6b --no-enable
-    hermes -p worker-astra plugins install https://github.com/DietrichGebert/ponytail.git --ref 16f29800fd2681bdf24f3eb4ccffe38be3baec6b --no-enable
+Install method: on Hermes `v0.21.5+6751.g9cf7960`, `hermes plugins install https://github.com/DietrichGebert/ponytail.git --ref 7801d061243d7b753bad0e0b3c057cd250b11755` stops with `plugin.json declares an unsupported or missing Agent Plugins schema`, so the plugin is installed by hand (owner decision of 2026-11-19): `git clone`, `git checkout --detach` of the commit, and `hermes plugins adopt`, which writes the origin URL and the revision to the profile's `plugins/.install-metadata.json` with `pinned` false. This method does not run the Hermes community-source scan, the scan of 2026-11-18 found no finding in the files that the Hermes plugin loads (`__init__.py`, `plugin.yaml`, `skills/`), and the normal `hermes plugins install --ref` method replaces this method after Hermes fixes NousResearch/hermes-agent#125937. For ponytail, `./scripts/verify-state` therefore requires the install metadata entry with `revision` `7801d061243d7b753bad0e0b3c057cd250b11755` and `source` `https://github.com/DietrichGebert/ponytail.git` (not `pinned` true), and a `plugins list --plain --no-bundled` line with source `git` and version `5.3.3` (not the `pinned@` text).
 
-(--ref pins exactly; catalog does not list ponytail. `--no-enable` installs disabled, skipping the enable prompt.)
+### 3a. Remove Ponytail 4.8.4 first
 
-If a profile already has Ponytail enabled, disable it instead of reinstalling:
+Ponytail 4.8.4 (commit `16f29800fd2681bdf24f3eb4ccffe38be3baec6b`) was installed and disabled with `plugins install --ref` on the ten board Claude workers and on the ten retired implementation profiles. `git clone` stops when `plugins/ponytail` exists, and `plugins adopt` stops when the install metadata has a `ponytail` entry. `plugins remove` deletes both:
 
-    hermes -p <profile> plugins disable ponytail
+    hermes -p anki-worker plugins remove ponytail
+    hermes -p anki-worker-2 plugins remove ponytail
+    hermes -p chapt-worker plugins remove ponytail
+    hermes -p chapt-worker-2 plugins remove ponytail
+    hermes -p harness-worker plugins remove ponytail
+    hermes -p harness-worker-2 plugins remove ponytail
+    hermes -p jobcron-worker plugins remove ponytail
+    hermes -p jobcron-worker-2 plugins remove ponytail
+    hermes -p jss-worker plugins remove ponytail
+    hermes -p jss-worker-2 plugins remove ponytail
+    hermes -p worker-flash-1 plugins remove ponytail
+    hermes -p worker-flash-2 plugins remove ponytail
+    hermes -p worker-flash-3 plugins remove ponytail
+    hermes -p worker-luna-1 plugins remove ponytail
+    hermes -p worker-luna-2 plugins remove ponytail
+    hermes -p worker-terra-1 plugins remove ponytail
+    hermes -p worker-terra-2 plugins remove ponytail
+    hermes -p worker-glm-full plugins remove ponytail
+    hermes -p worker-sol plugins remove ponytail
+    hermes -p worker-astra plugins remove ponytail
 
-Verify disabled-but-pinned on each:
+On any other target profile whose `plugins list --plain --no-bundled` output has a `ponytail` line, run `hermes -p`, that profile name written literally, and `plugins remove ponytail` before section 3b.
 
-    hermes -p <profile> plugins list --plain --no-bundled
-    # expect: disabled     git pinned@16f29800 4.8.4    ponytail
-    # drift: absent line (not installed) or `enabled` prefix (plugin active) — both are failures
-    # the resolver honors PONYTAIL_DEFAULT_MODE and ~/.config/ponytail/config.json; with the plugin disabled they are irrelevant — leave both unset unless a mode override is an approved change
+### 3b. The 56 target profiles: install, enable, `.env` line, verification
+
+For each profile, in this order: clone, check out the commit, confirm the commit, adopt, enable, add the `.env` line only if it is absent, and verify. The `.env` command prints no line of the file and appends a line feed before the new line so that a last line without a line feed stays separate; an empty line in `.env` has no effect.
+
+`harness-orchestrator`:
+
+    git clone https://github.com/DietrichGebert/ponytail.git /Users/chanbla11mit/.hermes/profiles/harness-orchestrator/plugins/ponytail
+    git -C /Users/chanbla11mit/.hermes/profiles/harness-orchestrator/plugins/ponytail checkout --detach 7801d061243d7b753bad0e0b3c057cd250b11755
+    git -C /Users/chanbla11mit/.hermes/profiles/harness-orchestrator/plugins/ponytail rev-parse HEAD
+    # expect: 7801d061243d7b753bad0e0b3c057cd250b11755
+    hermes -p harness-orchestrator plugins adopt ponytail
+    hermes -p harness-orchestrator plugins enable ponytail
+    grep -qxF 'PONYTAIL_DEFAULT_MODE=full' /Users/chanbla11mit/.hermes/profiles/harness-orchestrator/.env || printf '\nPONYTAIL_DEFAULT_MODE=full\n' >> /Users/chanbla11mit/.hermes/profiles/harness-orchestrator/.env
+    hermes -p harness-orchestrator plugins list --plain --no-bundled | grep -x 'enabled      git      5.3.3    ponytail'
+    # expect: enabled      git      5.3.3    ponytail
+
+`harness-reviewer`:
+
+    git clone https://github.com/DietrichGebert/ponytail.git /Users/chanbla11mit/.hermes/profiles/harness-reviewer/plugins/ponytail
+    git -C /Users/chanbla11mit/.hermes/profiles/harness-reviewer/plugins/ponytail checkout --detach 7801d061243d7b753bad0e0b3c057cd250b11755
+    git -C /Users/chanbla11mit/.hermes/profiles/harness-reviewer/plugins/ponytail rev-parse HEAD
+    # expect: 7801d061243d7b753bad0e0b3c057cd250b11755
+    hermes -p harness-reviewer plugins adopt ponytail
+    hermes -p harness-reviewer plugins enable ponytail
+    grep -qxF 'PONYTAIL_DEFAULT_MODE=full' /Users/chanbla11mit/.hermes/profiles/harness-reviewer/.env || printf '\nPONYTAIL_DEFAULT_MODE=full\n' >> /Users/chanbla11mit/.hermes/profiles/harness-reviewer/.env
+    hermes -p harness-reviewer plugins list --plain --no-bundled | grep -x 'enabled      git      5.3.3    ponytail'
+    # expect: enabled      git      5.3.3    ponytail
+
+`harness-reviewer-glm`:
+
+    git clone https://github.com/DietrichGebert/ponytail.git /Users/chanbla11mit/.hermes/profiles/harness-reviewer-glm/plugins/ponytail
+    git -C /Users/chanbla11mit/.hermes/profiles/harness-reviewer-glm/plugins/ponytail checkout --detach 7801d061243d7b753bad0e0b3c057cd250b11755
+    git -C /Users/chanbla11mit/.hermes/profiles/harness-reviewer-glm/plugins/ponytail rev-parse HEAD
+    # expect: 7801d061243d7b753bad0e0b3c057cd250b11755
+    hermes -p harness-reviewer-glm plugins adopt ponytail
+    hermes -p harness-reviewer-glm plugins enable ponytail
+    grep -qxF 'PONYTAIL_DEFAULT_MODE=full' /Users/chanbla11mit/.hermes/profiles/harness-reviewer-glm/.env || printf '\nPONYTAIL_DEFAULT_MODE=full\n' >> /Users/chanbla11mit/.hermes/profiles/harness-reviewer-glm/.env
+    hermes -p harness-reviewer-glm plugins list --plain --no-bundled | grep -x 'enabled      git      5.3.3    ponytail'
+    # expect: enabled      git      5.3.3    ponytail
+
+`harness-worker`:
+
+    git clone https://github.com/DietrichGebert/ponytail.git /Users/chanbla11mit/.hermes/profiles/harness-worker/plugins/ponytail
+    git -C /Users/chanbla11mit/.hermes/profiles/harness-worker/plugins/ponytail checkout --detach 7801d061243d7b753bad0e0b3c057cd250b11755
+    git -C /Users/chanbla11mit/.hermes/profiles/harness-worker/plugins/ponytail rev-parse HEAD
+    # expect: 7801d061243d7b753bad0e0b3c057cd250b11755
+    hermes -p harness-worker plugins adopt ponytail
+    hermes -p harness-worker plugins enable ponytail
+    grep -qxF 'PONYTAIL_DEFAULT_MODE=full' /Users/chanbla11mit/.hermes/profiles/harness-worker/.env || printf '\nPONYTAIL_DEFAULT_MODE=full\n' >> /Users/chanbla11mit/.hermes/profiles/harness-worker/.env
+    hermes -p harness-worker plugins list --plain --no-bundled | grep -x 'enabled      git      5.3.3    ponytail'
+    # expect: enabled      git      5.3.3    ponytail
+
+`harness-worker-2`:
+
+    git clone https://github.com/DietrichGebert/ponytail.git /Users/chanbla11mit/.hermes/profiles/harness-worker-2/plugins/ponytail
+    git -C /Users/chanbla11mit/.hermes/profiles/harness-worker-2/plugins/ponytail checkout --detach 7801d061243d7b753bad0e0b3c057cd250b11755
+    git -C /Users/chanbla11mit/.hermes/profiles/harness-worker-2/plugins/ponytail rev-parse HEAD
+    # expect: 7801d061243d7b753bad0e0b3c057cd250b11755
+    hermes -p harness-worker-2 plugins adopt ponytail
+    hermes -p harness-worker-2 plugins enable ponytail
+    grep -qxF 'PONYTAIL_DEFAULT_MODE=full' /Users/chanbla11mit/.hermes/profiles/harness-worker-2/.env || printf '\nPONYTAIL_DEFAULT_MODE=full\n' >> /Users/chanbla11mit/.hermes/profiles/harness-worker-2/.env
+    hermes -p harness-worker-2 plugins list --plain --no-bundled | grep -x 'enabled      git      5.3.3    ponytail'
+    # expect: enabled      git      5.3.3    ponytail
+
+`harness-worker-glm-easy-1`:
+
+    git clone https://github.com/DietrichGebert/ponytail.git /Users/chanbla11mit/.hermes/profiles/harness-worker-glm-easy-1/plugins/ponytail
+    git -C /Users/chanbla11mit/.hermes/profiles/harness-worker-glm-easy-1/plugins/ponytail checkout --detach 7801d061243d7b753bad0e0b3c057cd250b11755
+    git -C /Users/chanbla11mit/.hermes/profiles/harness-worker-glm-easy-1/plugins/ponytail rev-parse HEAD
+    # expect: 7801d061243d7b753bad0e0b3c057cd250b11755
+    hermes -p harness-worker-glm-easy-1 plugins adopt ponytail
+    hermes -p harness-worker-glm-easy-1 plugins enable ponytail
+    grep -qxF 'PONYTAIL_DEFAULT_MODE=full' /Users/chanbla11mit/.hermes/profiles/harness-worker-glm-easy-1/.env || printf '\nPONYTAIL_DEFAULT_MODE=full\n' >> /Users/chanbla11mit/.hermes/profiles/harness-worker-glm-easy-1/.env
+    hermes -p harness-worker-glm-easy-1 plugins list --plain --no-bundled | grep -x 'enabled      git      5.3.3    ponytail'
+    # expect: enabled      git      5.3.3    ponytail
+
+`harness-worker-glm-easy-2`:
+
+    git clone https://github.com/DietrichGebert/ponytail.git /Users/chanbla11mit/.hermes/profiles/harness-worker-glm-easy-2/plugins/ponytail
+    git -C /Users/chanbla11mit/.hermes/profiles/harness-worker-glm-easy-2/plugins/ponytail checkout --detach 7801d061243d7b753bad0e0b3c057cd250b11755
+    git -C /Users/chanbla11mit/.hermes/profiles/harness-worker-glm-easy-2/plugins/ponytail rev-parse HEAD
+    # expect: 7801d061243d7b753bad0e0b3c057cd250b11755
+    hermes -p harness-worker-glm-easy-2 plugins adopt ponytail
+    hermes -p harness-worker-glm-easy-2 plugins enable ponytail
+    grep -qxF 'PONYTAIL_DEFAULT_MODE=full' /Users/chanbla11mit/.hermes/profiles/harness-worker-glm-easy-2/.env || printf '\nPONYTAIL_DEFAULT_MODE=full\n' >> /Users/chanbla11mit/.hermes/profiles/harness-worker-glm-easy-2/.env
+    hermes -p harness-worker-glm-easy-2 plugins list --plain --no-bundled | grep -x 'enabled      git      5.3.3    ponytail'
+    # expect: enabled      git      5.3.3    ponytail
+
+`harness-worker-glm-medium-1`:
+
+    git clone https://github.com/DietrichGebert/ponytail.git /Users/chanbla11mit/.hermes/profiles/harness-worker-glm-medium-1/plugins/ponytail
+    git -C /Users/chanbla11mit/.hermes/profiles/harness-worker-glm-medium-1/plugins/ponytail checkout --detach 7801d061243d7b753bad0e0b3c057cd250b11755
+    git -C /Users/chanbla11mit/.hermes/profiles/harness-worker-glm-medium-1/plugins/ponytail rev-parse HEAD
+    # expect: 7801d061243d7b753bad0e0b3c057cd250b11755
+    hermes -p harness-worker-glm-medium-1 plugins adopt ponytail
+    hermes -p harness-worker-glm-medium-1 plugins enable ponytail
+    grep -qxF 'PONYTAIL_DEFAULT_MODE=full' /Users/chanbla11mit/.hermes/profiles/harness-worker-glm-medium-1/.env || printf '\nPONYTAIL_DEFAULT_MODE=full\n' >> /Users/chanbla11mit/.hermes/profiles/harness-worker-glm-medium-1/.env
+    hermes -p harness-worker-glm-medium-1 plugins list --plain --no-bundled | grep -x 'enabled      git      5.3.3    ponytail'
+    # expect: enabled      git      5.3.3    ponytail
+
+`harness-worker-glm-medium-2`:
+
+    git clone https://github.com/DietrichGebert/ponytail.git /Users/chanbla11mit/.hermes/profiles/harness-worker-glm-medium-2/plugins/ponytail
+    git -C /Users/chanbla11mit/.hermes/profiles/harness-worker-glm-medium-2/plugins/ponytail checkout --detach 7801d061243d7b753bad0e0b3c057cd250b11755
+    git -C /Users/chanbla11mit/.hermes/profiles/harness-worker-glm-medium-2/plugins/ponytail rev-parse HEAD
+    # expect: 7801d061243d7b753bad0e0b3c057cd250b11755
+    hermes -p harness-worker-glm-medium-2 plugins adopt ponytail
+    hermes -p harness-worker-glm-medium-2 plugins enable ponytail
+    grep -qxF 'PONYTAIL_DEFAULT_MODE=full' /Users/chanbla11mit/.hermes/profiles/harness-worker-glm-medium-2/.env || printf '\nPONYTAIL_DEFAULT_MODE=full\n' >> /Users/chanbla11mit/.hermes/profiles/harness-worker-glm-medium-2/.env
+    hermes -p harness-worker-glm-medium-2 plugins list --plain --no-bundled | grep -x 'enabled      git      5.3.3    ponytail'
+    # expect: enabled      git      5.3.3    ponytail
+
+`harness-worker-glm-hard-1`:
+
+    git clone https://github.com/DietrichGebert/ponytail.git /Users/chanbla11mit/.hermes/profiles/harness-worker-glm-hard-1/plugins/ponytail
+    git -C /Users/chanbla11mit/.hermes/profiles/harness-worker-glm-hard-1/plugins/ponytail checkout --detach 7801d061243d7b753bad0e0b3c057cd250b11755
+    git -C /Users/chanbla11mit/.hermes/profiles/harness-worker-glm-hard-1/plugins/ponytail rev-parse HEAD
+    # expect: 7801d061243d7b753bad0e0b3c057cd250b11755
+    hermes -p harness-worker-glm-hard-1 plugins adopt ponytail
+    hermes -p harness-worker-glm-hard-1 plugins enable ponytail
+    grep -qxF 'PONYTAIL_DEFAULT_MODE=full' /Users/chanbla11mit/.hermes/profiles/harness-worker-glm-hard-1/.env || printf '\nPONYTAIL_DEFAULT_MODE=full\n' >> /Users/chanbla11mit/.hermes/profiles/harness-worker-glm-hard-1/.env
+    hermes -p harness-worker-glm-hard-1 plugins list --plain --no-bundled | grep -x 'enabled      git      5.3.3    ponytail'
+    # expect: enabled      git      5.3.3    ponytail
+
+`harness-worker-glm-hard-2`:
+
+    git clone https://github.com/DietrichGebert/ponytail.git /Users/chanbla11mit/.hermes/profiles/harness-worker-glm-hard-2/plugins/ponytail
+    git -C /Users/chanbla11mit/.hermes/profiles/harness-worker-glm-hard-2/plugins/ponytail checkout --detach 7801d061243d7b753bad0e0b3c057cd250b11755
+    git -C /Users/chanbla11mit/.hermes/profiles/harness-worker-glm-hard-2/plugins/ponytail rev-parse HEAD
+    # expect: 7801d061243d7b753bad0e0b3c057cd250b11755
+    hermes -p harness-worker-glm-hard-2 plugins adopt ponytail
+    hermes -p harness-worker-glm-hard-2 plugins enable ponytail
+    grep -qxF 'PONYTAIL_DEFAULT_MODE=full' /Users/chanbla11mit/.hermes/profiles/harness-worker-glm-hard-2/.env || printf '\nPONYTAIL_DEFAULT_MODE=full\n' >> /Users/chanbla11mit/.hermes/profiles/harness-worker-glm-hard-2/.env
+    hermes -p harness-worker-glm-hard-2 plugins list --plain --no-bundled | grep -x 'enabled      git      5.3.3    ponytail'
+    # expect: enabled      git      5.3.3    ponytail
+
+`chapt-orchestrator`:
+
+    git clone https://github.com/DietrichGebert/ponytail.git /Users/chanbla11mit/.hermes/profiles/chapt-orchestrator/plugins/ponytail
+    git -C /Users/chanbla11mit/.hermes/profiles/chapt-orchestrator/plugins/ponytail checkout --detach 7801d061243d7b753bad0e0b3c057cd250b11755
+    git -C /Users/chanbla11mit/.hermes/profiles/chapt-orchestrator/plugins/ponytail rev-parse HEAD
+    # expect: 7801d061243d7b753bad0e0b3c057cd250b11755
+    hermes -p chapt-orchestrator plugins adopt ponytail
+    hermes -p chapt-orchestrator plugins enable ponytail
+    grep -qxF 'PONYTAIL_DEFAULT_MODE=full' /Users/chanbla11mit/.hermes/profiles/chapt-orchestrator/.env || printf '\nPONYTAIL_DEFAULT_MODE=full\n' >> /Users/chanbla11mit/.hermes/profiles/chapt-orchestrator/.env
+    hermes -p chapt-orchestrator plugins list --plain --no-bundled | grep -x 'enabled      git      5.3.3    ponytail'
+    # expect: enabled      git      5.3.3    ponytail
+
+`chapt-reviewer`:
+
+    git clone https://github.com/DietrichGebert/ponytail.git /Users/chanbla11mit/.hermes/profiles/chapt-reviewer/plugins/ponytail
+    git -C /Users/chanbla11mit/.hermes/profiles/chapt-reviewer/plugins/ponytail checkout --detach 7801d061243d7b753bad0e0b3c057cd250b11755
+    git -C /Users/chanbla11mit/.hermes/profiles/chapt-reviewer/plugins/ponytail rev-parse HEAD
+    # expect: 7801d061243d7b753bad0e0b3c057cd250b11755
+    hermes -p chapt-reviewer plugins adopt ponytail
+    hermes -p chapt-reviewer plugins enable ponytail
+    grep -qxF 'PONYTAIL_DEFAULT_MODE=full' /Users/chanbla11mit/.hermes/profiles/chapt-reviewer/.env || printf '\nPONYTAIL_DEFAULT_MODE=full\n' >> /Users/chanbla11mit/.hermes/profiles/chapt-reviewer/.env
+    hermes -p chapt-reviewer plugins list --plain --no-bundled | grep -x 'enabled      git      5.3.3    ponytail'
+    # expect: enabled      git      5.3.3    ponytail
+
+`chapt-reviewer-glm`:
+
+    git clone https://github.com/DietrichGebert/ponytail.git /Users/chanbla11mit/.hermes/profiles/chapt-reviewer-glm/plugins/ponytail
+    git -C /Users/chanbla11mit/.hermes/profiles/chapt-reviewer-glm/plugins/ponytail checkout --detach 7801d061243d7b753bad0e0b3c057cd250b11755
+    git -C /Users/chanbla11mit/.hermes/profiles/chapt-reviewer-glm/plugins/ponytail rev-parse HEAD
+    # expect: 7801d061243d7b753bad0e0b3c057cd250b11755
+    hermes -p chapt-reviewer-glm plugins adopt ponytail
+    hermes -p chapt-reviewer-glm plugins enable ponytail
+    grep -qxF 'PONYTAIL_DEFAULT_MODE=full' /Users/chanbla11mit/.hermes/profiles/chapt-reviewer-glm/.env || printf '\nPONYTAIL_DEFAULT_MODE=full\n' >> /Users/chanbla11mit/.hermes/profiles/chapt-reviewer-glm/.env
+    hermes -p chapt-reviewer-glm plugins list --plain --no-bundled | grep -x 'enabled      git      5.3.3    ponytail'
+    # expect: enabled      git      5.3.3    ponytail
+
+`chapt-worker`:
+
+    git clone https://github.com/DietrichGebert/ponytail.git /Users/chanbla11mit/.hermes/profiles/chapt-worker/plugins/ponytail
+    git -C /Users/chanbla11mit/.hermes/profiles/chapt-worker/plugins/ponytail checkout --detach 7801d061243d7b753bad0e0b3c057cd250b11755
+    git -C /Users/chanbla11mit/.hermes/profiles/chapt-worker/plugins/ponytail rev-parse HEAD
+    # expect: 7801d061243d7b753bad0e0b3c057cd250b11755
+    hermes -p chapt-worker plugins adopt ponytail
+    hermes -p chapt-worker plugins enable ponytail
+    grep -qxF 'PONYTAIL_DEFAULT_MODE=full' /Users/chanbla11mit/.hermes/profiles/chapt-worker/.env || printf '\nPONYTAIL_DEFAULT_MODE=full\n' >> /Users/chanbla11mit/.hermes/profiles/chapt-worker/.env
+    hermes -p chapt-worker plugins list --plain --no-bundled | grep -x 'enabled      git      5.3.3    ponytail'
+    # expect: enabled      git      5.3.3    ponytail
+
+`chapt-worker-2`:
+
+    git clone https://github.com/DietrichGebert/ponytail.git /Users/chanbla11mit/.hermes/profiles/chapt-worker-2/plugins/ponytail
+    git -C /Users/chanbla11mit/.hermes/profiles/chapt-worker-2/plugins/ponytail checkout --detach 7801d061243d7b753bad0e0b3c057cd250b11755
+    git -C /Users/chanbla11mit/.hermes/profiles/chapt-worker-2/plugins/ponytail rev-parse HEAD
+    # expect: 7801d061243d7b753bad0e0b3c057cd250b11755
+    hermes -p chapt-worker-2 plugins adopt ponytail
+    hermes -p chapt-worker-2 plugins enable ponytail
+    grep -qxF 'PONYTAIL_DEFAULT_MODE=full' /Users/chanbla11mit/.hermes/profiles/chapt-worker-2/.env || printf '\nPONYTAIL_DEFAULT_MODE=full\n' >> /Users/chanbla11mit/.hermes/profiles/chapt-worker-2/.env
+    hermes -p chapt-worker-2 plugins list --plain --no-bundled | grep -x 'enabled      git      5.3.3    ponytail'
+    # expect: enabled      git      5.3.3    ponytail
+
+`chapt-worker-glm-easy-1`:
+
+    git clone https://github.com/DietrichGebert/ponytail.git /Users/chanbla11mit/.hermes/profiles/chapt-worker-glm-easy-1/plugins/ponytail
+    git -C /Users/chanbla11mit/.hermes/profiles/chapt-worker-glm-easy-1/plugins/ponytail checkout --detach 7801d061243d7b753bad0e0b3c057cd250b11755
+    git -C /Users/chanbla11mit/.hermes/profiles/chapt-worker-glm-easy-1/plugins/ponytail rev-parse HEAD
+    # expect: 7801d061243d7b753bad0e0b3c057cd250b11755
+    hermes -p chapt-worker-glm-easy-1 plugins adopt ponytail
+    hermes -p chapt-worker-glm-easy-1 plugins enable ponytail
+    grep -qxF 'PONYTAIL_DEFAULT_MODE=full' /Users/chanbla11mit/.hermes/profiles/chapt-worker-glm-easy-1/.env || printf '\nPONYTAIL_DEFAULT_MODE=full\n' >> /Users/chanbla11mit/.hermes/profiles/chapt-worker-glm-easy-1/.env
+    hermes -p chapt-worker-glm-easy-1 plugins list --plain --no-bundled | grep -x 'enabled      git      5.3.3    ponytail'
+    # expect: enabled      git      5.3.3    ponytail
+
+`chapt-worker-glm-easy-2`:
+
+    git clone https://github.com/DietrichGebert/ponytail.git /Users/chanbla11mit/.hermes/profiles/chapt-worker-glm-easy-2/plugins/ponytail
+    git -C /Users/chanbla11mit/.hermes/profiles/chapt-worker-glm-easy-2/plugins/ponytail checkout --detach 7801d061243d7b753bad0e0b3c057cd250b11755
+    git -C /Users/chanbla11mit/.hermes/profiles/chapt-worker-glm-easy-2/plugins/ponytail rev-parse HEAD
+    # expect: 7801d061243d7b753bad0e0b3c057cd250b11755
+    hermes -p chapt-worker-glm-easy-2 plugins adopt ponytail
+    hermes -p chapt-worker-glm-easy-2 plugins enable ponytail
+    grep -qxF 'PONYTAIL_DEFAULT_MODE=full' /Users/chanbla11mit/.hermes/profiles/chapt-worker-glm-easy-2/.env || printf '\nPONYTAIL_DEFAULT_MODE=full\n' >> /Users/chanbla11mit/.hermes/profiles/chapt-worker-glm-easy-2/.env
+    hermes -p chapt-worker-glm-easy-2 plugins list --plain --no-bundled | grep -x 'enabled      git      5.3.3    ponytail'
+    # expect: enabled      git      5.3.3    ponytail
+
+`chapt-worker-glm-medium-1`:
+
+    git clone https://github.com/DietrichGebert/ponytail.git /Users/chanbla11mit/.hermes/profiles/chapt-worker-glm-medium-1/plugins/ponytail
+    git -C /Users/chanbla11mit/.hermes/profiles/chapt-worker-glm-medium-1/plugins/ponytail checkout --detach 7801d061243d7b753bad0e0b3c057cd250b11755
+    git -C /Users/chanbla11mit/.hermes/profiles/chapt-worker-glm-medium-1/plugins/ponytail rev-parse HEAD
+    # expect: 7801d061243d7b753bad0e0b3c057cd250b11755
+    hermes -p chapt-worker-glm-medium-1 plugins adopt ponytail
+    hermes -p chapt-worker-glm-medium-1 plugins enable ponytail
+    grep -qxF 'PONYTAIL_DEFAULT_MODE=full' /Users/chanbla11mit/.hermes/profiles/chapt-worker-glm-medium-1/.env || printf '\nPONYTAIL_DEFAULT_MODE=full\n' >> /Users/chanbla11mit/.hermes/profiles/chapt-worker-glm-medium-1/.env
+    hermes -p chapt-worker-glm-medium-1 plugins list --plain --no-bundled | grep -x 'enabled      git      5.3.3    ponytail'
+    # expect: enabled      git      5.3.3    ponytail
+
+`chapt-worker-glm-medium-2`:
+
+    git clone https://github.com/DietrichGebert/ponytail.git /Users/chanbla11mit/.hermes/profiles/chapt-worker-glm-medium-2/plugins/ponytail
+    git -C /Users/chanbla11mit/.hermes/profiles/chapt-worker-glm-medium-2/plugins/ponytail checkout --detach 7801d061243d7b753bad0e0b3c057cd250b11755
+    git -C /Users/chanbla11mit/.hermes/profiles/chapt-worker-glm-medium-2/plugins/ponytail rev-parse HEAD
+    # expect: 7801d061243d7b753bad0e0b3c057cd250b11755
+    hermes -p chapt-worker-glm-medium-2 plugins adopt ponytail
+    hermes -p chapt-worker-glm-medium-2 plugins enable ponytail
+    grep -qxF 'PONYTAIL_DEFAULT_MODE=full' /Users/chanbla11mit/.hermes/profiles/chapt-worker-glm-medium-2/.env || printf '\nPONYTAIL_DEFAULT_MODE=full\n' >> /Users/chanbla11mit/.hermes/profiles/chapt-worker-glm-medium-2/.env
+    hermes -p chapt-worker-glm-medium-2 plugins list --plain --no-bundled | grep -x 'enabled      git      5.3.3    ponytail'
+    # expect: enabled      git      5.3.3    ponytail
+
+`chapt-worker-glm-hard-1`:
+
+    git clone https://github.com/DietrichGebert/ponytail.git /Users/chanbla11mit/.hermes/profiles/chapt-worker-glm-hard-1/plugins/ponytail
+    git -C /Users/chanbla11mit/.hermes/profiles/chapt-worker-glm-hard-1/plugins/ponytail checkout --detach 7801d061243d7b753bad0e0b3c057cd250b11755
+    git -C /Users/chanbla11mit/.hermes/profiles/chapt-worker-glm-hard-1/plugins/ponytail rev-parse HEAD
+    # expect: 7801d061243d7b753bad0e0b3c057cd250b11755
+    hermes -p chapt-worker-glm-hard-1 plugins adopt ponytail
+    hermes -p chapt-worker-glm-hard-1 plugins enable ponytail
+    grep -qxF 'PONYTAIL_DEFAULT_MODE=full' /Users/chanbla11mit/.hermes/profiles/chapt-worker-glm-hard-1/.env || printf '\nPONYTAIL_DEFAULT_MODE=full\n' >> /Users/chanbla11mit/.hermes/profiles/chapt-worker-glm-hard-1/.env
+    hermes -p chapt-worker-glm-hard-1 plugins list --plain --no-bundled | grep -x 'enabled      git      5.3.3    ponytail'
+    # expect: enabled      git      5.3.3    ponytail
+
+`chapt-worker-glm-hard-2`:
+
+    git clone https://github.com/DietrichGebert/ponytail.git /Users/chanbla11mit/.hermes/profiles/chapt-worker-glm-hard-2/plugins/ponytail
+    git -C /Users/chanbla11mit/.hermes/profiles/chapt-worker-glm-hard-2/plugins/ponytail checkout --detach 7801d061243d7b753bad0e0b3c057cd250b11755
+    git -C /Users/chanbla11mit/.hermes/profiles/chapt-worker-glm-hard-2/plugins/ponytail rev-parse HEAD
+    # expect: 7801d061243d7b753bad0e0b3c057cd250b11755
+    hermes -p chapt-worker-glm-hard-2 plugins adopt ponytail
+    hermes -p chapt-worker-glm-hard-2 plugins enable ponytail
+    grep -qxF 'PONYTAIL_DEFAULT_MODE=full' /Users/chanbla11mit/.hermes/profiles/chapt-worker-glm-hard-2/.env || printf '\nPONYTAIL_DEFAULT_MODE=full\n' >> /Users/chanbla11mit/.hermes/profiles/chapt-worker-glm-hard-2/.env
+    hermes -p chapt-worker-glm-hard-2 plugins list --plain --no-bundled | grep -x 'enabled      git      5.3.3    ponytail'
+    # expect: enabled      git      5.3.3    ponytail
+
+`jobcron-orchestrator`:
+
+    git clone https://github.com/DietrichGebert/ponytail.git /Users/chanbla11mit/.hermes/profiles/jobcron-orchestrator/plugins/ponytail
+    git -C /Users/chanbla11mit/.hermes/profiles/jobcron-orchestrator/plugins/ponytail checkout --detach 7801d061243d7b753bad0e0b3c057cd250b11755
+    git -C /Users/chanbla11mit/.hermes/profiles/jobcron-orchestrator/plugins/ponytail rev-parse HEAD
+    # expect: 7801d061243d7b753bad0e0b3c057cd250b11755
+    hermes -p jobcron-orchestrator plugins adopt ponytail
+    hermes -p jobcron-orchestrator plugins enable ponytail
+    grep -qxF 'PONYTAIL_DEFAULT_MODE=full' /Users/chanbla11mit/.hermes/profiles/jobcron-orchestrator/.env || printf '\nPONYTAIL_DEFAULT_MODE=full\n' >> /Users/chanbla11mit/.hermes/profiles/jobcron-orchestrator/.env
+    hermes -p jobcron-orchestrator plugins list --plain --no-bundled | grep -x 'enabled      git      5.3.3    ponytail'
+    # expect: enabled      git      5.3.3    ponytail
+
+`jobcron-reviewer`:
+
+    git clone https://github.com/DietrichGebert/ponytail.git /Users/chanbla11mit/.hermes/profiles/jobcron-reviewer/plugins/ponytail
+    git -C /Users/chanbla11mit/.hermes/profiles/jobcron-reviewer/plugins/ponytail checkout --detach 7801d061243d7b753bad0e0b3c057cd250b11755
+    git -C /Users/chanbla11mit/.hermes/profiles/jobcron-reviewer/plugins/ponytail rev-parse HEAD
+    # expect: 7801d061243d7b753bad0e0b3c057cd250b11755
+    hermes -p jobcron-reviewer plugins adopt ponytail
+    hermes -p jobcron-reviewer plugins enable ponytail
+    grep -qxF 'PONYTAIL_DEFAULT_MODE=full' /Users/chanbla11mit/.hermes/profiles/jobcron-reviewer/.env || printf '\nPONYTAIL_DEFAULT_MODE=full\n' >> /Users/chanbla11mit/.hermes/profiles/jobcron-reviewer/.env
+    hermes -p jobcron-reviewer plugins list --plain --no-bundled | grep -x 'enabled      git      5.3.3    ponytail'
+    # expect: enabled      git      5.3.3    ponytail
+
+`jobcron-reviewer-glm`:
+
+    git clone https://github.com/DietrichGebert/ponytail.git /Users/chanbla11mit/.hermes/profiles/jobcron-reviewer-glm/plugins/ponytail
+    git -C /Users/chanbla11mit/.hermes/profiles/jobcron-reviewer-glm/plugins/ponytail checkout --detach 7801d061243d7b753bad0e0b3c057cd250b11755
+    git -C /Users/chanbla11mit/.hermes/profiles/jobcron-reviewer-glm/plugins/ponytail rev-parse HEAD
+    # expect: 7801d061243d7b753bad0e0b3c057cd250b11755
+    hermes -p jobcron-reviewer-glm plugins adopt ponytail
+    hermes -p jobcron-reviewer-glm plugins enable ponytail
+    grep -qxF 'PONYTAIL_DEFAULT_MODE=full' /Users/chanbla11mit/.hermes/profiles/jobcron-reviewer-glm/.env || printf '\nPONYTAIL_DEFAULT_MODE=full\n' >> /Users/chanbla11mit/.hermes/profiles/jobcron-reviewer-glm/.env
+    hermes -p jobcron-reviewer-glm plugins list --plain --no-bundled | grep -x 'enabled      git      5.3.3    ponytail'
+    # expect: enabled      git      5.3.3    ponytail
+
+`jobcron-worker`:
+
+    git clone https://github.com/DietrichGebert/ponytail.git /Users/chanbla11mit/.hermes/profiles/jobcron-worker/plugins/ponytail
+    git -C /Users/chanbla11mit/.hermes/profiles/jobcron-worker/plugins/ponytail checkout --detach 7801d061243d7b753bad0e0b3c057cd250b11755
+    git -C /Users/chanbla11mit/.hermes/profiles/jobcron-worker/plugins/ponytail rev-parse HEAD
+    # expect: 7801d061243d7b753bad0e0b3c057cd250b11755
+    hermes -p jobcron-worker plugins adopt ponytail
+    hermes -p jobcron-worker plugins enable ponytail
+    grep -qxF 'PONYTAIL_DEFAULT_MODE=full' /Users/chanbla11mit/.hermes/profiles/jobcron-worker/.env || printf '\nPONYTAIL_DEFAULT_MODE=full\n' >> /Users/chanbla11mit/.hermes/profiles/jobcron-worker/.env
+    hermes -p jobcron-worker plugins list --plain --no-bundled | grep -x 'enabled      git      5.3.3    ponytail'
+    # expect: enabled      git      5.3.3    ponytail
+
+`jobcron-worker-2`:
+
+    git clone https://github.com/DietrichGebert/ponytail.git /Users/chanbla11mit/.hermes/profiles/jobcron-worker-2/plugins/ponytail
+    git -C /Users/chanbla11mit/.hermes/profiles/jobcron-worker-2/plugins/ponytail checkout --detach 7801d061243d7b753bad0e0b3c057cd250b11755
+    git -C /Users/chanbla11mit/.hermes/profiles/jobcron-worker-2/plugins/ponytail rev-parse HEAD
+    # expect: 7801d061243d7b753bad0e0b3c057cd250b11755
+    hermes -p jobcron-worker-2 plugins adopt ponytail
+    hermes -p jobcron-worker-2 plugins enable ponytail
+    grep -qxF 'PONYTAIL_DEFAULT_MODE=full' /Users/chanbla11mit/.hermes/profiles/jobcron-worker-2/.env || printf '\nPONYTAIL_DEFAULT_MODE=full\n' >> /Users/chanbla11mit/.hermes/profiles/jobcron-worker-2/.env
+    hermes -p jobcron-worker-2 plugins list --plain --no-bundled | grep -x 'enabled      git      5.3.3    ponytail'
+    # expect: enabled      git      5.3.3    ponytail
+
+`jobcron-worker-glm-easy-1`:
+
+    git clone https://github.com/DietrichGebert/ponytail.git /Users/chanbla11mit/.hermes/profiles/jobcron-worker-glm-easy-1/plugins/ponytail
+    git -C /Users/chanbla11mit/.hermes/profiles/jobcron-worker-glm-easy-1/plugins/ponytail checkout --detach 7801d061243d7b753bad0e0b3c057cd250b11755
+    git -C /Users/chanbla11mit/.hermes/profiles/jobcron-worker-glm-easy-1/plugins/ponytail rev-parse HEAD
+    # expect: 7801d061243d7b753bad0e0b3c057cd250b11755
+    hermes -p jobcron-worker-glm-easy-1 plugins adopt ponytail
+    hermes -p jobcron-worker-glm-easy-1 plugins enable ponytail
+    grep -qxF 'PONYTAIL_DEFAULT_MODE=full' /Users/chanbla11mit/.hermes/profiles/jobcron-worker-glm-easy-1/.env || printf '\nPONYTAIL_DEFAULT_MODE=full\n' >> /Users/chanbla11mit/.hermes/profiles/jobcron-worker-glm-easy-1/.env
+    hermes -p jobcron-worker-glm-easy-1 plugins list --plain --no-bundled | grep -x 'enabled      git      5.3.3    ponytail'
+    # expect: enabled      git      5.3.3    ponytail
+
+`jobcron-worker-glm-easy-2`:
+
+    git clone https://github.com/DietrichGebert/ponytail.git /Users/chanbla11mit/.hermes/profiles/jobcron-worker-glm-easy-2/plugins/ponytail
+    git -C /Users/chanbla11mit/.hermes/profiles/jobcron-worker-glm-easy-2/plugins/ponytail checkout --detach 7801d061243d7b753bad0e0b3c057cd250b11755
+    git -C /Users/chanbla11mit/.hermes/profiles/jobcron-worker-glm-easy-2/plugins/ponytail rev-parse HEAD
+    # expect: 7801d061243d7b753bad0e0b3c057cd250b11755
+    hermes -p jobcron-worker-glm-easy-2 plugins adopt ponytail
+    hermes -p jobcron-worker-glm-easy-2 plugins enable ponytail
+    grep -qxF 'PONYTAIL_DEFAULT_MODE=full' /Users/chanbla11mit/.hermes/profiles/jobcron-worker-glm-easy-2/.env || printf '\nPONYTAIL_DEFAULT_MODE=full\n' >> /Users/chanbla11mit/.hermes/profiles/jobcron-worker-glm-easy-2/.env
+    hermes -p jobcron-worker-glm-easy-2 plugins list --plain --no-bundled | grep -x 'enabled      git      5.3.3    ponytail'
+    # expect: enabled      git      5.3.3    ponytail
+
+`jobcron-worker-glm-medium-1`:
+
+    git clone https://github.com/DietrichGebert/ponytail.git /Users/chanbla11mit/.hermes/profiles/jobcron-worker-glm-medium-1/plugins/ponytail
+    git -C /Users/chanbla11mit/.hermes/profiles/jobcron-worker-glm-medium-1/plugins/ponytail checkout --detach 7801d061243d7b753bad0e0b3c057cd250b11755
+    git -C /Users/chanbla11mit/.hermes/profiles/jobcron-worker-glm-medium-1/plugins/ponytail rev-parse HEAD
+    # expect: 7801d061243d7b753bad0e0b3c057cd250b11755
+    hermes -p jobcron-worker-glm-medium-1 plugins adopt ponytail
+    hermes -p jobcron-worker-glm-medium-1 plugins enable ponytail
+    grep -qxF 'PONYTAIL_DEFAULT_MODE=full' /Users/chanbla11mit/.hermes/profiles/jobcron-worker-glm-medium-1/.env || printf '\nPONYTAIL_DEFAULT_MODE=full\n' >> /Users/chanbla11mit/.hermes/profiles/jobcron-worker-glm-medium-1/.env
+    hermes -p jobcron-worker-glm-medium-1 plugins list --plain --no-bundled | grep -x 'enabled      git      5.3.3    ponytail'
+    # expect: enabled      git      5.3.3    ponytail
+
+`jobcron-worker-glm-medium-2`:
+
+    git clone https://github.com/DietrichGebert/ponytail.git /Users/chanbla11mit/.hermes/profiles/jobcron-worker-glm-medium-2/plugins/ponytail
+    git -C /Users/chanbla11mit/.hermes/profiles/jobcron-worker-glm-medium-2/plugins/ponytail checkout --detach 7801d061243d7b753bad0e0b3c057cd250b11755
+    git -C /Users/chanbla11mit/.hermes/profiles/jobcron-worker-glm-medium-2/plugins/ponytail rev-parse HEAD
+    # expect: 7801d061243d7b753bad0e0b3c057cd250b11755
+    hermes -p jobcron-worker-glm-medium-2 plugins adopt ponytail
+    hermes -p jobcron-worker-glm-medium-2 plugins enable ponytail
+    grep -qxF 'PONYTAIL_DEFAULT_MODE=full' /Users/chanbla11mit/.hermes/profiles/jobcron-worker-glm-medium-2/.env || printf '\nPONYTAIL_DEFAULT_MODE=full\n' >> /Users/chanbla11mit/.hermes/profiles/jobcron-worker-glm-medium-2/.env
+    hermes -p jobcron-worker-glm-medium-2 plugins list --plain --no-bundled | grep -x 'enabled      git      5.3.3    ponytail'
+    # expect: enabled      git      5.3.3    ponytail
+
+`jobcron-worker-glm-hard-1`:
+
+    git clone https://github.com/DietrichGebert/ponytail.git /Users/chanbla11mit/.hermes/profiles/jobcron-worker-glm-hard-1/plugins/ponytail
+    git -C /Users/chanbla11mit/.hermes/profiles/jobcron-worker-glm-hard-1/plugins/ponytail checkout --detach 7801d061243d7b753bad0e0b3c057cd250b11755
+    git -C /Users/chanbla11mit/.hermes/profiles/jobcron-worker-glm-hard-1/plugins/ponytail rev-parse HEAD
+    # expect: 7801d061243d7b753bad0e0b3c057cd250b11755
+    hermes -p jobcron-worker-glm-hard-1 plugins adopt ponytail
+    hermes -p jobcron-worker-glm-hard-1 plugins enable ponytail
+    grep -qxF 'PONYTAIL_DEFAULT_MODE=full' /Users/chanbla11mit/.hermes/profiles/jobcron-worker-glm-hard-1/.env || printf '\nPONYTAIL_DEFAULT_MODE=full\n' >> /Users/chanbla11mit/.hermes/profiles/jobcron-worker-glm-hard-1/.env
+    hermes -p jobcron-worker-glm-hard-1 plugins list --plain --no-bundled | grep -x 'enabled      git      5.3.3    ponytail'
+    # expect: enabled      git      5.3.3    ponytail
+
+`jobcron-worker-glm-hard-2`:
+
+    git clone https://github.com/DietrichGebert/ponytail.git /Users/chanbla11mit/.hermes/profiles/jobcron-worker-glm-hard-2/plugins/ponytail
+    git -C /Users/chanbla11mit/.hermes/profiles/jobcron-worker-glm-hard-2/plugins/ponytail checkout --detach 7801d061243d7b753bad0e0b3c057cd250b11755
+    git -C /Users/chanbla11mit/.hermes/profiles/jobcron-worker-glm-hard-2/plugins/ponytail rev-parse HEAD
+    # expect: 7801d061243d7b753bad0e0b3c057cd250b11755
+    hermes -p jobcron-worker-glm-hard-2 plugins adopt ponytail
+    hermes -p jobcron-worker-glm-hard-2 plugins enable ponytail
+    grep -qxF 'PONYTAIL_DEFAULT_MODE=full' /Users/chanbla11mit/.hermes/profiles/jobcron-worker-glm-hard-2/.env || printf '\nPONYTAIL_DEFAULT_MODE=full\n' >> /Users/chanbla11mit/.hermes/profiles/jobcron-worker-glm-hard-2/.env
+    hermes -p jobcron-worker-glm-hard-2 plugins list --plain --no-bundled | grep -x 'enabled      git      5.3.3    ponytail'
+    # expect: enabled      git      5.3.3    ponytail
+
+`jss-orchestrator`:
+
+    git clone https://github.com/DietrichGebert/ponytail.git /Users/chanbla11mit/.hermes/profiles/jss-orchestrator/plugins/ponytail
+    git -C /Users/chanbla11mit/.hermes/profiles/jss-orchestrator/plugins/ponytail checkout --detach 7801d061243d7b753bad0e0b3c057cd250b11755
+    git -C /Users/chanbla11mit/.hermes/profiles/jss-orchestrator/plugins/ponytail rev-parse HEAD
+    # expect: 7801d061243d7b753bad0e0b3c057cd250b11755
+    hermes -p jss-orchestrator plugins adopt ponytail
+    hermes -p jss-orchestrator plugins enable ponytail
+    grep -qxF 'PONYTAIL_DEFAULT_MODE=full' /Users/chanbla11mit/.hermes/profiles/jss-orchestrator/.env || printf '\nPONYTAIL_DEFAULT_MODE=full\n' >> /Users/chanbla11mit/.hermes/profiles/jss-orchestrator/.env
+    hermes -p jss-orchestrator plugins list --plain --no-bundled | grep -x 'enabled      git      5.3.3    ponytail'
+    # expect: enabled      git      5.3.3    ponytail
+
+`jss-reviewer`:
+
+    git clone https://github.com/DietrichGebert/ponytail.git /Users/chanbla11mit/.hermes/profiles/jss-reviewer/plugins/ponytail
+    git -C /Users/chanbla11mit/.hermes/profiles/jss-reviewer/plugins/ponytail checkout --detach 7801d061243d7b753bad0e0b3c057cd250b11755
+    git -C /Users/chanbla11mit/.hermes/profiles/jss-reviewer/plugins/ponytail rev-parse HEAD
+    # expect: 7801d061243d7b753bad0e0b3c057cd250b11755
+    hermes -p jss-reviewer plugins adopt ponytail
+    hermes -p jss-reviewer plugins enable ponytail
+    grep -qxF 'PONYTAIL_DEFAULT_MODE=full' /Users/chanbla11mit/.hermes/profiles/jss-reviewer/.env || printf '\nPONYTAIL_DEFAULT_MODE=full\n' >> /Users/chanbla11mit/.hermes/profiles/jss-reviewer/.env
+    hermes -p jss-reviewer plugins list --plain --no-bundled | grep -x 'enabled      git      5.3.3    ponytail'
+    # expect: enabled      git      5.3.3    ponytail
+
+`jss-reviewer-glm`:
+
+    git clone https://github.com/DietrichGebert/ponytail.git /Users/chanbla11mit/.hermes/profiles/jss-reviewer-glm/plugins/ponytail
+    git -C /Users/chanbla11mit/.hermes/profiles/jss-reviewer-glm/plugins/ponytail checkout --detach 7801d061243d7b753bad0e0b3c057cd250b11755
+    git -C /Users/chanbla11mit/.hermes/profiles/jss-reviewer-glm/plugins/ponytail rev-parse HEAD
+    # expect: 7801d061243d7b753bad0e0b3c057cd250b11755
+    hermes -p jss-reviewer-glm plugins adopt ponytail
+    hermes -p jss-reviewer-glm plugins enable ponytail
+    grep -qxF 'PONYTAIL_DEFAULT_MODE=full' /Users/chanbla11mit/.hermes/profiles/jss-reviewer-glm/.env || printf '\nPONYTAIL_DEFAULT_MODE=full\n' >> /Users/chanbla11mit/.hermes/profiles/jss-reviewer-glm/.env
+    hermes -p jss-reviewer-glm plugins list --plain --no-bundled | grep -x 'enabled      git      5.3.3    ponytail'
+    # expect: enabled      git      5.3.3    ponytail
+
+`jss-worker`:
+
+    git clone https://github.com/DietrichGebert/ponytail.git /Users/chanbla11mit/.hermes/profiles/jss-worker/plugins/ponytail
+    git -C /Users/chanbla11mit/.hermes/profiles/jss-worker/plugins/ponytail checkout --detach 7801d061243d7b753bad0e0b3c057cd250b11755
+    git -C /Users/chanbla11mit/.hermes/profiles/jss-worker/plugins/ponytail rev-parse HEAD
+    # expect: 7801d061243d7b753bad0e0b3c057cd250b11755
+    hermes -p jss-worker plugins adopt ponytail
+    hermes -p jss-worker plugins enable ponytail
+    grep -qxF 'PONYTAIL_DEFAULT_MODE=full' /Users/chanbla11mit/.hermes/profiles/jss-worker/.env || printf '\nPONYTAIL_DEFAULT_MODE=full\n' >> /Users/chanbla11mit/.hermes/profiles/jss-worker/.env
+    hermes -p jss-worker plugins list --plain --no-bundled | grep -x 'enabled      git      5.3.3    ponytail'
+    # expect: enabled      git      5.3.3    ponytail
+
+`jss-worker-2`:
+
+    git clone https://github.com/DietrichGebert/ponytail.git /Users/chanbla11mit/.hermes/profiles/jss-worker-2/plugins/ponytail
+    git -C /Users/chanbla11mit/.hermes/profiles/jss-worker-2/plugins/ponytail checkout --detach 7801d061243d7b753bad0e0b3c057cd250b11755
+    git -C /Users/chanbla11mit/.hermes/profiles/jss-worker-2/plugins/ponytail rev-parse HEAD
+    # expect: 7801d061243d7b753bad0e0b3c057cd250b11755
+    hermes -p jss-worker-2 plugins adopt ponytail
+    hermes -p jss-worker-2 plugins enable ponytail
+    grep -qxF 'PONYTAIL_DEFAULT_MODE=full' /Users/chanbla11mit/.hermes/profiles/jss-worker-2/.env || printf '\nPONYTAIL_DEFAULT_MODE=full\n' >> /Users/chanbla11mit/.hermes/profiles/jss-worker-2/.env
+    hermes -p jss-worker-2 plugins list --plain --no-bundled | grep -x 'enabled      git      5.3.3    ponytail'
+    # expect: enabled      git      5.3.3    ponytail
+
+`jss-worker-glm-easy-1`:
+
+    git clone https://github.com/DietrichGebert/ponytail.git /Users/chanbla11mit/.hermes/profiles/jss-worker-glm-easy-1/plugins/ponytail
+    git -C /Users/chanbla11mit/.hermes/profiles/jss-worker-glm-easy-1/plugins/ponytail checkout --detach 7801d061243d7b753bad0e0b3c057cd250b11755
+    git -C /Users/chanbla11mit/.hermes/profiles/jss-worker-glm-easy-1/plugins/ponytail rev-parse HEAD
+    # expect: 7801d061243d7b753bad0e0b3c057cd250b11755
+    hermes -p jss-worker-glm-easy-1 plugins adopt ponytail
+    hermes -p jss-worker-glm-easy-1 plugins enable ponytail
+    grep -qxF 'PONYTAIL_DEFAULT_MODE=full' /Users/chanbla11mit/.hermes/profiles/jss-worker-glm-easy-1/.env || printf '\nPONYTAIL_DEFAULT_MODE=full\n' >> /Users/chanbla11mit/.hermes/profiles/jss-worker-glm-easy-1/.env
+    hermes -p jss-worker-glm-easy-1 plugins list --plain --no-bundled | grep -x 'enabled      git      5.3.3    ponytail'
+    # expect: enabled      git      5.3.3    ponytail
+
+`jss-worker-glm-easy-2`:
+
+    git clone https://github.com/DietrichGebert/ponytail.git /Users/chanbla11mit/.hermes/profiles/jss-worker-glm-easy-2/plugins/ponytail
+    git -C /Users/chanbla11mit/.hermes/profiles/jss-worker-glm-easy-2/plugins/ponytail checkout --detach 7801d061243d7b753bad0e0b3c057cd250b11755
+    git -C /Users/chanbla11mit/.hermes/profiles/jss-worker-glm-easy-2/plugins/ponytail rev-parse HEAD
+    # expect: 7801d061243d7b753bad0e0b3c057cd250b11755
+    hermes -p jss-worker-glm-easy-2 plugins adopt ponytail
+    hermes -p jss-worker-glm-easy-2 plugins enable ponytail
+    grep -qxF 'PONYTAIL_DEFAULT_MODE=full' /Users/chanbla11mit/.hermes/profiles/jss-worker-glm-easy-2/.env || printf '\nPONYTAIL_DEFAULT_MODE=full\n' >> /Users/chanbla11mit/.hermes/profiles/jss-worker-glm-easy-2/.env
+    hermes -p jss-worker-glm-easy-2 plugins list --plain --no-bundled | grep -x 'enabled      git      5.3.3    ponytail'
+    # expect: enabled      git      5.3.3    ponytail
+
+`jss-worker-glm-medium-1`:
+
+    git clone https://github.com/DietrichGebert/ponytail.git /Users/chanbla11mit/.hermes/profiles/jss-worker-glm-medium-1/plugins/ponytail
+    git -C /Users/chanbla11mit/.hermes/profiles/jss-worker-glm-medium-1/plugins/ponytail checkout --detach 7801d061243d7b753bad0e0b3c057cd250b11755
+    git -C /Users/chanbla11mit/.hermes/profiles/jss-worker-glm-medium-1/plugins/ponytail rev-parse HEAD
+    # expect: 7801d061243d7b753bad0e0b3c057cd250b11755
+    hermes -p jss-worker-glm-medium-1 plugins adopt ponytail
+    hermes -p jss-worker-glm-medium-1 plugins enable ponytail
+    grep -qxF 'PONYTAIL_DEFAULT_MODE=full' /Users/chanbla11mit/.hermes/profiles/jss-worker-glm-medium-1/.env || printf '\nPONYTAIL_DEFAULT_MODE=full\n' >> /Users/chanbla11mit/.hermes/profiles/jss-worker-glm-medium-1/.env
+    hermes -p jss-worker-glm-medium-1 plugins list --plain --no-bundled | grep -x 'enabled      git      5.3.3    ponytail'
+    # expect: enabled      git      5.3.3    ponytail
+
+`jss-worker-glm-medium-2`:
+
+    git clone https://github.com/DietrichGebert/ponytail.git /Users/chanbla11mit/.hermes/profiles/jss-worker-glm-medium-2/plugins/ponytail
+    git -C /Users/chanbla11mit/.hermes/profiles/jss-worker-glm-medium-2/plugins/ponytail checkout --detach 7801d061243d7b753bad0e0b3c057cd250b11755
+    git -C /Users/chanbla11mit/.hermes/profiles/jss-worker-glm-medium-2/plugins/ponytail rev-parse HEAD
+    # expect: 7801d061243d7b753bad0e0b3c057cd250b11755
+    hermes -p jss-worker-glm-medium-2 plugins adopt ponytail
+    hermes -p jss-worker-glm-medium-2 plugins enable ponytail
+    grep -qxF 'PONYTAIL_DEFAULT_MODE=full' /Users/chanbla11mit/.hermes/profiles/jss-worker-glm-medium-2/.env || printf '\nPONYTAIL_DEFAULT_MODE=full\n' >> /Users/chanbla11mit/.hermes/profiles/jss-worker-glm-medium-2/.env
+    hermes -p jss-worker-glm-medium-2 plugins list --plain --no-bundled | grep -x 'enabled      git      5.3.3    ponytail'
+    # expect: enabled      git      5.3.3    ponytail
+
+`jss-worker-glm-hard-1`:
+
+    git clone https://github.com/DietrichGebert/ponytail.git /Users/chanbla11mit/.hermes/profiles/jss-worker-glm-hard-1/plugins/ponytail
+    git -C /Users/chanbla11mit/.hermes/profiles/jss-worker-glm-hard-1/plugins/ponytail checkout --detach 7801d061243d7b753bad0e0b3c057cd250b11755
+    git -C /Users/chanbla11mit/.hermes/profiles/jss-worker-glm-hard-1/plugins/ponytail rev-parse HEAD
+    # expect: 7801d061243d7b753bad0e0b3c057cd250b11755
+    hermes -p jss-worker-glm-hard-1 plugins adopt ponytail
+    hermes -p jss-worker-glm-hard-1 plugins enable ponytail
+    grep -qxF 'PONYTAIL_DEFAULT_MODE=full' /Users/chanbla11mit/.hermes/profiles/jss-worker-glm-hard-1/.env || printf '\nPONYTAIL_DEFAULT_MODE=full\n' >> /Users/chanbla11mit/.hermes/profiles/jss-worker-glm-hard-1/.env
+    hermes -p jss-worker-glm-hard-1 plugins list --plain --no-bundled | grep -x 'enabled      git      5.3.3    ponytail'
+    # expect: enabled      git      5.3.3    ponytail
+
+`jss-worker-glm-hard-2`:
+
+    git clone https://github.com/DietrichGebert/ponytail.git /Users/chanbla11mit/.hermes/profiles/jss-worker-glm-hard-2/plugins/ponytail
+    git -C /Users/chanbla11mit/.hermes/profiles/jss-worker-glm-hard-2/plugins/ponytail checkout --detach 7801d061243d7b753bad0e0b3c057cd250b11755
+    git -C /Users/chanbla11mit/.hermes/profiles/jss-worker-glm-hard-2/plugins/ponytail rev-parse HEAD
+    # expect: 7801d061243d7b753bad0e0b3c057cd250b11755
+    hermes -p jss-worker-glm-hard-2 plugins adopt ponytail
+    hermes -p jss-worker-glm-hard-2 plugins enable ponytail
+    grep -qxF 'PONYTAIL_DEFAULT_MODE=full' /Users/chanbla11mit/.hermes/profiles/jss-worker-glm-hard-2/.env || printf '\nPONYTAIL_DEFAULT_MODE=full\n' >> /Users/chanbla11mit/.hermes/profiles/jss-worker-glm-hard-2/.env
+    hermes -p jss-worker-glm-hard-2 plugins list --plain --no-bundled | grep -x 'enabled      git      5.3.3    ponytail'
+    # expect: enabled      git      5.3.3    ponytail
+
+`anki-orchestrator`:
+
+    git clone https://github.com/DietrichGebert/ponytail.git /Users/chanbla11mit/.hermes/profiles/anki-orchestrator/plugins/ponytail
+    git -C /Users/chanbla11mit/.hermes/profiles/anki-orchestrator/plugins/ponytail checkout --detach 7801d061243d7b753bad0e0b3c057cd250b11755
+    git -C /Users/chanbla11mit/.hermes/profiles/anki-orchestrator/plugins/ponytail rev-parse HEAD
+    # expect: 7801d061243d7b753bad0e0b3c057cd250b11755
+    hermes -p anki-orchestrator plugins adopt ponytail
+    hermes -p anki-orchestrator plugins enable ponytail
+    grep -qxF 'PONYTAIL_DEFAULT_MODE=full' /Users/chanbla11mit/.hermes/profiles/anki-orchestrator/.env || printf '\nPONYTAIL_DEFAULT_MODE=full\n' >> /Users/chanbla11mit/.hermes/profiles/anki-orchestrator/.env
+    hermes -p anki-orchestrator plugins list --plain --no-bundled | grep -x 'enabled      git      5.3.3    ponytail'
+    # expect: enabled      git      5.3.3    ponytail
+
+`anki-reviewer`:
+
+    git clone https://github.com/DietrichGebert/ponytail.git /Users/chanbla11mit/.hermes/profiles/anki-reviewer/plugins/ponytail
+    git -C /Users/chanbla11mit/.hermes/profiles/anki-reviewer/plugins/ponytail checkout --detach 7801d061243d7b753bad0e0b3c057cd250b11755
+    git -C /Users/chanbla11mit/.hermes/profiles/anki-reviewer/plugins/ponytail rev-parse HEAD
+    # expect: 7801d061243d7b753bad0e0b3c057cd250b11755
+    hermes -p anki-reviewer plugins adopt ponytail
+    hermes -p anki-reviewer plugins enable ponytail
+    grep -qxF 'PONYTAIL_DEFAULT_MODE=full' /Users/chanbla11mit/.hermes/profiles/anki-reviewer/.env || printf '\nPONYTAIL_DEFAULT_MODE=full\n' >> /Users/chanbla11mit/.hermes/profiles/anki-reviewer/.env
+    hermes -p anki-reviewer plugins list --plain --no-bundled | grep -x 'enabled      git      5.3.3    ponytail'
+    # expect: enabled      git      5.3.3    ponytail
+
+`anki-reviewer-glm`:
+
+    git clone https://github.com/DietrichGebert/ponytail.git /Users/chanbla11mit/.hermes/profiles/anki-reviewer-glm/plugins/ponytail
+    git -C /Users/chanbla11mit/.hermes/profiles/anki-reviewer-glm/plugins/ponytail checkout --detach 7801d061243d7b753bad0e0b3c057cd250b11755
+    git -C /Users/chanbla11mit/.hermes/profiles/anki-reviewer-glm/plugins/ponytail rev-parse HEAD
+    # expect: 7801d061243d7b753bad0e0b3c057cd250b11755
+    hermes -p anki-reviewer-glm plugins adopt ponytail
+    hermes -p anki-reviewer-glm plugins enable ponytail
+    grep -qxF 'PONYTAIL_DEFAULT_MODE=full' /Users/chanbla11mit/.hermes/profiles/anki-reviewer-glm/.env || printf '\nPONYTAIL_DEFAULT_MODE=full\n' >> /Users/chanbla11mit/.hermes/profiles/anki-reviewer-glm/.env
+    hermes -p anki-reviewer-glm plugins list --plain --no-bundled | grep -x 'enabled      git      5.3.3    ponytail'
+    # expect: enabled      git      5.3.3    ponytail
+
+`anki-worker`:
+
+    git clone https://github.com/DietrichGebert/ponytail.git /Users/chanbla11mit/.hermes/profiles/anki-worker/plugins/ponytail
+    git -C /Users/chanbla11mit/.hermes/profiles/anki-worker/plugins/ponytail checkout --detach 7801d061243d7b753bad0e0b3c057cd250b11755
+    git -C /Users/chanbla11mit/.hermes/profiles/anki-worker/plugins/ponytail rev-parse HEAD
+    # expect: 7801d061243d7b753bad0e0b3c057cd250b11755
+    hermes -p anki-worker plugins adopt ponytail
+    hermes -p anki-worker plugins enable ponytail
+    grep -qxF 'PONYTAIL_DEFAULT_MODE=full' /Users/chanbla11mit/.hermes/profiles/anki-worker/.env || printf '\nPONYTAIL_DEFAULT_MODE=full\n' >> /Users/chanbla11mit/.hermes/profiles/anki-worker/.env
+    hermes -p anki-worker plugins list --plain --no-bundled | grep -x 'enabled      git      5.3.3    ponytail'
+    # expect: enabled      git      5.3.3    ponytail
+
+`anki-worker-2`:
+
+    git clone https://github.com/DietrichGebert/ponytail.git /Users/chanbla11mit/.hermes/profiles/anki-worker-2/plugins/ponytail
+    git -C /Users/chanbla11mit/.hermes/profiles/anki-worker-2/plugins/ponytail checkout --detach 7801d061243d7b753bad0e0b3c057cd250b11755
+    git -C /Users/chanbla11mit/.hermes/profiles/anki-worker-2/plugins/ponytail rev-parse HEAD
+    # expect: 7801d061243d7b753bad0e0b3c057cd250b11755
+    hermes -p anki-worker-2 plugins adopt ponytail
+    hermes -p anki-worker-2 plugins enable ponytail
+    grep -qxF 'PONYTAIL_DEFAULT_MODE=full' /Users/chanbla11mit/.hermes/profiles/anki-worker-2/.env || printf '\nPONYTAIL_DEFAULT_MODE=full\n' >> /Users/chanbla11mit/.hermes/profiles/anki-worker-2/.env
+    hermes -p anki-worker-2 plugins list --plain --no-bundled | grep -x 'enabled      git      5.3.3    ponytail'
+    # expect: enabled      git      5.3.3    ponytail
+
+`anki-worker-glm-easy-1`:
+
+    git clone https://github.com/DietrichGebert/ponytail.git /Users/chanbla11mit/.hermes/profiles/anki-worker-glm-easy-1/plugins/ponytail
+    git -C /Users/chanbla11mit/.hermes/profiles/anki-worker-glm-easy-1/plugins/ponytail checkout --detach 7801d061243d7b753bad0e0b3c057cd250b11755
+    git -C /Users/chanbla11mit/.hermes/profiles/anki-worker-glm-easy-1/plugins/ponytail rev-parse HEAD
+    # expect: 7801d061243d7b753bad0e0b3c057cd250b11755
+    hermes -p anki-worker-glm-easy-1 plugins adopt ponytail
+    hermes -p anki-worker-glm-easy-1 plugins enable ponytail
+    grep -qxF 'PONYTAIL_DEFAULT_MODE=full' /Users/chanbla11mit/.hermes/profiles/anki-worker-glm-easy-1/.env || printf '\nPONYTAIL_DEFAULT_MODE=full\n' >> /Users/chanbla11mit/.hermes/profiles/anki-worker-glm-easy-1/.env
+    hermes -p anki-worker-glm-easy-1 plugins list --plain --no-bundled | grep -x 'enabled      git      5.3.3    ponytail'
+    # expect: enabled      git      5.3.3    ponytail
+
+`anki-worker-glm-easy-2`:
+
+    git clone https://github.com/DietrichGebert/ponytail.git /Users/chanbla11mit/.hermes/profiles/anki-worker-glm-easy-2/plugins/ponytail
+    git -C /Users/chanbla11mit/.hermes/profiles/anki-worker-glm-easy-2/plugins/ponytail checkout --detach 7801d061243d7b753bad0e0b3c057cd250b11755
+    git -C /Users/chanbla11mit/.hermes/profiles/anki-worker-glm-easy-2/plugins/ponytail rev-parse HEAD
+    # expect: 7801d061243d7b753bad0e0b3c057cd250b11755
+    hermes -p anki-worker-glm-easy-2 plugins adopt ponytail
+    hermes -p anki-worker-glm-easy-2 plugins enable ponytail
+    grep -qxF 'PONYTAIL_DEFAULT_MODE=full' /Users/chanbla11mit/.hermes/profiles/anki-worker-glm-easy-2/.env || printf '\nPONYTAIL_DEFAULT_MODE=full\n' >> /Users/chanbla11mit/.hermes/profiles/anki-worker-glm-easy-2/.env
+    hermes -p anki-worker-glm-easy-2 plugins list --plain --no-bundled | grep -x 'enabled      git      5.3.3    ponytail'
+    # expect: enabled      git      5.3.3    ponytail
+
+`anki-worker-glm-medium-1`:
+
+    git clone https://github.com/DietrichGebert/ponytail.git /Users/chanbla11mit/.hermes/profiles/anki-worker-glm-medium-1/plugins/ponytail
+    git -C /Users/chanbla11mit/.hermes/profiles/anki-worker-glm-medium-1/plugins/ponytail checkout --detach 7801d061243d7b753bad0e0b3c057cd250b11755
+    git -C /Users/chanbla11mit/.hermes/profiles/anki-worker-glm-medium-1/plugins/ponytail rev-parse HEAD
+    # expect: 7801d061243d7b753bad0e0b3c057cd250b11755
+    hermes -p anki-worker-glm-medium-1 plugins adopt ponytail
+    hermes -p anki-worker-glm-medium-1 plugins enable ponytail
+    grep -qxF 'PONYTAIL_DEFAULT_MODE=full' /Users/chanbla11mit/.hermes/profiles/anki-worker-glm-medium-1/.env || printf '\nPONYTAIL_DEFAULT_MODE=full\n' >> /Users/chanbla11mit/.hermes/profiles/anki-worker-glm-medium-1/.env
+    hermes -p anki-worker-glm-medium-1 plugins list --plain --no-bundled | grep -x 'enabled      git      5.3.3    ponytail'
+    # expect: enabled      git      5.3.3    ponytail
+
+`anki-worker-glm-medium-2`:
+
+    git clone https://github.com/DietrichGebert/ponytail.git /Users/chanbla11mit/.hermes/profiles/anki-worker-glm-medium-2/plugins/ponytail
+    git -C /Users/chanbla11mit/.hermes/profiles/anki-worker-glm-medium-2/plugins/ponytail checkout --detach 7801d061243d7b753bad0e0b3c057cd250b11755
+    git -C /Users/chanbla11mit/.hermes/profiles/anki-worker-glm-medium-2/plugins/ponytail rev-parse HEAD
+    # expect: 7801d061243d7b753bad0e0b3c057cd250b11755
+    hermes -p anki-worker-glm-medium-2 plugins adopt ponytail
+    hermes -p anki-worker-glm-medium-2 plugins enable ponytail
+    grep -qxF 'PONYTAIL_DEFAULT_MODE=full' /Users/chanbla11mit/.hermes/profiles/anki-worker-glm-medium-2/.env || printf '\nPONYTAIL_DEFAULT_MODE=full\n' >> /Users/chanbla11mit/.hermes/profiles/anki-worker-glm-medium-2/.env
+    hermes -p anki-worker-glm-medium-2 plugins list --plain --no-bundled | grep -x 'enabled      git      5.3.3    ponytail'
+    # expect: enabled      git      5.3.3    ponytail
+
+`anki-worker-glm-hard-1`:
+
+    git clone https://github.com/DietrichGebert/ponytail.git /Users/chanbla11mit/.hermes/profiles/anki-worker-glm-hard-1/plugins/ponytail
+    git -C /Users/chanbla11mit/.hermes/profiles/anki-worker-glm-hard-1/plugins/ponytail checkout --detach 7801d061243d7b753bad0e0b3c057cd250b11755
+    git -C /Users/chanbla11mit/.hermes/profiles/anki-worker-glm-hard-1/plugins/ponytail rev-parse HEAD
+    # expect: 7801d061243d7b753bad0e0b3c057cd250b11755
+    hermes -p anki-worker-glm-hard-1 plugins adopt ponytail
+    hermes -p anki-worker-glm-hard-1 plugins enable ponytail
+    grep -qxF 'PONYTAIL_DEFAULT_MODE=full' /Users/chanbla11mit/.hermes/profiles/anki-worker-glm-hard-1/.env || printf '\nPONYTAIL_DEFAULT_MODE=full\n' >> /Users/chanbla11mit/.hermes/profiles/anki-worker-glm-hard-1/.env
+    hermes -p anki-worker-glm-hard-1 plugins list --plain --no-bundled | grep -x 'enabled      git      5.3.3    ponytail'
+    # expect: enabled      git      5.3.3    ponytail
+
+`anki-worker-glm-hard-2`:
+
+    git clone https://github.com/DietrichGebert/ponytail.git /Users/chanbla11mit/.hermes/profiles/anki-worker-glm-hard-2/plugins/ponytail
+    git -C /Users/chanbla11mit/.hermes/profiles/anki-worker-glm-hard-2/plugins/ponytail checkout --detach 7801d061243d7b753bad0e0b3c057cd250b11755
+    git -C /Users/chanbla11mit/.hermes/profiles/anki-worker-glm-hard-2/plugins/ponytail rev-parse HEAD
+    # expect: 7801d061243d7b753bad0e0b3c057cd250b11755
+    hermes -p anki-worker-glm-hard-2 plugins adopt ponytail
+    hermes -p anki-worker-glm-hard-2 plugins enable ponytail
+    grep -qxF 'PONYTAIL_DEFAULT_MODE=full' /Users/chanbla11mit/.hermes/profiles/anki-worker-glm-hard-2/.env || printf '\nPONYTAIL_DEFAULT_MODE=full\n' >> /Users/chanbla11mit/.hermes/profiles/anki-worker-glm-hard-2/.env
+    hermes -p anki-worker-glm-hard-2 plugins list --plain --no-bundled | grep -x 'enabled      git      5.3.3    ponytail'
+    # expect: enabled      git      5.3.3    ponytail
+
+`advisor`:
+
+    git clone https://github.com/DietrichGebert/ponytail.git /Users/chanbla11mit/.hermes/profiles/advisor/plugins/ponytail
+    git -C /Users/chanbla11mit/.hermes/profiles/advisor/plugins/ponytail checkout --detach 7801d061243d7b753bad0e0b3c057cd250b11755
+    git -C /Users/chanbla11mit/.hermes/profiles/advisor/plugins/ponytail rev-parse HEAD
+    # expect: 7801d061243d7b753bad0e0b3c057cd250b11755
+    hermes -p advisor plugins adopt ponytail
+    hermes -p advisor plugins enable ponytail
+    grep -qxF 'PONYTAIL_DEFAULT_MODE=full' /Users/chanbla11mit/.hermes/profiles/advisor/.env || printf '\nPONYTAIL_DEFAULT_MODE=full\n' >> /Users/chanbla11mit/.hermes/profiles/advisor/.env
+    hermes -p advisor plugins list --plain --no-bundled | grep -x 'enabled      git      5.3.3    ponytail'
+    # expect: enabled      git      5.3.3    ponytail
+
+### 3c. The ten retired implementation profiles: install and keep disabled
+
+These profiles get no `.env` line, because the plugin stays disabled.
+
+`worker-flash-1`:
+
+    git clone https://github.com/DietrichGebert/ponytail.git /Users/chanbla11mit/.hermes/profiles/worker-flash-1/plugins/ponytail
+    git -C /Users/chanbla11mit/.hermes/profiles/worker-flash-1/plugins/ponytail checkout --detach 7801d061243d7b753bad0e0b3c057cd250b11755
+    git -C /Users/chanbla11mit/.hermes/profiles/worker-flash-1/plugins/ponytail rev-parse HEAD
+    # expect: 7801d061243d7b753bad0e0b3c057cd250b11755
+    hermes -p worker-flash-1 plugins adopt ponytail
+    hermes -p worker-flash-1 plugins disable ponytail
+    hermes -p worker-flash-1 plugins list --plain --no-bundled | grep -x 'disabled     git      5.3.3    ponytail'
+    # expect: disabled     git      5.3.3    ponytail
+
+`worker-flash-2`:
+
+    git clone https://github.com/DietrichGebert/ponytail.git /Users/chanbla11mit/.hermes/profiles/worker-flash-2/plugins/ponytail
+    git -C /Users/chanbla11mit/.hermes/profiles/worker-flash-2/plugins/ponytail checkout --detach 7801d061243d7b753bad0e0b3c057cd250b11755
+    git -C /Users/chanbla11mit/.hermes/profiles/worker-flash-2/plugins/ponytail rev-parse HEAD
+    # expect: 7801d061243d7b753bad0e0b3c057cd250b11755
+    hermes -p worker-flash-2 plugins adopt ponytail
+    hermes -p worker-flash-2 plugins disable ponytail
+    hermes -p worker-flash-2 plugins list --plain --no-bundled | grep -x 'disabled     git      5.3.3    ponytail'
+    # expect: disabled     git      5.3.3    ponytail
+
+`worker-flash-3`:
+
+    git clone https://github.com/DietrichGebert/ponytail.git /Users/chanbla11mit/.hermes/profiles/worker-flash-3/plugins/ponytail
+    git -C /Users/chanbla11mit/.hermes/profiles/worker-flash-3/plugins/ponytail checkout --detach 7801d061243d7b753bad0e0b3c057cd250b11755
+    git -C /Users/chanbla11mit/.hermes/profiles/worker-flash-3/plugins/ponytail rev-parse HEAD
+    # expect: 7801d061243d7b753bad0e0b3c057cd250b11755
+    hermes -p worker-flash-3 plugins adopt ponytail
+    hermes -p worker-flash-3 plugins disable ponytail
+    hermes -p worker-flash-3 plugins list --plain --no-bundled | grep -x 'disabled     git      5.3.3    ponytail'
+    # expect: disabled     git      5.3.3    ponytail
+
+`worker-luna-1`:
+
+    git clone https://github.com/DietrichGebert/ponytail.git /Users/chanbla11mit/.hermes/profiles/worker-luna-1/plugins/ponytail
+    git -C /Users/chanbla11mit/.hermes/profiles/worker-luna-1/plugins/ponytail checkout --detach 7801d061243d7b753bad0e0b3c057cd250b11755
+    git -C /Users/chanbla11mit/.hermes/profiles/worker-luna-1/plugins/ponytail rev-parse HEAD
+    # expect: 7801d061243d7b753bad0e0b3c057cd250b11755
+    hermes -p worker-luna-1 plugins adopt ponytail
+    hermes -p worker-luna-1 plugins disable ponytail
+    hermes -p worker-luna-1 plugins list --plain --no-bundled | grep -x 'disabled     git      5.3.3    ponytail'
+    # expect: disabled     git      5.3.3    ponytail
+
+`worker-luna-2`:
+
+    git clone https://github.com/DietrichGebert/ponytail.git /Users/chanbla11mit/.hermes/profiles/worker-luna-2/plugins/ponytail
+    git -C /Users/chanbla11mit/.hermes/profiles/worker-luna-2/plugins/ponytail checkout --detach 7801d061243d7b753bad0e0b3c057cd250b11755
+    git -C /Users/chanbla11mit/.hermes/profiles/worker-luna-2/plugins/ponytail rev-parse HEAD
+    # expect: 7801d061243d7b753bad0e0b3c057cd250b11755
+    hermes -p worker-luna-2 plugins adopt ponytail
+    hermes -p worker-luna-2 plugins disable ponytail
+    hermes -p worker-luna-2 plugins list --plain --no-bundled | grep -x 'disabled     git      5.3.3    ponytail'
+    # expect: disabled     git      5.3.3    ponytail
+
+`worker-terra-1`:
+
+    git clone https://github.com/DietrichGebert/ponytail.git /Users/chanbla11mit/.hermes/profiles/worker-terra-1/plugins/ponytail
+    git -C /Users/chanbla11mit/.hermes/profiles/worker-terra-1/plugins/ponytail checkout --detach 7801d061243d7b753bad0e0b3c057cd250b11755
+    git -C /Users/chanbla11mit/.hermes/profiles/worker-terra-1/plugins/ponytail rev-parse HEAD
+    # expect: 7801d061243d7b753bad0e0b3c057cd250b11755
+    hermes -p worker-terra-1 plugins adopt ponytail
+    hermes -p worker-terra-1 plugins disable ponytail
+    hermes -p worker-terra-1 plugins list --plain --no-bundled | grep -x 'disabled     git      5.3.3    ponytail'
+    # expect: disabled     git      5.3.3    ponytail
+
+`worker-terra-2`:
+
+    git clone https://github.com/DietrichGebert/ponytail.git /Users/chanbla11mit/.hermes/profiles/worker-terra-2/plugins/ponytail
+    git -C /Users/chanbla11mit/.hermes/profiles/worker-terra-2/plugins/ponytail checkout --detach 7801d061243d7b753bad0e0b3c057cd250b11755
+    git -C /Users/chanbla11mit/.hermes/profiles/worker-terra-2/plugins/ponytail rev-parse HEAD
+    # expect: 7801d061243d7b753bad0e0b3c057cd250b11755
+    hermes -p worker-terra-2 plugins adopt ponytail
+    hermes -p worker-terra-2 plugins disable ponytail
+    hermes -p worker-terra-2 plugins list --plain --no-bundled | grep -x 'disabled     git      5.3.3    ponytail'
+    # expect: disabled     git      5.3.3    ponytail
+
+`worker-glm-full`:
+
+    git clone https://github.com/DietrichGebert/ponytail.git /Users/chanbla11mit/.hermes/profiles/worker-glm-full/plugins/ponytail
+    git -C /Users/chanbla11mit/.hermes/profiles/worker-glm-full/plugins/ponytail checkout --detach 7801d061243d7b753bad0e0b3c057cd250b11755
+    git -C /Users/chanbla11mit/.hermes/profiles/worker-glm-full/plugins/ponytail rev-parse HEAD
+    # expect: 7801d061243d7b753bad0e0b3c057cd250b11755
+    hermes -p worker-glm-full plugins adopt ponytail
+    hermes -p worker-glm-full plugins disable ponytail
+    hermes -p worker-glm-full plugins list --plain --no-bundled | grep -x 'disabled     git      5.3.3    ponytail'
+    # expect: disabled     git      5.3.3    ponytail
+
+`worker-sol`:
+
+    git clone https://github.com/DietrichGebert/ponytail.git /Users/chanbla11mit/.hermes/profiles/worker-sol/plugins/ponytail
+    git -C /Users/chanbla11mit/.hermes/profiles/worker-sol/plugins/ponytail checkout --detach 7801d061243d7b753bad0e0b3c057cd250b11755
+    git -C /Users/chanbla11mit/.hermes/profiles/worker-sol/plugins/ponytail rev-parse HEAD
+    # expect: 7801d061243d7b753bad0e0b3c057cd250b11755
+    hermes -p worker-sol plugins adopt ponytail
+    hermes -p worker-sol plugins disable ponytail
+    hermes -p worker-sol plugins list --plain --no-bundled | grep -x 'disabled     git      5.3.3    ponytail'
+    # expect: disabled     git      5.3.3    ponytail
+
+`worker-astra`:
+
+    git clone https://github.com/DietrichGebert/ponytail.git /Users/chanbla11mit/.hermes/profiles/worker-astra/plugins/ponytail
+    git -C /Users/chanbla11mit/.hermes/profiles/worker-astra/plugins/ponytail checkout --detach 7801d061243d7b753bad0e0b3c057cd250b11755
+    git -C /Users/chanbla11mit/.hermes/profiles/worker-astra/plugins/ponytail rev-parse HEAD
+    # expect: 7801d061243d7b753bad0e0b3c057cd250b11755
+    hermes -p worker-astra plugins adopt ponytail
+    hermes -p worker-astra plugins disable ponytail
+    hermes -p worker-astra plugins list --plain --no-bundled | grep -x 'disabled     git      5.3.3    ponytail'
+    # expect: disabled     git      5.3.3    ponytail
+
+Hermes loads plugins when a process starts: each running gateway and each running worker of a changed profile must restart to load the plugin. Then run `./scripts/verify-state`.
 
 ## 4. Deploy the shared skills (manual copy; never symlink)
 
@@ -141,7 +938,7 @@ Hermes skills load per profile: worker profiles read only `~/.hermes/profiles/<p
       cp -R skills/devops/production-deployment-planning ~/.hermes/profiles/$profile/skills/devops/
     done
 
-The tracked trees under `skills/` are canonical source; the copies under each profile home are intentional deployment artifacts. Profiles do not share on-disk skill files, inherit live changes, or use symlinks. Every deployed copy, including every supporting file in both deployment skills, must match the tracked hashes in `snapshots/sanitized-current-state.yaml`; its `deploy_profiles` lists exactly which profile homes host each skill, and `./scripts/verify-state` hashes each copy and fails on a missing or divergent one. Copy the reviewed tracked source only; do not patch a live skill. Preserve worker-astra's three declared, hash-pinned built-in skill overrides; they are profile-local exceptions, not copies to normalize. After copying, run `./scripts/verify-state` so source and deployed copies are identical. Reviewer and advisor profiles never receive `minimal-implementation`; the orchestrator attaches it per card per the routing policy in `skills/multi-agent-coding-orchestrator/SKILL.md`.
+The tracked trees under `skills/` are canonical source; the copies under each profile home are intentional deployment artifacts. Profiles do not share on-disk skill files, inherit live changes, or use symlinks. Every deployed copy, including every supporting file in both deployment skills, must match the tracked hashes in `snapshots/sanitized-current-state.yaml`; its `deploy_profiles` lists exactly which profile homes host each skill, and `./scripts/verify-state` hashes each copy and fails on a missing or divergent one. Copy the reviewed tracked source only; do not patch a live skill. Preserve worker-astra's three declared, hash-pinned built-in skill overrides; they are profile-local exceptions, not copies to normalize. After copying, run `./scripts/verify-state` so source and deployed copies are identical. The active policy for minimal implementation is the Ponytail plugin at level `full` (section 3); the orchestrators no longer attach `minimal-implementation` to a card.
 
 Before creating any card that force-loads skills, reject incompatible requests before the card exists:
 
