@@ -99,7 +99,8 @@ class Roster(unittest.TestCase):
                 self.assertEqual(entry["toolsets"], "review")
                 self.assertTrue(entry["credential_required"])
                 self.assertIsNone(entry["credential_present"])
-                self.assertEqual(entry["required_plugins"], ["jev"])
+                # Card t_9c1b6b2f: Ponytail is required on the 56 target profiles.
+                self.assertEqual(entry["required_plugins"], ["jev", "ponytail"])
                 self.assertEqual(entry["installed_disabled_plugins"], [])
                 self.assertNotIn("auxiliary_models", entry)
                 # Card t_50fd66f2 (owner decision of 2026-11-16): the Claude subscription fallback

@@ -144,6 +144,7 @@
       "hermes-terminal-outcome-notification": "enabled      git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification"
     },
     "advisor": {
+      "ponytail": "enabled      git      5.3.3    ponytail",
       "jev": "enabled      user     0.1.0    jev"
     },
     "reviewer-sol": {
@@ -151,236 +152,281 @@
     },
     "worker-flash-1": {
       "hermes-terminal-outcome-notification": "enabled      git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification",
-      "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail"
+      "ponytail": "disabled     git      5.3.3    ponytail"
     },
     "worker-flash-2": {
       "hermes-terminal-outcome-notification": "enabled      git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification",
-      "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail"
+      "ponytail": "disabled     git      5.3.3    ponytail"
     },
     "worker-flash-3": {
       "hermes-terminal-outcome-notification": "enabled      git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification",
-      "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail"
+      "ponytail": "disabled     git      5.3.3    ponytail"
     },
     "worker-luna-1": {
       "hermes-terminal-outcome-notification": "enabled      git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification",
-      "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail"
+      "ponytail": "disabled     git      5.3.3    ponytail"
     },
     "worker-luna-2": {
       "hermes-terminal-outcome-notification": "enabled      git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification",
-      "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail"
+      "ponytail": "disabled     git      5.3.3    ponytail"
     },
     "worker-terra-1": {
       "hermes-terminal-outcome-notification": "enabled      git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification",
-      "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail"
+      "ponytail": "disabled     git      5.3.3    ponytail"
     },
     "worker-glm-full": {
       "hermes-terminal-outcome-notification": "enabled      git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification",
-      "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail"
+      "ponytail": "disabled     git      5.3.3    ponytail"
     },
     "worker-sol": {
       "hermes-terminal-outcome-notification": "enabled      git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification",
-      "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail"
+      "ponytail": "disabled     git      5.3.3    ponytail"
     },
     "worker-astra": {
       "hermes-terminal-outcome-notification": "enabled      git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification",
-      "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail"
+      "ponytail": "disabled     git      5.3.3    ponytail"
     },
     "worker-terra-2": {
-      "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail"
+      "ponytail": "disabled     git      5.3.3    ponytail"
     },
     "jobcron-orchestrator": {
       "hermes-terminal-outcome-notification": "disabled     git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification",
+      "ponytail": "enabled      git      5.3.3    ponytail",
       "jev": "enabled      user     0.1.0    jev"
     },
     "jobcron-worker": {
       "hermes-terminal-outcome-notification": "disabled     git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification",
-      "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail",
+      "ponytail": "enabled      git      5.3.3    ponytail",
       "jev": "enabled      user     0.1.0    jev"
     },
     "jobcron-worker-2": {
       "hermes-terminal-outcome-notification": "disabled     git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification",
-      "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail",
+      "ponytail": "enabled      git      5.3.3    ponytail",
       "jev": "enabled      user     0.1.0    jev"
     },
     "jobcron-reviewer": {
       "hermes-terminal-outcome-notification": "disabled     git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification",
+      "ponytail": "enabled      git      5.3.3    ponytail",
       "jev": "enabled      user     0.1.0    jev"
     },
     "chapt-orchestrator": {
       "hermes-terminal-outcome-notification": "disabled     git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification",
+      "ponytail": "enabled      git      5.3.3    ponytail",
       "jev": "enabled      user     0.1.0    jev"
     },
     "chapt-worker": {
       "hermes-terminal-outcome-notification": "disabled     git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification",
-      "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail",
+      "ponytail": "enabled      git      5.3.3    ponytail",
       "jev": "enabled      user     0.1.0    jev"
     },
     "chapt-worker-2": {
       "hermes-terminal-outcome-notification": "disabled     git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification",
-      "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail",
+      "ponytail": "enabled      git      5.3.3    ponytail",
       "jev": "enabled      user     0.1.0    jev"
     },
     "chapt-reviewer": {
       "hermes-terminal-outcome-notification": "disabled     git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification",
+      "ponytail": "enabled      git      5.3.3    ponytail",
       "jev": "enabled      user     0.1.0    jev"
     },
     "harness-orchestrator": {
       "hermes-terminal-outcome-notification": "disabled     git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification",
+      "ponytail": "enabled      git      5.3.3    ponytail",
       "jev": "enabled      user     0.1.0    jev"
     },
     "harness-worker": {
       "hermes-terminal-outcome-notification": "disabled     git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification",
-      "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail",
+      "ponytail": "enabled      git      5.3.3    ponytail",
       "jev": "enabled      user     0.1.0    jev"
     },
     "harness-worker-2": {
       "hermes-terminal-outcome-notification": "disabled     git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification",
-      "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail",
+      "ponytail": "enabled      git      5.3.3    ponytail",
       "jev": "enabled      user     0.1.0    jev"
     },
     "harness-reviewer": {
       "hermes-terminal-outcome-notification": "disabled     git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification",
+      "ponytail": "enabled      git      5.3.3    ponytail",
       "jev": "enabled      user     0.1.0    jev"
     },
     "jss-orchestrator": {
       "hermes-terminal-outcome-notification": "disabled     git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification",
+      "ponytail": "enabled      git      5.3.3    ponytail",
       "jev": "enabled      user     0.1.0    jev"
     },
     "jss-worker": {
       "hermes-terminal-outcome-notification": "disabled     git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification",
-      "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail",
+      "ponytail": "enabled      git      5.3.3    ponytail",
       "jev": "enabled      user     0.1.0    jev"
     },
     "jss-worker-2": {
       "hermes-terminal-outcome-notification": "disabled     git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification",
-      "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail",
+      "ponytail": "enabled      git      5.3.3    ponytail",
       "jev": "enabled      user     0.1.0    jev"
     },
     "jss-reviewer": {
       "hermes-terminal-outcome-notification": "disabled     git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification",
+      "ponytail": "enabled      git      5.3.3    ponytail",
       "jev": "enabled      user     0.1.0    jev"
     },
     "jobcron-worker-glm-easy-1": {
+      "ponytail": "enabled      git      5.3.3    ponytail",
       "jev": "enabled      user     0.1.0    jev"
     },
     "jobcron-worker-glm-easy-2": {
+      "ponytail": "enabled      git      5.3.3    ponytail",
       "jev": "enabled      user     0.1.0    jev"
     },
     "jobcron-worker-glm-medium-1": {
+      "ponytail": "enabled      git      5.3.3    ponytail",
       "jev": "enabled      user     0.1.0    jev"
     },
     "jobcron-worker-glm-medium-2": {
+      "ponytail": "enabled      git      5.3.3    ponytail",
       "jev": "enabled      user     0.1.0    jev"
     },
     "jobcron-worker-glm-hard-1": {
+      "ponytail": "enabled      git      5.3.3    ponytail",
       "jev": "enabled      user     0.1.0    jev"
     },
     "jobcron-worker-glm-hard-2": {
+      "ponytail": "enabled      git      5.3.3    ponytail",
       "jev": "enabled      user     0.1.0    jev"
     },
     "jobcron-reviewer-glm": {
+      "ponytail": "enabled      git      5.3.3    ponytail",
       "jev": "enabled      user     0.1.0    jev"
     },
     "chapt-worker-glm-easy-1": {
+      "ponytail": "enabled      git      5.3.3    ponytail",
       "jev": "enabled      user     0.1.0    jev"
     },
     "chapt-worker-glm-easy-2": {
+      "ponytail": "enabled      git      5.3.3    ponytail",
       "jev": "enabled      user     0.1.0    jev"
     },
     "chapt-worker-glm-medium-1": {
+      "ponytail": "enabled      git      5.3.3    ponytail",
       "jev": "enabled      user     0.1.0    jev"
     },
     "chapt-worker-glm-medium-2": {
+      "ponytail": "enabled      git      5.3.3    ponytail",
       "jev": "enabled      user     0.1.0    jev"
     },
     "chapt-worker-glm-hard-1": {
+      "ponytail": "enabled      git      5.3.3    ponytail",
       "jev": "enabled      user     0.1.0    jev"
     },
     "chapt-worker-glm-hard-2": {
+      "ponytail": "enabled      git      5.3.3    ponytail",
       "jev": "enabled      user     0.1.0    jev"
     },
     "chapt-reviewer-glm": {
+      "ponytail": "enabled      git      5.3.3    ponytail",
       "jev": "enabled      user     0.1.0    jev"
     },
     "harness-worker-glm-easy-1": {
+      "ponytail": "enabled      git      5.3.3    ponytail",
       "jev": "enabled      user     0.1.0    jev"
     },
     "harness-worker-glm-easy-2": {
+      "ponytail": "enabled      git      5.3.3    ponytail",
       "jev": "enabled      user     0.1.0    jev"
     },
     "harness-worker-glm-medium-1": {
+      "ponytail": "enabled      git      5.3.3    ponytail",
       "jev": "enabled      user     0.1.0    jev"
     },
     "harness-worker-glm-medium-2": {
+      "ponytail": "enabled      git      5.3.3    ponytail",
       "jev": "enabled      user     0.1.0    jev"
     },
     "harness-worker-glm-hard-1": {
+      "ponytail": "enabled      git      5.3.3    ponytail",
       "jev": "enabled      user     0.1.0    jev"
     },
     "harness-worker-glm-hard-2": {
+      "ponytail": "enabled      git      5.3.3    ponytail",
       "jev": "enabled      user     0.1.0    jev"
     },
     "harness-reviewer-glm": {
+      "ponytail": "enabled      git      5.3.3    ponytail",
       "jev": "enabled      user     0.1.0    jev"
     },
     "jss-worker-glm-easy-1": {
+      "ponytail": "enabled      git      5.3.3    ponytail",
       "jev": "enabled      user     0.1.0    jev"
     },
     "jss-worker-glm-easy-2": {
+      "ponytail": "enabled      git      5.3.3    ponytail",
       "jev": "enabled      user     0.1.0    jev"
     },
     "jss-worker-glm-medium-1": {
+      "ponytail": "enabled      git      5.3.3    ponytail",
       "jev": "enabled      user     0.1.0    jev"
     },
     "jss-worker-glm-medium-2": {
+      "ponytail": "enabled      git      5.3.3    ponytail",
       "jev": "enabled      user     0.1.0    jev"
     },
     "jss-worker-glm-hard-1": {
+      "ponytail": "enabled      git      5.3.3    ponytail",
       "jev": "enabled      user     0.1.0    jev"
     },
     "jss-worker-glm-hard-2": {
+      "ponytail": "enabled      git      5.3.3    ponytail",
       "jev": "enabled      user     0.1.0    jev"
     },
     "jss-reviewer-glm": {
+      "ponytail": "enabled      git      5.3.3    ponytail",
       "jev": "enabled      user     0.1.0    jev"
     },
     "anki-orchestrator": {
       "hermes-terminal-outcome-notification": "disabled     git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification",
+      "ponytail": "enabled      git      5.3.3    ponytail",
       "jev": "enabled      user     0.1.0    jev"
     },
     "anki-worker": {
       "hermes-terminal-outcome-notification": "disabled     git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification",
-      "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail",
+      "ponytail": "enabled      git      5.3.3    ponytail",
       "jev": "enabled      user     0.1.0    jev"
     },
     "anki-worker-2": {
       "hermes-terminal-outcome-notification": "disabled     git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification",
-      "ponytail": "disabled     git pinned@16f29800 4.8.4    ponytail",
+      "ponytail": "enabled      git      5.3.3    ponytail",
       "jev": "enabled      user     0.1.0    jev"
     },
     "anki-reviewer": {
       "hermes-terminal-outcome-notification": "disabled     git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification",
+      "ponytail": "enabled      git      5.3.3    ponytail",
       "jev": "enabled      user     0.1.0    jev"
     },
     "anki-worker-glm-easy-1": {
+      "ponytail": "enabled      git      5.3.3    ponytail",
       "jev": "enabled      user     0.1.0    jev"
     },
     "anki-worker-glm-easy-2": {
+      "ponytail": "enabled      git      5.3.3    ponytail",
       "jev": "enabled      user     0.1.0    jev"
     },
     "anki-worker-glm-medium-1": {
+      "ponytail": "enabled      git      5.3.3    ponytail",
       "jev": "enabled      user     0.1.0    jev"
     },
     "anki-worker-glm-medium-2": {
+      "ponytail": "enabled      git      5.3.3    ponytail",
       "jev": "enabled      user     0.1.0    jev"
     },
     "anki-worker-glm-hard-1": {
+      "ponytail": "enabled      git      5.3.3    ponytail",
       "jev": "enabled      user     0.1.0    jev"
     },
     "anki-worker-glm-hard-2": {
+      "ponytail": "enabled      git      5.3.3    ponytail",
       "jev": "enabled      user     0.1.0    jev"
     },
     "anki-reviewer-glm": {
+      "ponytail": "enabled      git      5.3.3    ponytail",
       "jev": "enabled      user     0.1.0    jev"
     }
   },
@@ -10982,5 +11028,345 @@
     "harness-reviewer-glm": true,
     "jss-reviewer-glm": true,
     "anki-reviewer-glm": true
+  },
+  "ponytail_mode_env": {
+    "advisor": true,
+    "jobcron-orchestrator": true,
+    "jobcron-worker": true,
+    "jobcron-worker-2": true,
+    "jobcron-reviewer": true,
+    "chapt-orchestrator": true,
+    "chapt-worker": true,
+    "chapt-worker-2": true,
+    "chapt-reviewer": true,
+    "harness-orchestrator": true,
+    "harness-worker": true,
+    "harness-worker-2": true,
+    "harness-reviewer": true,
+    "jss-orchestrator": true,
+    "jss-worker": true,
+    "jss-worker-2": true,
+    "jss-reviewer": true,
+    "jobcron-worker-glm-easy-1": true,
+    "jobcron-worker-glm-easy-2": true,
+    "jobcron-worker-glm-medium-1": true,
+    "jobcron-worker-glm-medium-2": true,
+    "jobcron-worker-glm-hard-1": true,
+    "jobcron-worker-glm-hard-2": true,
+    "jobcron-reviewer-glm": true,
+    "chapt-worker-glm-easy-1": true,
+    "chapt-worker-glm-easy-2": true,
+    "chapt-worker-glm-medium-1": true,
+    "chapt-worker-glm-medium-2": true,
+    "chapt-worker-glm-hard-1": true,
+    "chapt-worker-glm-hard-2": true,
+    "chapt-reviewer-glm": true,
+    "harness-worker-glm-easy-1": true,
+    "harness-worker-glm-easy-2": true,
+    "harness-worker-glm-medium-1": true,
+    "harness-worker-glm-medium-2": true,
+    "harness-worker-glm-hard-1": true,
+    "harness-worker-glm-hard-2": true,
+    "harness-reviewer-glm": true,
+    "jss-worker-glm-easy-1": true,
+    "jss-worker-glm-easy-2": true,
+    "jss-worker-glm-medium-1": true,
+    "jss-worker-glm-medium-2": true,
+    "jss-worker-glm-hard-1": true,
+    "jss-worker-glm-hard-2": true,
+    "jss-reviewer-glm": true,
+    "anki-orchestrator": true,
+    "anki-worker": true,
+    "anki-worker-2": true,
+    "anki-reviewer": true,
+    "anki-worker-glm-easy-1": true,
+    "anki-worker-glm-easy-2": true,
+    "anki-worker-glm-medium-1": true,
+    "anki-worker-glm-medium-2": true,
+    "anki-worker-glm-hard-1": true,
+    "anki-worker-glm-hard-2": true,
+    "anki-reviewer-glm": true
+  },
+  "ponytail_install_metadata": {
+    "advisor": {
+      "pinned": false,
+      "revision": "7801d061243d7b753bad0e0b3c057cd250b11755",
+      "source": "https://github.com/DietrichGebert/ponytail.git"
+    },
+    "jobcron-orchestrator": {
+      "pinned": false,
+      "revision": "7801d061243d7b753bad0e0b3c057cd250b11755",
+      "source": "https://github.com/DietrichGebert/ponytail.git"
+    },
+    "jobcron-worker": {
+      "pinned": false,
+      "revision": "7801d061243d7b753bad0e0b3c057cd250b11755",
+      "source": "https://github.com/DietrichGebert/ponytail.git"
+    },
+    "jobcron-worker-2": {
+      "pinned": false,
+      "revision": "7801d061243d7b753bad0e0b3c057cd250b11755",
+      "source": "https://github.com/DietrichGebert/ponytail.git"
+    },
+    "jobcron-reviewer": {
+      "pinned": false,
+      "revision": "7801d061243d7b753bad0e0b3c057cd250b11755",
+      "source": "https://github.com/DietrichGebert/ponytail.git"
+    },
+    "chapt-orchestrator": {
+      "pinned": false,
+      "revision": "7801d061243d7b753bad0e0b3c057cd250b11755",
+      "source": "https://github.com/DietrichGebert/ponytail.git"
+    },
+    "chapt-worker": {
+      "pinned": false,
+      "revision": "7801d061243d7b753bad0e0b3c057cd250b11755",
+      "source": "https://github.com/DietrichGebert/ponytail.git"
+    },
+    "chapt-worker-2": {
+      "pinned": false,
+      "revision": "7801d061243d7b753bad0e0b3c057cd250b11755",
+      "source": "https://github.com/DietrichGebert/ponytail.git"
+    },
+    "chapt-reviewer": {
+      "pinned": false,
+      "revision": "7801d061243d7b753bad0e0b3c057cd250b11755",
+      "source": "https://github.com/DietrichGebert/ponytail.git"
+    },
+    "harness-orchestrator": {
+      "pinned": false,
+      "revision": "7801d061243d7b753bad0e0b3c057cd250b11755",
+      "source": "https://github.com/DietrichGebert/ponytail.git"
+    },
+    "harness-worker": {
+      "pinned": false,
+      "revision": "7801d061243d7b753bad0e0b3c057cd250b11755",
+      "source": "https://github.com/DietrichGebert/ponytail.git"
+    },
+    "harness-worker-2": {
+      "pinned": false,
+      "revision": "7801d061243d7b753bad0e0b3c057cd250b11755",
+      "source": "https://github.com/DietrichGebert/ponytail.git"
+    },
+    "harness-reviewer": {
+      "pinned": false,
+      "revision": "7801d061243d7b753bad0e0b3c057cd250b11755",
+      "source": "https://github.com/DietrichGebert/ponytail.git"
+    },
+    "jss-orchestrator": {
+      "pinned": false,
+      "revision": "7801d061243d7b753bad0e0b3c057cd250b11755",
+      "source": "https://github.com/DietrichGebert/ponytail.git"
+    },
+    "jss-worker": {
+      "pinned": false,
+      "revision": "7801d061243d7b753bad0e0b3c057cd250b11755",
+      "source": "https://github.com/DietrichGebert/ponytail.git"
+    },
+    "jss-worker-2": {
+      "pinned": false,
+      "revision": "7801d061243d7b753bad0e0b3c057cd250b11755",
+      "source": "https://github.com/DietrichGebert/ponytail.git"
+    },
+    "jss-reviewer": {
+      "pinned": false,
+      "revision": "7801d061243d7b753bad0e0b3c057cd250b11755",
+      "source": "https://github.com/DietrichGebert/ponytail.git"
+    },
+    "jobcron-worker-glm-easy-1": {
+      "pinned": false,
+      "revision": "7801d061243d7b753bad0e0b3c057cd250b11755",
+      "source": "https://github.com/DietrichGebert/ponytail.git"
+    },
+    "jobcron-worker-glm-easy-2": {
+      "pinned": false,
+      "revision": "7801d061243d7b753bad0e0b3c057cd250b11755",
+      "source": "https://github.com/DietrichGebert/ponytail.git"
+    },
+    "jobcron-worker-glm-medium-1": {
+      "pinned": false,
+      "revision": "7801d061243d7b753bad0e0b3c057cd250b11755",
+      "source": "https://github.com/DietrichGebert/ponytail.git"
+    },
+    "jobcron-worker-glm-medium-2": {
+      "pinned": false,
+      "revision": "7801d061243d7b753bad0e0b3c057cd250b11755",
+      "source": "https://github.com/DietrichGebert/ponytail.git"
+    },
+    "jobcron-worker-glm-hard-1": {
+      "pinned": false,
+      "revision": "7801d061243d7b753bad0e0b3c057cd250b11755",
+      "source": "https://github.com/DietrichGebert/ponytail.git"
+    },
+    "jobcron-worker-glm-hard-2": {
+      "pinned": false,
+      "revision": "7801d061243d7b753bad0e0b3c057cd250b11755",
+      "source": "https://github.com/DietrichGebert/ponytail.git"
+    },
+    "jobcron-reviewer-glm": {
+      "pinned": false,
+      "revision": "7801d061243d7b753bad0e0b3c057cd250b11755",
+      "source": "https://github.com/DietrichGebert/ponytail.git"
+    },
+    "chapt-worker-glm-easy-1": {
+      "pinned": false,
+      "revision": "7801d061243d7b753bad0e0b3c057cd250b11755",
+      "source": "https://github.com/DietrichGebert/ponytail.git"
+    },
+    "chapt-worker-glm-easy-2": {
+      "pinned": false,
+      "revision": "7801d061243d7b753bad0e0b3c057cd250b11755",
+      "source": "https://github.com/DietrichGebert/ponytail.git"
+    },
+    "chapt-worker-glm-medium-1": {
+      "pinned": false,
+      "revision": "7801d061243d7b753bad0e0b3c057cd250b11755",
+      "source": "https://github.com/DietrichGebert/ponytail.git"
+    },
+    "chapt-worker-glm-medium-2": {
+      "pinned": false,
+      "revision": "7801d061243d7b753bad0e0b3c057cd250b11755",
+      "source": "https://github.com/DietrichGebert/ponytail.git"
+    },
+    "chapt-worker-glm-hard-1": {
+      "pinned": false,
+      "revision": "7801d061243d7b753bad0e0b3c057cd250b11755",
+      "source": "https://github.com/DietrichGebert/ponytail.git"
+    },
+    "chapt-worker-glm-hard-2": {
+      "pinned": false,
+      "revision": "7801d061243d7b753bad0e0b3c057cd250b11755",
+      "source": "https://github.com/DietrichGebert/ponytail.git"
+    },
+    "chapt-reviewer-glm": {
+      "pinned": false,
+      "revision": "7801d061243d7b753bad0e0b3c057cd250b11755",
+      "source": "https://github.com/DietrichGebert/ponytail.git"
+    },
+    "harness-worker-glm-easy-1": {
+      "pinned": false,
+      "revision": "7801d061243d7b753bad0e0b3c057cd250b11755",
+      "source": "https://github.com/DietrichGebert/ponytail.git"
+    },
+    "harness-worker-glm-easy-2": {
+      "pinned": false,
+      "revision": "7801d061243d7b753bad0e0b3c057cd250b11755",
+      "source": "https://github.com/DietrichGebert/ponytail.git"
+    },
+    "harness-worker-glm-medium-1": {
+      "pinned": false,
+      "revision": "7801d061243d7b753bad0e0b3c057cd250b11755",
+      "source": "https://github.com/DietrichGebert/ponytail.git"
+    },
+    "harness-worker-glm-medium-2": {
+      "pinned": false,
+      "revision": "7801d061243d7b753bad0e0b3c057cd250b11755",
+      "source": "https://github.com/DietrichGebert/ponytail.git"
+    },
+    "harness-worker-glm-hard-1": {
+      "pinned": false,
+      "revision": "7801d061243d7b753bad0e0b3c057cd250b11755",
+      "source": "https://github.com/DietrichGebert/ponytail.git"
+    },
+    "harness-worker-glm-hard-2": {
+      "pinned": false,
+      "revision": "7801d061243d7b753bad0e0b3c057cd250b11755",
+      "source": "https://github.com/DietrichGebert/ponytail.git"
+    },
+    "harness-reviewer-glm": {
+      "pinned": false,
+      "revision": "7801d061243d7b753bad0e0b3c057cd250b11755",
+      "source": "https://github.com/DietrichGebert/ponytail.git"
+    },
+    "jss-worker-glm-easy-1": {
+      "pinned": false,
+      "revision": "7801d061243d7b753bad0e0b3c057cd250b11755",
+      "source": "https://github.com/DietrichGebert/ponytail.git"
+    },
+    "jss-worker-glm-easy-2": {
+      "pinned": false,
+      "revision": "7801d061243d7b753bad0e0b3c057cd250b11755",
+      "source": "https://github.com/DietrichGebert/ponytail.git"
+    },
+    "jss-worker-glm-medium-1": {
+      "pinned": false,
+      "revision": "7801d061243d7b753bad0e0b3c057cd250b11755",
+      "source": "https://github.com/DietrichGebert/ponytail.git"
+    },
+    "jss-worker-glm-medium-2": {
+      "pinned": false,
+      "revision": "7801d061243d7b753bad0e0b3c057cd250b11755",
+      "source": "https://github.com/DietrichGebert/ponytail.git"
+    },
+    "jss-worker-glm-hard-1": {
+      "pinned": false,
+      "revision": "7801d061243d7b753bad0e0b3c057cd250b11755",
+      "source": "https://github.com/DietrichGebert/ponytail.git"
+    },
+    "jss-worker-glm-hard-2": {
+      "pinned": false,
+      "revision": "7801d061243d7b753bad0e0b3c057cd250b11755",
+      "source": "https://github.com/DietrichGebert/ponytail.git"
+    },
+    "jss-reviewer-glm": {
+      "pinned": false,
+      "revision": "7801d061243d7b753bad0e0b3c057cd250b11755",
+      "source": "https://github.com/DietrichGebert/ponytail.git"
+    },
+    "anki-orchestrator": {
+      "pinned": false,
+      "revision": "7801d061243d7b753bad0e0b3c057cd250b11755",
+      "source": "https://github.com/DietrichGebert/ponytail.git"
+    },
+    "anki-worker": {
+      "pinned": false,
+      "revision": "7801d061243d7b753bad0e0b3c057cd250b11755",
+      "source": "https://github.com/DietrichGebert/ponytail.git"
+    },
+    "anki-worker-2": {
+      "pinned": false,
+      "revision": "7801d061243d7b753bad0e0b3c057cd250b11755",
+      "source": "https://github.com/DietrichGebert/ponytail.git"
+    },
+    "anki-reviewer": {
+      "pinned": false,
+      "revision": "7801d061243d7b753bad0e0b3c057cd250b11755",
+      "source": "https://github.com/DietrichGebert/ponytail.git"
+    },
+    "anki-worker-glm-easy-1": {
+      "pinned": false,
+      "revision": "7801d061243d7b753bad0e0b3c057cd250b11755",
+      "source": "https://github.com/DietrichGebert/ponytail.git"
+    },
+    "anki-worker-glm-easy-2": {
+      "pinned": false,
+      "revision": "7801d061243d7b753bad0e0b3c057cd250b11755",
+      "source": "https://github.com/DietrichGebert/ponytail.git"
+    },
+    "anki-worker-glm-medium-1": {
+      "pinned": false,
+      "revision": "7801d061243d7b753bad0e0b3c057cd250b11755",
+      "source": "https://github.com/DietrichGebert/ponytail.git"
+    },
+    "anki-worker-glm-medium-2": {
+      "pinned": false,
+      "revision": "7801d061243d7b753bad0e0b3c057cd250b11755",
+      "source": "https://github.com/DietrichGebert/ponytail.git"
+    },
+    "anki-worker-glm-hard-1": {
+      "pinned": false,
+      "revision": "7801d061243d7b753bad0e0b3c057cd250b11755",
+      "source": "https://github.com/DietrichGebert/ponytail.git"
+    },
+    "anki-worker-glm-hard-2": {
+      "pinned": false,
+      "revision": "7801d061243d7b753bad0e0b3c057cd250b11755",
+      "source": "https://github.com/DietrichGebert/ponytail.git"
+    },
+    "anki-reviewer-glm": {
+      "pinned": false,
+      "revision": "7801d061243d7b753bad0e0b3c057cd250b11755",
+      "source": "https://github.com/DietrichGebert/ponytail.git"
+    }
   }
 }

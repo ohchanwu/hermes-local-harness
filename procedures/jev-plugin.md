@@ -57,19 +57,20 @@ Card `t_71b4ef4a` added `anki-worker-glm-1` and `anki-worker-glm-2` to `roster.y
    - `memories/MEMORY.md` and `memories/USER.md`;
    - the `plugins/` directory, with `ponytail` and `hermes-terminal-outcome-notification` (both installed and disabled on `anki-worker`), and `jev` if it is installed on `anki-worker` at that time.
 
-   The clone copies no `auth.json`. The GLM worker profiles have no Anthropic API fallback (`procedures/anthropic-api-fallback.md`, section 1, limits it to the four Jobcron profiles and the claude-subscription profiles listed in section 8), so steps 2 to 4 remove the copied key, the copied memory files, the two copied plugins and the copied fallback values.
+   The clone copies no `auth.json`. The GLM worker profiles have no Anthropic API fallback (`procedures/anthropic-api-fallback.md`, section 1, limits it to the four Jobcron profiles and the claude-subscription profiles listed in section 8), so steps 2 to 4 remove the copied key, the copied memory files, the copied `hermes-terminal-outcome-notification` plugin and the copied fallback values, and step 3 keeps the copied `ponytail` plugin.
 2. The owner removes the copied Anthropic API key from the profile's `.env`, before any other step:
 
         hermes -p <profile> config unset ANTHROPIC_API_KEY
 
    The command prints `✓ Unset ANTHROPIC_API_KEY from <path of the profile .env>` and no key value (`procedures/anthropic-api-fallback.md`, section 7, step 3). Then `hermes -p <profile> auth list anthropic` must list no entry with source `env:ANTHROPIC_API_KEY`. Nobody else opens or changes the profile's `.env`.
-3. Delete the two copied memory files, as `procedures/manual-apply.md` requires for a cloned profile, and remove the two copied plugins, because the roster entry declares `installed_disabled_plugins` `[]`:
+3. Delete the two copied memory files, as `procedures/manual-apply.md` requires for a cloned profile, and remove the copied `hermes-terminal-outcome-notification` plugin, because the roster entry declares `installed_disabled_plugins` `[]`:
 
         rm /Users/chanbla11mit/.hermes/profiles/<profile>/memories/MEMORY.md /Users/chanbla11mit/.hermes/profiles/<profile>/memories/USER.md
-        hermes -p <profile> plugins remove ponytail
         hermes -p <profile> plugins remove hermes-terminal-outcome-notification
 
-   Without the plugin removal, `scripts/verify-state` prints `WARN: dormant unexpected plugin <profile>: ponytail` and the same line for `hermes-terminal-outcome-notification`.
+   Without the plugin removal, `scripts/verify-state` prints `WARN: dormant unexpected plugin <profile>: hermes-terminal-outcome-notification`.
+
+   Keep the copied `ponytail` plugin, because every GLM worker profile of the five boards lists `ponytail` in `required_plugins` in `roster.yaml`. Run the Ponytail steps of `procedures/manual-apply.md`, section 3b, for the new profile: the enable command, the `.env` line command and the verification command with its expected output.
 4. Set the model and provider and clear the copied fallback values: model `glm-5.3`, provider `zai`, base URL `https://api.z.ai/api/coding/paas/v4`, the helper tasks on the same target, `fallback_providers` and every `auxiliary.<task>.fallback_chain` set to `[]`, and the profile in `kanban.dispatch_profiles`. The switch script does all of this in one command after it backs up the profile's `config.yaml` (preview first with `--dry-run`):
 
         python3 /Users/chanbla11mit/hermes-local-harness/scripts/switch-profile-model --profile <profile> --to glm --dispatch add --clear-fallbacks

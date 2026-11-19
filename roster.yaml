@@ -353,7 +353,8 @@
       "lifecycle": "active",
       "concurrency_limit": 1,
       "required_plugins": [
-        "jev"
+        "jev",
+        "ponytail"
       ],
       "modes": [],
       "toolsets": "read-only",
@@ -727,7 +728,8 @@
       "lifecycle": "project-active",
       "concurrency_limit": 1,
       "required_plugins": [
-        "jev"
+        "jev",
+        "ponytail"
       ],
       "modes": [
         "project-isolated",
@@ -867,7 +869,8 @@
       "lifecycle": "project-active",
       "concurrency_limit": 1,
       "required_plugins": [
-        "jev"
+        "jev",
+        "ponytail"
       ],
       "modes": [
         "project-isolated",
@@ -877,7 +880,6 @@
       "credential_required": true,
       "credential_present": true,
       "installed_disabled_plugins": [
-        "ponytail",
         "hermes-terminal-outcome-notification"
       ],
       "auxiliary_models": {
@@ -1000,7 +1002,8 @@
       "lifecycle": "project-active",
       "concurrency_limit": 1,
       "required_plugins": [
-        "jev"
+        "jev",
+        "ponytail"
       ],
       "modes": [
         "project-isolated",
@@ -1010,7 +1013,6 @@
       "credential_required": true,
       "credential_present": true,
       "installed_disabled_plugins": [
-        "ponytail",
         "hermes-terminal-outcome-notification"
       ],
       "auxiliary_models": {
@@ -1133,7 +1135,8 @@
       "lifecycle": "project-active",
       "concurrency_limit": 1,
       "required_plugins": [
-        "jev"
+        "jev",
+        "ponytail"
       ],
       "modes": [
         "project-isolated",
@@ -1265,7 +1268,8 @@
       "lifecycle": "project-active",
       "concurrency_limit": 1,
       "required_plugins": [
-        "jev"
+        "jev",
+        "ponytail"
       ],
       "modes": [
         "project-isolated",
@@ -1405,7 +1409,8 @@
       "lifecycle": "project-active",
       "concurrency_limit": 1,
       "required_plugins": [
-        "jev"
+        "jev",
+        "ponytail"
       ],
       "modes": [
         "project-isolated",
@@ -1415,7 +1420,6 @@
       "credential_required": true,
       "credential_present": true,
       "installed_disabled_plugins": [
-        "ponytail",
         "hermes-terminal-outcome-notification"
       ],
       "auxiliary_models": {
@@ -1538,7 +1542,8 @@
       "lifecycle": "project-active",
       "concurrency_limit": 1,
       "required_plugins": [
-        "jev"
+        "jev",
+        "ponytail"
       ],
       "modes": [
         "project-isolated",
@@ -1548,7 +1553,6 @@
       "credential_required": true,
       "credential_present": true,
       "installed_disabled_plugins": [
-        "ponytail",
         "hermes-terminal-outcome-notification"
       ],
       "auxiliary_models": {
@@ -1671,7 +1675,8 @@
       "lifecycle": "project-active",
       "concurrency_limit": 1,
       "required_plugins": [
-        "jev"
+        "jev",
+        "ponytail"
       ],
       "modes": [
         "project-isolated",
@@ -1803,7 +1808,8 @@
       "lifecycle": "project-active",
       "concurrency_limit": 1,
       "required_plugins": [
-        "jev"
+        "jev",
+        "ponytail"
       ],
       "modes": [
         "project-isolated",
@@ -1943,7 +1949,8 @@
       "lifecycle": "project-active",
       "concurrency_limit": 1,
       "required_plugins": [
-        "jev"
+        "jev",
+        "ponytail"
       ],
       "modes": [
         "project-isolated",
@@ -1953,7 +1960,6 @@
       "credential_required": true,
       "credential_present": true,
       "installed_disabled_plugins": [
-        "ponytail",
         "hermes-terminal-outcome-notification"
       ],
       "auxiliary_models": {
@@ -2076,7 +2082,8 @@
       "lifecycle": "project-active",
       "concurrency_limit": 1,
       "required_plugins": [
-        "jev"
+        "jev",
+        "ponytail"
       ],
       "modes": [
         "project-isolated",
@@ -2086,7 +2093,6 @@
       "credential_required": true,
       "credential_present": true,
       "installed_disabled_plugins": [
-        "ponytail",
         "hermes-terminal-outcome-notification"
       ],
       "auxiliary_models": {
@@ -2209,7 +2215,8 @@
       "lifecycle": "project-active",
       "concurrency_limit": 1,
       "required_plugins": [
-        "jev"
+        "jev",
+        "ponytail"
       ],
       "modes": [
         "project-isolated",
@@ -2341,7 +2348,8 @@
       "lifecycle": "project-active",
       "concurrency_limit": 1,
       "required_plugins": [
-        "jev"
+        "jev",
+        "ponytail"
       ],
       "modes": [
         "project-isolated",
@@ -2481,7 +2489,8 @@
       "lifecycle": "project-active",
       "concurrency_limit": 1,
       "required_plugins": [
-        "jev"
+        "jev",
+        "ponytail"
       ],
       "modes": [
         "project-isolated",
@@ -2491,7 +2500,6 @@
       "credential_required": true,
       "credential_present": true,
       "installed_disabled_plugins": [
-        "ponytail",
         "hermes-terminal-outcome-notification"
       ],
       "auxiliary_models": {
@@ -2614,7 +2622,8 @@
       "lifecycle": "project-active",
       "concurrency_limit": 1,
       "required_plugins": [
-        "jev"
+        "jev",
+        "ponytail"
       ],
       "modes": [
         "project-isolated",
@@ -2624,7 +2633,6 @@
       "credential_required": true,
       "credential_present": true,
       "installed_disabled_plugins": [
-        "ponytail",
         "hermes-terminal-outcome-notification"
       ],
       "auxiliary_models": {
@@ -2747,7 +2755,8 @@
       "lifecycle": "project-active",
       "concurrency_limit": 1,
       "required_plugins": [
-        "jev"
+        "jev",
+        "ponytail"
       ],
       "modes": [
         "project-isolated",
@@ -2886,7 +2895,8 @@
       "credential_required": true,
       "credential_present": null,
       "required_plugins": [
-        "jev"
+        "jev",
+        "ponytail"
       ],
       "installed_disabled_plugins": [],
       "fallback_providers": [
@@ -3012,7 +3022,8 @@
       "credential_required": true,
       "credential_present": null,
       "required_plugins": [
-        "jev"
+        "jev",
+        "ponytail"
       ],
       "installed_disabled_plugins": [],
       "fallback_providers": [
@@ -3138,7 +3149,8 @@
       "credential_required": true,
       "credential_present": null,
       "required_plugins": [
-        "jev"
+        "jev",
+        "ponytail"
       ],
       "installed_disabled_plugins": [],
       "fallback_providers": [
@@ -3264,7 +3276,8 @@
       "credential_required": true,
       "credential_present": null,
       "required_plugins": [
-        "jev"
+        "jev",
+        "ponytail"
       ],
       "installed_disabled_plugins": [],
       "fallback_providers": [
@@ -3390,7 +3403,8 @@
       "credential_required": true,
       "credential_present": null,
       "required_plugins": [
-        "jev"
+        "jev",
+        "ponytail"
       ],
       "installed_disabled_plugins": [],
       "fallback_providers": [
@@ -3516,7 +3530,8 @@
       "credential_required": true,
       "credential_present": null,
       "required_plugins": [
-        "jev"
+        "jev",
+        "ponytail"
       ],
       "installed_disabled_plugins": [],
       "fallback_providers": [
@@ -3642,7 +3657,8 @@
       "credential_required": true,
       "credential_present": null,
       "required_plugins": [
-        "jev"
+        "jev",
+        "ponytail"
       ],
       "installed_disabled_plugins": [],
       "fallback_providers": [
@@ -3768,7 +3784,8 @@
       "credential_required": true,
       "credential_present": null,
       "required_plugins": [
-        "jev"
+        "jev",
+        "ponytail"
       ],
       "installed_disabled_plugins": [],
       "fallback_providers": [
@@ -3894,7 +3911,8 @@
       "credential_required": true,
       "credential_present": null,
       "required_plugins": [
-        "jev"
+        "jev",
+        "ponytail"
       ],
       "installed_disabled_plugins": [],
       "fallback_providers": [
@@ -4020,7 +4038,8 @@
       "credential_required": true,
       "credential_present": null,
       "required_plugins": [
-        "jev"
+        "jev",
+        "ponytail"
       ],
       "installed_disabled_plugins": [],
       "fallback_providers": [
@@ -4146,7 +4165,8 @@
       "credential_required": true,
       "credential_present": null,
       "required_plugins": [
-        "jev"
+        "jev",
+        "ponytail"
       ],
       "installed_disabled_plugins": [],
       "fallback_providers": [
@@ -4272,7 +4292,8 @@
       "credential_required": true,
       "credential_present": null,
       "required_plugins": [
-        "jev"
+        "jev",
+        "ponytail"
       ],
       "installed_disabled_plugins": [],
       "fallback_providers": [
@@ -4398,7 +4419,8 @@
       "credential_required": true,
       "credential_present": null,
       "required_plugins": [
-        "jev"
+        "jev",
+        "ponytail"
       ],
       "installed_disabled_plugins": [],
       "fallback_providers": [
@@ -4524,7 +4546,8 @@
       "credential_required": true,
       "credential_present": null,
       "required_plugins": [
-        "jev"
+        "jev",
+        "ponytail"
       ],
       "installed_disabled_plugins": [],
       "fallback_providers": [
@@ -4650,7 +4673,8 @@
       "credential_required": true,
       "credential_present": null,
       "required_plugins": [
-        "jev"
+        "jev",
+        "ponytail"
       ],
       "installed_disabled_plugins": [],
       "fallback_providers": [
@@ -4776,7 +4800,8 @@
       "credential_required": true,
       "credential_present": null,
       "required_plugins": [
-        "jev"
+        "jev",
+        "ponytail"
       ],
       "installed_disabled_plugins": [],
       "fallback_providers": [
@@ -4902,7 +4927,8 @@
       "credential_required": true,
       "credential_present": null,
       "required_plugins": [
-        "jev"
+        "jev",
+        "ponytail"
       ],
       "installed_disabled_plugins": [],
       "fallback_providers": [
@@ -5028,7 +5054,8 @@
       "credential_required": true,
       "credential_present": null,
       "required_plugins": [
-        "jev"
+        "jev",
+        "ponytail"
       ],
       "installed_disabled_plugins": [],
       "fallback_providers": [
@@ -5154,7 +5181,8 @@
       "credential_required": true,
       "credential_present": null,
       "required_plugins": [
-        "jev"
+        "jev",
+        "ponytail"
       ],
       "installed_disabled_plugins": [],
       "fallback_providers": [
@@ -5280,7 +5308,8 @@
       "credential_required": true,
       "credential_present": null,
       "required_plugins": [
-        "jev"
+        "jev",
+        "ponytail"
       ],
       "installed_disabled_plugins": [],
       "fallback_providers": [
@@ -5406,7 +5435,8 @@
       "credential_required": true,
       "credential_present": null,
       "required_plugins": [
-        "jev"
+        "jev",
+        "ponytail"
       ],
       "installed_disabled_plugins": [],
       "fallback_providers": [
@@ -5532,7 +5562,8 @@
       "credential_required": true,
       "credential_present": null,
       "required_plugins": [
-        "jev"
+        "jev",
+        "ponytail"
       ],
       "installed_disabled_plugins": [],
       "fallback_providers": [
@@ -5658,7 +5689,8 @@
       "credential_required": true,
       "credential_present": null,
       "required_plugins": [
-        "jev"
+        "jev",
+        "ponytail"
       ],
       "installed_disabled_plugins": [],
       "fallback_providers": [
@@ -5784,7 +5816,8 @@
       "credential_required": true,
       "credential_present": null,
       "required_plugins": [
-        "jev"
+        "jev",
+        "ponytail"
       ],
       "installed_disabled_plugins": [],
       "fallback_providers": [
@@ -5910,7 +5943,8 @@
       "credential_required": true,
       "credential_present": null,
       "required_plugins": [
-        "jev"
+        "jev",
+        "ponytail"
       ],
       "installed_disabled_plugins": [],
       "fallback_providers": [
@@ -6036,7 +6070,8 @@
       "credential_required": true,
       "credential_present": null,
       "required_plugins": [
-        "jev"
+        "jev",
+        "ponytail"
       ],
       "installed_disabled_plugins": [],
       "fallback_providers": [
@@ -6162,7 +6197,8 @@
       "credential_required": true,
       "credential_present": null,
       "required_plugins": [
-        "jev"
+        "jev",
+        "ponytail"
       ],
       "installed_disabled_plugins": [],
       "fallback_providers": [
@@ -6288,7 +6324,8 @@
       "credential_required": true,
       "credential_present": null,
       "required_plugins": [
-        "jev"
+        "jev",
+        "ponytail"
       ],
       "installed_disabled_plugins": [],
       "fallback_providers": [
@@ -6407,7 +6444,8 @@
       "lifecycle": "project-active",
       "concurrency_limit": 1,
       "required_plugins": [
-        "jev"
+        "jev",
+        "ponytail"
       ],
       "modes": [
         "project-isolated",
@@ -6547,7 +6585,8 @@
       "lifecycle": "project-active",
       "concurrency_limit": 1,
       "required_plugins": [
-        "jev"
+        "jev",
+        "ponytail"
       ],
       "modes": [
         "project-isolated",
@@ -6557,7 +6596,6 @@
       "credential_required": true,
       "credential_present": true,
       "installed_disabled_plugins": [
-        "ponytail",
         "hermes-terminal-outcome-notification"
       ],
       "auxiliary_models": {
@@ -6680,7 +6718,8 @@
       "lifecycle": "project-active",
       "concurrency_limit": 1,
       "required_plugins": [
-        "jev"
+        "jev",
+        "ponytail"
       ],
       "modes": [
         "project-isolated",
@@ -6690,7 +6729,6 @@
       "credential_required": true,
       "credential_present": true,
       "installed_disabled_plugins": [
-        "ponytail",
         "hermes-terminal-outcome-notification"
       ],
       "auxiliary_models": {
@@ -6813,7 +6851,8 @@
       "lifecycle": "project-active",
       "concurrency_limit": 1,
       "required_plugins": [
-        "jev"
+        "jev",
+        "ponytail"
       ],
       "modes": [
         "project-isolated",
@@ -6952,7 +6991,8 @@
       "credential_required": true,
       "credential_present": null,
       "required_plugins": [
-        "jev"
+        "jev",
+        "ponytail"
       ],
       "installed_disabled_plugins": [],
       "fallback_providers": [
@@ -7078,7 +7118,8 @@
       "credential_required": true,
       "credential_present": null,
       "required_plugins": [
-        "jev"
+        "jev",
+        "ponytail"
       ],
       "installed_disabled_plugins": [],
       "fallback_providers": [
@@ -7204,7 +7245,8 @@
       "credential_required": true,
       "credential_present": null,
       "required_plugins": [
-        "jev"
+        "jev",
+        "ponytail"
       ],
       "installed_disabled_plugins": [],
       "fallback_providers": [
@@ -7330,7 +7372,8 @@
       "credential_required": true,
       "credential_present": null,
       "required_plugins": [
-        "jev"
+        "jev",
+        "ponytail"
       ],
       "installed_disabled_plugins": [],
       "fallback_providers": [
@@ -7456,7 +7499,8 @@
       "credential_required": true,
       "credential_present": null,
       "required_plugins": [
-        "jev"
+        "jev",
+        "ponytail"
       ],
       "installed_disabled_plugins": [],
       "fallback_providers": [
@@ -7582,7 +7626,8 @@
       "credential_required": true,
       "credential_present": null,
       "required_plugins": [
-        "jev"
+        "jev",
+        "ponytail"
       ],
       "installed_disabled_plugins": [],
       "fallback_providers": [
@@ -7708,7 +7753,8 @@
       "credential_required": true,
       "credential_present": null,
       "required_plugins": [
-        "jev"
+        "jev",
+        "ponytail"
       ],
       "installed_disabled_plugins": [],
       "fallback_providers": [

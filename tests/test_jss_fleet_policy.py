@@ -327,8 +327,9 @@ class FleetDesiredState(unittest.TestCase):
                 self.assertEqual(profile["dispatch_eligible"], dispatchable)
                 self.assertEqual(profile["lifecycle"], "project-active")
                 self.assertIn("jss-genr", profile["modes"])
-                # jev is a required plugin on every Claude project profile (card t_4f7740d0).
-                self.assertEqual(profile["required_plugins"], ["jev"])
+                # jev is a required plugin on every Claude project profile (card t_4f7740d0);
+                # Ponytail is required on the 56 target profiles (card t_9c1b6b2f).
+                self.assertEqual(profile["required_plugins"], ["jev", "ponytail"])
                 self.assertIn("hermes-terminal-outcome-notification", profile["installed_disabled_plugins"])
                 self.assertIsNone(RETIRED_MODEL.search(profile["model"] + " " + profile["provider"]))
         self.assertEqual(self.roster["approval_policy"]["profiles"], list(self.profiles))
@@ -353,7 +354,8 @@ class FleetDesiredState(unittest.TestCase):
                 self.assertTrue(profile["dispatch_eligible"])
                 self.assertTrue(profile["in_dispatch_pool"])
                 self.assertEqual(profile["modes"], ["project-isolated", "jss-genr"])
-                self.assertEqual(profile["required_plugins"], ["jev"])
+                # Card t_9c1b6b2f: Ponytail is required on the 56 target profiles.
+                self.assertEqual(profile["required_plugins"], ["jev", "ponytail"])
                 self.assertNotIn("retired_on", profile)
 
     def test_skill_deployment_matrix(self):
@@ -1448,8 +1450,10 @@ class FixtureMode(unittest.TestCase):
                  f"profile SOUL drift {REVIEWER}"),
                 (lambda d: d["profile_models"].__setitem__(WORKER, "wrong-model"),
                  f"model drift {WORKER}"),
-                (lambda d: d["plugins"][WORKER].__setitem__("ponytail", "enabled      git pinned@16f29800 4.8.4    ponytail"),
-                 f"ponytail enabled drift {WORKER}"),
+                (lambda d: d["plugins"][WORKER].__setitem__("ponytail", "disabled     git pinned@7801d061 5.3.3    ponytail"),
+                 f"plugin drift {WORKER}: required ponytail not enabled"),
+                (lambda d: d["ponytail_mode_env"].__setitem__(WORKER, False),
+                 f"ponytail mode drift {WORKER}: PONYTAIL_DEFAULT_MODE=full absent"),
                 (lambda d: d["project_isolation"]["jss-genr"]["repositories"].append("/Users/chanbla11mit/projects/other"),
                  "project repository allowlist drift: jss-genr"),
                 (lambda d: d["skill_files"]["minimal-implementation"].pop(WORKER),

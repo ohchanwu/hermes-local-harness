@@ -191,7 +191,8 @@ class FleetDesiredState(unittest.TestCase):
                 self.assertTrue(profile["in_dispatch_pool"])
                 self.assertTrue(profile["installed"])
                 self.assertEqual(profile["modes"], ["project-isolated", "anki"])
-                self.assertEqual(profile["required_plugins"], ["jev"])
+                # Card t_9c1b6b2f: Ponytail is required on the 56 target profiles.
+                self.assertEqual(profile["required_plugins"], ["jev", "ponytail"])
         self.assertEqual(self.roster["dispatch_pool"]["dispatch_allowlist"], [])
 
     def test_skill_deployment_matrix_and_provenance(self):
@@ -614,8 +615,10 @@ class FixtureMode(unittest.TestCase):
                  f"profile SOUL drift {REVIEWER}"),
                 (lambda d: d["profile_models"].__setitem__(WORKER, "wrong-model"), f"model drift {WORKER}"),
                 (lambda d: d["plugins"][WORKER].__setitem__(
-                    "ponytail", "enabled      git pinned@16f29800 4.8.4    ponytail"),
-                 f"ponytail enabled drift {WORKER}"),
+                    "ponytail", "disabled     git pinned@7801d061 5.3.3    ponytail"),
+                 f"plugin drift {WORKER}: required ponytail not enabled"),
+                (lambda d: d["ponytail_mode_env"].__setitem__(WORKER, False),
+                 f"ponytail mode drift {WORKER}: PONYTAIL_DEFAULT_MODE=full absent"),
                 (lambda d: d["project_isolation"]["anki"]["repositories"].append("/Users/chanbla11mit/projects/x"),
                  "project repository allowlist drift: anki"),
                 (lambda d: d["skill_files"]["minimal-implementation"].pop(WORKER2),

@@ -3,6 +3,7 @@ import importlib.util
 import hashlib
 import io
 import json
+import os
 import shutil
 import tempfile
 from importlib.machinery import SourceFileLoader
@@ -189,7 +190,7 @@ check("--fixture", str(FIXTURES / "terminal-deployment-pending.yaml"), code=1, t
 # rollback observation is also red against the authorized deployment declaration
 check("--fixture", str(FIXTURES / "terminal-notification-rollback.yaml"), code=1, text="terminal notification deployment pending")
 # enabled required plugin at wrong pin/version fails
-check("--fixture", str(FIXTURES / "plugin-pin-drift.yaml"), code=1, text="expected pinned 4.8.4@16f29800")
+check("--fixture", str(FIXTURES / "plugin-pin-drift.yaml"), code=1, text="expected pinned 5.3.3@7801d061243d7b753bad0e0b3c057cd250b11755")
 # deployed skill hash divergence from tracked canonical source fails
 check("--fixture", str(FIXTURES / "deployed-skill-divergence.yaml"), code=1, text="deployed skill hash mismatch")
 # The canonical orchestration policy is versioned and its source-to-live hash
@@ -752,10 +753,104 @@ check("--fixture", str(FIXTURES / "terminal-retry-missing-scope.yaml"), code=1,
       text="terminal retry policy missing required scope")
 check("--fixture", str(FIXTURES / "terminal-retry-missing-human-gate.yaml"), code=1,
       text="terminal retry policy missing human/infrastructure exclusion")
-# enabled Ponytail on an implementation profile fails with its own diagnostic
+# enabled Ponytail on a retired implementation profile (expected installed and disabled) fails with its own diagnostic
 check("--fixture", str(FIXTURES / "ponytail-enabled-drift.yaml"), code=1, text="must be disabled")
-# absent required-disabled Ponytail fails with its own diagnostic
+# absent required-disabled Ponytail on a retired implementation profile fails with its own diagnostic
 check("--fixture", str(FIXTURES / "ponytail-absent-drift.yaml"), code=1, text="required-disabled ponytail absent")
+# Ponytail installed but disabled on a profile that requires it enabled fails
+check("--fixture", str(FIXTURES / "ponytail-disabled-target-drift.yaml"), code=1,
+      text="plugin drift harness-worker: required ponytail not enabled")
+# the line PONYTAIL_DEFAULT_MODE=full absent from the .env file of a profile that requires ponytail fails
+check("--fixture", str(FIXTURES / "ponytail-mode-line-absent-drift.yaml"), code=1,
+      text="ponytail mode drift harness-worker-glm-medium-1: PONYTAIL_DEFAULT_MODE=full absent")
+# a ponytail clone at another revision on a profile that requires ponytail fails
+check("--fixture", str(FIXTURES / "ponytail-revision-drift.yaml"), code=1,
+      text="plugin drift jss-reviewer: ponytail install metadata not at 7801d061243d7b753bad0e0b3c057cd250b11755 "
+           "from https://github.com/DietrichGebert/ponytail.git")
+# ponytail is installed by hand (`plugins adopt` records pinned=false): the revision and the source decide,
+# `pinned` does not; another plugin still requires pinned=true
+_pony_pin = json.loads((ROOT / "snapshots/sanitized-current-state.yaml").read_text())["plugins"]["ponytail"]
+_adopted = {"pinned": False, "revision": "7801d061243d7b753bad0e0b3c057cd250b11755",
+            "source": "https://github.com/DietrichGebert/ponytail.git"}
+assert verify_state.full_pin_entry_errors("advisor", _pony_pin, _adopted) == []
+assert verify_state.full_pin_entry_errors("advisor", _pony_pin, dict(_adopted, pinned=True)) == []
+assert len(verify_state.full_pin_entry_errors(
+    "advisor", _pony_pin, dict(_adopted, source="https://github.com/example/ponytail.git"))) == 1
+assert verify_state.full_pin_entry_errors("advisor", _pony_pin, None) == [
+    "plugin drift advisor: ponytail missing from install metadata"]
+_notif_pin = json.loads((ROOT / "snapshots/sanitized-current-state.yaml").read_text())["plugins"][
+    "hermes-terminal-outcome-notification"]
+assert len(verify_state.full_pin_entry_errors(
+    "advisor", _notif_pin, {"pinned": False, "revision": _notif_pin["pinned_commit"]})) == 1
+# the list line of a ponytail clone has no `pinned@` text; another plugin still needs it
+assert verify_state.pin_display_matches(_pony_pin, "enabled      git      5.3.3    ponytail")
+assert not verify_state.pin_display_matches(_pony_pin, "enabled      git      5.3.2    ponytail")
+assert not verify_state.pin_display_matches(_pony_pin, "enabled      user     5.3.3    ponytail")
+assert not verify_state.pin_display_matches(_notif_pin, "enabled      git      0.2.0    hermes-terminal-outcome-notification")
+# a fixture that omits one profile from ponytail_install_metadata, or the whole section, is incomplete
+_pony_meta_fixture = json.loads((FIXTURES / "clean.yaml").read_text())
+del _pony_meta_fixture["ponytail_install_metadata"]["advisor"]
+with tempfile.TemporaryDirectory(prefix="ponytail-metadata-fixture-") as _tmp:
+    _incomplete = Path(_tmp) / "ponytail-metadata-omits-profile.yaml"
+    _incomplete.write_text(json.dumps(_pony_meta_fixture))
+    check("--fixture", str(_incomplete), code=1, text="incomplete fixture: ponytail_install_metadata omits advisor")
+    del _pony_meta_fixture["ponytail_install_metadata"]
+    _incomplete.write_text(json.dumps(_pony_meta_fixture))
+    check("--fixture", str(_incomplete), code=1,
+          text="incomplete fixture: missing required section 'ponytail_install_metadata'")
+# a fixture that omits one profile from ponytail_mode_env is incomplete
+_ponytail_fixture = json.loads((FIXTURES / "clean.yaml").read_text())
+del _ponytail_fixture["ponytail_mode_env"]["harness-worker"]
+with tempfile.TemporaryDirectory(prefix="ponytail-mode-fixture-") as _tmp:
+    _incomplete = Path(_tmp) / "ponytail-mode-omits-profile.yaml"
+    _incomplete.write_text(json.dumps(_ponytail_fixture))
+    check("--fixture", str(_incomplete), code=1, text="incomplete fixture: ponytail_mode_env omits harness-worker")
+    del _ponytail_fixture["ponytail_mode_env"]
+    _incomplete.write_text(json.dumps(_ponytail_fixture))
+    check("--fixture", str(_incomplete), code=1,
+          text="incomplete fixture: missing required section 'ponytail_mode_env'")
+# every profile that requires ponytail is in the clean fixture's ponytail_mode_env, and no other profile is
+_roster = json.loads((ROOT / "roster.yaml").read_text())
+_ponytail_required = sorted(profile["name"] for profile in _roster["profiles"]
+                            if "ponytail" in profile.get("required_plugins", []))
+assert len(_ponytail_required) == 56, len(_ponytail_required)
+assert sorted(json.loads((FIXTURES / "clean.yaml").read_text())["ponytail_mode_env"]) == _ponytail_required
+assert not [profile["name"] for profile in _roster["profiles"]
+            if "ponytail" in profile.get("required_plugins", [])
+            and "ponytail" in profile.get("installed_disabled_plugins", [])]
+# the observation of the .env file is one boolean for the exact line; no other line is stored or printed
+_home_before = os.environ.get("HOME")
+with tempfile.TemporaryDirectory(prefix="ponytail-mode-home-") as _tmp:
+    os.environ["HOME"] = _tmp
+    try:
+        _secret = "SYNTHETIC_KEY=synthetic-value-not-shown"
+        for _lines, _want in (
+                (["PONYTAIL_DEFAULT_MODE=full"], True),
+                ([_secret, "PONYTAIL_DEFAULT_MODE=full", "OTHER=1"], True),
+                (["PONYTAIL_DEFAULT_MODE=full\r"], True),
+                ([_secret], False),
+                (["PONYTAIL_DEFAULT_MODE=off"], False),
+                (["PONYTAIL_DEFAULT_MODE=full2"], False),
+                ([" PONYTAIL_DEFAULT_MODE=full"], False),
+                (["#PONYTAIL_DEFAULT_MODE=full"], False),
+                (["export PONYTAIL_DEFAULT_MODE=full"], False),
+                (["PONYTAIL_DEFAULT_MODE=\"full\""], False),
+                ([], False)):
+            _env_dir = Path(_tmp) / ".hermes" / "profiles" / "harness-worker"
+            _env_dir.mkdir(parents=True, exist_ok=True)
+            (_env_dir / ".env").write_text("".join(line + "\n" for line in _lines))
+            assert verify_state.ponytail_mode_line_present("harness-worker") is _want, (_lines, _want)
+        # an absent .env file is an absent line
+        assert verify_state.ponytail_mode_line_present("advisor") is False
+    finally:
+        if _home_before is None:
+            del os.environ["HOME"]
+        else:
+            os.environ["HOME"] = _home_before
+_ponytail_errors = []
+with redirect_stdout(io.StringIO()):
+    verify_state.check_ponytail_mode(_ponytail_errors, ["harness-worker", "advisor"], {"harness-worker": True, "advisor": False})
+assert _ponytail_errors == ["ponytail mode drift advisor: PONYTAIL_DEFAULT_MODE=full absent"], _ponytail_errors
 # a missing per-profile deployed copy of a non-retired profile fails
 check("--fixture", str(FIXTURES / "skill-deployment-missing.yaml"), code=1, text="deployed skill copy missing")
 # a supporting file in either deployment skill is part of the deployed tree contract
@@ -915,11 +1010,14 @@ def test_unreadable_config(tmp="/tmp/hermes-verify-stub"):
     )
     stub.chmod(0o700)
     import os as _os
-    env = dict(_os.environ, PATH=f"{stub_dir}:{_os.environ['PATH']}")
+    # HOME points to an empty directory so the live path reads no real profile file.
+    empty_home = tempfile.mkdtemp(prefix="hermes-verify-home-")
+    env = dict(_os.environ, PATH=f"{stub_dir}:{_os.environ['PATH']}", HOME=empty_home)
     result = subprocess.run([str(VERIFY)], text=True, capture_output=True, env=env)
     assert result.returncode == 1 and "unreadable" in result.stdout, result.stdout + result.stderr
     import shutil
     shutil.rmtree(stub_dir)
+    shutil.rmtree(empty_home)
 
 
 test_unreadable_config()

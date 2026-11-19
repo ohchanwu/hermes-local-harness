@@ -77,13 +77,39 @@ def plugin_state(text):
     return state
 
 
+# Plugins installed by hand (card t_9c1b6b2f, Amendment 1): `hermes plugins install` refuses the
+# plugin.json of Ponytail 5.3.3 on this Hermes version (NousResearch/hermes-agent#125937), so the
+# plugin is installed with `git clone`, `git checkout --detach <commit>` and `hermes plugins adopt`.
+# `plugins adopt` records pinned=false and `plugins list` then prints no `pinned@` text, so for
+# these plugins only, the install metadata must record the exact revision and this exact source,
+# and the list line must show source `git` and the expected version.
+MANUAL_INSTALL_SOURCES = {"ponytail": "https://github.com/DietrichGebert/ponytail.git"}
+
+
+def full_pin_entry_errors(profile, pinned, entry):
+    """Full-commit pin provenance of one install metadata entry (None when the entry is absent).
+    Returns a list of error messages (empty when the exact pin is proven)."""
+    if not isinstance(entry, dict):
+        return [f"plugin drift {profile}: {pinned['name']} missing from install metadata"]
+    want_commit = pinned["pinned_commit"]
+    manual_source = MANUAL_INSTALL_SOURCES.get(pinned["name"])
+    if manual_source is not None:
+        if entry.get("revision") != want_commit or entry.get("source") != manual_source:
+            return [f"plugin drift {profile}: {pinned['name']} install metadata not at {want_commit} "
+                    f"from {manual_source} (revision={entry.get('revision')!r}, source={entry.get('source')!r})"]
+        return []
+    if entry.get("pinned") is not True or entry.get("revision") != want_commit:
+        return [f"plugin drift {profile}: {pinned['name']} install metadata not pinned at "
+                f"{want_commit} (pinned={entry.get('pinned')!r}, revision={entry.get('revision')!r})"]
+    return []
+
+
 def full_pin_errors(profile, pinned):
     """Full-commit pin provenance: the CLI display truncates, so read the install
     metadata the plugin manager itself maintains and require the exact revision.
     Returns a list of error messages (empty when the exact pin is proven)."""
     if not pinned:
         return []
-    want_commit, want_version = pinned["pinned_commit"], pinned["version"]
     home = Path.home() / ".hermes"
     if profile == "default":
         meta_path = home / "plugins" / ".install-metadata.json"
@@ -94,13 +120,14 @@ def full_pin_errors(profile, pinned):
     except (OSError, json.JSONDecodeError):
         return [f"plugin drift {profile}: unable to read install metadata for full pin verification"]
     entry = meta.get(pinned["name"]) if isinstance(meta, dict) else None
-    if not isinstance(entry, dict):
-        return [f"plugin drift {profile}: {pinned['name']} missing from install metadata"]
-    errors = []
-    if entry.get("pinned") is not True or entry.get("revision") != want_commit:
-        errors.append(f"plugin drift {profile}: {pinned['name']} install metadata not pinned at "
-                      f"{want_commit} (pinned={entry.get('pinned')!r}, revision={entry.get('revision')!r})")
-    return errors
+    return full_pin_entry_errors(profile, pinned, entry)
+
+
+def pin_display_matches(pinned, line):
+    """The `plugins list --plain` line shows the expected pin (see MANUAL_INSTALL_SOURCES)."""
+    if pinned["name"] in MANUAL_INSTALL_SOURCES:
+        return str(line).split()[1:] == ["git", pinned["version"], pinned["name"]]
+    return f"pinned@{pinned.get('pinned_display_commit', pinned['pinned_commit'])} {pinned['version']}" in str(line)
 
 
 def check_plugins(errors, warnings, profile, expected, observed_plugins, pinned_plugins=None,
@@ -116,7 +143,7 @@ def check_plugins(errors, warnings, profile, expected, observed_plugins, pinned_
         actual = state.get(required)
         if actual is None or not str(actual).startswith("enabled"):
             fail(errors, f"plugin drift {profile}: required {required} not enabled (actual {actual!r})")
-        elif pinned and f"pinned@{pinned.get('pinned_display_commit', pinned['pinned_commit'])} {pinned['version']}" not in actual:
+        elif pinned and not pin_display_matches(pinned, actual):
             fail(errors, f"plugin drift {profile}: {required} expected pinned {pinned['version']}@{pinned['pinned_commit']}")
     for required in required_disabled or []:
         pinned = (pinned_plugins or {}).get(required)
@@ -125,7 +152,7 @@ def check_plugins(errors, warnings, profile, expected, observed_plugins, pinned_
             fail(errors, f"plugin drift {profile}: required-disabled {required} absent (expected installed and disabled)")
         elif str(actual).startswith("enabled"):
             fail(errors, f"ponytail enabled drift {profile}: {required} must be disabled")
-        elif pinned and f"pinned@{pinned.get('pinned_display_commit', pinned['pinned_commit'])} {pinned['version']}" not in str(actual):
+        elif pinned and not pin_display_matches(pinned, actual):
             fail(errors, f"plugin drift {profile}: {required} expected pinned {pinned['version']}@{pinned['pinned_commit']}")
     for name, status in sorted(state.items()):
         enabled = str(status).startswith("enabled")
@@ -2200,6 +2227,59 @@ def check_live_glm_reviewers(errors, fleets, read):
                                        for name in glm_reviewer_profiles()})
 
 
+# Level of the Ponytail plugin: it reads PONYTAIL_DEFAULT_MODE from the environment of the
+# profile, which Hermes loads from the profile's .env file. The collection compares each line
+# of the file with this one exact line and records one boolean; it never stores or prints
+# any other line.
+PONYTAIL_MODE_LINE = "PONYTAIL_DEFAULT_MODE=full"
+PONYTAIL = "ponytail"
+
+
+def ponytail_mode_profiles(roster):
+    """Names of the roster profiles that require the ponytail plugin."""
+    return [profile["name"] for profile in roster["profiles"]
+            if PONYTAIL in profile.get("required_plugins", [])]
+
+
+def ponytail_mode_line_present(name):
+    env_file = Path.home() / ".hermes" / "profiles" / name / ".env"
+    try:
+        with env_file.open(encoding="utf-8") as handle:
+            return any(line.rstrip("\r\n") == PONYTAIL_MODE_LINE for line in handle)
+    except (OSError, ValueError):
+        return False
+
+
+def check_ponytail_mode(errors, profiles, observed=_ABSENT_SECTION):
+    """Each profile that requires ponytail has the line PONYTAIL_DEFAULT_MODE=full in its .env
+    file. observed is a mapping of one boolean per profile; the absent-marker sentinel (a
+    fixture without the section) and a profile missing from the mapping are incomplete fixtures."""
+    if not isinstance(observed, dict):
+        fail(errors, "incomplete fixture: missing required section 'ponytail_mode_env'")
+        return
+    for name in profiles:
+        present = observed.get(name)
+        if present is None:
+            fail(errors, f"incomplete fixture: ponytail_mode_env omits {name}")
+        elif present is not True:
+            fail(errors, f"ponytail mode drift {name}: {PONYTAIL_MODE_LINE} absent")
+
+
+def check_ponytail_install_metadata(errors, profiles, pinned, observed=_ABSENT_SECTION):
+    """Fixture mode: full pin provenance of ponytail on each profile that requires it, from one
+    install metadata entry per profile in the fixture (live mode reads the install metadata file
+    through full_pin_errors). The absent-marker sentinel and an omitted profile are incomplete fixtures."""
+    if not isinstance(observed, dict):
+        fail(errors, "incomplete fixture: missing required section 'ponytail_install_metadata'")
+        return
+    for name in profiles:
+        if name not in observed:
+            fail(errors, f"incomplete fixture: ponytail_install_metadata omits {name}")
+        else:
+            for message in full_pin_entry_errors(name, pinned, observed[name]):
+                fail(errors, message)
+
+
 def usable_absolute_path(value):
     return isinstance(value, str) and Path(value).is_absolute() and not value.startswith("__")
 
@@ -2531,7 +2611,7 @@ def main():
             return 2
         # Fail-closed fixture schema: a passing fixture must represent every required
         # observed field and every installed roster profile; omission is drift, not success.
-        for section in ("profile_models", "profile_providers", "profile_approval_modes", "plugins", "dispatch_profiles", "kanban", "skill_files", "profile_local_skill_overrides", "profile_soul_hashes", "repository_policy_hashes", "adapters", "terminal_notification_runtime", "terminal_retry_policy", "jev_peak_hold_agent", "glm_reviewer_skills", "project_isolation", "project_repair_policy", "project_repair_cards", "profile_managed_settings", "profile_fallback_settings", "profile_auxiliary_settings"):
+        for section in ("profile_models", "profile_providers", "profile_approval_modes", "plugins", "dispatch_profiles", "kanban", "skill_files", "profile_local_skill_overrides", "profile_soul_hashes", "repository_policy_hashes", "adapters", "terminal_notification_runtime", "terminal_retry_policy", "jev_peak_hold_agent", "glm_reviewer_skills", "ponytail_mode_env", "ponytail_install_metadata", "project_isolation", "project_repair_policy", "project_repair_cards", "profile_managed_settings", "profile_fallback_settings", "profile_auxiliary_settings"):
             if section not in observed:
                 fail(errors, f"incomplete fixture: missing required section '{section}'")
         # None is a live/desired-only sentinel in these helpers, not a fixture
@@ -2592,6 +2672,10 @@ def main():
         check_terminal_retry_policy(errors, roster, observed)
         check_jev_peak_hold_agent(errors, observed.get("jev_peak_hold_agent", _ABSENT_SECTION))
         check_glm_reviewer_skills(errors, observed.get("glm_reviewer_skills", _ABSENT_SECTION))
+        check_ponytail_mode(errors, ponytail_mode_profiles(roster),
+                            observed.get("ponytail_mode_env", _ABSENT_SECTION))
+        check_ponytail_install_metadata(errors, ponytail_mode_profiles(roster), snapshot["plugins"][PONYTAIL],
+                                        observed.get("ponytail_install_metadata", _ABSENT_SECTION))
         check_project_isolation(errors, snapshot.get("project_isolation"), observed.get("project_isolation"))
         check_project_repair_policy(errors, project_repair_policy, observed.get("project_repair_policy"))
         project_cards = observed.get("project_repair_cards")
@@ -2654,6 +2738,9 @@ def main():
                         for message in full_pin_errors(name, snapshot["plugins"].get(
                                 "hermes-terminal-outcome-notification")):
                             fail(errors, message)
+                    if PONYTAIL in profile["required_plugins"]:
+                        for message in full_pin_errors(name, snapshot["plugins"].get(PONYTAIL)):
+                            fail(errors, message)
                     check_plugins(errors, warnings, name, profile["required_plugins"], state, snapshot["plugins"],
                                   profile.get("installed_disabled_plugins"))
         check_managed_setting_groups(errors, roster, fleets, expected, json_config)
@@ -2662,6 +2749,9 @@ def main():
         check_live_terminal_notification_runtime(errors, snapshot["terminal_notification"]["producer_profiles"])
         check_jev_peak_hold_agent(errors, launchctl_observation(run, JEV_PEAK_HOLD_LABEL))
         check_live_glm_reviewers(errors, fleets, json_config)
+        ponytail_profiles = ponytail_mode_profiles(roster)
+        check_ponytail_mode(errors, ponytail_profiles,
+                            {name: ponytail_mode_line_present(name) for name in ponytail_profiles})
         for key, want in snapshot["kanban"].items():
             actual = json_config("default", f"kanban.{key}")
             if actual is UNREADABLE or actual != want:

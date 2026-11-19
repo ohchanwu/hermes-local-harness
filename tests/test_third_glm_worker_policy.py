@@ -398,7 +398,8 @@ class DesiredState(unittest.TestCase):
                 self.assertEqual((entry["model"], entry["provider"], entry["lifecycle"]),
                                  ("glm-5.3", "zai", "project-active"))
                 self.assertTrue(entry["dispatch_eligible"] and entry["in_dispatch_pool"])
-                self.assertEqual(entry["required_plugins"], ["jev"])
+                # Card t_9c1b6b2f: Ponytail is required on the 56 target profiles.
+                self.assertEqual(entry["required_plugins"], ["jev", "ponytail"])
                 for key in ("profiles",):
                     self.assertIn(third, roster["approval_policy"][key])
                 self.assertIn(third, roster["project_dispatch_allowlist"])
