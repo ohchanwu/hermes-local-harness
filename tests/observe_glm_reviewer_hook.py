@@ -15,9 +15,11 @@ under HERMES_HOME at interpreter exit.
 It exits 0 when every expected case of a to d holds, otherwise 1. Case e is
 printed and reported; it does not affect the exit status.
 
-Run it from the repository root:
+Run it from the repository root with the interpreter of the installed Hermes
+environment, which installed_hermes_python() of tests/hermes_isolated_home.py
+returns (tests/test_jev_glm_reviewer_hook.py does this):
 
-    /Users/chanbla11mit/.hermes/hermes-agent/venv/bin/python -I tests/observe_glm_reviewer_hook.py
+    <interpreter> -I tests/observe_glm_reviewer_hook.py
 """
 
 import atexit
@@ -32,7 +34,6 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SCRIPT = REPO_ROOT / "scripts" / "jev-glm-reviewer-hook"
-HERMES_PYTHON = Path("/Users/chanbla11mit/.hermes/hermes-agent/venv/bin/python")
 
 # Variables of a worker or gateway session must not reach the observation: the
 # dispatcher's environment decides registration and tool routing. HERMES_HOME

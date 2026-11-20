@@ -45,6 +45,21 @@ Boundaries: import/CLI-help-level actions only.  No model, auth, provider or
 network calls (the child blocks every ``socket.socket`` construction), no
 writes to the live install state, no modification of installed source
 (``-B`` keeps even ``__pycache__` untouched).
+
+Re-verified read-only on v0.23.3 (commit caafe5389ae5): items 1 to 3 hold at
+hermes_cli/venv_sync.py:459, pm/environments.py:450-461 and 464-483, and
+pm/environments.py:20-37 (install key and per-home install state);
+environment-variables.md:861 still documents the variable.
+
+Finding the install
+-------------------
+``installed_checkout_root`` reads the documented install layout first
+(website/docs/getting-started/installation.md, "Install layout": the POSIX
+source script places the checkout in ``~/.hermes/hermes-agent/``), so a
+non-interactive shell without the user's PATH finds the same install; the
+``hermes`` shim on PATH is the fallback for other layouts.  The interpreter is
+the venv that the per-install ``facts.json`` names
+(website/docs/reference/package-management.md, "Per-install facts.json").
 """
 
 from __future__ import annotations
@@ -63,7 +78,7 @@ from typing import Iterator, NamedTuple
 
 #: Installed Hermes display versions this helper has been exercised against.
 #: ``hermes_isolated_home`` refuses to run on anything else.
-TESTED_HERMES_VERSIONS = ("0.21.5+6751.g9cf7960",)
+TESTED_HERMES_VERSIONS = ("0.21.5+6751.g9cf7960", "0.23.3")
 
 #: Environment variable documented in the installed Hermes env-var reference
 #: (website/docs/reference/environment-variables.md, "Internal PM policy used
@@ -150,6 +165,20 @@ def _shim_checkout_root() -> Path | None:
     return root if (root / "install-stamp.json").is_file() else None
 
 
+def installed_checkout_root() -> Path | None:
+    """The installed checkout: the documented source-script location, else the PATH shim's."""
+    documented = default_dependency_root() / "hermes-agent"
+    if (documented / "install-stamp.json").is_file():
+        return documented
+    return _shim_checkout_root()
+
+
+def installed_hermes_python() -> Path | None:
+    """The interpreter of the installed Hermes environment (per-install facts.json), or None."""
+    checkout = installed_checkout_root()
+    return None if checkout is None else resolve_committed_venv_python(checkout, default_dependency_root())
+
+
 def installed_hermes_version(checkout_root: Path) -> str | None:
     """Display version from the install stamp (passive read, no process)."""
     try:
@@ -234,10 +263,11 @@ def isolated_hermes_home(*, extra_env: dict[str, str] | None = None) -> Iterator
     in the TESTED list or its committed interpreter cannot be resolved
     passively.  Everything the child writes stays inside *home*.
     """
-    checkout_root = _shim_checkout_root()
+    checkout_root = installed_checkout_root()
     if checkout_root is None:
         raise IsolatedHomeError(
-            "no installed `hermes` shim on PATH with a readable install stamp; "
+            "no install stamp in the documented checkout location and no installed "
+            "`hermes` shim on PATH with one; "
             "the isolated Hermes home helper only probes an existing install")
     reason = version_gate(installed_hermes_version(checkout_root))
     if reason is not None:
