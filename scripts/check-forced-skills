@@ -11,10 +11,11 @@ def use_hermes_python():
     """The resolver imports Hermes's dependency set, not the caller's Python environment."""
     if os.environ.get("HERMES_FORCED_SKILL_CHECK_REEXEC"):
         return
-    interpreter = Path(os.environ.get(
-        "HERMES_SKILL_RESOLVER_PYTHON",
-        Path.home() / ".hermes" / "hermes-agent" / "venv" / "bin" / "python"))
-    if interpreter.is_file() and os.access(interpreter, os.X_OK):
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "tests"))
+    from hermes_isolated_home import installed_hermes_python
+    del sys.path[0]
+    interpreter = os.environ.get("HERMES_SKILL_RESOLVER_PYTHON") or installed_hermes_python()
+    if interpreter and Path(interpreter).is_file() and os.access(interpreter, os.X_OK):
         environment = dict(os.environ, HERMES_FORCED_SKILL_CHECK_REEXEC="1")
         os.execve(interpreter, [str(interpreter), __file__, *sys.argv[1:]], environment)
 

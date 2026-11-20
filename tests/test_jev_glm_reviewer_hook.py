@@ -6,13 +6,16 @@ Standard library unittest only; run with python3 from the repository root:
 """
 
 import subprocess
+import sys
 import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 SCRIPT = ROOT / "scripts" / "jev-glm-reviewer-hook"
 OBSERVER = ROOT / "tests" / "observe_glm_reviewer_hook.py"
-HERMES_PYTHON = Path("/Users/chanbla11mit/.hermes/hermes-agent/venv/bin/python")
+sys.path.insert(0, str(ROOT / "tests"))
+from hermes_isolated_home import installed_hermes_python  # noqa: E402
+HERMES_PYTHON = installed_hermes_python()
 
 MESSAGE_START = "A GLM reviewer may not call kanban_complete or kanban_request_review."
 
@@ -55,9 +58,9 @@ class ObservationTests(unittest.TestCase):
     """The observation program against the installed Hermes in a temporary home."""
 
     def test_observation_program_exits_0_with_the_installed_hermes_venv(self):
-        if not HERMES_PYTHON.is_file():
+        if HERMES_PYTHON is None:
             self.skipTest(
-                f"the installed Hermes venv interpreter {HERMES_PYTHON} does not exist; "
+                "no interpreter of the installed Hermes is recorded in its per-install facts.json; "
                 "the observation program needs the installed Hermes modules")
         result = subprocess.run([str(HERMES_PYTHON), "-I", str(OBSERVER)],
                                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT,

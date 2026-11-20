@@ -13,6 +13,7 @@ Layout:
 No network, no model/auth/provider calls, no writes to the live home.
 """
 
+import json
 import os
 import subprocess
 import sys
@@ -61,13 +62,33 @@ class PassiveResolutionTests(unittest.TestCase):
     def test_committed_venv_python_resolved_passively(self):
         # Uses the real machine state (passive reads only) — the exact path
         # the real exercise will use.
-        checkout = hih._shim_checkout_root()
+        checkout = hih.installed_checkout_root()
         if checkout is None:
-            self.skipTest("no installed hermes shim with install stamp on PATH")
+            self.skipTest("no installed Hermes checkout with an install stamp")
         python = hih.resolve_committed_venv_python(checkout, hih.default_dependency_root())
         assert python is not None, "expected a committed venv for the installed checkout"
         self.assertTrue(python.is_file())
         self.assertIn("environments", str(python))
+
+    def test_documented_checkout_and_interpreter_found_without_path(self):
+        # Synthetic data root outside ~/.hermes; PATH names no `hermes` shim.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve()
+            checkout = root / "hermes-agent"
+            checkout.mkdir()
+            (checkout / "install-stamp.json").write_text('{"displayVersion": "0.23.3"}', encoding="utf-8")
+            python = root / "env" / "bin" / "python3"
+            python.parent.mkdir(parents=True)
+            python.write_text("", encoding="utf-8")
+            facts = root / "installs" / hih._install_key(checkout) / "facts.json"
+            facts.parent.mkdir(parents=True)
+            facts.write_text(json.dumps({"packages": {"venv": {"environment": str(root / "env")}}}),
+                             encoding="utf-8")
+            with patch.dict(os.environ, {"HERMES_HOME": str(root), "PATH": "/nonexistent"}):
+                self.assertEqual(hih.installed_checkout_root(), checkout)
+                self.assertEqual(hih.installed_hermes_version(checkout), "0.23.3")
+                self.assertIsNone(hih.version_gate("0.23.3"))
+                self.assertEqual(hih.installed_hermes_python(), python)
 
     def test_committed_venv_python_none_on_missing_state(self):
         self.assertIsNone(hih.resolve_committed_venv_python(
@@ -89,7 +110,7 @@ class ChildGuardTests(unittest.TestCase):
 
 class RefusalTests(unittest.TestCase):
     def test_isolated_home_refuses_untested_version(self):
-        with patch.object(hih, "_shim_checkout_root", return_value=ROOT), \
+        with patch.object(hih, "installed_checkout_root", return_value=ROOT), \
                 patch.object(hih, "installed_hermes_version", return_value="1.2.3"):
             with self.assertRaises(hih.IsolatedHomeError) as ctx:
                 with hih.isolated_hermes_home():
@@ -97,7 +118,7 @@ class RefusalTests(unittest.TestCase):
             self.assertIn("not in the TESTED list", str(ctx.exception))
 
     def test_isolated_home_refuses_when_venv_unresolvable(self):
-        with patch.object(hih, "_shim_checkout_root", return_value=ROOT), \
+        with patch.object(hih, "installed_checkout_root", return_value=ROOT), \
                 patch.object(hih, "installed_hermes_version", return_value=None), \
                 patch.object(hih, "resolve_committed_venv_python", return_value=None):
             with self.assertRaises(hih.IsolatedHomeError):
@@ -107,7 +128,7 @@ class RefusalTests(unittest.TestCase):
 
 class IsolatedHomeContractTests(unittest.TestCase):
     def test_isolated_home_env_shape(self):
-        with patch.object(hih, "_shim_checkout_root", return_value=ROOT), \
+        with patch.object(hih, "installed_checkout_root", return_value=ROOT), \
                 patch.object(hih, "installed_hermes_version", return_value=hih.TESTED_HERMES_VERSIONS[0]), \
                 patch.object(hih, "resolve_committed_venv_python", return_value=Path("/synthetic/python3")):
             with hih.isolated_hermes_home() as iso:
@@ -131,9 +152,9 @@ class RealExerciseTests(unittest.TestCase):
     """The mandatory real exercise — skipped only without a TESTED install."""
 
     def test_import_and_help_without_bootstrap_and_live_state_unchanged(self):
-        checkout = hih._shim_checkout_root()
+        checkout = hih.installed_checkout_root()
         if checkout is None:
-            self.skipTest("no installed hermes shim with install stamp on PATH")
+            self.skipTest("no installed Hermes checkout with an install stamp")
         if hih.version_gate(hih.installed_hermes_version(checkout)) is not None:
             self.skipTest("installed Hermes is not in the TESTED list")
         state_dir = hih.default_dependency_root() / "installs" / hih._install_key(checkout)

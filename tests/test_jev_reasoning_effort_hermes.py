@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """The jev llm_request middleware through the real Hermes middleware (card t_caf5dba0).
 
-Run from the repository root with the installed Hermes interpreter:
+Run from the repository root with the interpreter of the installed Hermes
+environment, which installed_hermes_python() of tests/hermes_isolated_home.py
+returns (the line printed under another interpreter names it):
 
-    /Users/chanbla11mit/.hermes/hermes-agent/venv/bin/python -I tests/test_jev_reasoning_effort_hermes.py
+    <interpreter> -I tests/test_jev_reasoning_effort_hermes.py
 
 Steps (procedures/isolated-hermes-test-home.md):
 1. HOME, HERMES_HOME and TMPDIR point at a new temporary directory before any
@@ -66,8 +68,10 @@ def hermes_importable():
         import hermes_cli.plugins  # noqa: F401
         import providers  # noqa: F401
     except Exception as exc:  # any import failure means this interpreter cannot run the test
+        sys.path.insert(0, str(REPO_ROOT / "tests"))
+        from hermes_isolated_home import installed_hermes_python
         print(f"SKIP: Hermes is not importable with {sys.executable} ({type(exc).__name__}); "
-              "run this file with /Users/chanbla11mit/.hermes/hermes-agent/venv/bin/python -I")
+              f"run this file with {installed_hermes_python()} -I")
         return False
     return True
 
