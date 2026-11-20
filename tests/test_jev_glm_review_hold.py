@@ -15,7 +15,9 @@ section 5, way 2, and item 6 of "What the plugin cards must implement":
   hold is not active or the time in its reason has passed.
 
 Offline: a temporary Kanban database, a temporary switch file and log
-directory, a fixed time, and for part B a stand-in ``hermes`` command. Every
+directory, a fixed time, and a stand-in ``hermes`` command
+(``kanban.hermes_command``) that answers ``show --json`` and ``list --json``
+from the database and, for part B, records and applies the changes. Every
 test sets ``HERMES_PROFILE``, ``HERMES_KANBAN_TASK`` and
 ``HERMES_KANBAN_RUN_ID`` itself with ``mock.patch.dict(os.environ, ...)``.
 Nothing touches a live board, the live switch file or the live logs.
@@ -43,6 +45,7 @@ sys.path.insert(0, str(ROOT / "tests"))
 
 import jev_log  # noqa: E402
 import peak_hold  # noqa: E402
+from test_jev_client import write_fake_hermes  # noqa: E402
 from test_jev_glm_review_pass import STAND_IN_HERMES, build_pass_db  # noqa: E402
 
 SCRIPT = ROOT / "scripts" / "jev-peak-hold"
@@ -81,25 +84,25 @@ def read_records(log_dir: Path, event=None) -> list:
     return [r for r in records if event is None or r.get("event") == event]
 
 
-def build_run_db(path: Path, *, block_kind=None, started_at=STARTED_INSIDE, run_task=CARD,
-                 with_block_kind=True) -> None:
-    """A board database with ``tasks`` (``block_kind``) and ``task_runs`` (``started_at``)."""
+def build_run_db(path: Path, *, block_kind=None, started_at=STARTED_INSIDE, run_task=CARD) -> None:
+    """A board database with the card, ``task_runs`` (``started_at``) and, when
+    ``block_kind`` is set, an earlier ``blocked`` event whose payload ``kind`` is
+    ``block_kind`` (the plugin reads the block kind from the newest such event)."""
     path.parent.mkdir(parents=True, exist_ok=True)
     if path.exists():
         path.unlink()
     conn = sqlite3.connect(path)
     conn.execute("PRAGMA journal_mode=wal")
-    kind_column = ", block_kind TEXT" if with_block_kind else ""
-    conn.execute("CREATE TABLE tasks (id TEXT PRIMARY KEY, title TEXT, body TEXT, status TEXT,"
-                 f" assignee TEXT{kind_column})")
+    conn.execute("CREATE TABLE tasks (id TEXT PRIMARY KEY, title TEXT, body TEXT, status TEXT, assignee TEXT)")
+    conn.execute("CREATE TABLE task_events (id INTEGER PRIMARY KEY AUTOINCREMENT, task_id TEXT, run_id INTEGER,"
+                 " kind TEXT, payload TEXT, created_at INTEGER)")
     conn.execute("CREATE TABLE task_runs (id INTEGER PRIMARY KEY, task_id TEXT, profile TEXT,"
                  " status TEXT, started_at INTEGER NOT NULL, ended_at INTEGER, outcome TEXT)")
-    if with_block_kind:
-        conn.execute("INSERT INTO tasks (id, title, status, assignee, block_kind) VALUES (?, ?, ?, ?, ?)",
-                     (CARD, "synthetic card", "running", GLM_REVIEWER, block_kind))
-    else:
-        conn.execute("INSERT INTO tasks (id, title, status, assignee) VALUES (?, ?, ?, ?)",
-                     (CARD, "synthetic card", "running", GLM_REVIEWER))
+    conn.execute("INSERT INTO tasks (id, title, status, assignee) VALUES (?, ?, ?, ?)",
+                 (CARD, "synthetic card", "running", GLM_REVIEWER))
+    if block_kind is not None:
+        conn.execute("INSERT INTO task_events (task_id, kind, payload, created_at) VALUES (?, 'blocked', ?, 0)",
+                     (CARD, json.dumps({"reason": "earlier block", "kind": block_kind, "source_status": "review"})))
     conn.execute("INSERT INTO task_runs (id, task_id, profile, status, started_at) VALUES (?, ?, ?, 'running', ?)",
                  (int(RUN_ID), run_task, GLM_REVIEWER, started_at))
     conn.commit()
@@ -131,6 +134,17 @@ class PluginHoldTests(unittest.TestCase):
         self.addCleanup(now_patcher.stop)
         self.db = self.dir / "kanban-home" / "kanban" / "boards" / BOARD / "kanban.db"
         build_run_db(self.db)
+        self.hermes = write_fake_hermes(self.dir)
+        self.config = self.with_fake_hermes(CONFIG)
+        config_patcher = mock.patch.object(self.plugin, "load_config", side_effect=lambda: self.config)
+        config_patcher.start()
+        self.addCleanup(config_patcher.stop)
+
+    def with_fake_hermes(self, config):
+        """A copy of ``config`` that reads the board through the stand-in ``hermes``."""
+        config = json.loads(json.dumps(config))
+        config["kanban"]["hermes_command"] = self.hermes
+        return config
 
     def call(self, tool, args=None, result=None, profile=None, config=None):
         """One call through ``jev._tool_execution``; returns (next_call arguments, result)."""
@@ -145,7 +159,7 @@ class PluginHoldTests(unittest.TestCase):
         env = {"HERMES_PROFILE": profile} if profile else {}
         with mock.patch.dict(os.environ, env):
             if config is not None:
-                with mock.patch.object(self.plugin, "load_config", return_value=config):
+                with mock.patch.object(self.plugin, "load_config", return_value=self.with_fake_hermes(config)):
                     out = self.plugin._tool_execution(tool_name=tool, args=args, next_call=next_call)
             else:
                 out = self.plugin._tool_execution(tool_name=tool, args=args, next_call=next_call)
@@ -199,11 +213,23 @@ class PluginHoldTests(unittest.TestCase):
         self.assertEqual(len(read_records(self.log_dir, "glm_review_hold")), 1)
 
     def test_block_kind_read_error_gives_needs_input(self):
-        build_run_db(self.db, with_block_kind=False)
-        calls, _out = self.call("kanban_block", {"task_id": CARD, "reason": "x"})
+        build_run_db(self.db, block_kind="needs_input")
+        self.call("terminal", {})  # the run start is read and kept for this run
+        with mock.patch.dict(os.environ, {"FAKE_HERMES_READ_EXIT": "1"}):
+            calls, _out = self.call("kanban_block", {"task_id": CARD, "reason": "x"})
         self.assertEqual(calls[0][0]["kind"], "needs_input")
-        [record] = read_records(self.log_dir, "glm_review_hold")
-        self.assertEqual(record["error_class"], "OperationalError")
+        record = read_records(self.log_dir, "glm_review_hold")[-1]
+        self.assertEqual(record["error_class"], "CommandFailed")
+
+    def test_the_newest_blocked_event_gives_the_block_kind(self):
+        build_run_db(self.db, block_kind="capability")
+        conn = sqlite3.connect(self.db)
+        conn.execute("INSERT INTO task_events (task_id, kind, payload, created_at) VALUES (?, 'blocked', ?, 1)",
+                     (CARD, json.dumps({"reason": "later block", "kind": "needs_input"})))
+        conn.commit()
+        conn.close()
+        calls, _out = self.call("kanban_block", {"task_id": CARD, "reason": "x"})
+        self.assertEqual(calls[0][0]["kind"], "capability")
 
     def test_kanban_complete_and_request_review_stay_refused_as_at_the_baseline(self):
         for tool in ("kanban_complete", "kanban_request_review"):
@@ -245,7 +271,7 @@ class PluginHoldTests(unittest.TestCase):
 
     def test_the_run_start_is_read_once_and_the_switch_on_every_call(self):
         hold_module = self.glm_review.peak_hold
-        with mock.patch.object(hold_module, "connect_readonly", wraps=hold_module.connect_readonly) as read:
+        with mock.patch.object(hold_module, "show_card", wraps=hold_module.show_card) as read:
             self.call("terminal", {})
             self.call("read_file", {})
             self.assertEqual(read.call_count, 1)
@@ -300,7 +326,8 @@ class PluginHoldTests(unittest.TestCase):
                 self.assertEqual((calls, out), ([()], OK_RESULT))
         self.assertEqual(read_records(self.log_dir, "glm_review_hold"), [])
 
-    def test_database_read_error_is_not_held(self):
+    def test_board_read_error_is_not_held(self):
+        # The stand-in `hermes kanban show --json` exits 1 on a damaged database.
         self.db.unlink()
         self.db.write_bytes(b"this file is not a SQLite database" * 200)
         self.assert_baseline_tool(*self.call("terminal", {}))
@@ -356,6 +383,9 @@ class ReleaseTests(unittest.TestCase):
             os.environ.pop(name, None)
 
     def save_config(self):
+        # The script reads the board with kanban.hermes_command; --hermes is
+        # used for the change commands.
+        self.config["kanban"]["hermes_command"] = self.hermes
         self.config_path.write_text(json.dumps(self.config), encoding="utf-8")
 
     def rebuild_held(self, task_id="t_4e1d0001", status="blocked", assignee=GLM_REVIEWER, event=None):
@@ -463,9 +493,9 @@ class ReleaseTests(unittest.TestCase):
         self.assertEqual(self.calls(), [])
         self.assertEqual([(r["skipped"], r["applied"], r["error_class"]) for r in results], [(True, False, None)])
         self.assertEqual(read_records(self.log_dir, "release"), [])
-        with mock.patch.object(peak_hold, "connect_readonly", side_effect=sqlite3.OperationalError("locked")):
+        with mock.patch.dict(os.environ, {"FAKE_HERMES_READ_EXIT": "1"}):
             results = peak_hold.apply_review_release(self.config, releases, self.hermes, {BOARD: self.db})
-        self.assertEqual([(r["skipped"], r["error_class"]) for r in results], [(True, "OperationalError")])
+        self.assertEqual([(r["skipped"], r["error_class"]) for r in results], [(True, "CommandFailed")])
         self.assertEqual(self.calls(), [])
 
     def test_dry_run_prints_the_release_and_runs_no_command(self):
@@ -501,10 +531,11 @@ class ReleaseTests(unittest.TestCase):
         self.assertEqual(self.calls(), [["kanban", "--board", BOARD, "unblock", "t_4e1d0001"]] * 2)
 
     def test_read_error_goes_through_the_read_error_handling(self):
+        # The stand-in `hermes kanban list --json` exits 1 on a damaged database.
         self.db.write_bytes(b"this file is not a SQLite database" * 200)
-        self.assertEqual(self.plan(), ([], [{"board": BOARD, "error_class": "DatabaseError"}]))
+        self.assertEqual(self.plan(), ([], [{"board": BOARD, "error_class": "CommandFailed"}]))
         out = self.script("--apply", returncode=1)
-        self.assertIn("failed read harness error_class=DatabaseError", out)
+        self.assertIn("failed read harness error_class=CommandFailed", out)
         self.assertEqual(self.calls(), [])
         self.assertEqual([r["board"] for r in read_records(self.log_dir, "read_error")], [BOARD])
 

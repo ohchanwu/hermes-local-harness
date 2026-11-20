@@ -29,7 +29,6 @@ import json
 import os
 import re
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Any, Callable, Dict, Mapping, Optional, Tuple
 
 try:  # loaded as the plugin package
@@ -157,13 +156,13 @@ def handle_pass_block(args: Any, next_call: Callable[..., Any], *, config: Any) 
 
     1. It finds the task ID (``args["task_id"]`` when it is a Hermes task
        ID, else ``HERMES_KANBAN_TASK``) and the board
-       (``routing.resolve_board(args, config)``), reads the card's
-       ``block_kind`` from ``tasks`` with
-       ``peak_hold.connect_readonly(peak_hold.kanban_db_path(config, board))``
-       and closes the connection. It calls ``next_call`` with a copy of
-       ``args`` whose ``kind`` is ``needs_input``, or ``capability`` when the
-       card's ``block_kind`` is ``needs_input`` (the kind that keeps the card
-       out of ``triage``); the original ``args`` object, the ``reason`` text
+       (``routing.resolve_board(args, config)``) and reads the card with
+       ``peak_hold.show_card`` (``hermes kanban --board <board> show <id>
+       --json``); the card's block kind is the ``kind`` of its newest
+       ``blocked`` event (``peak_hold.block_kind``). It calls ``next_call``
+       with a copy of ``args`` whose ``kind`` is ``needs_input``, or
+       ``capability`` when the card's block kind is ``needs_input`` (the kind
+       that keeps the card out of ``triage``); the original ``args`` object, the ``reason`` text
        and every other argument are unchanged. When the task ID or the board
        is not recognized, the card is not found, or the read raises, it calls
        ``next_call()`` with the arguments unchanged. After the tool returned,
@@ -191,9 +190,9 @@ def handle_pass_block(args: Any, next_call: Callable[..., Any], *, config: Any) 
        this function before the tool call means one ``next_call()`` with the
        unchanged arguments: ``next_call`` is not called inside the ``try``
        that catches this function's exceptions.
-    4. This function starts no ``hermes kanban`` command, opens no write
-       connection and calls no Hermes function other than through
-       ``next_call``.
+    4. The only ``hermes kanban`` command that this function starts is the
+       read ``show --json`` of item 1; it changes no card and calls no Hermes
+       function other than through ``next_call``.
     """
     payload: Optional[Dict[str, Any]] = None
     record: Dict[str, Any] = {}
@@ -217,15 +216,11 @@ def handle_pass_block(args: Any, next_call: Callable[..., Any], *, config: Any) 
             if board is None:
                 record["not_applied_reason"] = "board_not_configured"
             else:
-                conn = peak_hold.connect_readonly(peak_hold.kanban_db_path(config, board))
-                try:
-                    row = conn.execute("SELECT block_kind FROM tasks WHERE id = ?", (task_id,)).fetchone()
-                finally:
-                    conn.close()
-                if row is None:
+                card = peak_hold.show_card(config, board, task_id)
+                if card is None:
                     record["not_applied_reason"] = "card_not_found"
                 else:
-                    kind = "capability" if row["block_kind"] == "needs_input" else "needs_input"
+                    kind = "capability" if peak_hold.block_kind(card) == "needs_input" else "needs_input"
                     payload = dict(args)
                     payload["kind"] = kind
                     record["kind"] = kind
@@ -268,9 +263,9 @@ HOLD_EVENT = "glm_review_hold"
 # The dispatcher writes HERMES_KANBAN_RUN_ID as the decimal run id
 # (hermes_cli/kanban_db_dispatch.py, ``str(task.current_run_id)``).
 _RUN_ID = re.compile(r"[0-9]{1,18}")
-# (board database path, task ID, run ID) to the run start time in Unix
-# seconds, or None when the read failed or found no run of that task. The
-# database is read at most once per run per process.
+# (board, task ID, run ID) to the run start time in Unix seconds, or None
+# when the read failed or found no run of that task. The card is read at most
+# once per run per process.
 _RUN_STARTED_AT: Dict[Tuple[str, str, str], Optional[int]] = {}
 
 
@@ -279,29 +274,26 @@ def _now() -> datetime:
     return datetime.now().astimezone()
 
 
-def _run_started_at(path: Path, task_id: str, run_id: str) -> Optional[int]:
-    """``task_runs.started_at`` of the run ``run_id`` of ``task_id``, or None.
+def _run_started_at(config: Any, board: str, task_id: str, run_id: str) -> Optional[int]:
+    """``started_at`` of the run ``run_id`` of ``task_id``, or None.
 
-    Reads with ``peak_hold.connect_readonly`` once per (path, task ID, run
-    ID) per process and keeps the answer in memory, a failed read included.
-    None when the read raises, when there is no such run, when the run belongs
-    to another task, or when ``started_at`` is not an integer.
+    Reads the card with ``peak_hold.show_card`` once per (board, task ID,
+    run ID) per process and keeps the answer in memory, a failed read
+    included. None when the read raises, when the card does not exist, when
+    the card has no run with that ID (``show`` lists only the runs of this
+    task), or when ``started_at`` is not an integer.
     """
-    key = (str(path), task_id, run_id)
+    key = (board, task_id, run_id)
     if key in _RUN_STARTED_AT:
         return _RUN_STARTED_AT[key]
     started: Optional[int] = None
     try:
-        conn = peak_hold.connect_readonly(path)
-        try:
-            row = conn.execute("SELECT task_id, started_at FROM task_runs WHERE id = ?",
-                               (int(run_id),)).fetchone()
-        finally:
-            conn.close()
-        if row is not None and row["task_id"] == task_id:
-            value = row["started_at"]
-            if isinstance(value, int) and not isinstance(value, bool):
-                started = value
+        card = peak_hold.show_card(config, board, task_id)
+        for run in (card or {}).get("runs") or []:
+            if isinstance(run, dict) and run.get("id") == int(run_id):
+                value = run.get("started_at")
+                if isinstance(value, int) and not isinstance(value, bool):
+                    started = value
     except Exception:
         started = None
     _RUN_STARTED_AT[key] = started
@@ -339,7 +331,7 @@ def held_run(profile: Any, config: Any, now: datetime) -> Optional[Dict[str, Any
     reviewers = entry.get("glm_reviewers")
     if not isinstance(reviewers, (list, tuple)) or profile not in reviewers:
         return None
-    started = _run_started_at(peak_hold.kanban_db_path(config, board), task_id, run_id)
+    started = _run_started_at(config, board, task_id, run_id)
     if started is None:
         return None
     cfg = config.get("peak_hold") or {}
@@ -391,19 +383,16 @@ def _write_hold_record(held: Mapping[str, Any], tool_name: Any, action: str,
 def _hold_kind(config: Any, held: Mapping[str, Any]) -> Tuple[str, Optional[str]]:
     """``(kind, error_class)`` for the block of a held run, by the rule of ``handle_pass_block``.
 
-    ``capability`` when the card's ``block_kind`` is ``needs_input``, else
+    ``capability`` when the card's block kind (``peak_hold.block_kind``, the
+    ``kind`` of its newest ``blocked`` event) is ``needs_input``, else
     ``needs_input``. A read failure gives ``needs_input`` and the exception
     class name.
     """
     try:
-        conn = peak_hold.connect_readonly(peak_hold.kanban_db_path(config, held["board"]))
-        try:
-            row = conn.execute("SELECT block_kind FROM tasks WHERE id = ?", (held["task_id"],)).fetchone()
-        finally:
-            conn.close()
+        card = peak_hold.show_card(config, held["board"], held["task_id"])
     except Exception as exc:
         return "needs_input", type(exc).__name__
-    if row is not None and row["block_kind"] == "needs_input":
+    if card is not None and peak_hold.block_kind(card) == "needs_input":
         return "capability", None
     return "needs_input", None
 

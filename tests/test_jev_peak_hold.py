@@ -1,8 +1,10 @@
 """Offline tests for the GLM peak-hours hold (Part E) and the owner's on/off switch.
 
-Board changes go through a fake ``hermes`` command (tests/test_jev_client.py)
-that records its arguments and applies ``schedule`` and ``unblock`` to a
-synthetic board database. Jev is the local fake TypeSafe endpoint. Nothing
+Board reads and changes go through a fake ``hermes`` command
+(tests/test_jev_client.py; ``kanban.hermes_command`` of the test
+configuration). It answers ``show --json`` and ``list --json`` from a
+synthetic board database, and it records the arguments of ``schedule`` and
+``unblock`` and applies them to that database. Jev is the local fake TypeSafe endpoint. Nothing
 touches a live board, the live switch file or the live logs.
 """
 from __future__ import annotations
@@ -194,6 +196,9 @@ class _BoardCase(unittest.TestCase):
         self.save_config()
 
     def save_config(self):
+        # The plugin and the script read the board with kanban.hermes_command;
+        # --hermes of the script is used for the change commands.
+        self.config["kanban"]["hermes_command"] = self.hermes
         self.config_path.write_text(json.dumps(self.config), encoding="utf-8")
 
     def script(self, *args, now=WEDNESDAY_16, extra_env=None, python=None, returncode=0, boards=("harness",),
@@ -370,14 +375,15 @@ class PeakHoldScriptTests(_BoardCase):
         self.assertEqual(self.statuses()["t_glm_ready"], "ready")
 
     def test_unreadable_board_does_not_stop_other_boards(self):
+        # The fake `hermes kanban list --json` exits 1 on a damaged database.
         broken = self.db.parent.parent / "jobcron" / "kanban.db"
         broken.parent.mkdir(parents=True)
         broken.write_bytes(b"this file is not a SQLite database" * 200)
         out = self.script("--apply", boards=("jobcron", "harness"), kanban_db=False, returncode=1)
-        self.assertIn("failed read jobcron error_class=DatabaseError", out)
+        self.assertIn("failed read jobcron error_class=CommandFailed", out)
         self.assertEqual(self.statuses()["t_glm_ready"], "scheduled")
         errors = self.decisions("read_error")
-        self.assertEqual([(r["board"], r["error_class"]) for r in errors], [("jobcron", "DatabaseError")])
+        self.assertEqual([(r["board"], r["error_class"]) for r in errors], [("jobcron", "CommandFailed")])
         status = self.script("status", boards=("jobcron", "harness"), kanban_db=False, returncode=1)
         self.assertIn("held cards: 2 (boards that could not be read are not counted)", status)
 
@@ -390,10 +396,10 @@ class PeakHoldScriptTests(_BoardCase):
         for now in runs:
             with self.subTest(now=now):
                 out = self.script("--apply", boards=("jobcron", "harness"), kanban_db=False, returncode=1, now=now)
-                self.assertIn("failed read jobcron error_class=DatabaseError", out)
+                self.assertIn("failed read jobcron error_class=CommandFailed", out)
         errors = self.decisions("read_error")
         self.assertEqual([(r["board"], r["error_class"]) for r in errors],
-                         [("jobcron", "DatabaseError"), ("jobcron", "DatabaseError")])
+                         [("jobcron", "CommandFailed"), ("jobcron", "CommandFailed")])
         state_file = self.log_dir / "read-error-state.json"
         self.assertEqual(json.loads(state_file.read_text(encoding="utf-8")),
                          {"jobcron": "2026-11-11T17:00:00+09:00"})
@@ -427,16 +433,43 @@ class PeakHoldScriptTests(_BoardCase):
         state = json.loads((self.log_dir / "read-error-state.json").read_text(encoding="utf-8"))
         self.assertEqual(state, {"jobcron": "2026-11-11T16:00:00+09:00"})
 
-    def test_read_is_query_only(self):
-        conn = peak_hold.connect_readonly(self.db)
-        try:
-            with self.assertRaises(sqlite3.OperationalError):
-                conn.execute("UPDATE tasks SET status='done'")
-        finally:
-            conn.close()
-        with self.assertRaises(FileNotFoundError):
-            peak_hold.connect_readonly(self.dir / "missing.db")
-        self.assertFalse((self.dir / "missing.db").exists())
+    def test_reads_use_only_kanban_show_and_list_with_json(self):
+        # Change 1 of docs/decisions/261120-plugin-behaviour-across-hermes-updates.md:
+        # the board is read with `hermes kanban --board <board> show <id> --json`
+        # and `... list --status <status> [--assignee <profile>] --json` only.
+        read_log = self.dir / "hermes-reads.jsonl"
+        self.script("--apply")
+        self.script("--apply", now=WEDNESDAY_19, extra_env={"FAKE_HERMES_READ_LOG": str(read_log)})
+        reads = fake_hermes_calls(read_log)
+        self.assertTrue(reads)
+        for argv in reads:
+            self.assertEqual((argv[:3], argv[-1]), (["kanban", "--board", "harness"], "--json"), argv)
+            self.assertIn(argv[3], ("show", "list"), argv)
+        self.assertIn(["kanban", "--board", "harness", "list", "--status", "scheduled", "--json"], reads)
+        self.assertIn(["kanban", "--board", "harness", "show", "t_glm_ready", "--json"], reads)
+        self.assertNotIn("show", [c[3] for c in fake_hermes_calls(self.calls_log)])
+
+    def test_read_of_a_missing_card_and_read_failures(self):
+        self.assertIsNone(peak_hold.show_card(self.config, "harness", "t_0000beef"))
+        self.assertEqual(peak_hold.show_card(self.config, "harness", "t_glm_ready")["task"]["status"], "ready")
+        self.assertEqual([t["id"] for t in peak_hold.list_cards(self.config, "harness", "ready")],
+                         ["t_claude_ready", "t_glm_ready"])
+        with mock.patch.dict(os.environ, {"FAKE_HERMES_READ_EXIT": "1"}):
+            with self.assertRaises(peak_hold.CommandFailed):
+                peak_hold.show_card(self.config, "harness", "t_glm_ready")
+            with self.assertRaises(peak_hold.CommandFailed):
+                peak_hold.list_cards(self.config, "harness", "ready")
+        config = json.loads(json.dumps(self.config))
+        config["kanban"]["hermes_command"] = str(self.dir / "no-such-hermes")
+        with self.assertRaises(peak_hold.CommandNotFound):
+            peak_hold.show_card(config, "harness", "t_glm_ready")
+        config["kanban"]["hermes_command"] = "/bin/echo"
+        with self.assertRaises(peak_hold.UnexpectedOutput):
+            peak_hold.list_cards(config, "harness", "ready")
+        config["kanban"]["hermes_command"] = f"{sys.executable} -c 'import time; time.sleep(5)'"
+        config["kanban"]["command_timeout_seconds"] = 0.2
+        with self.assertRaises(peak_hold.CommandTimeout):
+            peak_hold.show_card(config, "harness", "t_glm_ready")
 
 
 class OwnerSwitchTests(_BoardCase):
@@ -782,7 +815,7 @@ class UnblockHoldTests(_BoardCase):
         self.db.write_bytes(b"this file is not a SQLite database" * 200)
         calls, _ = self.unblock("t_0b10c4ed")
         self.assertEqual(calls, [None])
-        self.assertEqual(self.decisions("hold")[-1]["error_class"], "DatabaseError")
+        self.assertEqual(self.decisions("hold")[-1]["error_class"], "CommandFailed")
 
 
 class EscalatedCardHoldTests(_BoardCase):
@@ -890,16 +923,16 @@ class EscalatedCardHoldTests(_BoardCase):
         actions, _switch, _errors = peak_hold.plan(self.config, datetime.fromisoformat(WEDNESDAY_16), boards)
         holds = [a for a in actions if a["action"] == "hold"]
         self.assertTrue(holds)
-        with mock.patch.object(peak_hold, "connect_readonly", side_effect=sqlite3.OperationalError("locked")):
+        with mock.patch.dict(os.environ, {"FAKE_HERMES_READ_EXIT": "1"}):
             results = peak_hold.apply(self.config, holds, self.hermes, boards)
-        self.assertTrue(all(r["skipped"] and r["error_class"] == "OperationalError" for r in results))
+        self.assertTrue(all(r["skipped"] and r["error_class"] == "CommandFailed" for r in results))
         self.assertEqual(self.schedule_calls(holds[0]["task_id"]), [])
         out = io.StringIO()
         with contextlib.redirect_stdout(out):
             status = script._print_results(results)
         self.assertEqual(status, 0)
         self.assertIn(f"skipped hold harness {holds[0]['task_id']}: the card could not be read again "
-                      "(error_class=OperationalError); the next run tries again", out.getvalue())
+                      "(error_class=CommandFailed); the next run tries again", out.getvalue())
         self.assertNotIn("no longer a ready or todo card", out.getvalue())
 
     def test_held_card_that_is_escalated_is_released(self):

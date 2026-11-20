@@ -6,9 +6,10 @@ access other than a temporary database, no network and no model calls. Every tes
 its own environment with mock.patch.dict(os.environ, ...) and writes plugin logs only
 to a temporary directory, so the result does not depend on the profile that runs them.
 
-The board database is synthetic and every board change goes through the fake
-``hermes`` command of tests/test_jev_client.py, which applies ``set-model`` and
-``reassign`` to it, as the tests of tests/test_jev_routing.py do. The reviewer of
+The board database is synthetic and every board read and change goes through
+the fake ``hermes`` command of tests/test_jev_client.py, which answers ``show
+--json`` from it and applies ``set-model`` and ``reassign`` to it, as the tests
+of tests/test_jev_routing.py do. The reviewer of
 each ``changes_requested`` event is written to its payload, as the Hermes
 ``request_changes`` function writes it (``hermes_cli/kanban_db.py``).
 """
@@ -80,6 +81,7 @@ class CountedChangeRequestTests(unittest.TestCase):
         patcher.start()
         self.addCleanup(patcher.stop)
         self.config = json.loads(json.dumps(CONFIG))
+        self.config["kanban"]["hermes_command"] = self.hermes
 
     # --- helpers ---------------------------------------------------------------
 
@@ -241,16 +243,12 @@ class CountedChangeRequestTests(unittest.TestCase):
     def test_change_request_state_still_counts_every_event(self):
         # `change_request_state` keeps its return value: the third item is the
         # number of the card's `changes_requested` events, GLM reviewer events
-        # included.
-        import sqlite3
+        # included. The card is read with `hermes kanban show --json`.
         self.add_events(GLM_CARD, [GLM_REVIEWER, GLM_REVIEWER, OPUS_REVIEWER])
-        conn = sqlite3.connect(self.db)
-        try:
-            conn.row_factory = sqlite3.Row
-            self.assertEqual(routing.change_request_state(conn, GLM_CARD),
-                             ("ready", "harness-worker-glm-easy-1", 3))
-        finally:
-            conn.close()
+        card = routing.peak_hold.show_card(self.config, "harness", GLM_CARD)
+        self.assertEqual(routing.change_request_state(card), ("ready", "harness-worker-glm-easy-1", 3))
+        self.assertIsNone(routing.change_request_state(routing.peak_hold.show_card(self.config, "harness",
+                                                                                   "t_5a1e00ff")))
 
 
 if __name__ == "__main__":

@@ -7,12 +7,13 @@ board's Opus reviewer with ``hermes kanban assign`` and then
 ``hermes kanban unblock``, on every ``run`` of the script, independent of the
 peak-hours hold.
 
-Board changes go through a stand-in ``hermes`` command that records its
-arguments and applies ``assign``, ``unblock`` and ``schedule`` to a temporary
-Kanban database that has the Hermes columns the code reads (``tasks``,
+Board reads and changes go through a stand-in ``hermes`` command
+(``kanban.hermes_command`` of the test configuration). It answers ``show
+--json`` and ``list --json`` from a temporary Kanban database (``tasks``,
 ``task_events`` with ``payload`` and ``run_id``, ``task_runs`` with
-``profile``). Nothing touches a live board, the live switch file or the live
-logs.
+``profile``), and it records the arguments of ``assign``, ``unblock`` and
+``schedule`` and applies them to that database. Nothing touches a live board,
+the live switch file or the live logs.
 """
 from __future__ import annotations
 
@@ -31,8 +32,11 @@ from zoneinfo import ZoneInfo
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "plugins" / "jev"))
 
+sys.path.insert(0, str(ROOT / "tests"))
+
 import jev_log  # noqa: E402
 import peak_hold  # noqa: E402
+from test_jev_client import FAKE_HERMES_READS  # noqa: E402
 
 SCRIPT = ROOT / "scripts" / "jev-peak-hold"
 CONFIG = json.loads((ROOT / "plugins" / "jev" / "config.json").read_text(encoding="utf-8"))
@@ -55,12 +59,14 @@ MARK = "jev-peak-hold until 2026-11-11T19:00:00+09:00"
 CONTRACT_EMPTY_DB = Path("/Users/chanbla11mit/.hermes/profiles/harness-worker-glm-2/cache/scratch/"
                          "t_64f37437-empty.db")
 
-# The stand-in hermes command: it records its arguments, applies assign,
+# The stand-in hermes command: it answers show --json and list --json from
+# $FAKE_KANBAN_DB (FAKE_HERMES_READS of tests/test_jev_client.py, which does
+# not record reads). For every other command it records its arguments, applies assign,
 # unblock and schedule to $FAKE_KANBAN_DB, and exits 1 for a verb named in
 # $FAKE_HERMES_FAIL_VERBS (comma separated). Like Hermes, unblock returns a
 # card whose newest blocked event records source_status review to review, and
 # every other blocked or scheduled card to ready.
-STAND_IN_HERMES = r'''
+STAND_IN_HERMES = FAKE_HERMES_READS + r'''
 import json, os, sqlite3, sys, time
 argv = sys.argv[1:]
 with open(os.environ["FAKE_HERMES_LOG"], "a", encoding="utf-8") as fh:
@@ -117,7 +123,8 @@ def build_pass_db(path: Path, tasks=(), events=(), runs=()) -> None:
 
     ``tasks``: ``(id, status, assignee)``. ``events``: ``(task_id, run_id,
     kind, payload)`` in order, so the last entry is the newest event.
-    ``runs``: ``(run_id, profile)``.
+    ``runs``: ``(run_id, profile)``; a run belongs to the task of the first
+    event that names it (``show --json`` lists only the runs of the card).
     """
     path.parent.mkdir(parents=True, exist_ok=True)
     if path.exists():
@@ -140,9 +147,12 @@ def build_pass_db(path: Path, tasks=(), events=(), runs=()) -> None:
     for task_id, run_id, kind, payload in events:
         conn.execute("INSERT INTO task_events (task_id, run_id, kind, payload, created_at) VALUES (?,?,?,?,0)",
                      (task_id, run_id, kind, json.dumps(payload) if payload is not None else None))
+    run_tasks = {}
+    for task_id, run_id, _kind, _payload in events:
+        run_tasks.setdefault(run_id, task_id)
     for run_id, profile in runs:
         conn.execute("INSERT INTO task_runs (id, task_id, profile, status, started_at)"
-                     " VALUES (?, 't_0none', ?, 'done', 0)", (run_id, profile))
+                     " VALUES (?, ?, ?, 'done', 0)", (run_id, run_tasks.get(run_id, "t_0none"), profile))
     conn.commit()
     conn.close()
 
@@ -173,6 +183,9 @@ class _PassCase(unittest.TestCase):
         self.addCleanup(patcher.stop)
 
     def save_config(self):
+        # The script reads the board with kanban.hermes_command; --hermes is
+        # used for the change commands.
+        self.config["kanban"]["hermes_command"] = self.hermes
         self.config_path.write_text(json.dumps(self.config), encoding="utf-8")
 
     def rebuild(self, tasks=(), events=(), runs=()):
@@ -338,10 +351,11 @@ class SelectionTests(_PassCase):
                 self.assertEqual((passes, errors), ([], []))
 
     def test_read_error_leaves_the_cards_and_reports_the_board(self):
+        # The stand-in `hermes kanban list --json` exits 1 on a damaged database.
         self.db.write_bytes(b"this file is not a SQLite database" * 200)
         passes, errors = self.plan()
         self.assertEqual(passes, [])
-        self.assertEqual(errors, [{"board": BOARD, "error_class": "DatabaseError"}])
+        self.assertEqual(errors, [{"board": BOARD, "error_class": "CommandFailed"}])
 
 
 class ApplyTests(_PassCase):
@@ -420,11 +434,10 @@ class ApplyTests(_PassCase):
 
     def test_read_error_before_the_commands_skips_the_card(self):
         passes = self.planned()
-        with mock.patch.object(peak_hold, "connect_readonly",
-                               side_effect=sqlite3.OperationalError("locked")):
+        with mock.patch.dict(os.environ, {"FAKE_HERMES_READ_EXIT": "1"}):
             results = peak_hold.apply_glm_review_pass(self.config, passes, self.hermes, {BOARD: self.db})
         self.assertEqual(self.calls(), [])
-        self.assertEqual([(r["skipped"], r["error_class"]) for r in results], [(True, "OperationalError")])
+        self.assertEqual([(r["skipped"], r["error_class"]) for r in results], [(True, "CommandFailed")])
 
     def test_the_record_has_exactly_the_fields_of_item_6(self):
         peak_hold.apply_glm_review_pass(self.config, self.planned(), self.hermes, {BOARD: self.db})

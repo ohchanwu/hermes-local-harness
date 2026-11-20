@@ -30,8 +30,10 @@ has passed (``plan_review_release``, ``apply_review_release``). This part also
 runs no command in a process that a worker started.
 
 Changes to cards go through ``hermes kanban --board <board> ...`` commands only.
-Reads use a SQLite connection to the board database with ``PRAGMA query_only``
-(see ``connect_readonly``).
+Reads go through the documented commands ``hermes kanban --board <board> show
+<id> --json`` and ``hermes kanban --board <board> list --status <status>
+[--assignee <profile>] --json`` (``show_card``, ``list_cards``; decision record
+``docs/decisions/261120-plugin-behaviour-across-hermes-updates.md``, row J14).
 """
 from __future__ import annotations
 
@@ -39,7 +41,6 @@ import json
 import os
 import shlex
 import shutil
-import sqlite3
 import subprocess
 from datetime import datetime, time as dtime
 from pathlib import Path
@@ -274,182 +275,268 @@ def kanban_db_path(config: Mapping[str, Any], board: str) -> Path:
 
 # --- board reads ------------------------------------------------------------
 
-def connect_readonly(path: Path) -> sqlite3.Connection:
-    """Open a board database for reading only.
+class KanbanReadError(Exception):
+    """A ``hermes kanban ... --json`` read failed. The callers record the class
+    name of the subclass as the error class, in the form that ``run_kanban``
+    uses for a change command. The message is the board name only, because
+    the command output can repeat card text."""
 
-    Hermes board databases use ``journal_mode=wal``. When the last writer closes,
-    SQLite removes the ``-wal`` and ``-shm`` files, and older SQLite versions
-    (for example the one in /usr/bin/python3 on macOS) then refuse a
-    ``mode=ro`` URI connection with "unable to open database file". A normal
-    connection with ``PRAGMA query_only=ON`` reads that state with every SQLite
-    version and refuses every write statement. The existence check keeps the
-    normal connection from creating an empty database file.
-    """
-    if not Path(path).is_file():
-        raise FileNotFoundError(str(path))
-    conn = sqlite3.connect(str(path), timeout=10)
+
+class CommandNotFound(KanbanReadError):
+    pass
+
+
+class CommandTimeout(KanbanReadError):
+    pass
+
+
+class CommandFailed(KanbanReadError):
+    pass
+
+
+class UnexpectedOutput(KanbanReadError):
+    pass
+
+
+def _command_timeout(config: Mapping[str, Any]) -> float:
     try:
-        conn.execute("PRAGMA query_only = ON")
-    except Exception:
-        conn.close()
-        raise
-    conn.row_factory = sqlite3.Row
-    return conn
+        return float((config.get("kanban") or {}).get("command_timeout_seconds") or 30)
+    except (TypeError, ValueError):
+        return 30.0
 
 
-def card_hold_state(conn: sqlite3.Connection, task_id: str, mark: str) -> Optional[Tuple[str, Optional[str], bool]]:
+def _read_kanban(config: Mapping[str, Any], board: str, args: List[str],
+                 command: Optional[str]) -> subprocess.CompletedProcess:
+    """Run ``<hermes> kanban --board <board> <args> --json`` and return the finished process."""
+    argv = hermes_argv(config, command) + ["kanban", "--board", board] + list(args) + ["--json"]
+    try:
+        # Hermes prints the JSON with ensure_ascii=False; UTF-8 is set here
+        # because the locale encoding is ASCII when LANG is not set.
+        return subprocess.run(argv, stdin=subprocess.DEVNULL, capture_output=True, encoding="utf-8",
+                              errors="replace", timeout=_command_timeout(config), check=False)
+    except FileNotFoundError:
+        raise CommandNotFound(board) from None
+    except subprocess.TimeoutExpired:
+        raise CommandTimeout(board) from None
+
+
+def _parse_output(text: str, board: str) -> Any:
+    try:
+        return json.loads(text)
+    except ValueError:
+        raise UnexpectedOutput(board) from None
+
+
+def show_card(config: Mapping[str, Any], board: str, task_id: str,
+              command: Optional[str] = None) -> Optional[Dict[str, Any]]:
+    """One card from ``hermes kanban --board <board> show <task_id> --json``, or
+    None when Hermes reports that the task does not exist.
+
+    The object has ``task`` (with ``status``, ``assignee`` and ``body``),
+    ``events`` (each with ``kind``, ``payload`` and ``run_id``, oldest first)
+    and ``runs`` (each with ``id``, ``profile`` and ``started_at``) (Hermes
+    ``hermes_cli/kanban.py`` ``_cmd_show``; ``kanban.md``). Every other
+    failure raises a ``KanbanReadError``. Hermes refuses no ``show`` call in a
+    worker session, so the middleware uses only this read.
+    """
+    completed = _read_kanban(config, board, ["show", task_id], command)
+    if completed.returncode != 0:
+        # Hermes v0.23.3 prints "no such task: <id>" for an unknown task. When a
+        # later Hermes prints another text, the call is a read error instead;
+        # every caller then leaves the card unchanged, as for a missing card,
+        # and only the recorded reason differs.
+        if f"no such task: {task_id}" in (completed.stderr or ""):
+            return None
+        raise CommandFailed(board)
+    card = _parse_output(completed.stdout, board)
+    if (not isinstance(card, dict) or not isinstance(card.get("task"), dict)
+            or not isinstance(card.get("events"), list) or not isinstance(card.get("runs"), list)):
+        raise UnexpectedOutput(board)
+    return card
+
+
+def list_cards(config: Mapping[str, Any], board: str, status: str, assignee: Optional[str] = None,
+               command: Optional[str] = None) -> List[Dict[str, Any]]:
+    """The tasks of ``hermes kanban --board <board> list --status <status>
+    [--assignee <assignee>] --json``, in task ID order (the order of the
+    earlier SQLite reads; Hermes sorts by priority).
+
+    Every failure raises a ``KanbanReadError``. Hermes refuses ``list`` in a
+    process that a dispatched worker started, because ``list`` first runs
+    ``recompute_ready``, which changes the board; only the passes of
+    ``scripts/jev-peak-hold`` call this function.
+    """
+    args = ["list", "--status", status] + (["--assignee", assignee] if assignee else [])
+    completed = _read_kanban(config, board, args, command)
+    if completed.returncode != 0:
+        raise CommandFailed(board)
+    tasks = _parse_output(completed.stdout, board)
+    if not isinstance(tasks, list) or not all(isinstance(t, dict) and isinstance(t.get("id"), str)
+                                              for t in tasks):
+        raise UnexpectedOutput(board)
+    return sorted(tasks, key=lambda task: task["id"])
+
+
+def event_payload(raw: Any) -> Dict[str, Any]:
+    """The payload of one event as a dict, or an empty dict (never raises).
+
+    ``show --json`` gives the parsed payload; a JSON text is parsed as well.
+    """
+    if isinstance(raw, str):
+        try:
+            raw = json.loads(raw)
+        except Exception:
+            return {}
+    return raw if isinstance(raw, dict) else {}
+
+
+def newest_event(card: Mapping[str, Any], kind: str) -> Optional[Mapping[str, Any]]:
+    """The newest event of ``kind`` in a ``show_card`` result, or None when there is none."""
+    found = None
+    for event in card.get("events") or []:
+        if isinstance(event, Mapping) and event.get("kind") == kind:
+            found = event
+    return found
+
+
+def block_kind(card: Mapping[str, Any]) -> Optional[str]:
+    """The ``kind`` of the newest ``blocked`` event (``kanban.md``), used in
+    place of the ``tasks.block_kind`` column, which ``show --json`` does not give."""
+    event = newest_event(card, "blocked")
+    kind = event_payload(event.get("payload")).get("kind") if event is not None else None
+    return kind if isinstance(kind, str) else None
+
+
+def _held_reason(card: Mapping[str, Any], mark: str) -> Optional[str]:
+    """The reason of the newest ``scheduled`` event when the card is ``scheduled``
+    and that reason carries the marker, else None."""
+    if card["task"].get("status") != "scheduled":
+        return None
+    event = newest_event(card, "scheduled")
+    reason = event_payload(event.get("payload")).get("reason") if event is not None else None
+    return reason if carries_marker(reason, mark) else None
+
+
+def card_hold_state(config: Mapping[str, Any], board: str, task_id: str, mark: str,
+                    command: Optional[str] = None) -> Optional[Tuple[str, Optional[str], bool]]:
     """``(status, assignee, carries_marker)`` of one card, or None when it does not exist.
 
     ``carries_marker`` is true only for a ``scheduled`` card whose latest
     ``scheduled`` event reason carries the marker.
     """
-    row = conn.execute("SELECT status, assignee FROM tasks WHERE id = ?", (task_id,)).fetchone()
-    if row is None:
+    card = show_card(config, board, task_id, command)
+    if card is None:
         return None
-    status = str(row["status"])
-    held = False
-    if status == "scheduled":
-        held = any(card_id == task_id for card_id, _assignee, _reason in held_cards(conn, mark, only=task_id))
-    return status, row["assignee"], held
+    task = card["task"]
+    return str(task.get("status")), task.get("assignee"), _held_reason(card, mark) is not None
 
 
-def holdable_cards(conn: sqlite3.Connection, workers: Iterable[str]) -> List[Tuple[str, str]]:
-    """``(task_id, assignee)`` for ``ready`` and ``todo`` cards assigned to ``workers``."""
+def holdable_cards(config: Mapping[str, Any], board: str, workers: Iterable[str],
+                   command: Optional[str] = None) -> List[Tuple[str, str]]:
+    """``(task_id, assignee)`` for ``ready`` and ``todo`` cards assigned to ``workers``, in ID order."""
     workers = list(workers)
     if not workers:
         return []
-    marks = ",".join("?" for _ in workers)
-    rows = conn.execute(
-        f"SELECT id, assignee FROM tasks WHERE status IN ('ready', 'todo') AND assignee IN ({marks}) "
-        "ORDER BY id", workers).fetchall()
-    return [(str(r["id"]), str(r["assignee"])) for r in rows]
+    tasks = list_cards(config, board, "ready", command=command) + list_cards(config, board, "todo", command=command)
+    return sorted((task["id"], str(task["assignee"])) for task in tasks if task.get("assignee") in workers)
 
 
-def held_cards(conn: sqlite3.Connection, mark: str, *, only: Optional[str] = None) -> List[Tuple[str, Optional[str], str]]:
+def held_cards(config: Mapping[str, Any], board: str, mark: str,
+               command: Optional[str] = None) -> List[Tuple[str, Optional[str], str]]:
     """``(task_id, assignee, reason)`` for ``scheduled`` cards whose latest ``scheduled``
-    event reason carries the marker. Other scheduled or blocked cards are never returned.
-    ``only`` limits the query to one card."""
+    event reason carries the marker. Other scheduled or blocked cards are never returned."""
     out = []
-    query = "SELECT id, assignee FROM tasks WHERE status = 'scheduled'"
-    params: Tuple[Any, ...] = ()
-    if only is not None:
-        query += " AND id = ?"
-        params = (only,)
-    for row in conn.execute(query + " ORDER BY id", params).fetchall():
-        event = conn.execute(
-            "SELECT payload FROM task_events WHERE task_id = ? AND kind = 'scheduled' "
-            "ORDER BY id DESC LIMIT 1", (row["id"],)).fetchone()
-        if event is None:
+    for task in list_cards(config, board, "scheduled", command=command):
+        card = show_card(config, board, task["id"], command)
+        if card is None:
             continue
-        try:
-            reason = (json.loads(event["payload"] or "{}") or {}).get("reason")
-        except Exception:
-            continue
-        if carries_marker(reason, mark):
-            out.append((str(row["id"]), row["assignee"], reason))
+        reason = _held_reason(card, mark)
+        if reason is not None:
+            out.append((task["id"], card["task"].get("assignee"), reason))
     return out
 
 
 # --- the GLM review pass (decision item 5) -----------------------------------
 
-def _event_payload(raw: Any) -> Dict[str, Any]:
-    """The parsed payload of one event row, or an empty dict (never raises)."""
-    try:
-        content = json.loads(raw or "{}")
-    except Exception:
-        return {}
-    return content if isinstance(content, dict) else {}
-
-
-def _latest_blocked_event(conn: sqlite3.Connection, task_id: str) -> Optional[sqlite3.Row]:
-    """The newest ``blocked`` event row of one card, or None when there is none."""
-    return conn.execute(
-        "SELECT run_id, payload FROM task_events WHERE task_id = ? AND kind = 'blocked' "
-        "ORDER BY id DESC LIMIT 1", (task_id,)).fetchone()
-
-
-def _run_profile(conn: sqlite3.Connection, run_id: Any) -> Optional[str]:
-    """The ``task_runs.profile`` of one run id, or None when absent."""
+def _run_profile(card: Mapping[str, Any], run_id: Any) -> Optional[str]:
+    """The ``profile`` of the run ``run_id`` of the card, or None when absent."""
     if not isinstance(run_id, int):
         return None
-    row = conn.execute("SELECT profile FROM task_runs WHERE id = ?", (run_id,)).fetchone()
-    return None if row is None else row["profile"]
+    for run in card.get("runs") or []:
+        if isinstance(run, Mapping) and run.get("id") == run_id:
+            return run.get("profile")
+    return None
 
 
-def _card_matches_pass(conn: sqlite3.Connection, task_id: str, glm_reviewer: str,
+def _card_matches_pass(card: Optional[Mapping[str, Any]], glm_reviewer: str,
                        opus_reviewer: str) -> bool:
-    """True when the card meets every selection condition of decision item 5.3.
+    """True when the card (a ``show_card`` result) meets every selection condition of decision item 5.3.
 
     ``blocked`` status, the newest ``blocked`` event reason starts with the
     pass prefix and its payload records ``source_status: review`` (Hermes
     ``block_task`` writes it; the value comes from ``_retry_status_for_run``,
     which reads the ``source_status`` of the run's ``claimed`` event), the run
-    of that event (``task_events.run_id`` joined to ``task_runs.profile``) is
-    the GLM reviewer, and the assignee is the GLM reviewer or the Opus
-    reviewer. Any unexpected shape (an unparsable payload, a missing run row)
-    makes the answer False.
+    of that event (its ``run_id`` matched with the card's ``runs``) is the GLM
+    reviewer, and the assignee is the GLM reviewer or the Opus reviewer. A
+    missing card and any unexpected shape (a payload that is not an object, a
+    missing run) make the answer False.
     """
-    row = conn.execute("SELECT status, assignee FROM tasks WHERE id = ?", (task_id,)).fetchone()
-    if row is None or str(row["status"]) != "blocked":
+    if card is None:
         return False
-    if row["assignee"] not in (glm_reviewer, opus_reviewer):
+    task = card["task"]
+    if str(task.get("status")) != "blocked":
         return False
-    event = _latest_blocked_event(conn, task_id)
+    if task.get("assignee") not in (glm_reviewer, opus_reviewer):
+        return False
+    event = newest_event(card, "blocked")
     if event is None:
         return False
-    payload = _event_payload(event["payload"])
+    payload = event_payload(event.get("payload"))
     reason = payload.get("reason")
     if not (isinstance(reason, str) and reason.startswith(GLM_REVIEW_PASS_PREFIX)):
         return False
     if payload.get("source_status") != "review":
         return False
-    return _run_profile(conn, event["run_id"]) == glm_reviewer
-
-
-def glm_review_pass_cards(conn: sqlite3.Connection, glm_reviewer: str,
-                          opus_reviewer: str) -> List[str]:
-    """The task ids of the cards to pass to the Opus reviewer, in ``id`` order."""
-    rows = conn.execute("SELECT id FROM tasks WHERE status = 'blocked' ORDER BY id").fetchall()
-    return [str(row["id"]) for row in rows
-            if _card_matches_pass(conn, str(row["id"]), glm_reviewer, opus_reviewer)]
+    return _run_profile(card, event.get("run_id")) == glm_reviewer
 
 
 def plan_glm_review_pass(config: Mapping[str, Any], boards: Mapping[str, Path]
                          ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
-    """Planned passes for ``boards`` (board name to database path).
+    """Planned passes for ``boards`` (board name to database path; only the
+    names are used, the cards are read with ``list_cards`` and ``show_card``).
 
     Returns ``(passes, read_errors)``. A pass is ``{"board", "task_id",
     "glm_reviewer", "opus_reviewer", "assign"}`` where ``assign`` is true when
-    the card is not yet assigned to the Opus reviewer. A board whose database
-    cannot be read adds ``{"board", "error_class"}`` to ``read_errors`` and
-    does not stop the other boards. This is independent of
+    the card is not yet assigned to the Opus reviewer. A board that cannot be
+    read adds ``{"board", "error_class"}`` to ``read_errors`` and does not
+    stop the other boards. Passes are in task ID order. This is independent of
     ``peak_hold.enabled``, of the switch and of the window.
     """
     passes: List[Dict[str, Any]] = []
     errors: List[Dict[str, Any]] = []
     pairs = glm_reviewer_pairs(config)
-    for board, path in boards.items():
+    for board in boards:
         pair = pairs.get(board)
         if pair is None:
             continue
         glm_reviewer, opus_reviewer = pair
         try:
-            conn = connect_readonly(path)
-            try:
-                for task_id in glm_review_pass_cards(conn, glm_reviewer, opus_reviewer):
-                    row = conn.execute("SELECT assignee FROM tasks WHERE id = ?", (task_id,)).fetchone()
-                    passes.append({"board": board, "task_id": task_id, "glm_reviewer": glm_reviewer,
+            for task in list_cards(config, board, "blocked"):
+                # _card_matches_pass needs one of the two assignees; this saves a show call per other card.
+                if task.get("assignee") not in (glm_reviewer, opus_reviewer):
+                    continue
+                card = show_card(config, board, task["id"])
+                if card is not None and _card_matches_pass(card, glm_reviewer, opus_reviewer):
+                    passes.append({"board": board, "task_id": task["id"], "glm_reviewer": glm_reviewer,
                                    "opus_reviewer": opus_reviewer,
-                                   "assign": row is None or row["assignee"] != opus_reviewer})
-            finally:
-                conn.close()
+                                   "assign": card["task"].get("assignee") != opus_reviewer})
         except Exception as exc:
             errors.append({"board": board, "error_class": type(exc).__name__})
     return passes, errors
 
 
 def still_passable(config: Mapping[str, Any], board: str, task_id: str,
-                   path: Path) -> Tuple[bool, Optional[str]]:
+                   command: Optional[str] = None) -> Tuple[bool, Optional[str]]:
     """``(passable, read error class)``: passable when the card still meets
     every selection condition of the pass for ``board``.
 
@@ -464,11 +551,7 @@ def still_passable(config: Mapping[str, Any], board: str, task_id: str,
         return False, None
     glm_reviewer, opus_reviewer = pair
     try:
-        conn = connect_readonly(path)
-        try:
-            return _card_matches_pass(conn, task_id, glm_reviewer, opus_reviewer), None
-        finally:
-            conn.close()
+        return _card_matches_pass(show_card(config, board, task_id, command), glm_reviewer, opus_reviewer), None
     except Exception as exc:
         return False, type(exc).__name__
 
@@ -497,8 +580,9 @@ def apply_glm_review_pass(config: Mapping[str, Any], passes: List[Mapping[str, A
                           boards: Optional[Mapping[str, Path]] = None) -> List[Dict[str, Any]]:
     """Pass each planned card to the Opus reviewer; one decisions record each.
 
-    With ``boards`` (board name to database path) each card is checked again
-    with ``still_passable`` first; a card that no longer meets the selection
+    With ``boards`` (board name to database path; only the names are used)
+    each card is checked again with ``still_passable`` first, read with the
+    same ``command``; a card that no longer meets the selection
     conditions, or that cannot be read again, is skipped (no command). For a
     card that is not yet assigned to the Opus reviewer, ``hermes kanban assign``
     runs first; only after it succeeded, or when it was not needed,
@@ -513,7 +597,7 @@ def apply_glm_review_pass(config: Mapping[str, Any], passes: List[Mapping[str, A
         glm_reviewer = str(item["glm_reviewer"])
         opus_reviewer = str(item["opus_reviewer"])
         if boards is not None and board in boards:
-            passable, read_error = still_passable(config, board, task_id, boards[board])
+            passable, read_error = still_passable(config, board, task_id, command)
             if not passable:
                 log_glm_review_pass(board, task_id, glm_reviewer, opus_reviewer, None, False,
                                     True, read_error)
@@ -563,9 +647,10 @@ def first_glm_reviewer_by_board(config: Mapping[str, Any]) -> Dict[str, str]:
     return out
 
 
-def _review_hold_reason(conn: sqlite3.Connection, task_id: str, glm_reviewer: str,
+def _review_hold_reason(card: Optional[Mapping[str, Any]], glm_reviewer: str,
                         mark: str) -> Optional[str]:
-    """The reason of the newest ``blocked`` event when the card is held in review, else None.
+    """The reason of the newest ``blocked`` event when the card (a ``show_card``
+    result) is held in review, else None.
 
     Held in review: status ``blocked``, assignee ``glm_reviewer``, and the
     newest ``blocked`` event has a ``reason`` that carries the marker
@@ -574,13 +659,15 @@ def _review_hold_reason(conn: sqlite3.Connection, task_id: str, glm_reviewer: st
     ``hermes kanban unblock`` returns such a card to ``review`` with the same
     assignee.
     """
-    row = conn.execute("SELECT status, assignee FROM tasks WHERE id = ?", (task_id,)).fetchone()
-    if row is None or str(row["status"]) != "blocked" or row["assignee"] != glm_reviewer:
+    if card is None:
         return None
-    event = _latest_blocked_event(conn, task_id)
+    task = card["task"]
+    if str(task.get("status")) != "blocked" or task.get("assignee") != glm_reviewer:
+        return None
+    event = newest_event(card, "blocked")
     if event is None:
         return None
-    payload = _event_payload(event["payload"])
+    payload = event_payload(event.get("payload"))
     reason = payload.get("reason")
     if not carries_marker(reason, mark) or payload.get("source_status") != "review":
         return None
@@ -599,7 +686,8 @@ def _until_passed(until: Optional[str], now: datetime, cfg: Mapping[str, Any]) -
 
 def plan_review_release(config: Mapping[str, Any], now: datetime, boards: Mapping[str, Path]
                         ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
-    """Planned releases of cards held in review, for ``boards`` (board name to database path).
+    """Planned releases of cards held in review, for ``boards`` (board name to
+    database path; only the names are used).
 
     Returns ``(releases, read_errors)``. A card held in review
     (``_review_hold_reason``, with the first entry of the board's
@@ -607,7 +695,7 @@ def plan_review_release(config: Mapping[str, Any], now: datetime, boards: Mappin
     window, switch off or ``peak_hold.enabled`` false) or when the time in its
     reason (``until_from_reason``) has passed. A release is ``{"action":
     "release", "board", "task_id", "assignee", "held_until", "released_to":
-    "review"}``. A board whose database cannot be read adds ``{"board",
+    "review"}``. A board that cannot be read adds ``{"board",
     "error_class"}`` to ``read_errors`` and does not stop the other boards.
     """
     active, _switch_error = hold_active(config, now)
@@ -616,35 +704,29 @@ def plan_review_release(config: Mapping[str, Any], now: datetime, boards: Mappin
     reviewers = first_glm_reviewer_by_board(config)
     releases: List[Dict[str, Any]] = []
     errors: List[Dict[str, Any]] = []
-    for board, path in boards.items():
+    for board in boards:
         glm_reviewer = reviewers.get(board)
         if glm_reviewer is None:
             continue
         try:
-            conn = connect_readonly(path)
-            try:
-                rows = conn.execute("SELECT id FROM tasks WHERE status = 'blocked' AND assignee = ? "
-                                    "ORDER BY id", (glm_reviewer,)).fetchall()
-                for row in rows:
-                    task_id = str(row["id"])
-                    reason = _review_hold_reason(conn, task_id, glm_reviewer, mark)
-                    if reason is None:
-                        continue
-                    until = until_from_reason(reason, mark)
-                    if active and not _until_passed(until, now, cfg):
-                        continue
-                    releases.append({"action": "release", "board": board, "task_id": task_id,
-                                     "assignee": glm_reviewer, "held_until": until,
-                                     "released_to": RELEASED_TO_REVIEW})
-            finally:
-                conn.close()
+            for task in list_cards(config, board, "blocked", glm_reviewer):
+                task_id = task["id"]
+                reason = _review_hold_reason(show_card(config, board, task_id), glm_reviewer, mark)
+                if reason is None:
+                    continue
+                until = until_from_reason(reason, mark)
+                if active and not _until_passed(until, now, cfg):
+                    continue
+                releases.append({"action": "release", "board": board, "task_id": task_id,
+                                 "assignee": glm_reviewer, "held_until": until,
+                                 "released_to": RELEASED_TO_REVIEW})
         except Exception as exc:
             errors.append({"board": board, "error_class": type(exc).__name__})
     return releases, errors
 
 
 def still_held_in_review(config: Mapping[str, Any], board: str, task_id: str,
-                         path: Path) -> Tuple[bool, Optional[str]]:
+                         command: Optional[str] = None) -> Tuple[bool, Optional[str]]:
     """``(held, read error class)``: held when the card still meets the selection of
     ``plan_review_release``. A read error returns ``(False, <error class>)``, so the
     card stays ``blocked`` until the next run."""
@@ -652,11 +734,8 @@ def still_held_in_review(config: Mapping[str, Any], board: str, task_id: str,
     if glm_reviewer is None:
         return False, None
     try:
-        conn = connect_readonly(path)
-        try:
-            return _review_hold_reason(conn, task_id, glm_reviewer, marker(config)) is not None, None
-        finally:
-            conn.close()
+        card = show_card(config, board, task_id, command)
+        return _review_hold_reason(card, glm_reviewer, marker(config)) is not None, None
     except Exception as exc:
         return False, type(exc).__name__
 
@@ -666,8 +745,9 @@ def apply_review_release(config: Mapping[str, Any], releases: List[Mapping[str, 
                          boards: Optional[Mapping[str, Path]] = None) -> List[Dict[str, Any]]:
     """Release each planned card with ``hermes kanban unblock``; one ``release`` record each.
 
-    With ``boards`` (board name to database path) each card is read again
-    with ``still_held_in_review`` first; a card that no longer meets the
+    With ``boards`` (board name to database path; only the names are used)
+    each card is read again with ``still_held_in_review`` first, with the
+    same ``command``; a card that no longer meets the
     selection, or that cannot be read again, is skipped (``skipped`` true, no
     command, no record). The record is the ``release`` record of
     ``log_release`` with the added field ``released_to: review``. A failed
@@ -679,7 +759,7 @@ def apply_review_release(config: Mapping[str, Any], releases: List[Mapping[str, 
         board = str(item["board"])
         task_id = str(item["task_id"])
         if boards is not None and board in boards:
-            held, read_error = still_held_in_review(config, board, task_id, boards[board])
+            held, read_error = still_held_in_review(config, board, task_id, command)
             if not held:
                 results.append({**item, "applied": False, "skipped": True, "error_class": read_error})
                 continue
@@ -734,16 +814,11 @@ def run_kanban(config: Mapping[str, Any], board: Optional[str], args: List[str],
 
     The command's output is not returned or logged because it can repeat card text.
     """
-    kanban_cfg = config.get("kanban") or {}
     base = hermes_argv(config, command)
     argv = base + ["kanban"] + (["--board", board] if board else []) + list(args)
     try:
-        timeout = float(kanban_cfg.get("command_timeout_seconds") or 30)
-    except (TypeError, ValueError):
-        timeout = 30.0
-    try:
         completed = subprocess.run(argv, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
-                                   stderr=subprocess.DEVNULL, timeout=timeout, check=False)
+                                   stderr=subprocess.DEVNULL, timeout=_command_timeout(config), check=False)
     except FileNotFoundError:
         return False, "CommandNotFound"
     except subprocess.TimeoutExpired:
@@ -785,12 +860,12 @@ def log_release(board: str, task_id: str, assignee: Optional[str], until: Option
 
 # --- one pass over the boards (used by scripts/jev-peak-hold) ---------------
 
-def _plan_board(conn: sqlite3.Connection, board: str, workers: List[str], mark: str, active: bool,
+def _plan_board(config: Mapping[str, Any], board: str, workers: List[str], mark: str, active: bool,
                 until: str) -> List[Dict[str, Any]]:
     actions: List[Dict[str, Any]] = []
-    held = held_cards(conn, mark)
+    held = held_cards(config, board, mark)
     if active:
-        for task_id, assignee in holdable_cards(conn, workers):
+        for task_id, assignee in holdable_cards(config, board, workers):
             actions.append({"action": "hold", "board": board, "task_id": task_id,
                             "assignee": assignee, "held_until": until})
         for task_id, assignee, reason in held:
@@ -807,14 +882,15 @@ def _plan_board(conn: sqlite3.Connection, board: str, workers: List[str], mark: 
 def plan(config: Mapping[str, Any], now: datetime, boards: Mapping[str, Path],
          *, force_release: bool = False
          ) -> Tuple[List[Dict[str, Any]], Optional[str], List[Dict[str, Any]]]:
-    """Planned holds and releases for ``boards`` (board name to database path).
+    """Planned holds and releases for ``boards`` (board name to database path;
+    only the names are used).
 
     Returns ``(actions, switch_error_class, read_errors)``. When the hold is
     active, ready and todo cards of the board's GLM workers are held, and cards
     held with the marker that are no longer assigned to a GLM worker are
     released. When it is not active (outside the window, switch off or
     ``peak_hold.enabled`` false), every card held with the marker is released.
-    A board whose database cannot be read adds ``{"board", "error_class"}`` to
+    A board that cannot be read adds ``{"board", "error_class"}`` to
     ``read_errors`` and does not stop the other boards.
     """
     active, switch_error = hold_active(config, now)
@@ -826,20 +902,16 @@ def plan(config: Mapping[str, Any], now: datetime, boards: Mapping[str, Path],
     until = held_until(now, cfg)
     actions: List[Dict[str, Any]] = []
     errors: List[Dict[str, Any]] = []
-    for board, path in boards.items():
+    for board in boards:
         try:
-            conn = connect_readonly(path)
-            try:
-                actions.extend(_plan_board(conn, board, workers_by_board.get(board, []), mark, active, until))
-            finally:
-                conn.close()
+            actions.extend(_plan_board(config, board, workers_by_board.get(board, []), mark, active, until))
         except Exception as exc:
             errors.append({"board": board, "error_class": type(exc).__name__})
     return actions, switch_error, errors
 
 
 def still_holdable(config: Mapping[str, Any], board: str, task_id: str,
-                   path: Path) -> Tuple[bool, Optional[str]]:
+                   command: Optional[str] = None) -> Tuple[bool, Optional[str]]:
     """``(holdable, read error class)``: holdable when the card is still ``ready``
     or ``todo`` and assigned to a GLM worker of ``board``.
 
@@ -850,30 +922,28 @@ def still_holdable(config: Mapping[str, Any], board: str, task_id: str,
     unchanged until the next run.
     """
     try:
-        conn = connect_readonly(path)
-        try:
-            row = conn.execute("SELECT status, assignee FROM tasks WHERE id = ?", (task_id,)).fetchone()
-        finally:
-            conn.close()
+        card = show_card(config, board, task_id, command)
     except Exception as exc:
         return False, type(exc).__name__
-    return (row is not None and row["status"] in ("ready", "todo")
-            and row["assignee"] in glm_workers_by_board(config).get(board, [])), None
+    task = card["task"] if card is not None else None
+    return (task is not None and task.get("status") in ("ready", "todo")
+            and task.get("assignee") in glm_workers_by_board(config).get(board, [])), None
 
 
 def apply(config: Mapping[str, Any], actions: List[Dict[str, Any]],
           command: Optional[str] = None, boards: Optional[Mapping[str, Path]] = None) -> List[Dict[str, Any]]:
     """Perform ``actions`` with ``hermes kanban`` commands; one decisions record each.
 
-    With ``boards`` (board name to database path) each planned hold is checked
-    again with ``still_holdable`` first; a card that no longer qualifies, or
+    With ``boards`` (board name to database path; only the names are used)
+    each planned hold is checked again with ``still_holdable`` first, read
+    with the same ``command``; a card that no longer qualifies, or
     that cannot be read again, is skipped (``skipped`` true, no command, no
     record; ``error_class`` is the read error class or None).
     """
     results = []
     for item in actions:
         if item["action"] == "hold" and boards is not None and item["board"] in boards:
-            holdable, read_error = still_holdable(config, item["board"], item["task_id"], boards[item["board"]])
+            holdable, read_error = still_holdable(config, item["board"], item["task_id"], command)
             if not holdable:
                 results.append({**item, "applied": False, "skipped": True, "error_class": read_error})
                 continue
@@ -959,17 +1029,14 @@ def log_read_errors(errors: Iterable[Mapping[str, Any]], now: datetime) -> int:
 
 
 def count_held(config: Mapping[str, Any], boards: Mapping[str, Path]) -> Tuple[int, List[Dict[str, Any]]]:
-    """``(number of cards held with the marker, read_errors)`` over ``boards``."""
+    """``(number of cards held with the marker, read_errors)`` over ``boards``
+    (board name to database path; only the names are used)."""
     mark = marker(config)
     total = 0
     errors: List[Dict[str, Any]] = []
-    for board, path in boards.items():
+    for board in boards:
         try:
-            conn = connect_readonly(path)
-            try:
-                total += len(held_cards(conn, mark))
-            finally:
-                conn.close()
+            total += len(held_cards(config, board, mark))
         except Exception as exc:
             errors.append({"board": board, "error_class": type(exc).__name__})
     return total, errors

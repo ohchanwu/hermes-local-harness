@@ -566,11 +566,7 @@ def handle_unblock(args: Mapping[str, Any], next_call: Callable[..., Any], *, co
             board = _configured_board(resolve_board(args, config), config)
             glm_here = peak_hold.glm_workers_by_board(config).get(board or "", [])
             if task_id and board and glm_here:
-                conn = peak_hold.connect_readonly(peak_hold.kanban_db_path(config, board))
-                try:
-                    state = peak_hold.card_hold_state(conn, task_id, peak_hold.marker(config))
-                finally:
-                    conn.close()
+                state = peak_hold.card_hold_state(config, board, task_id, peak_hold.marker(config), command)
                 if state is not None and state[1] in glm_here:
                     assignee = state[1]
                     until = peak_hold.held_until(moment, config.get("peak_hold") or {})
@@ -622,23 +618,27 @@ def _board_review_names(board_cfg: Mapping[str, Any]) -> Tuple[Optional[str], Li
     return (opus if isinstance(opus, str) and opus else None), glm
 
 
-def _card_change_request_reviewers(conn: Any, task_id: str, opus_reviewer: str,
+def _change_request_payloads(card: Optional[Mapping[str, Any]]) -> List[Dict[str, Any]]:
+    """The payloads of the card's ``changes_requested`` events, oldest first
+    (``show --json`` order); a payload that is not an object is an empty dict,
+    and a missing card has no events."""
+    events = (card or {}).get("events") or []
+    return [peak_hold.event_payload(event.get("payload")) for event in events
+            if isinstance(event, Mapping) and event.get("kind") == "changes_requested"]
+
+
+def _card_change_request_reviewers(card: Optional[Mapping[str, Any]], opus_reviewer: str,
                                    glm_reviewers: List[str]) -> Tuple[int, int, Optional[str]]:
-    """``(A, G, latest reviewer)`` of one card: A is the number of its
-    ``changes_requested`` events whose payload reviewer is ``opus_reviewer``,
-    G the number whose payload reviewer is in ``glm_reviewers``, and the latest
-    reviewer is the payload reviewer of the last event that has one. The events
-    are read in the order of their rows; no other text of a payload is used."""
-    rows = conn.execute("SELECT payload FROM task_events WHERE task_id = ? AND kind = 'changes_requested' "
-                        "ORDER BY id", (task_id,)).fetchall()
+    """``(A, G, latest reviewer)`` of one card (a ``peak_hold.show_card``
+    result): A is the number of its ``changes_requested`` events whose payload
+    reviewer is ``opus_reviewer``, G the number whose payload reviewer is in
+    ``glm_reviewers``, and the latest reviewer is the payload reviewer of the
+    last event that has one. The events are read oldest first; no other text
+    of a payload is used."""
     opus = glm = 0
     latest: Optional[str] = None
-    for row in rows:
-        try:
-            parsed = json.loads(row["payload"] or "null")
-        except Exception:
-            parsed = None
-        reviewer = parsed.get("reviewer") if isinstance(parsed, dict) else None
+    for payload in _change_request_payloads(card):
+        reviewer = payload.get("reviewer")
         if not isinstance(reviewer, str) or not reviewer:
             continue
         latest = reviewer
@@ -652,8 +652,9 @@ def _card_change_request_reviewers(conn: Any, task_id: str, opus_reviewer: str,
 def _review_payload(args: Mapping[str, Any], config: Mapping[str, Any], profile: str,
                     command: Optional[str]) -> Tuple[Optional[Dict[str, Any]], Dict[str, Any]]:
     """``(arguments for the tool, record)`` of the reviewer choice; the
-    arguments are None when they are unchanged. Reads the card with read-only
-    connections only and starts no ``hermes kanban`` command."""
+    arguments are None when they are unchanged. Reads the card with
+    ``peak_hold.show_card`` (``hermes kanban show --json``) and starts no
+    command that changes the card."""
     routing_section = config.get("routing")
     routing: Mapping[str, Any] = routing_section if isinstance(routing_section, dict) else {}
     glm_section = routing.get("glm_review")
@@ -680,12 +681,8 @@ def _review_payload(args: Mapping[str, Any], config: Mapping[str, Any], profile:
     if opus_reviewer is None or not glm_reviewers:
         return None, record(None, False, "reviewer_not_configured")
 
-    conn = peak_hold.connect_readonly(peak_hold.kanban_db_path(config, board))
-    try:
-        opus_events, glm_events, latest = _card_change_request_reviewers(conn, task_id, opus_reviewer,
-                                                                        glm_reviewers)
-    finally:
-        conn.close()
+    card = peak_hold.show_card(config, board, task_id, command)
+    opus_events, glm_events, latest = _card_change_request_reviewers(card, opus_reviewer, glm_reviewers)
 
     arg_reviewer = args.get("reviewer")
     arg_names_glm = isinstance(arg_reviewer, str) and arg_reviewer in glm_reviewers
@@ -718,8 +715,8 @@ def handle_request_review(args: Mapping[str, Any], next_call: Callable[..., Any]
     Then, in a GLM worker session with ``routing.enabled`` true, the reviewer
     for the call is decided:
 
-    - Switch on (``routing.glm_review.enabled`` true): the card is read with a
-      read-only connection and its ``changes_requested`` events are counted by
+    - Switch on (``routing.glm_review.enabled`` true): the card is read with
+      ``hermes kanban show --json`` and its ``changes_requested`` events are counted by
       the ``reviewer`` of each payload. A is the number of events whose
       reviewer is the board's ``opus_reviewer``; G the number of events whose
       reviewer is in the board's ``glm_reviewers``. When A is 0 and G is less
@@ -822,17 +819,16 @@ def change_request_limit(route: Mapping[str, Any], routing: Mapping[str, Any]) -
     return own if own else setting_count(routing, "max_glm_change_requests")
 
 
-def change_request_state(conn: Any, task_id: str) -> Optional[Tuple[str, Optional[str], int]]:
-    """``(status, assignee, number of changes_requested events)`` of one card, or None."""
-    row = conn.execute("SELECT status, assignee FROM tasks WHERE id = ?", (task_id,)).fetchone()
-    if row is None:
+def change_request_state(card: Optional[Mapping[str, Any]]) -> Optional[Tuple[str, Optional[str], int]]:
+    """``(status, assignee, number of changes_requested events)`` of one card
+    (a ``peak_hold.show_card`` result), or None when the card does not exist."""
+    if card is None:
         return None
-    count = conn.execute("SELECT COUNT(*) FROM task_events WHERE task_id = ? AND kind = 'changes_requested'",
-                         (task_id,)).fetchone()[0]
-    return str(row["status"]), row["assignee"], int(count)
+    task = card["task"]
+    return str(task.get("status")), task.get("assignee"), len(_change_request_payloads(card))
 
 
-def _counted_change_requests(conn: Any, task_id: str, glm_reviewers: Sequence[str]) -> int:
+def _counted_change_requests(card: Optional[Mapping[str, Any]], glm_reviewers: Sequence[str]) -> int:
     """The number of the card's ``changes_requested`` events that count
     towards the change request limit: every event except one whose payload
     can be read and names one of ``glm_reviewers`` as the ``reviewer``.
@@ -841,15 +837,9 @@ def _counted_change_requests(conn: Any, task_id: str, glm_reviewers: Sequence[st
     ``reviewer``, is counted. With an empty ``glm_reviewers`` every event is
     counted, which is the number of the card's ``changes_requested`` events.
     """
-    rows = conn.execute("SELECT payload FROM task_events WHERE task_id = ? AND kind = 'changes_requested'",
-                        (task_id,)).fetchall()
     counted = 0
-    for row in rows:
-        try:
-            parsed = json.loads(row["payload"] or "null")
-        except Exception:
-            parsed = None
-        reviewer = parsed.get("reviewer") if isinstance(parsed, dict) else None
+    for payload in _change_request_payloads(card):
+        reviewer = payload.get("reviewer")
         if isinstance(reviewer, str) and reviewer in glm_reviewers:
             continue
         counted += 1
@@ -941,12 +931,8 @@ def rewrite_body_after_escalation(config: Mapping[str, Any], board: str, task_id
     body text is returned or logged.
     """
     try:
-        conn = peak_hold.connect_readonly(peak_hold.kanban_db_path(config, board))
-        try:
-            row = conn.execute("SELECT body FROM tasks WHERE id = ?", (task_id,)).fetchone()
-        finally:
-            conn.close()
-        body = row["body"] if row is not None else None
+        card = peak_hold.show_card(config, board, task_id, command)
+        body = card["task"].get("body") if card is not None else None
         new_body = rewrite_assigned_worker(body, claude_worker, only_from=glm_worker)
         if not isinstance(body, str) or new_body == body:
             return {"assigned_worker_line": "no_line", "assigned_worker_line_error_class": None}
@@ -1068,12 +1054,9 @@ def handle_request_changes(args: Mapping[str, Any], next_call: Callable[..., Any
         glm = peak_hold.glm_workers_by_board(config).get(board, [])
         claude = [str(w) for w in board_cfg.get("implementation_workers") or []]
         glm_reviewers = _board_review_names(board_cfg)[1]
-        conn = peak_hold.connect_readonly(peak_hold.kanban_db_path(config, board))
-        try:
-            state = change_request_state(conn, task_id)
-            count = _counted_change_requests(conn, task_id, glm_reviewers) if state is not None else 0
-        finally:
-            conn.close()
+        card = peak_hold.show_card(config, board, task_id, command)
+        state = change_request_state(card)
+        count = _counted_change_requests(card, glm_reviewers) if state is not None else 0
         if state is None:
             return result
         status, assignee, _ = state
