@@ -31,6 +31,12 @@ Registered callbacks:
 
 ``config.json`` beside this file is read on every call, so a changed setting
 applies without a restart. Each section turns off with its ``enabled`` value.
+
+When a Hermes name that Hermes does not document is absent (decision record
+docs/decisions/261120-plugin-behaviour-across-hermes-updates.md, change 2),
+jev turns off only the feature that needs it, leaves the Hermes call result
+unchanged and writes one Python ``logging`` record at level WARNING per process
+and name (``peak_hold.warn_missing_hermes_name``, logger ``jev``).
 """
 from __future__ import annotations
 
@@ -39,11 +45,24 @@ import importlib
 import json
 import os
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
-from . import glm_review, jev_client, jev_log, reasoning_effort, routing
+from . import glm_review, jev_client, jev_log, peak_hold, reasoning_effort, routing
 
 CONFIG_PATH = Path(__file__).resolve().parent / "config.json"
+
+# The argument names that jev reads or writes, per Kanban tool (decision record
+# docs/decisions/261120-plugin-behaviour-across-hermes-updates.md, row J21).
+KANBAN_TOOL_ARGUMENTS = {
+    "kanban_create": ("title", "body", "assignee", "model", "provider", "board"),
+    "kanban_unblock": ("task_id", "board"),
+    "kanban_request_review": ("task_id", "board", "reviewer"),
+    "kanban_request_changes": ("task_id", "board"),
+    "kanban_complete": ("task_id",),
+    "kanban_block": ("task_id", "reason", "kind", "board"),
+}
+# Tool name to the first argument name that its registered schema lacks, or None.
+_ABSENT_ARGUMENT: Dict[str, Optional[str]] = {}
 
 
 def load_config(path: Path = CONFIG_PATH) -> Dict[str, Any]:
@@ -70,9 +89,42 @@ def hermes_home() -> Path:
         return Path("/Users/chanbla11mit/.hermes")
 
 
+def _absent_argument(tool_name: str) -> Optional[str]:
+    """The first name of ``KANBAN_TOOL_ARGUMENTS[tool_name]`` that the Hermes
+    schema of the tool (``tools.registry.registry.get_schema``) does not list,
+    or None. Read once per tool per process. When the registry cannot be
+    imported or has no schema for the tool (as in the offline tests), the
+    answer is None and is not kept."""
+    if tool_name in _ABSENT_ARGUMENT:
+        return _ABSENT_ARGUMENT[tool_name]
+    try:
+        from tools.registry import registry  # type: ignore[import-not-found]
+        schema = registry.get_schema(tool_name)
+    except Exception:
+        return None
+    if not isinstance(schema, dict):
+        return None
+    parameters = schema.get("parameters")
+    properties = parameters.get("properties") if isinstance(parameters, dict) else None
+    names = properties if isinstance(properties, dict) else {}
+    absent = next((name for name in KANBAN_TOOL_ARGUMENTS[tool_name] if name not in names), None)
+    _ABSENT_ARGUMENT[tool_name] = absent
+    if absent is not None:
+        peak_hold.warn_missing_hermes_name(f"argument {absent} of the Hermes tool {tool_name}",
+                                           f"the jev handling of {tool_name}")
+    return absent
+
+
 def _tool_execution(**kwargs: Any) -> Any:
     next_call = kwargs["next_call"]
     tool_name = kwargs.get("tool_name")
+    try:
+        # Row J21: a Kanban tool whose schema lacks an argument name that jev uses passes through unchanged.
+        pass_through = tool_name in KANBAN_TOOL_ARGUMENTS and _absent_argument(tool_name) is not None
+    except Exception:
+        pass_through = False
+    if pass_through:
+        return next_call()
     if tool_name in ("kanban_complete", "kanban_request_review"):
         try:
             if glm_review.is_glm_reviewer(jev_log.profile_name(), load_config()):
@@ -144,6 +196,7 @@ def _transform_tool_result(**kwargs: Any) -> Any:
             tool_name=kwargs.get("tool_name"), args=kwargs.get("args"), result=kwargs.get("result"),
             session_id=kwargs.get("session_id"), profile=jev_log.profile_name(), settings=settings,
             ask=_bound_ask(config), log=jev_log.write, cache_dir=hermes_home() / "cache" / "jev",
+            warn=peak_hold.warn_missing_hermes_name,
         )
         return replacement if isinstance(replacement, str) else None
     except Exception:
@@ -165,6 +218,10 @@ def _post_auxiliary_call(**kwargs: Any) -> None:
         if not (load_config().get("auxiliary_log") or {}).get("enabled", False):
             return
         usage = kwargs.get("usage")
+        if isinstance(usage, dict) and not {"prompt_tokens", "input_tokens", "output_tokens"} & usage.keys():
+            peak_hold.warn_missing_hermes_name(
+                "usage keys prompt_tokens, input_tokens and output_tokens of the Hermes hook post_auxiliary_call",
+                "the token counts of the jev auxiliary log")
         if kwargs.get("error_type"):
             status = "error"
         elif kwargs.get("streaming"):

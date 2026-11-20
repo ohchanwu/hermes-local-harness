@@ -235,7 +235,7 @@ class GlmReviewPassBlockTests(unittest.TestCase):
 
     def test_unrecognized_task_id_keeps_the_arguments_unchanged(self):
         self.build_db(block_kind=None)
-        args = self.pass_args(task_id="not-a-task-id")
+        args = self.pass_args(task_id="-not-a-task-id")  # decision record 261120, row J23
         calls, _ = self.call("harness-reviewer-glm", args, env={"HERMES_KANBAN_TASK": ""})
         self.assertEqual(calls, [None])
         [record] = self.pass_records()

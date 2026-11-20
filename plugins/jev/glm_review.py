@@ -41,8 +41,9 @@ except ImportError:  # loaded directly by the tests
 # A GLM reviewer profile name ends in ``-reviewer-glm``; the first character
 # and the middle are lower case letters, digits and hyphens.
 _GLM_REVIEWER_NAME = re.compile(r"^[a-z0-9][a-z0-9-]*-reviewer-glm$")
-# Hermes task IDs are "t_" plus hexadecimal digits (hermes_cli/kanban_db.py _new_task_id).
-_HERMES_TASK_ID = re.compile(r"t_[0-9a-f]{4,32}")
+# The task ID pattern of the routing module (decision record
+# docs/decisions/261120-plugin-behaviour-across-hermes-updates.md, row J23).
+_HERMES_TASK_ID = routing._HERMES_TASK_ID
 
 # The fixed identifier of the decision document
 # 261114-glm-reviewer-pass-to-opus-reviewer: the reason prefix of the block
@@ -93,7 +94,7 @@ def handle_refused_tool(tool_name: str, args: Any) -> str:
 
     Writes one ``decisions`` record with the event ``glm_reviewer_refusal``,
     the tool name, the profile of this session and the task ID of the call (a
-    task ID of the Hermes form, else null; from ``args`` when it is a dict,
+    task ID that matches ``_HERMES_TASK_ID``, else null; from ``args`` when it is a dict,
     else from ``HERMES_KANBAN_TASK``). No other argument value is written. A
     failure to write the record is ignored. Never raises, never calls
     ``next_call``.

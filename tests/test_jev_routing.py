@@ -736,7 +736,8 @@ class RoutingTests(unittest.TestCase):
         hermes = write_fake_hermes(self.dir)
         calls_log = self.dir / "hermes-calls.jsonl"
         review_args = [
-            {"task_id": SENTINEL, "board": "harness", "summary": SENTINEL, "metadata": {"x": SENTINEL},
+            # A task ID may not start with "-" (decision record 261120, row J23).
+            {"task_id": f"-{SENTINEL}", "board": "harness", "summary": SENTINEL, "metadata": {"x": SENTINEL},
              "reviewer": SENTINEL, "artifacts": [SENTINEL]},
             {"task_id": "t_feedc0de", "board": SENTINEL, "summary": SENTINEL},
             {"summary": SENTINEL, "board": f"harness {SENTINEL}"},
@@ -747,7 +748,7 @@ class RoutingTests(unittest.TestCase):
                 routing.handle_request_review(args, lambda payload=None: '{"ok": true}', config=self.config,
                                               command=hermes)
         unblock_now = datetime(2026, 11, 11, 16, 0, tzinfo=KST)  # inside the window
-        for args in ({"task_id": SENTINEL, "board": "harness"}, {"task_id": "t_0b10c4ed", "board": SENTINEL}):
+        for args in ({"task_id": f"-{SENTINEL}", "board": "harness"}, {"task_id": "t_0b10c4ed", "board": SENTINEL}):
             routing.handle_unblock(args, lambda payload=None: '{"ok": true}', config=self.config, now=unblock_now,
                                    command=hermes)
         records = read_records(self.log_dir, "decisions")

@@ -545,9 +545,10 @@ class PluginFrameTests(unittest.TestCase):
                                                      session_id="s1", task_id="", duration_ms=1)
         self.assertEqual(out, "filtered")
         self.assertEqual(sorted(seen), ["args", "ask", "cache_dir", "log", "profile", "result", "session_id",
-                                        "settings", "tool_name"])
+                                        "settings", "tool_name", "warn"])
         self.assertEqual(seen["cache_dir"], Path(self.tmp.name) / "home" / "cache" / "jev")
         self.assertIs(seen["log"], self.plugin.jev_log.write)
+        self.assertIs(seen["warn"], self.plugin.peak_hold.warn_missing_hermes_name)
         self.assertEqual(seen["settings"]["min_chars"], 2000)
 
     def test_tool_results_turns_off(self):

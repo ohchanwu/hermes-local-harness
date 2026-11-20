@@ -157,7 +157,8 @@ class GlmReviewerRefusalTests(unittest.TestCase):
             self.assertEqual(read_records(self.log_dir, "decisions"), [])
 
     def test_task_id_argument_that_is_not_of_the_hermes_form_is_written_as_null(self):
-        for task_id in ("not-a-task-id", "T_0A1B2C3D", "t_0a1b2c3d extra", 1234, None):
+        # Decision record 261120, row J23: a letter or digit, then up to 63 letters, digits, "_" or "-".
+        for task_id in ("-t_0a1b2c3d", "_t_0a1b2c3d", "t_0a1b2c3d extra", "a" * 65, 1234, None):
             with self.subTest(task_id=task_id), self.profile_env("harness-reviewer-glm"):
                 before = len(self.refusal_records())
                 out = self.refuse("kanban_complete", {"task_id": task_id}, lambda payload=None: "tool result")

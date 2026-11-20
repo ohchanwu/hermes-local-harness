@@ -285,7 +285,7 @@ class ReviewChoiceTests(unittest.TestCase):
 
     def test_switch_on_unrecognized_task_id_keeps_arguments_unchanged(self):
         self.build_db("harness")
-        calls, _ = self.review("harness-worker-glm-easy-1", {"task_id": "not-a-task-id", "board": "harness"})
+        calls, _ = self.review("harness-worker-glm-easy-1", {"task_id": "-not-a-task-id", "board": "harness"})
         self.assertEqual(calls, [None])
         [record] = self.choice_records()
         self.assertEqual((record["applied"], record["not_applied_reason"]),
