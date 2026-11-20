@@ -72,10 +72,13 @@ class PassiveResolutionTests(unittest.TestCase):
 
     def test_documented_checkout_and_interpreter_found_without_path(self):
         # Synthetic data root outside ~/.hermes; PATH names no `hermes` shim.
+        # The home directory is a sibling of the root, so the root stays outside
+        # ~/.hermes even when TMPDIR is under the real ~/.hermes (worker runs).
         with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp).resolve()
+            home = Path(tmp).resolve() / "home"
+            root = Path(tmp).resolve() / "root"
             checkout = root / "hermes-agent"
-            checkout.mkdir()
+            checkout.mkdir(parents=True)
             (checkout / "install-stamp.json").write_text('{"displayVersion": "0.23.3"}', encoding="utf-8")
             python = root / "env" / "bin" / "python3"
             python.parent.mkdir(parents=True)
@@ -84,7 +87,9 @@ class PassiveResolutionTests(unittest.TestCase):
             facts.parent.mkdir(parents=True)
             facts.write_text(json.dumps({"packages": {"venv": {"environment": str(root / "env")}}}),
                              encoding="utf-8")
-            with patch.dict(os.environ, {"HERMES_HOME": str(root), "PATH": "/nonexistent"}):
+            with patch.dict(os.environ, {"HERMES_HOME": str(root), "PATH": "/nonexistent"}), \
+                    patch.object(hih.Path, "home", return_value=home):
+                self.assertEqual(hih.default_dependency_root(), root)
                 self.assertEqual(hih.installed_checkout_root(), checkout)
                 self.assertEqual(hih.installed_hermes_version(checkout), "0.23.3")
                 self.assertIsNone(hih.version_gate("0.23.3"))
