@@ -46,6 +46,7 @@ After every Hermes upgrade, run `scripts/verify-state`; it reports FAIL when one
 - [Completed local Hermes harness tracking plan](archive/260920-hermes-local-harness-tracking-plan.md)
 - [Decision: reviewers on Claude Opus 5.5, orchestrators on Claude Fable 5.2](decisions/261113-reviewers-on-opus-orchestrators-on-fable.md) — the measured token use of both roles from 2026-11-11 to 2026-11-13 and the owner's reasons.
 - [Decision: how a card passes from the GLM reviewer to the Opus reviewer](decisions/261114-glm-reviewer-pass-to-opus-reviewer.md) — the Hermes calls that move a card from a GLM review run to an Opus review run.
+- [Decision: behaviour of the harness plugins and provider across Hermes updates](decisions/261120-plugin-behaviour-across-hermes-updates.md) — every Hermes name used by `jev`, the terminal outcome notification plugin and the `claude-subscription` provider, whether Hermes documents it, and seven proposed changes.
 
 ## Bugs
 
