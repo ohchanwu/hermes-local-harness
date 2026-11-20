@@ -6,9 +6,10 @@ access other than a temporary database, no network and no model calls. Every tes
 HERMES_PROFILE itself with mock.patch.dict(os.environ, ...) and writes plugin logs only to
 a temporary directory, so the result does not depend on the profile that runs the tests.
 
-The temporary Kanban database holds the Hermes schema columns that the code reads
-(tasks, task_events with payload). The set-model command is replaced by the fake hermes
-command of tests/test_jev_client.py, as the tests of tests/test_jev_routing.py do.
+The plugin reads the card with ``hermes kanban show --json``. That read and the
+set-model command go to the fake hermes command of tests/test_jev_client.py (passed as
+``command``), which answers the read from a temporary Kanban database (tasks,
+task_events with payload), as the tests of tests/test_jev_routing.py do.
 """
 from __future__ import annotations
 

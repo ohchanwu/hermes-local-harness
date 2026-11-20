@@ -850,8 +850,9 @@ class RequestChangesTests(unittest.TestCase):
     ``max_glm_change_requests``, so a `hard` card goes at the third change
     request and an `easy` or `medium` card at the fifth.
 
-    The board database is synthetic and every board change goes through the fake
-    ``hermes`` command, which applies ``set-model`` and ``reassign`` to it.
+    The board database is synthetic and every board read and change goes
+    through the fake ``hermes`` command, which answers ``show --json`` from it
+    and applies ``set-model`` and ``reassign`` to it.
     """
 
     def setUp(self):
@@ -873,6 +874,7 @@ class RequestChangesTests(unittest.TestCase):
         patcher.start()
         self.addCleanup(patcher.stop)
         self.config = json.loads(json.dumps(CONFIG))
+        self.config["kanban"]["hermes_command"] = self.hermes
 
     def add_change_requests(self, task_id, count):
         import sqlite3
@@ -1283,14 +1285,15 @@ class RequestChangesTests(unittest.TestCase):
         self.assertEqual(fake_hermes_calls(self.calls_log), [])
         self.assertEqual(self.escalations(), [])
 
-    def test_board_database_error_leaves_result_unchanged(self):
+    def test_board_read_error_leaves_result_unchanged(self):
+        # Without the board database the fake `hermes kanban show --json` exits 1.
         self.add_change_requests(GLM_CARD, 5)
         self.db.unlink()
         self.request_changes()
         self.assertEqual(fake_hermes_calls(self.calls_log), [])
         [record] = self.escalations()
         self.assertEqual((record["applied"], record["not_applied_reason"], record["error_class"]),
-                         (False, "plugin_error", "FileNotFoundError"))
+                         (False, "plugin_error", "CommandFailed"))
 
     def test_exception_in_next_call_propagates_without_escalation(self):
         self.add_change_requests(GLM_CARD, 5)
@@ -1385,7 +1388,7 @@ class RequestChangesTests(unittest.TestCase):
                           record["assigned_worker_line_error_class"]), (True, "failed", "BodyTooLong"))
 
     def test_read_error_and_exception_return_failed_without_raising(self):
-        with mock.patch.object(routing.peak_hold, "kanban_db_path", side_effect=OSError("unreadable")):
+        with mock.patch.object(routing.peak_hold, "show_card", side_effect=OSError("unreadable")):
             out = routing.rewrite_body_after_escalation(self.config, "harness", GLM_CARD, "harness-worker-glm-easy-1",
                                                         "harness-worker", self.hermes)
         self.assertEqual(out, {"assigned_worker_line": "failed", "assigned_worker_line_error_class": "OSError"})

@@ -6,8 +6,12 @@ access other than a temporary database, no network and no model calls. Every tes
 HERMES_PROFILE itself with mock.patch.dict(os.environ, ...) and writes plugin logs only to
 a temporary directory, so the result does not depend on the profile that runs the tests.
 
-Every test goes through ``jev._tool_execution``. The temporary Kanban database holds the
-one column that the new code reads: ``tasks.block_kind``.
+Every test goes through ``jev._tool_execution``. The plugin reads the card with
+``hermes kanban --board <board> show <id> --json``; the tests point
+``kanban.hermes_command`` at the fake ``hermes`` of tests/test_jev_client.py, which
+answers from a temporary Kanban database. The block kind that the new code reads is the
+``kind`` of the card's newest ``blocked`` event, because the ``show --json`` task has no
+``block_kind`` field.
 """
 from __future__ import annotations
 
@@ -26,7 +30,7 @@ sys.path.insert(0, str(PLUGIN_DIR))
 sys.path.insert(0, str(ROOT / "plugins"))
 sys.path.insert(0, str(ROOT / "tests"))
 
-from test_jev_client import isolated_env, read_records  # noqa: E402
+from test_jev_client import isolated_env, read_records, write_fake_hermes  # noqa: E402
 
 CARD = "t_0a1b2c3d"
 PASS_REASON = "jev-glm-review-pass"
@@ -43,16 +47,27 @@ STREAM_NULL_FIELDS = ("original_assignee", "new_assignee", "orchestrator_model",
                       "jev_latency_ms", "jev_input_tokens", "held_until")
 
 
-def build_board_db(path: Path, task_id, block_kind) -> None:
-    """A temporary board database whose ``tasks`` table has ``block_kind``."""
+def build_board_db(path: Path, task_id, block_kinds) -> None:
+    """A temporary board database with one card and one earlier ``blocked``
+    event per entry of ``block_kinds`` (oldest first), whose payload ``kind`` is
+    that entry, as Hermes ``block_task`` writes it. ``None`` means no event."""
     import sqlite3
+    if block_kinds is None or isinstance(block_kinds, str):
+        block_kinds = [] if block_kinds is None else [block_kinds]
     path.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(path)
     conn.execute("PRAGMA journal_mode=wal")
-    conn.execute("CREATE TABLE tasks (id TEXT PRIMARY KEY, title TEXT, body TEXT, status TEXT,"
-                 " assignee TEXT, block_kind TEXT)")
-    conn.execute("INSERT INTO tasks (id, title, status, assignee, block_kind) VALUES (?, ?, ?, ?, ?)",
-                 (task_id, "synthetic card", "running", "harness-reviewer-glm", block_kind))
+    conn.execute("CREATE TABLE tasks (id TEXT PRIMARY KEY, title TEXT, body TEXT, status TEXT, assignee TEXT)")
+    conn.execute("CREATE TABLE task_events (id INTEGER PRIMARY KEY AUTOINCREMENT, task_id TEXT, run_id INTEGER,"
+                 " kind TEXT, payload TEXT, created_at INTEGER)")
+    conn.execute("INSERT INTO tasks (id, title, status, assignee) VALUES (?, ?, ?, ?)",
+                 (task_id, "synthetic card", "running", "harness-reviewer-glm"))
+    for number, kind in enumerate(block_kinds):
+        conn.execute("INSERT INTO task_events (task_id, kind, payload, created_at) VALUES (?, 'blocked', ?, ?)",
+                     (task_id, json.dumps({"reason": "earlier block", "kind": kind, "source_status": "review"}),
+                      number))
+        conn.execute("INSERT INTO task_events (task_id, kind, payload, created_at) VALUES (?, 'unblocked', NULL, ?)",
+                     (task_id, number))
     conn.commit()
     conn.close()
 
@@ -71,6 +86,12 @@ class GlmReviewPassBlockTests(unittest.TestCase):
         self.log_dir = self.dir / "logs"
         self.board_dir = self.dir / "kanban-home" / "kanban" / "boards"
         self.plugin = importlib.import_module("jev")
+        os.environ["FAKE_HERMES_LOG"] = str(self.dir / "hermes-calls.jsonl")
+        self.config = self.plugin.load_config()
+        self.config["kanban"]["hermes_command"] = write_fake_hermes(self.dir)
+        config_patcher = mock.patch.object(self.plugin, "load_config", return_value=self.config)
+        config_patcher.start()
+        self.addCleanup(config_patcher.stop)
 
     # --- helpers ---------------------------------------------------------------
 
@@ -125,6 +146,15 @@ class GlmReviewPassBlockTests(unittest.TestCase):
         self.assertEqual(calls[0]["kind"], "capability")
         [record] = self.pass_records()
         self.assertEqual((record["kind"], record["applied"]), ("capability", True))
+
+    def test_the_newest_blocked_event_gives_the_block_kind(self):
+        self.build_db(block_kind=["capability", "needs_input"])
+        calls, _ = self.call("harness-reviewer-glm", self.pass_args())
+        self.assertEqual(calls[0]["kind"], "capability")
+        (self.board_dir / "harness" / "kanban.db").unlink()
+        self.build_db(block_kind=["needs_input", "capability"])
+        calls, _ = self.call("harness-reviewer-glm", self.pass_args())
+        self.assertEqual(calls[0]["kind"], "needs_input")
 
     def test_a_kind_given_by_the_model_is_replaced(self):
         self.build_db(block_kind=None)
@@ -182,7 +212,7 @@ class GlmReviewPassBlockTests(unittest.TestCase):
 
     def test_the_note_names_no_reviewer_when_the_board_has_no_opus_reviewer(self):
         self.build_db(block_kind=None)
-        config = json.loads((PLUGIN_DIR / "config.json").read_text(encoding="utf-8"))
+        config = json.loads(json.dumps(self.config))
         del config["routing"]["boards"]["harness"]["opus_reviewer"]
         with mock.patch.object(self.plugin, "load_config", return_value=config):
             _calls, out = self.call("harness-reviewer-glm", self.pass_args())
@@ -228,7 +258,8 @@ class GlmReviewPassBlockTests(unittest.TestCase):
         [record] = self.pass_records()
         self.assertEqual((record["applied"], record["not_applied_reason"]), (False, "card_not_found"))
 
-    def test_database_read_error_keeps_the_arguments_unchanged(self):
+    def test_board_read_error_keeps_the_arguments_unchanged(self):
+        # Without the board database the fake `hermes kanban show --json` exits 1.
         self.build_db(block_kind=None)
         (self.board_dir / "harness" / "kanban.db").unlink()
         args = self.pass_args()
@@ -236,7 +267,7 @@ class GlmReviewPassBlockTests(unittest.TestCase):
         self.assertEqual(calls, [None])
         [record] = self.pass_records()
         self.assertEqual((record["applied"], record["not_applied_reason"], record["error_class"]),
-                         (False, "read_error", "FileNotFoundError"))
+                         (False, "read_error", "CommandFailed"))
 
     # --- every other call passes through --------------------------------------------
 
@@ -314,7 +345,7 @@ class GlmReviewPassBlockTests(unittest.TestCase):
         self.build_db(block_kind=None)
         args = self.pass_args()
         frozen = dict(args)
-        with mock.patch.object(self.plugin.glm_review.peak_hold, "connect_readonly",
+        with mock.patch.object(self.plugin.glm_review.peak_hold, "show_card",
                                side_effect=OSError("no database")):
             calls, out = self.call("harness-reviewer-glm", args)
         self.assertEqual(calls, [None])

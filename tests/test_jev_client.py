@@ -115,7 +115,87 @@ def isolated_env(tmp: Path) -> dict:
     return env
 
 
-FAKE_HERMES = r'''
+FAKE_HERMES_READS = r'''
+import json, os, sqlite3, sys
+from pathlib import Path
+
+
+def fake_board_db(argv):
+    """The board database of ``kanban [--board <board>] ...``: the file of the
+    Hermes layout under $HERMES_KANBAN_HOME when it exists, else
+    $FAKE_KANBAN_DB when set, else the Hermes layout path."""
+    board = argv[2] if argv[1:2] == ["--board"] else "default"
+    home = Path(os.environ.get("HERMES_KANBAN_HOME", ""))
+    path = home / "kanban.db" if board == "default" else home / "kanban" / "boards" / board / "kanban.db"
+    if not path.is_file() and os.environ.get("FAKE_KANBAN_DB"):
+        return os.environ["FAKE_KANBAN_DB"]
+    return str(path)
+
+
+def fake_read(argv):
+    """Answer ``show <id> --json`` and ``list ... --json`` in the form of Hermes
+    v0.23.3 (hermes_cli/kanban.py _cmd_show and _cmd_list) and exit; return for
+    every other command. The task has no ``block_kind`` (as in Hermes), an event
+    payload that is not JSON is null, and an unknown ID prints "no such task".
+    Reads are not written to $FAKE_HERMES_LOG, which lists the change commands;
+    $FAKE_HERMES_READ_LOG lists the reads, and $FAKE_HERMES_READ_EXIT makes them fail."""
+    rest = argv[1:]
+    if rest[:1] == ["--board"]:
+        rest = rest[2:]
+    if not rest or rest[0] not in ("show", "list") or "--json" not in rest:
+        return
+    if os.environ.get("FAKE_HERMES_READ_LOG"):
+        with open(os.environ["FAKE_HERMES_READ_LOG"], "a", encoding="utf-8") as fh:
+            fh.write(json.dumps(argv) + "\n")
+    if os.environ.get("FAKE_HERMES_READ_EXIT"):
+        sys.exit(int(os.environ["FAKE_HERMES_READ_EXIT"]))
+    path = fake_board_db(argv)
+    if not os.path.isfile(path):
+        print("kanban: board database not found", file=sys.stderr)
+        sys.exit(1)
+    conn = sqlite3.connect(path)
+    conn.row_factory = sqlite3.Row
+    tables = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
+    if rest[0] == "list":
+        status = rest[rest.index("--status") + 1] if "--status" in rest else None
+        assignee = rest[rest.index("--assignee") + 1] if "--assignee" in rest else None
+        # Hermes sorts by priority, not by ID; the reverse ID order checks that jev sorts.
+        tasks = [dict(row) for row in conn.execute("SELECT * FROM tasks ORDER BY id DESC")]
+        for task in tasks:
+            task.pop("block_kind", None)
+        print(json.dumps([task for task in tasks if (status is None or task.get("status") == status)
+                          and (assignee is None or task.get("assignee") == assignee)], ensure_ascii=False))
+        sys.exit(0)
+    task_id = rest[1]
+    row = conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
+    if row is None:
+        print(f"no such task: {task_id}", file=sys.stderr)
+        sys.exit(1)
+    task = dict(row)
+    task.pop("block_kind", None)
+    events = []
+    for event in conn.execute("SELECT * FROM task_events WHERE task_id = ? ORDER BY created_at ASC, id ASC",
+                              (task_id,)):
+        event = dict(event)
+        try:
+            payload = json.loads(event["payload"]) if event["payload"] else None
+        except ValueError:
+            payload = None
+        events.append({"kind": event["kind"], "payload": payload, "created_at": event.get("created_at"),
+                       "run_id": event.get("run_id")})
+    runs = []
+    if "task_runs" in tables:
+        runs = [dict(run) for run in conn.execute(
+            "SELECT * FROM task_runs WHERE task_id = ? ORDER BY started_at ASC, id ASC", (task_id,))]
+    print(json.dumps({"task": task, "events": events, "runs": runs}, ensure_ascii=False))
+    sys.exit(0)
+
+
+if sys.argv[1:2] == ["kanban"]:
+    fake_read(sys.argv[1:])
+'''
+
+FAKE_HERMES = FAKE_HERMES_READS + r'''
 import json, os, sqlite3, sys, time
 argv = sys.argv[1:]
 with open(os.environ["FAKE_HERMES_LOG"], "a", encoding="utf-8") as fh:
@@ -182,10 +262,14 @@ sys.exit(code)
 def write_fake_hermes(directory: Path) -> str:
     """Write the fake ``hermes`` command; return the command string for ``--hermes``.
 
-    It appends its arguments to ``$FAKE_HERMES_LOG`` and, when ``$FAKE_KANBAN_DB``
+    It answers ``show --json`` and ``list --json`` from the board database
+    (``FAKE_HERMES_READS``). For every other command it appends its arguments
+    to ``$FAKE_HERMES_LOG`` and, when ``$FAKE_KANBAN_DB``
     is set, applies ``schedule``, ``unblock``, ``set-model``, ``reassign``
     (``--reclaim`` needed for a running card) and ``edit --body`` to that database.
     ``$FAKE_HERMES_EXIT`` sets a non-zero exit code (the change is then not applied).
+    The plugin reads the board through the same command, so a test sets
+    ``kanban.hermes_command`` of its configuration to the returned string.
     """
     script = directory / "fake_hermes.py"
     script.write_text(FAKE_HERMES, encoding="utf-8")
