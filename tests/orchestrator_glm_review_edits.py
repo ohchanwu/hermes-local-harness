@@ -26,6 +26,7 @@ other test module at module level, so any test module can import it without a ci
 
 from test_jev_easy_medium_worker_split import reverse_easy_medium_split_edits
 from test_ponytail_policy_text import reverse_ponytail_policy_text_edits
+from test_reasoning_effort_skill_text import reverse_reasoning_effort_skill_text_edits
 
 BASELINE = "e18997b7e2d27c69ed1e7af2ce4fc6e73ba88875"
 PASS_REASON = "jev-glm-review-pass"
@@ -130,6 +131,7 @@ def reverse_orchestrator_glm_review_edits(relative_path, text):
     the same object, so a caller may apply it to a text that another caller already reversed.
     A text that contains some of the new texts but not each of them exactly once raises
     AssertionError. The later edits of card t_cf518fd0 are reversed first."""
+    text = reverse_reasoning_effort_skill_text_edits(relative_path, text)
     text = reverse_ponytail_policy_text_edits(relative_path, text)
     text = reverse_easy_medium_split_edits(relative_path, text)
     edits = ORCHESTRATOR_GLM_REVIEW_EDITS.get(relative_path)

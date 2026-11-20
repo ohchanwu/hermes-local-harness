@@ -381,7 +381,7 @@ class RoleContracts(unittest.TestCase):
 
     def test_skill_version_scope_and_board_pinning(self):
         # Raised by the jev plugin policy change (t_71b4ef4a).
-        self.assertRegex(self.skill_raw, r"(?m)^version: 0\.6\.10-anki\.14$")  # raised by t_ac454595, t_46b5e63e, t_f4ce916d, t_c7cc3830, t_e14a6d6a, t_35874d04, t_cf518fd0 and t_18a2dc93
+        self.assertRegex(self.skill_raw, r"(?m)^version: 0\.6\.10-anki\.15$")  # raised by t_ac454595, t_46b5e63e, t_f4ce916d, t_c7cc3830, t_e14a6d6a, t_35874d04, t_cf518fd0 and t_18a2dc93
         history = "This caused the 2026-10-20 stalls of the JSS and Jobcron orchestrators."
         self.assertEqual(self.skill_raw.count(history), 1)
         rest = self.skill_raw.replace(history, "")
@@ -400,9 +400,13 @@ class RoleContracts(unittest.TestCase):
         harness_paths = set(re.findall(r"/Users/chanbla11mit/hermes-local-harness/[^\s`'(),;]+", self.skill_raw))
         # Card Setup step 5 names the owner's switch commands of the jev peak-hours hold with
         # the full path of the script (t_71b4ef4a); the owner runs them, the fleet does not.
+        # Worker Selection names the decision record of the card line "Reasoning effort EXACT <level>."
+        # with its full path (t_12797c56).
         self.assertEqual(harness_paths, {CHECKLIST_ABS,
                                          "/Users/chanbla11mit/hermes-local-harness/scripts/check-forced-skills",
-                                         "/Users/chanbla11mit/hermes-local-harness/scripts/jev-peak-hold"})
+                                         "/Users/chanbla11mit/hermes-local-harness/scripts/jev-peak-hold",
+                                         "/Users/chanbla11mit/hermes-local-harness/docs/decisions/"
+                                         "261120-per-card-reasoning-effort.md"})
 
     def test_skill_card_types_collection_access_and_apply_rules(self):
         actions = ", ".join(f"`{action}`" for action in READ_ACTIONS)

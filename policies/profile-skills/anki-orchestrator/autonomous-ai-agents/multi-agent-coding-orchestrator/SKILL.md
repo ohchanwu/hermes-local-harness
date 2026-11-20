@@ -1,7 +1,7 @@
 ---
 name: multi-agent-coding-orchestrator
 description: "Use when orchestrating anki add-on, tooling, and deck change work."
-version: 0.6.10-anki.14
+version: 0.6.10-anki.15
 author: chanbla11mit, Hermes Agent
 license: MIT
 platforms: [macos]
@@ -126,6 +126,8 @@ Never claim a card and `kanban_block` it as a setup hold. The worker's first act
 - Never route implementation to the orchestrator or reviewer, and never route review to a worker.
 
 Before assignment, verify the exact profile with `hermes profile list`. To inspect queue state use `hermes kanban --board anki list --json`. Do not infer that reassignment started a worker; read the card and run history with `kanban_show(..., board: anki)` after the next normal dispatcher ticks.
+
+A card may contain one optional full line `Reasoning effort EXACT <level>.`, where `<level>` is one of `low`, `medium`, `high`, `xhigh` and `max`. Without the line, the worker runs at the reasoning effort of its profile; write the line only when the card needs a different level than the profile level of the assigned worker. The `jev` plugin of the worker applies the level to each model request of implementation workers only; reviewers and orchestrators keep their own level. For GLM, `xhigh` is sent as `max`. A Claude worker keeps the level of its first request for the whole run, so a changed line applies from the next run; change the body with `hermes kanban --board anki edit <task id> --body=<body>`. When the `kanban_create` result contains a `jev` notice about the line (JSON key `jev_note`), correct the line before you unblock the card. The full design, its Hermes dependencies and the fallback are in `/Users/chanbla11mit/hermes-local-harness/docs/decisions/261120-per-card-reasoning-effort.md`.
 
 ## Worktree and Baseline Gate
 

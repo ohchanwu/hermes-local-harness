@@ -34,6 +34,7 @@ from orchestrator_glm_review_edits import reverse_orchestrator_glm_review_edits
 from opus_reviewer_glm_review_edits import reverse_opus_reviewer_glm_review_edits
 from orchestrator_opus_5_5_edits import reverse_opus_5_5_orchestrator_edits
 from test_ponytail_policy_text import reverse_ponytail_policy_text_edits
+from test_reasoning_effort_skill_text import reverse_reasoning_effort_skill_text_edits
 
 BASELINE = "a0761ff0fb29cf3c2cbc7f27b79d5cab86278448"
 RELATIVE = "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md"
@@ -159,6 +160,7 @@ def reverse_hard_route_policy_edits(relative_path, text):
     A text that contains some of the new texts but not each of them exactly once raises
     AssertionError. The later edits of card t_35874d04, then those of card t_be416943, then
     those of card t_d3bb0983, are reversed first."""
+    text = reverse_reasoning_effort_skill_text_edits(relative_path, text)
     text = reverse_ponytail_policy_text_edits(relative_path, text)
     text = reverse_orchestrator_glm_review_edits(relative_path, text)
     text = reverse_opus_reviewer_glm_review_edits(relative_path, text)

@@ -23,6 +23,7 @@ test module can import it without a circular import.
 """
 from test_glm_claude_fallback import reverse_glm_claude_fallback_edits
 from test_ponytail_policy_text import reverse_ponytail_policy_text_edits
+from test_reasoning_effort_skill_text import reverse_reasoning_effort_skill_text_edits
 
 BASELINE = "b62e851cb7c0cdf0f23f6fb32f3a0698470ba618"
 RELATIVE = "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md"
@@ -212,6 +213,7 @@ def reverse_glm_route_worker_name_edits(relative_path, text):
 
     The later SOUL sentence of card t_50fd66f2 is reversed first
     (test_glm_claude_fallback.reverse_glm_claude_fallback_edits)."""
+    text = reverse_reasoning_effort_skill_text_edits(relative_path, text)
     text = reverse_ponytail_policy_text_edits(relative_path, text)
     text = reverse_glm_claude_fallback_edits(relative_path, text)
     edits = GLM_ROUTE_WORKER_NAME_EDITS.get(relative_path)

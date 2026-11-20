@@ -47,6 +47,7 @@ from test_jev_routing_policy_text import reverse_jev_routing_policy_edits
 from test_stale_test_rule_policy import reverse_stale_test_rule_edits
 from test_third_glm_worker_policy import with_third_glm_worker
 from test_ponytail_policy_text import reverse_ponytail_policy_text_edits
+from test_reasoning_effort_skill_text import reverse_reasoning_effort_skill_text_edits
 
 ROOT = Path(__file__).resolve().parents[1]
 RELATIVE = "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md"
@@ -411,8 +412,8 @@ BASELINE_SHA256 = {
 }
 # Raised again by cards t_ac454595, t_46b5e63e, t_f4ce916d and t_e14a6d6a, for jss by t_89838618 and t_a8884510,
 # and for chapt and jobcron by t_d3bb0983.
-VERSIONS = {skill("harness"): "0.6.7-harness.17", skill("chapt"): "0.6.7-chapt.18",
-            skill("jobcron"): "0.6.9-jobcron.19", skill("jss"): "0.6.7-jss.20", skill("anki"): "0.6.10-anki.14"}
+VERSIONS = {skill("harness"): "0.6.7-harness.18", skill("chapt"): "0.6.7-chapt.19",
+            skill("jobcron"): "0.6.9-jobcron.20", skill("jss"): "0.6.7-jss.21", skill("anki"): "0.6.10-anki.15"}
 # The GLM worker SOULs in this repository (the jobcron GLM workers have none).
 GLM_WORKER_SOUL_BOARDS = ("harness", "chapt", "jss", "anki")
 ANKI_GLM_SOULS = (soul("anki-worker-glm-1"), soul("anki-worker-glm-2"))
@@ -421,6 +422,7 @@ ANKI_GLM_SOULS = (soul("anki-worker-glm-1"), soul("anki-worker-glm-2"))
 def reverse_jev_policy_edits(relative_path, text):
     """Return text with the later t_46b5e63e and t_ac454595 edits and then this card's edits reversed;
     text may be str or bytes."""
+    text = reverse_reasoning_effort_skill_text_edits(relative_path, text)
     text = reverse_ponytail_policy_text_edits(relative_path, text)
     text = reverse_jev_routing_policy_edits(relative_path, reverse_stale_test_rule_edits(relative_path, text))
     as_bytes = isinstance(text, bytes)

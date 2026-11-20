@@ -26,6 +26,7 @@ from orchestrator_glm_review_edits import (
     reverse_orchestrator_glm_review_edits, skill)
 from test_jev_easy_medium_worker_split import VERSIONS as SPLIT_VERSIONS
 from test_ponytail_policy_text import reverse_ponytail_policy_text_edits
+from test_reasoning_effort_skill_text import reverse_reasoning_effort_skill_text_edits
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -81,13 +82,14 @@ class OrchestratorGlmReviewText(unittest.TestCase):
             version = SPLIT_VERSIONS[prefix][1]
             with self.subTest(prefix=prefix):
                 # Card t_18a2dc93 is reversed as well: the version after this card is reversed to the version after card t_18a2dc93.
-                self.assertEqual(re.findall(r"(?m)^version: (.+)$", reverse_ponytail_policy_text_edits(skill(prefix), (ROOT / skill(prefix)).read_text(encoding="utf-8"))), [{"harness": "0.6.7-harness.16"}.get(prefix, ROUTE_NAMES_VERSIONS[prefix][1])])
+                # Card t_12797c56 is reversed first.
+                self.assertEqual(re.findall(r"(?m)^version: (.+)$", reverse_ponytail_policy_text_edits(skill(prefix), reverse_reasoning_effort_skill_text_edits(skill(prefix), (ROOT / skill(prefix)).read_text(encoding="utf-8")))), [{"harness": "0.6.7-harness.16"}.get(prefix, ROUTE_NAMES_VERSIONS[prefix][1])])
                 # Card t_18a2dc93 raised each version by one more step.
                 self.assertEqual(ROUTE_NAMES_VERSIONS[prefix][0], version)
                 # Card t_40028345 raised the harness version by one more step.
                 self.assertEqual(re.findall(r"(?m)^version: (.+)$", (ROOT / skill(prefix)).read_text()),
-                                 [{"harness": "0.6.7-harness.17", "anki": "0.6.10-anki.14", "chapt": "0.6.7-chapt.18",
-                                   "jobcron": "0.6.9-jobcron.19", "jss": "0.6.7-jss.20"}[prefix]])
+                                 [{"harness": "0.6.7-harness.18", "anki": "0.6.10-anki.15", "chapt": "0.6.7-chapt.19",
+                                   "jobcron": "0.6.9-jobcron.20", "jss": "0.6.7-jss.21"}[prefix]])
 
     def test_names_both_reviewers_and_the_pass_reason(self):
         for prefix in PREFIXES:

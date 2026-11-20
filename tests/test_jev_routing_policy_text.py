@@ -57,6 +57,7 @@ from test_jev_easy_medium_worker_split import reverse_easy_medium_split_edits, s
 from test_stale_test_rule_policy import reverse_stale_test_rule_edits
 from test_third_glm_worker_policy import with_third_glm_worker
 from test_ponytail_policy_text import reverse_ponytail_policy_text_edits
+from test_reasoning_effort_skill_text import reverse_reasoning_effort_skill_text_edits
 
 ROOT = Path(__file__).resolve().parents[1]
 RELATIVE = "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md"
@@ -396,6 +397,7 @@ BASELINE_SHA256 = {
 
 def reverse_jev_routing_policy_edits(relative_path, text):
     """Return text with this card's edits reversed; text may be str or bytes."""
+    text = reverse_reasoning_effort_skill_text_edits(relative_path, text)
     text = reverse_ponytail_policy_text_edits(relative_path, text)
     as_bytes = isinstance(text, bytes)
     if as_bytes:
@@ -459,8 +461,8 @@ class RoutingPolicyText(unittest.TestCase):
                 # step, card t_e14a6d6a each version by one more step, and card t_d3bb0983 the chapt and
                 # jobcron versions by one more step; cards t_35874d04, t_cf518fd0 and t_18a2dc93 each version by one more
                 # step.
-                current = {"harness": "0.6.7-harness.17", "chapt": "0.6.7-chapt.18", "jobcron": "0.6.9-jobcron.19",
-                           "jss": "0.6.7-jss.20", "anki": "0.6.10-anki.14"}[prefix]
+                current = {"harness": "0.6.7-harness.18", "chapt": "0.6.7-chapt.19", "jobcron": "0.6.9-jobcron.20",
+                           "jss": "0.6.7-jss.21", "anki": "0.6.10-anki.15"}[prefix]
                 self.assertRegex(self.current[skill(prefix)], rf"(?m)^version: {re.escape(current)}$")
                 # Card t_c7cc3830 replaced the Part 5 rule text with the card split rule.
                 self.assertEqual(text.count(NEW_RULE), 1)

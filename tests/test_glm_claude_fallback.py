@@ -25,6 +25,7 @@ import unittest
 
 from harness_orchestrator_recovery_edits import reverse_harness_recovery_edits
 from test_ponytail_policy_text import reverse_ponytail_policy_text_edits
+from test_reasoning_effort_skill_text import reverse_reasoning_effort_skill_text_edits
 
 ROOT = Path(__file__).resolve().parents[1]
 ROSTER = ROOT / "roster.yaml"
@@ -81,6 +82,7 @@ def reverse_glm_claude_fallback_edits(relative_path, text):
     earlier cards. A path that the card did not change, and a text without the sentence, is
     returned as the same object. A text that contains the sentence more than once raises
     AssertionError. This function uses only the standard library."""
+    text = reverse_reasoning_effort_skill_text_edits(relative_path, text)
     text = reverse_ponytail_policy_text_edits(relative_path, text)
     # The later edits of card t_40028345 in the harness-orchestrator skill are reversed first.
     text = reverse_harness_recovery_edits(relative_path, text)
