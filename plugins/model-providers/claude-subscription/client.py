@@ -54,6 +54,24 @@ CLOSED_BY_STREAM_CLOSE = "stream closed before it finished"
 CLOSED_BY_REQUEST_ERROR = "request failed"
 CLOSED_BY_OTHER_EXCEPTION = "request ended with an exception other than ProviderError"
 CLOSED_BY_RESET_FAILURE = "session reset failed"
+# The keyword arguments of create() and the extra_body keys that this client reads. A request with another
+# name is not refused: the name is ignored and named in one warning per process (see warn_once), because a
+# newer Hermes can add an option to every request.
+ACCEPTED_OPTIONS = frozenset({"model", "messages", "tools", "stream", "stream_options", "timeout", "max_tokens",
+                              "max_completion_tokens", "parallel_tool_calls", "tool_choice", "extra_body"})
+ACCEPTED_EXTRA_BODY_KEYS = frozenset({"subscription_session_id", "response_format", "reasoning", CARD_EFFORT_KEY})
+_warned = set()  # the keys of warn_once() calls that have written their warning in this process
+_warned_lock = threading.Lock()
+
+
+def warn_once(key, message, *args):
+    """Write `message` as one WARNING record per process for each `key`. The arguments must be names only,
+    never a value of a request, a message, a token or a credential."""
+    with _warned_lock:
+        if key in _warned:
+            return
+        _warned.add(key)
+    log.warning(message, *args)
 
 
 def protocol_error(exc):
@@ -230,6 +248,9 @@ class ClaudeSubscriptionClient:
             evict = getattr(module, "_evict_cached_client_instance", None)
             if callable(evict):
                 evict(self)
+            else:
+                warn_once("evict", "claude-subscription: agent.auxiliary_client._evict_cached_client_instance is "
+                          "absent or not callable; a closed client stays in the Hermes auxiliary client cache")
         except Exception:
             pass
 
@@ -256,10 +277,9 @@ class ClaudeSubscriptionClient:
                                 + ", ".join(sorted(compat.MODELS)))
         if self._model is not None and model != self._model:
             raise ProviderError("model changed; use a separate client")
-        allowed = {"model", "messages", "tools", "stream", "stream_options", "timeout", "max_tokens",
-                   "max_completion_tokens", "parallel_tool_calls", "tool_choice", "extra_body"}
-        if set(kwargs) - allowed:
-            raise ProviderError("unsupported completion options: " + ", ".join(sorted(set(kwargs) - allowed)))
+        for name in sorted(set(kwargs) - ACCEPTED_OPTIONS):
+            warn_once(("option", name), "claude-subscription: ignored the request option %r, which this "
+                      "provider does not read (one warning per name per process)", name)
         if kwargs.get("parallel_tool_calls") not in (None, False, True) or kwargs.get("tool_choice", "auto") != "auto":
             raise ProviderError("only automatic tool choice is supported")
         if kwargs.get("stream_options", {"include_usage": True}) != {"include_usage": True}:
@@ -281,10 +301,11 @@ class ClaudeSubscriptionClient:
         response_seconds(kwargs.get("timeout", self.timeout))
         # response_format is ignored: the prompt already asks for the format. Hermes adds reasoning
         # to helper calls (titles turn thinking off); the effort above governs instead.
-        if (not isinstance(body, dict)
-                or set(body) - {"subscription_session_id", "response_format", "reasoning", CARD_EFFORT_KEY}
-                or not isinstance(body.get("reasoning", {}), dict)):
+        if not isinstance(body, dict) or not isinstance(body.get("reasoning", {}), dict):
             raise ProviderError("unsupported extra_body configuration")
+        for name in sorted(set(body) - ACCEPTED_EXTRA_BODY_KEYS, key=repr):
+            warn_once(("extra_body", name), "claude-subscription: ignored the extra_body key %r, which this "
+                      "provider does not read (one warning per name per process)", name)
         session_id = body.get("subscription_session_id")
         if session_id is not None and (not isinstance(session_id, str) or not session_id):
             raise ProviderError("subscription session id must be nonempty text")

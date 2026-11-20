@@ -297,7 +297,10 @@ helper request with the same cache key makes Hermes build a new client. The
 closed client stays closed and refuses every later request. The plugin calls
 that function only if Hermes has already loaded the module, never imports it,
 and ignores an absent function or an exception from it; the error of the
-request is the same either way. The client of the main conversation is not in
+request is the same either way. When the module is loaded and the function is
+absent or not callable, the plugin writes one warning per process on the logger
+of its `client` module that names the function; Hermes v0.23.3 has no
+documented replacement for it. The client of the main conversation is not in
 that cache, so for it the call removes nothing. The removal is asked for:
 
 - when a closed client refuses a request (the closed-client error above);
@@ -331,8 +334,9 @@ budget (TERM, then KILL/reap); runtime JSON lines are bounded at 8 MB. Because
 CLI compaction stays disabled, a very long session can fill the context window
 and end the client with an error; start a new client. Closing before first
 iteration creates no session files and launches no child; startup cancellation
-owns and reaps the version child, not merely the model child. Sampling/options,
-arbitrary CLI arguments and concurrent create calls are unsupported. CLI retries/nonstream fallback are disabled; the plugin never
+owns and reaps the version child, not merely the model child. Sampling options
+are ignored (see "Options that the client does not read" below); arbitrary CLI
+arguments and concurrent create calls are unsupported. CLI retries/nonstream fallback are disabled; the plugin never
 relaunches a failed runtime. Use a separate client for a new role/task/session.
 Cancellation is terminal, not resumable. Always close the client/agent, including
 parked streams; partial output is not successful completion.
@@ -386,6 +390,18 @@ analysis and the rest) can run on this provider
 - **Options:** `extra_body.response_format` and `extra_body.reasoning` (title
   generation turns thinking off) are ignored, and output caps below
   4096 tokens are raised to 4096 because thinking counts toward the cap.
+- **Options that the client does not read:** the client reads the keyword
+  arguments of `create()` in `ACCEPTED_OPTIONS` and the `extra_body` keys in
+  `ACCEPTED_EXTRA_BODY_KEYS` (constants of `client.py`). Any other keyword
+  argument or `extra_body` key is ignored, and the request continues; the
+  first time in a process that a name is ignored, the client writes one
+  warning on the logger of its `client` module that contains the name and not
+  the value. A newer Hermes can add an option to every request, so refusing
+  such an option would make every request fail. The client still refuses a
+  model outside its list, a `tool_choice` other than `auto`, `stream_options`
+  other than `{"include_usage": true}`, an invalid output token cap, a
+  `subscription_session_id` that is not nonempty text, an `extra_body` that is
+  not a dictionary and an `extra_body.reasoning` that is not a dictionary.
 - **Images:** base64 `data:` images (PNG, JPEG, GIF, WebP) in user messages are
   sent as image blocks. Remote image URLs and images in tool results are
   rejected. When a conversation is rebuilt, earlier images become a note.
