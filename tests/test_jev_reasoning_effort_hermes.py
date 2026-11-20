@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """The jev llm_request middleware through the real Hermes middleware (card t_caf5dba0).
 
-Run from the repository root with the interpreter of the installed Hermes
-environment, which installed_hermes_python() of tests/hermes_isolated_home.py
-returns (the line printed under another interpreter names it):
+Run from the repository root with python3, or directly with the interpreter of
+the installed Hermes environment, which installed_hermes_python() of
+tests/hermes_isolated_home.py returns:
 
     <interpreter> -I tests/test_jev_reasoning_effort_hermes.py
 
@@ -24,13 +24,16 @@ Steps (procedures/isolated-hermes-test-home.md):
    profile, and with a claude-subscription request.
 
 When Hermes cannot be imported (for example under /opt/homebrew/bin/python3),
-it prints one line saying so and exits 0.
+it runs itself with the interpreter of the installed Hermes and exits with
+its exit status. When no such interpreter is found, or the current interpreter
+is that interpreter, it prints one line that starts with SKIP and exits 0.
 """
 import atexit
 import json
 import os
 import shutil
 import socket
+import subprocess
 import sys
 import tempfile
 from pathlib import Path
@@ -41,6 +44,9 @@ CLEAR_VARS = ("HERMES_PROFILE", "HERMES_KANBAN_DB", "HERMES_KANBAN_BOARD", "HERM
               "HERMES_KANBAN_TASK", "HERMES_KANBAN_RUN_ID", "HERMES_KANBAN_WORKSPACE",
               "HERMES_KANBAN_WORKSPACES_ROOT", "HERMES_SESSION_ID", "HERMES_JEV_LOG_DIR",
               "HERMES_CLAUDE_SUBSCRIPTION_EFFORT", "HERMES_SAFE_MODE")
+# extra_body.thinking of the zai provider profile of Hermes v0.23.3 with thinking enabled
+# (plugins/model-providers/zai/__init__.py line 65).
+ZAI_THINKING = {"type": "enabled", "clear_thinking": False}
 CARDS = {"t_aaaa0001": "Repository x.\nReasoning effort EXACT xhigh.\n",
          "t_aaaa0002": "Repository x.\nReasoning effort EXACT high.\n",
          "t_aaaa0003": "Repository x.\nNo reasoning effort line.\n"}
@@ -68,12 +74,8 @@ def hermes_importable():
         import hermes_cli.plugins  # noqa: F401
         import providers  # noqa: F401
     except Exception as exc:  # any import failure means this interpreter cannot run the test
-        sys.path.insert(0, str(REPO_ROOT / "tests"))
-        from hermes_isolated_home import installed_hermes_python
-        print(f"SKIP: Hermes is not importable with {sys.executable} ({type(exc).__name__}); "
-              f"run this file with {installed_hermes_python()} -I")
-        return False
-    return True
+        return exc
+    return None
 
 
 def prepare(base):
@@ -128,7 +130,7 @@ def run(base):
     glm_request = {"model": "glm-5.3", "messages": [{"role": "user", "content": "synthetic"}],
                    **top_level, "extra_body": extra_body}
     check("zai profile request", glm_request.get("reasoning_effort") == "medium"
-          and extra_body.get("thinking") == {"type": "enabled"}, json.dumps(glm_request, sort_keys=True))
+          and extra_body.get("thinking") == ZAI_THINKING, json.dumps(glm_request, sort_keys=True))
 
     os.environ["HERMES_KANBAN_TASK"] = "t_aaaa0001"
     result = apply_llm_request_middleware(glm_request, task_id="session", provider="zai", model="glm-5.3",
@@ -138,7 +140,7 @@ def run(base):
           any(getattr(cb, "__module__", "").endswith("jev") for cb in middleware),
           [f"{getattr(cb, '__module__', '?')}.{getattr(cb, '__name__', '?')}" for cb in middleware])
     check("GLM xhigh applied as max", result.payload.get("reasoning_effort") == "max"
-          and result.payload.get("extra_body") == {"thinking": {"type": "enabled"}}
+          and result.payload.get("extra_body") == {"thinking": ZAI_THINKING}
           and {"source": "jev", "reason": "card reasoning effort"} in result.trace,
           f"reasoning_effort={result.payload.get('reasoning_effort')!r} trace={result.trace}")
     check("original request unchanged", glm_request.get("reasoning_effort") == "medium", "medium")
@@ -172,14 +174,26 @@ def run(base):
     check("one card read per task", sorted(calls) == sorted(
         f"kanban --board harness show {task} --json" for task in CARDS), calls)
 
-    print("real Hermes middleware test ran: "
+    print(f"{'FAILED' if failures else 'OK'}: real Hermes middleware test ran: "
           f"{'all checks passed' if not failures else 'failed: ' + ', '.join(failures)}")
     return 1 if failures else 0
 
 
 def main():
-    if not hermes_importable():
-        return 0
+    import_error = hermes_importable()
+    if import_error is not None:
+        sys.path.insert(0, str(REPO_ROOT / "tests"))
+        from hermes_isolated_home import installed_hermes_python
+        interpreter = installed_hermes_python()
+        if interpreter is None or Path(interpreter) == Path(sys.executable):
+            print(f"SKIP: Hermes is not importable with {sys.executable} ({type(import_error).__name__}); "
+                  f"run this file with {interpreter} -I")
+            return 0
+        # Under another interpreter (for example python3 on PATH), run this file with the
+        # interpreter of the installed Hermes and return its exit status.
+        print(f"running this file with {interpreter} -I", flush=True)
+        return subprocess.run([str(interpreter), "-I", str(Path(__file__).resolve())],
+                              cwd=str(REPO_ROOT)).returncode
     base = Path(tempfile.mkdtemp(prefix="jev-reasoning-effort-"))
     atexit.register(remove_quietly, base)
     try:
