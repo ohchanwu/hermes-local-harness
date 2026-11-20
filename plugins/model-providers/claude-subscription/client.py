@@ -40,6 +40,7 @@ __all__ = ["ClaudeSubscriptionClient", "Bridge", "ProviderError", "History", "Me
 log = logging.getLogger(__name__)
 OUTPUT_FLOOR = 4096
 MAX_SECOND_MESSAGES = 4  # decided follow-on messages per request before the stream counts as runaway
+CARD_EFFORT_KEY = "card_reasoning_effort"  # extra_body key; see README "Effort from the card"
 # The event types whose non-null parent_tool_use_id marks a subagent's message. The provider advertises
 # only its own MCP tools, so the CLI cannot start a subagent. tool_progress also declares the field;
 # it carries no model output and is accepted with any value of it.
@@ -267,16 +268,21 @@ class ClaudeSubscriptionClient:
         if len(caps) > 1 or any(type(cap) is not int or cap <= 0 for cap in caps):
             raise ProviderError("invalid output token cap")
         max_output = caps.pop() if caps else None
-        effort = os.environ.get(EFFORT_SETTING) or DEFAULT_EFFORT
+        body = kwargs.get("extra_body") or {}
+        # The jev plugin sends the card's effort; a value outside EFFORTS falls back to the setting (see _create).
+        card = body.get(CARD_EFFORT_KEY) if isinstance(body, dict) else None
+        card_effort = card if isinstance(card, str) and card in EFFORTS else None
+        card_invalid = isinstance(body, dict) and CARD_EFFORT_KEY in body and card_effort is None
+        effort = card_effort or os.environ.get(EFFORT_SETTING) or DEFAULT_EFFORT
         if effort not in EFFORTS:
             raise ProviderError(f"invalid effort setting {EFFORT_SETTING}; use one of: " + ", ".join(EFFORTS))
         if self.args:
             raise ProviderError("arbitrary runtime arguments are unsupported")
         response_seconds(kwargs.get("timeout", self.timeout))
-        body = kwargs.get("extra_body") or {}
         # response_format is ignored: the prompt already asks for the format. Hermes adds reasoning
-        # to helper calls (titles turn thinking off); the runtime's effort setting governs instead.
-        if (not isinstance(body, dict) or set(body) - {"subscription_session_id", "response_format", "reasoning"}
+        # to helper calls (titles turn thinking off); the effort above governs instead.
+        if (not isinstance(body, dict)
+                or set(body) - {"subscription_session_id", "response_format", "reasoning", CARD_EFFORT_KEY}
                 or not isinstance(body.get("reasoning", {}), dict)):
             raise ProviderError("unsupported extra_body configuration")
         session_id = body.get("subscription_session_id")
@@ -286,7 +292,7 @@ class ClaudeSubscriptionClient:
         tools = convert_tools(kwargs.get("tools"))
         if self._scope is not None and scope != self._scope:
             raise ProviderError("session/worktree/profile changed; use a separate client")
-        return model, scope, tools, max_output, effort
+        return model, scope, tools, max_output, effort, card_effort, card_invalid
 
     def create(self, **kwargs):
         try:
@@ -313,7 +319,7 @@ class ClaudeSubscriptionClient:
             if self.is_closed():
                 self._remove_from_hermes_cache()
                 raise self._closed_error()
-            model, scope, tools, max_output, effort = self._validate(kwargs)
+            model, scope, tools, max_output, effort, card_effort, card_invalid = self._validate(kwargs)
             # Never fall back to the interactive `claude` on PATH: it updates itself.
             # A bare name would be resolved through PATH, so only absolute paths count.
             if not self.command:
@@ -356,8 +362,16 @@ class ClaudeSubscriptionClient:
                 self._reset_session()
                 self.audit.append({"stage": "session_reset"})
             self._model, self._scope, self._tools, self._max_output = model, scope, tools, max_output
+            if card_invalid:
+                # The key name only, never the value the request carried.
+                self.audit.append({"stage": "card_effort_ignored", "key": CARD_EFFORT_KEY, "reason": "value not in EFFORTS"})
             if self._effort is None:
                 self._effort = effort
+            elif card_effort is not None and card_effort != self._effort:
+                # The CLI session keeps the effort of the client's first request; no new session for this.
+                self.audit.append({"stage": "card_effort_ignored", "key": CARD_EFFORT_KEY,
+                                   "reason": "effort fixed at the first request", "effort": self._effort,
+                                   "requested": card_effort})
             if self._process_env is None:
                 self._process_env = {k: os.environ[k] for k in ("PATH", "LANG", "TMPDIR") if os.environ.get(k)}
                 self._process_env.update(HOME=account.pw_dir, USER=account.pw_name, LOGNAME=account.pw_name)

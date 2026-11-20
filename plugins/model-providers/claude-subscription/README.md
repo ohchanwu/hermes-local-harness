@@ -71,7 +71,8 @@ execution was not separately measured live.
 
 A client owns one fresh, in-memory official CLI session. Its model, output
 token cap (`max_tokens`/`max_completion_tokens`, otherwise the CLI default) and
-effort (`HERMES_CLAUDE_SUBSCRIPTION_EFFORT`, default `medium`) are fixed by its
+effort (`extra_body.card_reasoning_effort`, then `HERMES_CLAUDE_SUBSCRIPTION_EFFORT`,
+then `medium`; see "Effort from the card" below) are fixed by its
 first request; changing any of them requires a separate client. A new client
 normally starts from one user message, optionally preceded by one system message.
 The system is passed as the runtime system prompt, user input through
@@ -343,6 +344,30 @@ search and minimal child environment preserve the owned transport boundary.
 Only MCP tools advertised by Hermes are allowed. Runtime init verifies the exact
 model, CLI version, auth-source indication and tool list. These controls do not
 replace Hermes permissions or globally forbid Hermes' own permitted tools.
+
+## Effort from the card
+
+The worker's `jev` plugin can send the effort that a Kanban card names in the
+request field `extra_body.card_reasoning_effort`
+([`jev` design record](../../../docs/decisions/261120-per-card-reasoning-effort.md)).
+The client takes the effort of a request in this order:
+
+1. `extra_body.card_reasoning_effort`, when it is a string in `low`, `medium`,
+   `high`, `xhigh`, `max`;
+2. `HERMES_CLAUDE_SUBSCRIPTION_EFFORT`;
+3. `medium`.
+
+A request without the field behaves as before the field existed. A field
+value that is not one of those strings does not refuse the request: the client
+uses the setting or `medium` and adds one audit entry (stage
+`card_effort_ignored`) that names the field but not its value. An invalid
+`HERMES_CLAUDE_SUBSCRIPTION_EFFORT` refuses the request only when the setting
+is the value used.
+
+The effort stays fixed at the first request of a client. A later request of
+the same client whose field names a different effort keeps the first effort,
+adds one audit entry (stage `card_effort_ignored`, with both efforts) and does
+not start a new CLI session.
 
 ## Hermes helper jobs
 
