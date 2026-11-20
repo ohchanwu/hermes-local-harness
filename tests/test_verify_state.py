@@ -226,6 +226,24 @@ for incomplete in ({}, {"hermes_cli/middleware.py": clean_sources["hermes_cli/mi
     with redirect_stdout(io.StringIO()):
         verify_state.check_hermes_reasoning_effort_sources(errors, [], incomplete)
     assert errors == ["incomplete fixture: missing required section 'hermes_reasoning_effort_sources'"], errors
+# plugins.auto_apply true on one profile: exactly one FAIL line, because updates stay manual
+result = subprocess.run([str(VERIFY), "--fixture", str(FIXTURES / "plugin-auto-apply-enabled.yaml")],
+                        text=True, capture_output=True)
+assert result.returncode == 1, result.stdout
+assert [line for line in result.stdout.splitlines() if line.startswith("FAIL:")] == [
+    "FAIL: plugins.auto_apply is True on harness-worker: Hermes updates and plugin updates must stay manual"], \
+    result.stdout
+# Hermes reads bool() of the value, so the string 'false' is true; an omitted profile is unreadable
+for observed, expected_errors in (
+        ({"a": {"plugins.auto_apply": False}, "b": {"plugins.auto_apply": None}}, []),
+        ({"a": {"plugins.auto_apply": "false"}}, ["plugins.auto_apply is 'false' on a: Hermes updates and "
+                                                  "plugin updates must stay manual"]),
+        ({}, ["plugins.auto_apply unreadable a"])):
+    errors = []
+    with redirect_stdout(io.StringIO()):
+        verify_state.check_plugin_auto_apply(errors, sorted({"a", *observed}),
+                                             verify_state.fixture_setting_reader(observed))
+    assert errors == expected_errors, (observed, errors)
 # command approval policy drift fails
 check("--fixture", str(FIXTURES / "approval-mode-drift.yaml"), code=1,
       text="approval mode drift jobcron-worker")

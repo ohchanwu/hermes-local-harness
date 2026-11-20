@@ -150,6 +150,9 @@ clean["profile_auxiliary_settings"] = {
             profile["auxiliary_models"]).items()}}
     for profile in roster["profiles"]
     if profile.get("lifecycle") != "retired" and "auxiliary_models" in profile}
+# Observed `hermes config get --json plugins.auto_apply` of every roster profile: false, because
+# Hermes updates and plugin updates stay manual (owner instruction, 2026-11-20).
+clean["profile_plugin_auto_apply"] = {profile["name"]: {"plugins.auto_apply": False} for profile in roster["profiles"]}
 clean["dispatch_profiles"] = copy.deepcopy(desired["kanban"]["dispatch_profiles"])
 clean["kanban"] = {key: copy.deepcopy(value) for key, value in desired["kanban"].items()
                    if key != "dispatch_profiles"}
@@ -398,6 +401,14 @@ def auxiliary_model_drift(d):
 
 
 write("auxiliary-model-drift.yaml", delta(auxiliary_model_drift))
+
+
+def plugin_auto_apply_enabled(d):
+    # One profile applies plugin updates with no person involved (plugins.auto_apply: true).
+    d["profile_plugin_auto_apply"]["harness-worker"]["plugins.auto_apply"] = True
+
+
+write("plugin-auto-apply-enabled.yaml", delta(plugin_auto_apply_enabled))
 
 
 def rogue(d):

@@ -62,6 +62,7 @@ FIXTURE_RESULTS = {
     # Card t_50fd66f2: a GLM worker that falls back to the provider anthropic.
     "glm-fallback-anthropic.yaml": (1, "fallback drift harness-worker-glm-medium-1 fallback_providers"),
     "auxiliary-model-drift.yaml": (1, "auxiliary model drift harness-worker auxiliary.title_generation.model"),
+    "plugin-auto-apply-enabled.yaml": (1, "plugins.auto_apply is True on harness-worker"),
     "terminal-deployment-pending.yaml": (1, "terminal notification deployment pending"),
     "terminal-notification-rollback.yaml": (1, "terminal notification deployment pending"),
     "plugin-pin-drift.yaml": (1, "expected pinned 5.3.3@7801d061243d7b753bad0e0b3c057cd250b11755"),

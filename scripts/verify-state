@@ -2639,6 +2639,21 @@ def check_managed_setting_groups(errors, roster, fleets, roster_profiles, read):
                          f"actual {group['profiles']}")
 
 
+def check_plugin_auto_apply(errors, profiles, read):
+    """Hermes updates and plugin updates stay manual (owner instruction, 2026-11-20). Hermes v0.23.3
+    applies plugin updates with no person involved when plugins.auto_apply is true: auto_apply_enabled in
+    hermes_cli/plugins_cadence.py (line 121) returns bool() of the value. The default is false
+    (hermes_cli/config_defaults.py, line 1675), and `hermes config get` merges the defaults, so the
+    value read here is the effective value and a missing key reads as false."""
+    for profile in profiles:
+        value = read(profile, "plugins.auto_apply")
+        if value is UNREADABLE:
+            fail(errors, f"plugins.auto_apply unreadable {profile}")
+        elif bool(value):
+            fail(errors, f"plugins.auto_apply is {value!r} on {profile}: Hermes updates and plugin "
+                         f"updates must stay manual")
+
+
 def fixture_setting_reader(observed_settings):
     """Fixture analogue of json_config: an absent or malformed entry is unreadable."""
     def read(profile, key):
@@ -2721,7 +2736,7 @@ def main():
             return 2
         # Fail-closed fixture schema: a passing fixture must represent every required
         # observed field and every installed roster profile; omission is drift, not success.
-        for section in ("profile_models", "profile_providers", "profile_approval_modes", "plugins", "dispatch_profiles", "kanban", "skill_files", "profile_local_skill_overrides", "profile_soul_hashes", "repository_policy_hashes", "adapters", "terminal_notification_runtime", "terminal_retry_policy", "jev_peak_hold_agent", "glm_reviewer_skills", "hermes_reasoning_effort_sources", "ponytail_mode_env", "ponytail_install_metadata", "project_isolation", "project_repair_policy", "project_repair_cards", "profile_managed_settings", "profile_fallback_settings", "profile_auxiliary_settings"):
+        for section in ("profile_models", "profile_providers", "profile_approval_modes", "plugins", "dispatch_profiles", "kanban", "skill_files", "profile_local_skill_overrides", "profile_soul_hashes", "repository_policy_hashes", "adapters", "terminal_notification_runtime", "terminal_retry_policy", "jev_peak_hold_agent", "glm_reviewer_skills", "hermes_reasoning_effort_sources", "ponytail_mode_env", "ponytail_install_metadata", "project_isolation", "project_repair_policy", "project_repair_cards", "profile_managed_settings", "profile_fallback_settings", "profile_auxiliary_settings", "profile_plugin_auto_apply"):
             if section not in observed:
                 fail(errors, f"incomplete fixture: missing required section '{section}'")
         # None is a live/desired-only sentinel in these helpers, not a fixture
@@ -2775,6 +2790,9 @@ def main():
         check_fallback_settings(errors, roster, fixture_setting_reader(observed.get("profile_fallback_settings")))
         check_auxiliary_models(errors, roster, fixture_setting_reader(observed.get("profile_auxiliary_settings")),
                                allowed_models)
+        auto_apply = observed.get("profile_plugin_auto_apply")
+        check_plugin_auto_apply(errors, [*expected, *(name for name in auto_apply or {} if name not in expected)],
+                                fixture_setting_reader(auto_apply))
         plugins = observed.get("plugins", {})
         check_terminal_notification_observed(errors, plugins, snapshot["terminal_notification"]["producer_profiles"])
         check_terminal_notification_runtime(errors, observed.get("terminal_notification_runtime", {}),
@@ -2856,6 +2874,7 @@ def main():
                             fail(errors, message)
                     check_plugins(errors, warnings, name, profile["required_plugins"], state, snapshot["plugins"],
                                   profile.get("installed_disabled_plugins"), configured_providers(profile))
+            check_plugin_auto_apply(errors, sorted(observed), json_config)
         check_managed_setting_groups(errors, roster, fleets, expected, json_config)
         check_fallback_settings(errors, roster, json_config)
         check_auxiliary_models(errors, roster, json_config, allowed_models)

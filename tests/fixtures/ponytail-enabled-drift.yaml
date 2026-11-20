@@ -11430,5 +11430,211 @@
     "plugins/model-providers/zai/__init__.py": "if is_5_2:\n    effort = _glm_5_2_reasoning_effort(reasoning_config, model=model)\n    if effort is not None:\n        top_level[\"reasoning_effort\"] = effort\n",
     "tools/kanban_tools_schemas.py": "\"model\": {\"type\": \"string\"},\n",
     "tools/kanban_tools.py": "new_tid = kb.create_task(conn, model_override=model_override)\n"
+  },
+  "profile_plugin_auto_apply": {
+    "default": {
+      "plugins.auto_apply": false
+    },
+    "advisor": {
+      "plugins.auto_apply": false
+    },
+    "reviewer-sol": {
+      "plugins.auto_apply": false
+    },
+    "worker-flash-1": {
+      "plugins.auto_apply": false
+    },
+    "worker-flash-2": {
+      "plugins.auto_apply": false
+    },
+    "worker-flash-3": {
+      "plugins.auto_apply": false
+    },
+    "worker-luna-1": {
+      "plugins.auto_apply": false
+    },
+    "worker-luna-2": {
+      "plugins.auto_apply": false
+    },
+    "worker-terra-1": {
+      "plugins.auto_apply": false
+    },
+    "worker-glm-full": {
+      "plugins.auto_apply": false
+    },
+    "worker-sol": {
+      "plugins.auto_apply": false
+    },
+    "worker-astra": {
+      "plugins.auto_apply": false
+    },
+    "worker-terra-2": {
+      "plugins.auto_apply": false
+    },
+    "jobcron-orchestrator": {
+      "plugins.auto_apply": false
+    },
+    "jobcron-worker": {
+      "plugins.auto_apply": false
+    },
+    "jobcron-worker-2": {
+      "plugins.auto_apply": false
+    },
+    "jobcron-reviewer": {
+      "plugins.auto_apply": false
+    },
+    "chapt-orchestrator": {
+      "plugins.auto_apply": false
+    },
+    "chapt-worker": {
+      "plugins.auto_apply": false
+    },
+    "chapt-worker-2": {
+      "plugins.auto_apply": false
+    },
+    "chapt-reviewer": {
+      "plugins.auto_apply": false
+    },
+    "harness-orchestrator": {
+      "plugins.auto_apply": false
+    },
+    "harness-worker": {
+      "plugins.auto_apply": false
+    },
+    "harness-worker-2": {
+      "plugins.auto_apply": false
+    },
+    "harness-reviewer": {
+      "plugins.auto_apply": false
+    },
+    "jss-orchestrator": {
+      "plugins.auto_apply": false
+    },
+    "jss-worker": {
+      "plugins.auto_apply": false
+    },
+    "jss-worker-2": {
+      "plugins.auto_apply": false
+    },
+    "jss-reviewer": {
+      "plugins.auto_apply": false
+    },
+    "jobcron-worker-glm-easy-1": {
+      "plugins.auto_apply": false
+    },
+    "jobcron-worker-glm-easy-2": {
+      "plugins.auto_apply": false
+    },
+    "jobcron-worker-glm-medium-1": {
+      "plugins.auto_apply": false
+    },
+    "jobcron-worker-glm-medium-2": {
+      "plugins.auto_apply": false
+    },
+    "jobcron-worker-glm-hard-1": {
+      "plugins.auto_apply": false
+    },
+    "jobcron-worker-glm-hard-2": {
+      "plugins.auto_apply": false
+    },
+    "jobcron-reviewer-glm": {
+      "plugins.auto_apply": false
+    },
+    "chapt-worker-glm-easy-1": {
+      "plugins.auto_apply": false
+    },
+    "chapt-worker-glm-easy-2": {
+      "plugins.auto_apply": false
+    },
+    "chapt-worker-glm-medium-1": {
+      "plugins.auto_apply": false
+    },
+    "chapt-worker-glm-medium-2": {
+      "plugins.auto_apply": false
+    },
+    "chapt-worker-glm-hard-1": {
+      "plugins.auto_apply": false
+    },
+    "chapt-worker-glm-hard-2": {
+      "plugins.auto_apply": false
+    },
+    "chapt-reviewer-glm": {
+      "plugins.auto_apply": false
+    },
+    "harness-worker-glm-easy-1": {
+      "plugins.auto_apply": false
+    },
+    "harness-worker-glm-easy-2": {
+      "plugins.auto_apply": false
+    },
+    "harness-worker-glm-medium-1": {
+      "plugins.auto_apply": false
+    },
+    "harness-worker-glm-medium-2": {
+      "plugins.auto_apply": false
+    },
+    "harness-worker-glm-hard-1": {
+      "plugins.auto_apply": false
+    },
+    "harness-worker-glm-hard-2": {
+      "plugins.auto_apply": false
+    },
+    "harness-reviewer-glm": {
+      "plugins.auto_apply": false
+    },
+    "jss-worker-glm-easy-1": {
+      "plugins.auto_apply": false
+    },
+    "jss-worker-glm-easy-2": {
+      "plugins.auto_apply": false
+    },
+    "jss-worker-glm-medium-1": {
+      "plugins.auto_apply": false
+    },
+    "jss-worker-glm-medium-2": {
+      "plugins.auto_apply": false
+    },
+    "jss-worker-glm-hard-1": {
+      "plugins.auto_apply": false
+    },
+    "jss-worker-glm-hard-2": {
+      "plugins.auto_apply": false
+    },
+    "jss-reviewer-glm": {
+      "plugins.auto_apply": false
+    },
+    "anki-orchestrator": {
+      "plugins.auto_apply": false
+    },
+    "anki-worker": {
+      "plugins.auto_apply": false
+    },
+    "anki-worker-2": {
+      "plugins.auto_apply": false
+    },
+    "anki-reviewer": {
+      "plugins.auto_apply": false
+    },
+    "anki-worker-glm-easy-1": {
+      "plugins.auto_apply": false
+    },
+    "anki-worker-glm-easy-2": {
+      "plugins.auto_apply": false
+    },
+    "anki-worker-glm-medium-1": {
+      "plugins.auto_apply": false
+    },
+    "anki-worker-glm-medium-2": {
+      "plugins.auto_apply": false
+    },
+    "anki-worker-glm-hard-1": {
+      "plugins.auto_apply": false
+    },
+    "anki-worker-glm-hard-2": {
+      "plugins.auto_apply": false
+    },
+    "anki-reviewer-glm": {
+      "plugins.auto_apply": false
+    }
   }
 }
