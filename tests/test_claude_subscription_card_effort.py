@@ -92,11 +92,15 @@ class CardEffortTests(unittest.TestCase):
         self.followup("again", extra_body={KEY: "high"})  # the same value records nothing
         self.assertEqual(len(self.ignored()), 1)
 
-    def test_other_unknown_extra_body_keys_are_still_refused(self):
-        for body in ({KEY: "high", "other": 1}, {"reasoning_effort": "high"}, {"effort": "high"}):
-            with self.subTest(body=body), self.assertRaisesRegex(client.ProviderError, "unsupported extra_body"):
+    def test_other_unknown_extra_body_keys_are_ignored(self):
+        for body, effort in (({KEY: "high", "other": 1}, "high"), ({"reasoning_effort": "high"}, "medium"),
+                             ({"effort": "high"}, "medium")):
+            with self.subTest(body=body), patch.object(client, "_warned", set()), \
+                    self.assertLogs(client.log.name, "WARNING"):
+                self.c = client.ClaudeSubscriptionClient(command=provider.SYNTHETIC_CLI)
+                self.addCleanup(self.c.close)
                 self.request(extra_body=body)
-        self.assertEqual(self.launches, [])
+                self.assertEqual(self.effort(), effort)
 
 
 if __name__ == "__main__":

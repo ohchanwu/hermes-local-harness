@@ -480,12 +480,28 @@ class ClientTests(unittest.TestCase):
 
     def test_lazy_constructor_and_invalid_configuration_have_no_runtime_effects(self):
         self.assertEqual(self.launches, [])
-        for extras in ({"model": "opus"}, {"tool_choice": "required"}, {"temperature": 0.5},
-                       {"max_tokens": 0}, {"max_completion_tokens": True}, {"extra_body": {"unknown": True}}):
+        for extras in ({"model": "opus"}, {"tool_choice": "required"}, {"stream_options": {}},
+                       {"max_tokens": 0}, {"max_completion_tokens": True}, {"extra_body": {"subscription_session_id": 5}}):
             kwargs = {"model": MODEL, "messages": [{"role": "user", "content": "unused"}], **extras}
             with self.subTest(extras=extras), self.assertRaises(client.ProviderError):
                 self.c.create(**kwargs)
         self.assertEqual(self.launches, [])
+
+    def test_unknown_options_are_ignored_with_one_warning_per_name(self):
+        secret = "SECRET-VALUE-NOT-LOGGED"
+        with patch.object(client, "_warned", set()):
+            with self.assertLogs(client.log.name, "WARNING") as logs:
+                response = self.request(temperature=secret, extra_body={"new_hermes_key": secret})
+            self.assertEqual(response.choices[0].message.content, "YES")
+            self.assertEqual(len(logs.records), 2)
+            self.assertIn("request option 'temperature'", logs.output[0])
+            self.assertIn("extra_body key 'new_hermes_key'", logs.output[1])
+            self.assertNotIn(secret, "\n".join(logs.output))
+            with self.assertNoLogs(client.log.name, "WARNING"):
+                response = self.followup("next", temperature=secret, extra_body={"new_hermes_key": secret})
+            self.assertEqual(response.choices[0].finish_reason, "stop")
+        self.assertEqual(client.ACCEPTED_OPTIONS & {"temperature"}, frozenset())
+        self.assertIn("subscription_session_id", client.ACCEPTED_EXTRA_BODY_KEYS)
 
     def test_nonstream_text_and_same_session_followup_shapes(self):
         response = self.request()

@@ -377,7 +377,8 @@ class CallsThatNeverAskForTheRemovalTests(CacheTestCase):
 class ErrorOfTheCallerIsUnchangedTests(CacheTestCase):
     """Item 1: an absent module, an absent or not callable attribute, and a function that raises."""
 
-    def modules(self):
+    @staticmethod
+    def modules():
         without_attribute = types.ModuleType(MODULE_NAME)
         not_callable = types.ModuleType(MODULE_NAME)
         not_callable._evict_cached_client_instance = "not callable"
@@ -420,6 +421,27 @@ class ErrorOfTheCallerIsUnchangedTests(CacheTestCase):
 
                 self.assertNotIn(failure_text.MARKER, str(error))
                 self.assertEqual(sys.modules.get(MODULE_NAME), module)
+
+
+class AbsentFunctionWarningTests(CacheTestCase):
+    """Row P9: one warning per process when the module is loaded and the function is absent or not callable."""
+
+    def test_one_warning_per_process_only_for_an_absent_or_not_callable_function(self):
+        warned = {"attribute absent", "attribute not callable"}
+        modules = ErrorOfTheCallerIsUnchangedTests.modules()
+        for name, module in [*modules.items(), ("function present", self.cache.module())]:
+            with self.subTest(name), patch.object(client, "_warned", set()):
+                self.load_module(module)
+                c = self.cache.lookup(KEY + (name,))
+                if name in warned:
+                    with self.assertLogs(client.log.name, "WARNING") as logs:
+                        for _ in range(3):
+                            c._remove_from_hermes_cache()
+                    self.assertEqual(len(logs.records), 1)
+                    self.assertIn("_evict_cached_client_instance is absent or not callable", logs.output[0])
+                else:
+                    with self.assertNoLogs(client.log.name, "WARNING"):
+                        c._remove_from_hermes_cache()
 
 
 class ClosedClientStaysClosedTests(CacheTestCase):
