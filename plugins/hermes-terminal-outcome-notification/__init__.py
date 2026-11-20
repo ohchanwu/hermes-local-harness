@@ -1,12 +1,14 @@
 """Hermes plugin entry point for terminal outcome notifications."""
 from __future__ import annotations
 
-import os
-import sqlite3
-from pathlib import Path
+import logging
 from typing import Any
 
 from .core import Store, shared_outbox_path
+
+_LOG = logging.getLogger(__name__)
+_SESSION_LISTING = "persistence_assembly.open_persistence_reader and store.sessions.list_gateway_sessions"
+_warned: set[str] = set()
 
 
 def _store() -> Store:
@@ -19,25 +21,24 @@ def _session_id(kwargs: dict[str, Any]) -> str:
 
 
 def _session_ids_for_key(session_key: str) -> list[str]:
-    """Durable session_key → session_id resolution. Hermes's state.db is the single routing
-    source of truth (rows carry session_key and compression forks inherit it), so mapping an
-    `agent_loop_stopped` session_key to live session ids is evidence, not a guess. Read-only;
-    any failure returns [] (fail closed -> recovery classifies `unknown`)."""
+    """Session IDs of the live gateway session for one session key, read through the documented
+    Hermes storage interface (plugin guide, "hermes_state deprecated: the storage interface
+    replacements"). Each entry is a SessionRecencyEntry; its `session` carries `session_key` and
+    `session_id`. Read-only. When the interface is absent or the read fails, return [] (recovery
+    then classifies the turn `unknown`) and write one WARNING record per process."""
     if not session_key:
         return []
-    db_path = os.environ.get("HERMES_TERMINAL_STATE_DB", "")
-    if not db_path:
-        try:
-            from hermes_constants import get_hermes_home  # type: ignore[attr-defined]
-            db_path = str(Path(get_hermes_home()) / "state.db")
-        except Exception:
-            return []
     try:
-        with sqlite3.connect(f"file:{db_path}?mode=ro", uri=True, timeout=5) as db:
-            rows = db.execute("SELECT id FROM sessions WHERE session_key=? AND end_reason IS NULL"
-                              " ORDER BY started_at DESC", (session_key,)).fetchall()
-            return [str(row[0]) for row in rows]
-    except sqlite3.Error:
+        from persistence_assembly import open_persistence_reader, profile_scope
+        with open_persistence_reader(profile_scope().profile_dir) as store:
+            return [str(entry.session.session_id)
+                    for entry in store.sessions.list_gateway_sessions(active_only=True)
+                    if entry.session.session_key == session_key]
+    except Exception as exc:  # any Hermes failure must not raise into Hermes
+        if _SESSION_LISTING not in _warned:
+            _warned.add(_SESSION_LISTING)
+            _LOG.warning("terminal outcome notification: Hermes %s failed (%s: %s); agent_loop_stopped "
+                         "stop evidence is recorded only by session key", _SESSION_LISTING, type(exc).__name__, exc)
         return []
 
 
@@ -94,7 +95,7 @@ def _pre_llm_call(**kwargs: Any) -> None:
     if session_id:
         # pre_llm_call supplies platform, never session_key: the surface lane is NOT captured
         # here (a platform value would match every session on that surface). session-key-level
-        # identity is resolved durably from state.db at agent_loop_stopped/reset time instead.
+        # identity is resolved through the Hermes storage interface at agent_loop_stopped instead.
         _store().touch(session_id, None, str(kwargs.get("parent_session_id") or "") or None)
 
 
@@ -115,14 +116,15 @@ def _on_session_end(**kwargs: Any) -> None:
 def _on_session_reset(**kwargs: Any) -> None:
     new_session_id = str(kwargs.get("new_session_id") or kwargs.get("session_id") or "")
     if new_session_id:
-        _store().reset(new_session_id, str(kwargs.get("old_session_id") or "") or None,
-                       str(kwargs.get("session_key") or "") or None)
+        # The hook does not document session_key (hooks.md), so no lane is passed; the gateway
+        # passes old_session_id, which Store.reset uses first.
+        _store().reset(new_session_id, str(kwargs.get("old_session_id") or "") or None)
 
 
 def _agent_loop_stopped(**kwargs: Any) -> None:
-    # Gateway/TUI supply session_key only. Resolve it to live session ids through Hermes's own
-    # durable routing table (state.db sessions.session_key) — evidence, not guessing — and
-    # stamp stop evidence so recovery classifies the turn `interrupted`, not `unknown`.
+    # Gateway/TUI supply session_key only. Resolve it to live session ids through the Hermes
+    # storage interface and stamp stop evidence so recovery classifies the turn `interrupted`,
+    # not `unknown`.
     session_key = str(kwargs.get("session_key") or "")
     reason = str(kwargs.get("reason") or "interrupted")
     store = _store()

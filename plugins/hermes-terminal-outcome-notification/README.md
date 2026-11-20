@@ -10,10 +10,13 @@ pointer to the tool — it never guesses a session. `campaign_terminal` records 
 candidate-only. `pre_llm_call` refreshes activity and follows durable `parent_session_id`
 continuation lineage across compression rotations (it supplies `platform`, never `session_key`,
 so the lane column stays reserved for real session-key identity). `agent_loop_stopped` supplies
-only `session_key`; the plugin resolves it to live session ids through Hermes's own durable
-routing table (`state.db` `sessions.session_key`, inherited across compression forks — read-only,
-override with `HERMES_TERMINAL_STATE_DB`), so interrupted gateway turns recover as `interrupted`
-from evidence, and every resolution failure fails closed to `unknown`.
+only `session_key`; the plugin resolves it to live session ids through the documented Hermes
+storage interface (`persistence_assembly.open_persistence_reader(profile_scope().profile_dir)` and
+`store.sessions.list_gateway_sessions(active_only=True)`, keeping the entries whose
+`session.session_key` equals the hook value; read-only), so interrupted gateway turns recover as
+`interrupted` from evidence. When that interface is absent or the read fails, the plugin writes one
+WARNING log record per process and the turn recovers as `unknown`. `on_session_reset` reads only
+the documented fields `new_session_id`, `session_id` and `old_session_id`.
 
 `watch_terminal_task` (tool or `/watch-terminal-task TASK_ID [title]`) explicitly watches one root
 or finalizer card. Re-arming a direct turn always mints a fresh campaign (generation increments),
@@ -50,8 +53,10 @@ stale pending-event cancellation. A verdict whose `campaign_generation` is older
 durable identity is stale and alerts as a human block.
 
 Producers and the LaunchAgent must use the same absolute `HERMES_TERMINAL_OUTBOX` path. The worker
-also needs `HERMES_KANBAN_DB` (or `--kanban-db`) to recheck human-relevant block finality. Its
-SQLite file is mode 0600 and parent directory mode 0700.
+also needs `HERMES_KANBAN_DB` (or `--kanban-db`) to recheck human-relevant block finality: it runs
+`hermes kanban show <id> --json` with that variable set and treats an absent board file, a failed
+command or output without the documented fields as an unreadable board. The outbox SQLite file is
+mode 0600 and parent directory mode 0700.
 
 Run manually only after approved deployment:
 

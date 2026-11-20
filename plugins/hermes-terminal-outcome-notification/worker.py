@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import sqlite3
 import subprocess
@@ -132,23 +133,36 @@ def send_macos(title: str, body: str) -> None:
 
 
 def kanban_state(task_id: str) -> dict | None:
-    """Durable board state for the finality recheck. Returns None only when the board is
-    unreadable (retry). A missing task row is reported as {"status": "missing"} — the task is
-    gone, so no durable human-block evidence exists and delivery must fail closed."""
+    """Board state for the finality recheck, read with `hermes kanban show <id> --json` on the
+    board that HERMES_KANBAN_DB names. Returns None when the board is unreadable (retry). A task
+    that Hermes reports as absent is {"status": "missing"}: no human-block evidence exists, so
+    delivery must not send. The block kind and recurrence count come from the newest `blocked`
+    or `block_loop_detected` event (kanban.md, "Event reference"); the current run is the run
+    without `ended_at`."""
     db_path = os.environ.get("HERMES_KANBAN_DB")
-    if not db_path:
+    # Hermes creates an empty board at a path that does not exist, which would report every
+    # task as missing and cancel its alert; an absent board file is unreadable (retry) instead.
+    if not db_path or not Path(db_path).is_file():
         return None
     try:
-        with sqlite3.connect(db_path) as kanban:
-            row = kanban.execute("""SELECT t.status, t.block_kind, t.block_recurrences, t.current_run_id, t.last_failure_error,
-                                           (SELECT MAX(id) FROM task_runs r WHERE r.task_id = t.id)
-                                    FROM tasks t WHERE t.id=?""", (task_id,)).fetchone()
-            if row is None:
-                return {"status": "missing"}
-            status, kind, recurrences, current_run, last_error, max_run = row
-            return {"status": status, "block_kind": kind, "block_recurrences": recurrences,
-                    "current_run_id": current_run, "max_run_id": max_run, "reason": last_error}
-    except sqlite3.Error:
+        result = subprocess.run(["hermes", "kanban", "show", task_id, "--json"],
+                                capture_output=True, text=True, timeout=30)
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    if result.returncode != 0:
+        # Hermes v0.23.3 prints exactly this for an absent task; any other failure is retried.
+        return {"status": "missing"} if result.stderr.strip() == f"no such task: {task_id}" else None
+    try:
+        shown = json.loads(result.stdout)
+        task, events, runs = shown["task"], shown["events"], shown["runs"]
+        block = next((event["payload"] or {} for event in reversed(events)
+                      if event["kind"] in ("blocked", "block_loop_detected")), {})
+        return {"status": task["status"], "block_kind": block.get("kind"),
+                "block_recurrences": block.get("recurrences"),
+                "current_run_id": next((run["id"] for run in reversed(runs) if run["ended_at"] is None), None),
+                "max_run_id": max((run["id"] for run in runs), default=None),
+                "reason": task.get("last_failure_error")}
+    except (ValueError, KeyError, TypeError, AttributeError):
         return None
 
 

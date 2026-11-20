@@ -6,7 +6,6 @@ import json
 import os
 import plistlib
 import shlex
-import sqlite3
 import stat
 import subprocess
 import sys
@@ -788,30 +787,57 @@ def test_macos_adapter_script_compiles():
         assert out.exists()
 
 
-def test_kanban_state_reader_resolves_runs():
+def _show(status, events, runs, last_failure_error=None):
+    # The shape of `hermes kanban show <id> --json` (Hermes v0.23.3, hermes_cli/kanban.py _cmd_show).
+    return {"task": {"id": "t", "status": status, "last_failure_error": last_failure_error},
+            "events": [{"kind": kind, "payload": payload, "run_id": run, "created_at": 0} for kind, payload, run in events],
+            "runs": [{"id": run_id, "ended_at": ended} for run_id, ended in runs], "comments": [], "parents": [], "children": []}
+
+
+def test_kanban_state_reader_uses_hermes_kanban_show_json():
     tmp = tempfile.TemporaryDirectory()
-    board = Path(tmp.name) / "kanban.db"
-    with sqlite3.connect(board) as db:
-        db.execute("CREATE TABLE tasks (id TEXT PRIMARY KEY, status TEXT, block_kind TEXT, block_recurrences INTEGER, current_run_id INTEGER, last_failure_error TEXT)")
-        db.execute("CREATE TABLE task_runs (id INTEGER PRIMARY KEY, task_id TEXT, status TEXT)")
-        db.execute("INSERT INTO tasks VALUES('t1','blocked','needs_input',0,5,NULL)")
-        db.execute("INSERT INTO task_runs VALUES(5,'t1','blocked')")
-    old = os.environ.get("HERMES_KANBAN_DB")
+    directory = Path(tmp.name)
+    board = directory / "kanban.db"
+    board.write_bytes(b"")  # the fake `hermes` never opens it; kanban_state only checks that it exists
+    (directory / "t1.json").write_text(json.dumps(_show("blocked", [
+        ("blocked", {"reason": "flaky", "kind": "transient", "recurrences": 1}, 4),
+        ("unblocked", None, None),
+        ("blocked", {"reason": "approval", "kind": "needs_input", "recurrences": 1}, 5)], [(4, 10), (5, None)])))
+    (directory / "t2.json").write_text(json.dumps(_show("triage", [
+        ("block_loop_detected", {"reason": "again", "kind": "transient", "recurrences": 2, "limit": 2}, 7)],
+        [(6, 1), (7, 2)], "exhausted")))
+    (directory / "bad.json").write_text("not json")
+    fake = directory / "hermes"
+    fake.write_text('#!/bin/sh\nprintf "%s|%s\\n" "$*" "$HERMES_KANBAN_DB" >> "$(dirname "$0")/calls.txt"\n'
+                    'if [ -f "$(dirname "$0")/$3.json" ]; then cat "$(dirname "$0")/$3.json"; exit 0; fi\n'
+                    'if [ "$3" = broken ]; then echo "database is locked" >&2; exit 1; fi\n'
+                    'echo "no such task: $3" >&2; exit 1\n')
+    fake.chmod(0o755)
+    old = {var: os.environ.get(var) for var in ("HERMES_KANBAN_DB", "PATH")}
     os.environ["HERMES_KANBAN_DB"] = str(board)
+    os.environ["PATH"] = f"{directory}:{old['PATH'] or '/usr/bin:/bin'}"
     try:
-        state = kanban_state("t1")
-        assert state["status"] == "blocked" and state["block_kind"] == "needs_input"
-        assert state["current_run_id"] == 5 and state["max_run_id"] == 5
-        assert kanban_state("missing") is not None  # conservative, not unavailable
-        board.unlink()  # now unreadable
-        board2 = Path(tmp.name) / "kanban.db"
-        os.environ["HERMES_KANBAN_DB"] = str(board2 / "sub" / "deep.db")  # connect fails
-        assert kanban_state("t1") is None  # unavailable -> retain
+        assert kanban_state("t1") == {"status": "blocked", "block_kind": "needs_input", "block_recurrences": 1,
+                                      "current_run_id": 5, "max_run_id": 5, "reason": None}  # newest block event
+        assert kanban_state("t2") == {"status": "triage", "block_kind": "transient", "block_recurrences": 2,
+                                      "current_run_id": None, "max_run_id": 7, "reason": "exhausted"}
+        assert kanban_state("t-gone") == {"status": "missing"}  # Hermes reports the task absent
+        assert kanban_state("broken") is None  # any other command failure -> retain
+        assert kanban_state("bad") is None  # output that is not the documented JSON -> retain
+        calls = (directory / "calls.txt").read_text().splitlines()
+        assert calls[0] == f"kanban show t1 --json|{board}", calls
+        os.environ["HERMES_KANBAN_DB"] = str(directory / "sub" / "deep.db")  # board file absent
+        assert kanban_state("t1") is None and not (directory / "sub").exists()  # retain; Hermes never runs
+        os.environ.pop("HERMES_KANBAN_DB")
+        assert kanban_state("t1") is None
+        os.environ["HERMES_KANBAN_DB"], os.environ["PATH"] = str(board), str(directory / "empty")  # no hermes
+        assert kanban_state("t1") is None
     finally:
-        if old is None:
-            os.environ.pop("HERMES_KANBAN_DB", None)
-        else:
-            os.environ["HERMES_KANBAN_DB"] = old
+        for var, value in old.items():
+            if value is None:
+                os.environ.pop(var, None)
+            else:
+                os.environ[var] = value
         tmp.cleanup()
 
 
@@ -892,16 +918,14 @@ def test_agent_loop_stopped_real_payloads_recover_interrupted():
     sys.modules["notification_plugin_r2"] = module
     tmp = tempfile.TemporaryDirectory()
     outbox = str(Path(tmp.name) / "shared.sqlite3")
-    state_db = Path(tmp.name) / "state.db"
-    with sqlite3.connect(state_db) as db:  # Hermes's durable routing table
-        db.execute("CREATE TABLE sessions (id TEXT PRIMARY KEY, session_key TEXT, started_at REAL, ended_at REAL, end_reason TEXT)")
-        db.execute("INSERT INTO sessions VALUES('opaque-gw-7','ns:telegram:dm:111',1,NULL,NULL)")
-        db.execute("INSERT INTO sessions VALUES('opaque-gw-8','ns:telegram:dm:222',2,NULL,NULL)")  # unrelated
-        db.execute("INSERT INTO sessions VALUES('ended-old','ns:telegram:dm:111',0,1,'compression')")
     old_outbox = os.environ.get("HERMES_TERMINAL_OUTBOX")
-    old_state = os.environ.get("HERMES_TERMINAL_STATE_DB")
     os.environ["HERMES_TERMINAL_OUTBOX"] = outbox
-    os.environ["HERMES_TERMINAL_STATE_DB"] = str(state_db)
+    calls = []
+    # The Hermes storage interface as observed in an isolated home on v0.23.3 (card t_955528ca):
+    # list_gateway_sessions(active_only=True) returns SessionRecencyEntry(session, last_active)
+    # for the newest live row of each session key; an ended row is not listed.
+    sys.modules["persistence_assembly"] = _fake_persistence_assembly(calls, [
+        ("opaque-gw-7", "ns:telegram:dm:111"), ("opaque-gw-8", "ns:telegram:dm:222"), ("no-key", None)])
     try:
         spec.loader.exec_module(module)
         # arm through the real tool entry point (host supplies session_id at dispatch)
@@ -921,18 +945,89 @@ def test_agent_loop_stopped_real_payloads_recover_interrupted():
         w = Worker(module._store(), telegram=lambda b: sent.append(b), macos=lambda t, b: sent.append(t))
         w.drain_once()
         statuses = {r["terminal_status"] for r in module._store().status()}
-        assert "interrupted" in statuses  # resolved through durable state.db evidence
+        assert "interrupted" in statuses  # resolved through the Hermes storage interface
+        assert calls == [("reader", "/fake/profile"), ("list_gateway_sessions", True)]
         unrelated = [r for r in module._store().status() if r["title"] == "Unrelated"]
         assert unrelated and all(r["terminal_status"] == "unknown" for r in unrelated)  # no stop evidence -> fail closed
         assert not any(r["terminal_status"] == "completed" for r in module._store().status())
         assert all("user_stop" in r["short_summary"] for r in module._store().status() if r["terminal_status"] == "interrupted")
     finally:
         sys.modules.pop("notification_plugin_r2", None)
-        for var, old in (("HERMES_TERMINAL_OUTBOX", old_outbox), ("HERMES_TERMINAL_STATE_DB", old_state)):
-            if old is None:
-                os.environ.pop(var, None)
-            else:
-                os.environ[var] = old
+        sys.modules.pop("persistence_assembly", None)
+        if old_outbox is None:
+            os.environ.pop("HERMES_TERMINAL_OUTBOX", None)
+        else:
+            os.environ["HERMES_TERMINAL_OUTBOX"] = old_outbox
+        tmp.cleanup()
+
+
+def _fake_persistence_assembly(calls, sessions):
+    import contextlib
+    import types
+    entries = tuple(types.SimpleNamespace(session=types.SimpleNamespace(session_id=sid, session_key=key), last_active=1.0)
+                    for sid, key in sessions)
+
+    @contextlib.contextmanager
+    def open_persistence_reader(target):
+        calls.append(("reader", str(target)))
+        def list_gateway_sessions(*, active_only=True):
+            calls.append(("list_gateway_sessions", active_only))
+            return entries
+        yield types.SimpleNamespace(sessions=types.SimpleNamespace(list_gateway_sessions=list_gateway_sessions))
+
+    module = types.ModuleType("persistence_assembly")
+    module.open_persistence_reader = open_persistence_reader
+    module.profile_scope = lambda: types.SimpleNamespace(profile_dir=Path("/fake/profile"))
+    return module
+
+
+def _load_plugin(name):
+    spec = importlib.util.spec_from_file_location(name, PLUGIN / "__init__.py", submodule_search_locations=[str(PLUGIN)])
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_session_listing_failure_returns_no_ids_and_warns_once_per_process():
+    import logging
+    module = _load_plugin("notification_plugin_warn")
+    records = []
+    handler = logging.Handler()
+    handler.emit = records.append
+    logging.getLogger(module.__name__).addHandler(handler)
+    sys.modules["persistence_assembly"] = None  # import fails, as when Hermes removes the module
+    try:
+        assert module._session_ids_for_key("ns:telegram:dm:111") == []
+        assert module._session_ids_for_key("ns:telegram:dm:222") == []
+        assert [r.levelno for r in records] == [logging.WARNING]
+        assert "list_gateway_sessions" in records[0].getMessage()
+        assert module._session_ids_for_key("") == [] and len(records) == 1
+    finally:
+        sys.modules.pop("persistence_assembly", None)
+        sys.modules.pop("notification_plugin_warn", None)
+        logging.getLogger(module.__name__).removeHandler(handler)
+
+
+def test_on_session_reset_ignores_undocumented_session_key():
+    tmp = tempfile.TemporaryDirectory()
+    old = os.environ.get("HERMES_TERMINAL_OUTBOX")
+    os.environ["HERMES_TERMINAL_OUTBOX"] = str(Path(tmp.name) / "shared.sqlite3")
+    try:
+        module = _load_plugin("notification_plugin_reset")
+        store = module._store()
+        store.arm_direct("old", "Old", lane="lane-a")
+        store.stopped("lane-a", "stopped", by_lane=True)
+        module._on_session_reset(new_session_id="new", session_key="lane-a")  # no lane is read
+        assert store.proposal("old", "completed", "x")  # still armed: no predecessor proven
+        module._on_session_reset(new_session_id="new2", old_session_id="old")
+        assert not store.proposal("old", "completed", "x")
+    finally:
+        sys.modules.pop("notification_plugin_reset", None)
+        if old is None:
+            os.environ.pop("HERMES_TERMINAL_OUTBOX", None)
+        else:
+            os.environ["HERMES_TERMINAL_OUTBOX"] = old
         tmp.cleanup()
 
 
