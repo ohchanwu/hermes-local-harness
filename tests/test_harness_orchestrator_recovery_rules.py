@@ -34,7 +34,7 @@ class HarnessOrchestratorRecoveryRules(unittest.TestCase):
         cls.raw = SKILL.read_text()
 
     def test_version(self):
-        self.assertEqual(re.findall(r"(?m)^version: (.+)$", self.raw), ["0.6.7-harness.17"])
+        self.assertEqual(re.findall(r"(?m)^version: (.+)$", self.raw), ["0.6.7-harness.18"])
 
     def test_part1_respawn_guarded_recovery_in_operational_discipline(self):
         section = raw_section(self.raw, "Operational Discipline")

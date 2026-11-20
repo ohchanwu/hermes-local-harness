@@ -29,6 +29,7 @@ from test_jss_fleet_policy import reverse_read_only_exception_edits
 from test_fable_5_2_declared_model import reverse_fable_5_2_edits
 from test_jev_policy_sources import reverse_jev_policy_edits
 from test_ponytail_policy_text import reverse_ponytail_policy_text_edits
+from test_reasoning_effort_skill_text import reverse_reasoning_effort_skill_text_edits
 
 ROOT = Path(__file__).resolve().parents[1]
 RELATIVE = "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md"
@@ -47,11 +48,11 @@ PROFILES = {HARNESS: "harness-orchestrator", JOBCRON: "jobcron-orchestrator", CH
 # policy change raised the Harness, Jobcron and Cha PT versions (t_b722c617) and
 # the jss-genr and anki versions (t_71b4ef4a).
 VERSIONS = {
-    HARNESS: "0.6.7-harness.17",  # raised by t_ac454595, t_46b5e63e, t_f4ce916d, t_c7cc3830, t_e14a6d6a, t_35874d04, t_cf518fd0 and t_18a2dc93
-    JOBCRON: "0.6.9-jobcron.19",  # raised by t_ac454595, t_46b5e63e, t_f4ce916d, t_c7cc3830, t_e14a6d6a, t_d3bb0983, t_35874d04, t_cf518fd0 and t_18a2dc93
-    CHAPT: "0.6.7-chapt.18",  # raised by t_ac454595, t_46b5e63e, t_f4ce916d, t_c7cc3830, t_e14a6d6a, t_d3bb0983, t_35874d04, t_cf518fd0 and t_18a2dc93
-    JSS: "0.6.7-jss.20",  # raised by t_ac454595, t_46b5e63e, t_89838618, t_f4ce916d, t_c7cc3830, t_a8884510, t_e14a6d6a, t_35874d04, t_cf518fd0 and t_18a2dc93
-    ANKI: "0.6.10-anki.14",  # raised by t_ac454595, t_46b5e63e, t_f4ce916d, t_c7cc3830, t_e14a6d6a, t_35874d04, t_cf518fd0 and t_18a2dc93
+    HARNESS: "0.6.7-harness.18",  # raised by t_ac454595, t_46b5e63e, t_f4ce916d, t_c7cc3830, t_e14a6d6a, t_35874d04, t_cf518fd0 and t_18a2dc93
+    JOBCRON: "0.6.9-jobcron.20",  # raised by t_ac454595, t_46b5e63e, t_f4ce916d, t_c7cc3830, t_e14a6d6a, t_d3bb0983, t_35874d04, t_cf518fd0 and t_18a2dc93
+    CHAPT: "0.6.7-chapt.19",  # raised by t_ac454595, t_46b5e63e, t_f4ce916d, t_c7cc3830, t_e14a6d6a, t_d3bb0983, t_35874d04, t_cf518fd0 and t_18a2dc93
+    JSS: "0.6.7-jss.21",  # raised by t_ac454595, t_46b5e63e, t_89838618, t_f4ce916d, t_c7cc3830, t_a8884510, t_e14a6d6a, t_35874d04, t_cf518fd0 and t_18a2dc93
+    ANKI: "0.6.10-anki.15",  # raised by t_ac454595, t_46b5e63e, t_f4ce916d, t_c7cc3830, t_e14a6d6a, t_35874d04, t_cf518fd0 and t_18a2dc93
 }
 
 # Bytes of each file at baseline a391e38a1d20ac14022a20189363931440cf22c9,
@@ -106,6 +107,7 @@ SKILL_CHANGES_EDITS = {
 
 def reverse_skill_changes_edits(relative_path, text):
     """Return text with this card's edits reversed; text may be str or bytes."""
+    text = reverse_reasoning_effort_skill_text_edits(relative_path, text)
     text = reverse_ponytail_policy_text_edits(relative_path, text)
     as_bytes = isinstance(text, bytes)
     if as_bytes:

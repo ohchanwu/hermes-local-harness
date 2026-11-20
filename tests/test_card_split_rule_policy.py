@@ -29,6 +29,7 @@ import unittest
 from glm_route_worker_names_edits import reverse_glm_route_worker_name_edits
 from jss_harness_repository_edits import reverse_harness_repository_edits
 from test_ponytail_policy_text import reverse_ponytail_policy_text_edits
+from test_reasoning_effort_skill_text import reverse_reasoning_effort_skill_text_edits
 
 ROOT = Path(__file__).resolve().parents[1]
 BASELINE = "43f9e2c2d51fd3ce8df11db341ed76e04a832fee"
@@ -39,8 +40,8 @@ VERSIONS = {"harness": "0.6.7-harness.11", "anki": "0.6.10-anki.9", "jss": "0.6.
 # The current skill versions: card t_a8884510 raised the jss version by one more step, card
 # t_e14a6d6a raised each version by one more step, and card t_d3bb0983 raised the chapt and
 # jobcron versions by one more step.
-CURRENT_VERSIONS = {"harness": "0.6.7-harness.17", "anki": "0.6.10-anki.14", "jss": "0.6.7-jss.20",
-                    "chapt": "0.6.7-chapt.18", "jobcron": "0.6.9-jobcron.19"}
+CURRENT_VERSIONS = {"harness": "0.6.7-harness.18", "anki": "0.6.10-anki.15", "jss": "0.6.7-jss.21",
+                    "chapt": "0.6.7-chapt.19", "jobcron": "0.6.9-jobcron.20"}
 
 NEW_RULE = (
     "By default, when the work for a card has several parts that each have their own acceptance check, "
@@ -110,6 +111,7 @@ def reverse_card_split_rule_edits(relative_path, text):
     """Return the bytes of relative_path at BASELINE when text is that file after card
     t_c7cc3830, else text unchanged; text may be str or bytes. The later Harness repository
     change of the read-only repository exception (t_a8884510) is reversed first."""
+    text = reverse_reasoning_effort_skill_text_edits(relative_path, text)
     text = reverse_ponytail_policy_text_edits(relative_path, text)
     text = reverse_harness_repository_edits(relative_path, text)
     want = AFTER_SHA256.get(relative_path)

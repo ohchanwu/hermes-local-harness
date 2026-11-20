@@ -11,6 +11,7 @@ test module can import it without a circular import.
 """
 from test_third_glm_worker_policy import reverse_third_glm_worker_edits
 from test_ponytail_policy_text import reverse_ponytail_policy_text_edits
+from test_reasoning_effort_skill_text import reverse_reasoning_effort_skill_text_edits
 
 _DECISION = (
     "Owner decision, 2026-11-13: downloading a file that the work needs (for example icon SVG files, "
@@ -68,6 +69,7 @@ DOWNLOAD_INSTALL_EDITS = {
 def reverse_download_install_edits(relative_path, text):
     """Return text with the t_89838618 edits reversed; text may be str or bytes. The text of a
     path that is not one of the six changed sources is returned unchanged."""
+    text = reverse_reasoning_effort_skill_text_edits(relative_path, text)
     text = reverse_ponytail_policy_text_edits(relative_path, text)
     if relative_path in DOWNLOAD_INSTALL_EDITS:
         text = reverse_third_glm_worker_edits(relative_path, text)

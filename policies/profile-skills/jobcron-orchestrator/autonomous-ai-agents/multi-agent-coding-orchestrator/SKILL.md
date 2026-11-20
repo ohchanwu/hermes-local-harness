@@ -1,7 +1,7 @@
 ---
 name: multi-agent-coding-orchestrator
 description: "Use when orchestrating multi-agent coding with Hermes."
-version: 0.6.9-jobcron.19
+version: 0.6.9-jobcron.20
 author: chanbla11mit, Hermes Agent
 license: MIT
 platforms: [macos]
@@ -236,6 +236,8 @@ Protected instruction files (AGENTS.md, CLAUDE.md, SOUL.md, .cursorrules, projec
 Never claim a card and `kanban_block` it as a setup hold. The worker's first action verifies `$HERMES_KANBAN_TASK`, worktree path, branch, and baseline, and it blocks only on a real mismatch.
 
 At creation Hermes records `workspace_path` as the repository root; the dispatcher's claim materializes the repository-owned worktree under `/Users/chanbla11mit/projects/jobcron`. A root value before claim is expected, not a mismatch; rely on the worker's start check.
+
+A card may contain one optional full line `Reasoning effort EXACT <level>.`, where `<level>` is one of `low`, `medium`, `high`, `xhigh` and `max`. Without the line, the worker runs at the reasoning effort of its profile; write the line only when the card needs a different level than the profile level of the assigned worker. The `jev` plugin of the worker applies the level to each model request of implementation workers only; reviewers and orchestrators keep their own level. For GLM, `xhigh` is sent as `max`. A Claude worker keeps the level of its first request for the whole run, so a changed line applies from the next run; change the body with `hermes kanban --board jobcron edit <task id> --body=<body>`. When the `kanban_create` result contains a `jev` notice about the line (JSON key `jev_note`), correct the line before you unblock the card. The full design, its Hermes dependencies and the fallback are in `/Users/chanbla11mit/hermes-local-harness/docs/decisions/261120-per-card-reasoning-effort.md`.
 
 ## Task Construction
 

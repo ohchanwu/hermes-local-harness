@@ -27,6 +27,7 @@ from test_orchestrator_skill_changes_policy import reverse_skill_changes_edits
 from test_repair_history_candidate_rules_policy import reverse_candidate_rule_edits
 from test_repair_history_format_policy import reverse_repair_format_edits
 from test_ponytail_policy_text import reverse_ponytail_policy_text_edits
+from test_reasoning_effort_skill_text import reverse_reasoning_effort_skill_text_edits
 
 ROOT = Path(__file__).resolve().parents[1]
 RELATIVE = "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md"
@@ -139,6 +140,7 @@ TERMINOLOGY_EDITS = {
 
 def reverse_terminology_edits(relative_path, text):
     """Return text with this card's edits reversed; text may be str or bytes."""
+    text = reverse_reasoning_effort_skill_text_edits(relative_path, text)
     text = reverse_ponytail_policy_text_edits(relative_path, text)
     as_bytes = isinstance(text, bytes)
     for new, old in TERMINOLOGY_EDITS[relative_path]:

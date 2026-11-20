@@ -45,6 +45,7 @@ from zoneinfo import ZoneInfo
 
 from glm_route_worker_names_edits import reverse_glm_route_worker_name_edits
 from test_ponytail_policy_text import reverse_ponytail_policy_text_edits
+from test_reasoning_effort_skill_text import reverse_reasoning_effort_skill_text_edits
 
 ROOT = Path(__file__).resolve().parents[1]
 BASELINE = "e7d7583f02e669a4bf79896c1e169ebb31d6b77f"
@@ -105,6 +106,7 @@ def reverse_easy_medium_split_edits(relative_path, text):
     object, so a caller may apply it to a text that another caller already reversed. A text that
     contains some of the new texts but not each of them exactly once raises AssertionError. The
     later edits of card t_18a2dc93 are reversed first."""
+    text = reverse_reasoning_effort_skill_text_edits(relative_path, text)
     text = reverse_ponytail_policy_text_edits(relative_path, text)
     text = reverse_glm_route_worker_name_edits(relative_path, text)
     edits = EASY_MEDIUM_SPLIT_EDITS.get(relative_path)

@@ -37,6 +37,7 @@ from hard_route_policy_edits import reverse_hard_route_policy_edits
 from test_card_split_rule_policy import reverse_card_split_rule_edits
 from test_glm_claude_fallback import reverse_glm_claude_fallback_edits
 from test_ponytail_policy_text import reverse_ponytail_policy_text_edits
+from test_reasoning_effort_skill_text import reverse_reasoning_effort_skill_text_edits
 
 ROOT = Path(__file__).resolve().parents[1]
 BASELINE = "aec198aad4abba35209eaf95f715c2622105d471"
@@ -59,8 +60,8 @@ VERSIONS = {"harness": ("0.6.7-harness.9", "0.6.7-harness.10"), "chapt": ("0.6.7
 # The current skill versions: card t_c7cc3830 raised each last number by one more step, card
 # t_a8884510 raised the jss version by one more step, card t_e14a6d6a raised each version by one
 # more step, and card t_d3bb0983 raised the chapt and jobcron versions by one more step.
-CURRENT_VERSIONS = {"harness": "0.6.7-harness.17", "chapt": "0.6.7-chapt.18",
-                    "jobcron": "0.6.9-jobcron.19", "jss": "0.6.7-jss.20", "anki": "0.6.10-anki.14"}
+CURRENT_VERSIONS = {"harness": "0.6.7-harness.18", "chapt": "0.6.7-chapt.19",
+                    "jobcron": "0.6.9-jobcron.20", "jss": "0.6.7-jss.21", "anki": "0.6.10-anki.15"}
 
 
 def soul(profile):
@@ -145,6 +146,7 @@ def reverse_third_glm_worker_edits(relative_path, text):
     """Return text with the t_f4ce916d edits reversed; text may be str or bytes. A path that
     the card did not change, and a text that contains none of the new texts, is returned as
     the same object. The later card split rule change (t_c7cc3830) is reversed first."""
+    text = reverse_reasoning_effort_skill_text_edits(relative_path, text)
     text = reverse_ponytail_policy_text_edits(relative_path, text)
     text = reverse_card_split_rule_edits(relative_path, text)
     edits = THIRD_GLM_WORKER_EDITS.get(relative_path)
