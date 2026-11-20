@@ -1,8 +1,21 @@
 # Telegram DM text with formatting entities reported dropped after admission
 
 - Report date: 2026-10-18 (KST). Card `t_6f475561` (diagnosis and test only; the fix goes in a follow-up card).
-- Status: **root cause not established.** The reported drop does not reproduce in the installed adapter for a well-formed `message.text` update. One silent receipt-without-delivery path is proven, and an expected-failure test covers it.
+- Status: **resolved on 2026-11-20 by the installed Hermes v0.23.3** (see "Resolution (2026-11-20)" below). The original status was: root cause not established; the reported drop does not reproduce for a well-formed `message.text` update, and one silent receipt-without-delivery path is proven.
 - Severity: silent loss of user input. The update is acknowledged and receipted, but no turn runs and nothing is logged.
+
+## Resolution (2026-11-20)
+
+Card `t_38e0db27`. The installed Hermes is v0.23.3, commit `caafe5389ae585ef77387a962aee05b1bcf17029`. It contains the upstream fixes for both parts of this record:
+
+- Text-less rich messages: upstream commits `ceeeec8374fd` ("messages that arrive as rich_message blocks reach the agent") and `b3daabee04ca` ("group triggers read text that arrives as rich_message blocks"), issue #63485. A message with an empty `text` and its content in `rich_message.blocks` now matches a core handler (`rich_message_filter` and `rich_message_text` in `plugins/platforms/telegram/telegram_entities.py`) and is delivered with the flattened text.
+- Silent receipt of an unserved update: upstream commit `4a2b984fd2ed` ("an observer's return does not receipt an unserved update", "Fixes #141570"), which changes `plugins/platforms/telegram/update_admission.py`. The later upstream commit `edb9736963cf` adds tests to `tests/plugins/test_telegram_update_admission.py`. The pull request number #151077 comes from the controller facts on card `t_38e0db27`; neither commit message contains it. The group-99 observer returning no longer completes a claim. An update that no core handler serves is not receipted and `plugins/platforms/telegram/update_admission.py` logs one INFO line, `[Telegram] Update <id> matched no core handler; not receipted (fields: ...)`, with field names only.
+
+Changes in this repository:
+- `tests/test_telegram_formatted_dm_drop.py` now asserts the v0.23.3 behaviour: a text-less `rich_message` DM from the authorized user is delivered once with its text, and an update that no core handler serves (a `new_chat_title` service message, the shape that upstream's own test uses) is not delivered, not receipted, and logged once without content. The dice message used before is now served by a core handler (`telegram_dice`), so it no longer shows the unserved path.
+- The local patch `docs/bugs/261018-telegram-unserved-update-receipt.patch` and its test `tests/test_telegram_unserved_update_patch.py` are removed, because the upstream fix replaces the patch. The patch no longer applies to v0.23.3 (base blob `d973bb3`). Both files remain in Git history at commit `ae1cbad`.
+
+The sections below are the original diagnosis against v0.21.5+6751.g9cf7960. Their line numbers refer to that version.
 
 ## Environment
 
@@ -76,10 +89,12 @@ Run from the worktree root:
 python3 tests/test_telegram_formatted_dm_drop.py
 ```
 
-Result: `Ran 4 tests ... OK (expected failures=1)`.
+Result on v0.21.5+6751.g9cf7960: `Ran 4 tests ... OK (expected failures=1)`.
 - (a) **Plain control.** Plain 1k/4k DM text is delivered once.
 - (b) **Formatted variants.** Every formatted variant is delivered once, equal to plain. These are plain assertions, not expected failures, because the drop does not reproduce.
 - (c) **Proven path.** The unserved update is receipted with no delivery and no INFO+ log. `test_unserved_update_is_not_silently_receipted` is the `expectedFailure` for the no-silent-loss invariant; it flips to an unexpected success once such an update is logged or no longer receipted.
+
+Result on v0.23.3 after card `t_38e0db27`: `Ran 4 tests ... OK`, no skip and no expected failure. (a) and (b) are unchanged; the tests for (c) are replaced as described in "Resolution (2026-11-20)".
 
 If the installed Hermes cannot be provided in an isolated home, the tests skip with the helper's reason; they never pass.
 
@@ -98,15 +113,15 @@ The installed Hermes source must not be modified locally.
 
 ## Proposed fix
 
-Card `t_a9b14c3c` implements option 2 as an upstream-ready patch. It has not been applied to the installed checkout or filed upstream.
+Card `t_a9b14c3c` implemented option 2 as an upstream-ready patch. It was not applied to the installed checkout or filed upstream. On 2026-11-20 the patch and its test were removed from this repository (they remain in Git history at commit `ae1cbad`), because upstream fixed the same path in v0.23.3; see "Resolution (2026-11-20)".
 
-- Patch: `docs/bugs/261018-telegram-unserved-update-receipt.patch`. It is a `git diff` against upstream `9cf7960f` and touches only `plugins/platforms/telegram/update_admission.py`.
+- Patch (removed): a `git diff` against upstream `9cf7960f` that touched only `plugins/platforms/telegram/update_admission.py`.
 - Behaviour:
   - Only a group-0 (core) callback completes a claim. The group-99 observer returning no longer does.
   - An update that nothing served or failed is therefore not receipted, so a Telegram redelivery is not suppressed.
   - Instead it logs one INFO line: `[Telegram] Update <id> matched no core handler; not receipted (fields: ...)`. The line carries the field names of the update and of its message (for example `message(chat,date,dice,from,message_id), update_id`). It never logs values, text, or chat/user ids.
   - Served updates, commands, callbacks, native plugin handlers and the failed-preparation path are unchanged.
-- Test: `python3 tests/test_telegram_unserved_update_patch.py`. Inside the isolated home it copies the installed telegram package, applies the patch to the copy with `git apply`, and runs the same real-PTB dispatch against it. The test checks three things:
+- Test (removed): inside the isolated home it copies the installed telegram package, applies the patch to the copy with `git apply`, and runs the same real-PTB dispatch against it. The test checks three things:
   - the unserved update is not receipted and logs exactly one names-only line;
   - plain and formatted DM text are each delivered once with one receipt;
   - the dispatch imported the patched copy.
