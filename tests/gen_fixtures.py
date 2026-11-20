@@ -41,6 +41,11 @@ PONY_INSTALL_METADATA = {"pinned": False, "revision": "7801d061243d7b753bad0e0b3
 # check_plugins compares only the leading `enabled` status.
 JEV = "jev"
 ENABLED_JEV = f"enabled      user     0.1.0    {JEV}"
+# Observed `plugins list --plain --no-bundled` line of the user model-provider plugin
+# claude-subscription in Hermes v0.23.3 (harness-worker, 2026-11-20). It is expected on every
+# profile whose model.provider or fallback_providers names it (configured_providers).
+CLAUDE_SUBSCRIPTION = "claude-subscription"
+ENABLED_CLAUDE_SUBSCRIPTION = f"enabled      user     0.1.0    {CLAUDE_SUBSCRIPTION}"
 
 
 def write(name, data):
@@ -74,6 +79,8 @@ def base_plugins():
             plugins[name][PONYTAIL] = DISABLED_PONY
         if JEV in roster_profiles[name].get("required_plugins", []):
             plugins[name][JEV] = ENABLED_JEV
+        if CLAUDE_SUBSCRIPTION in verifier_namespace["configured_providers"](roster_profiles[name]):
+            plugins[name][CLAUDE_SUBSCRIPTION] = ENABLED_CLAUDE_SUBSCRIPTION
     return plugins
 
 
@@ -208,7 +215,7 @@ clean["jev_peak_hold_agent"] = copy.deepcopy(desired["jev_peak_hold_agent"])
 GLM_REVIEWER_SKILL_INSTALLED = True
 clean["glm_reviewer_skills"] = {profile: GLM_REVIEWER_SKILL_INSTALLED
                                 for profile in roster["glm_reviewer_profile_settings"]["profiles"]}
-# Excerpts of the installed Hermes source (commit 9cf7960f) that the per-card reasoning
+# Excerpts of the installed Hermes source (v0.23.3, commit caafe538) that the per-card reasoning
 # effort of plugins/jev depends on (card t_caf5dba0); verify-state parses them with ast.
 HERMES_REASONING_EFFORT_SOURCES = {
     "hermes_cli/middleware.py": 'LLM_REQUEST_MIDDLEWARE = "llm_request"\n',
@@ -216,9 +223,11 @@ HERMES_REASONING_EFFORT_SOURCES = {
         "_llm_request_mw = apply_llm_request_middleware(\n"
         "    api_kwargs, task_id=effective_task_id, model=agent.model, provider=agent.provider,\n"
         ")\n"),
-    "hermes_cli/kanban_db_dispatch.py": (
-        'env["HERMES_KANBAN_TASK"] = task.id\n'
-        'env["HERMES_KANBAN_BOARD"] = _kb._normalize_board_slug(board) or _kb.get_current_board()\n'),
+    "gateway/session_kanban.py": (
+        "def bind_worker_context(frame):\n"
+        "    import os\n"
+        "    env = {'HERMES_KANBAN_TASK': context['task_id'], 'HERMES_KANBAN_BOARD': context['board']}\n"
+        "    os.environ.update(env)\n"),
     "plugins/model-providers/zai/__init__.py": (
         "if is_5_2:\n"
         "    effort = _glm_5_2_reasoning_effort(reasoning_config, model=model)\n"
@@ -312,7 +321,11 @@ write("hermes-llm-request-middleware-drift.yaml",
 write("hermes-turn-request-middleware-drift.yaml", hermes_source(
     "agent/turn_api_request.py", "_llm_request_mw = apply_llm_request_middleware(api_kwargs, model=agent.model)\n"))
 write("hermes-dispatch-kanban-environment-drift.yaml", hermes_source(
-    "hermes_cli/kanban_db_dispatch.py", 'env["HERMES_KANBAN_TASK"] = task.id\n'))
+    "gateway/session_kanban.py",
+    "def bind_worker_context(frame):\n"
+    "    import os\n"
+    "    env = {'HERMES_KANBAN_TASK': context['task_id']}\n"
+    "    os.environ.update(env)\n"))
 write("hermes-zai-reasoning-effort-drift.yaml", hermes_source(
     "plugins/model-providers/zai/__init__.py", 'extra_body["reasoning_effort"] = effort\n'))
 write("hermes-kanban-tool-reasoning-effort.yaml", hermes_source(
@@ -392,6 +405,15 @@ def rogue(d):
 
 
 write("unexpected-plugin.yaml", delta(rogue))
+
+
+def unused_provider_plugin(d):
+    # claude-subscription is enabled on a retired profile whose model.provider and
+    # fallback_providers do not name it, so it stays an unexpected plugin there.
+    d["plugins"]["worker-flash-1"][CLAUDE_SUBSCRIPTION] = ENABLED_CLAUDE_SUBSCRIPTION
+
+
+write("unused-provider-plugin.yaml", delta(unused_provider_plugin))
 
 
 def missing_required(d):

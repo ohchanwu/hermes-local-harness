@@ -180,6 +180,9 @@ check("--fixture", str(FIXTURES / "active-extra.yaml"), code=1, text="behavior-c
 check("--fixture", str(FIXTURES / "dormant-extra.yaml"), text="WARN: dormant")
 # enabled unexpected plugin on a roster profile fails
 check("--fixture", str(FIXTURES / "unexpected-plugin.yaml"), code=1, text="behavior-changing unexpected plugin")
+# an enabled model-provider plugin is expected only where model.provider or fallback_providers names it
+check("--fixture", str(FIXTURES / "unused-provider-plugin.yaml"), code=1,
+      text="behavior-changing unexpected plugin worker-flash-1: claude-subscription")
 # disabled required plugin fails
 check("--fixture", str(FIXTURES / "missing-plugin.yaml"), code=1, text="plugin drift")
 # Hermes behaviour that the per-card reasoning effort of plugins/jev depends on (card
@@ -193,8 +196,8 @@ for fixture, behaviour in (
          "agent/turn_api_request.py no longer calls apply_llm_request_middleware with the keyword arguments "
          "provider= and model="),
         ("hermes-dispatch-kanban-environment-drift.yaml",
-         "hermes_cli/kanban_db_dispatch.py no longer sets HERMES_KANBAN_TASK and HERMES_KANBAN_BOARD "
-         "in the worker environment"),
+         "gateway/session_kanban.py no longer sets HERMES_KANBAN_TASK and HERMES_KANBAN_BOARD "
+         "in os.environ in bind_worker_context"),
         ("hermes-zai-reasoning-effort-drift.yaml",
          'plugins/model-providers/zai/__init__.py no longer sets top_level["reasoning_effort"]')):
     result = subprocess.run([str(VERIFY), "--fixture", str(FIXTURES / fixture)], text=True, capture_output=True)
@@ -210,7 +213,7 @@ for changed, fail_count, warn_count in (
         ({}, 0, 0),
         ({"hermes_cli/middleware.py": None}, 1, 0),                         # file missing
         ({"agent/turn_api_request.py": "apply_llm_request_middleware(\n"}, 1, 0),  # not Python
-        ({"hermes_cli/kanban_db_dispatch.py": 'env["HERMES_KANBAN_BOARD"] = b\n'}, 1, 0),
+        ({"gateway/session_kanban.py": 'env["HERMES_KANBAN_BOARD"] = b\nos.environ.update(env)\n'}, 1, 0),
         ({"tools/kanban_tools_schemas.py": None, "tools/kanban_tools.py": None}, 0, 0),
         ({"tools/kanban_tools.py": "create_task(reasoning_effort=effort)\n"}, 0, 1)):
     errors, warnings = [], []
