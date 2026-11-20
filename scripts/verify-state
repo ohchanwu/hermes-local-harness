@@ -2215,6 +2215,89 @@ def check_glm_reviewer_skills(errors, observed=_ABSENT_SECTION):
             fail(errors, f"GLM reviewer skill missing {name}: {GLM_REVIEWER_SKILL} is not installed")
 
 
+# Hermes behaviour that the per-card reasoning effort of plugins/jev depends on (card
+# t_caf5dba0). The installed Hermes source is read as text and parsed with ast; Hermes is
+# never imported. Live mode reads the files under snapshot hermes_source.path; fixture
+# mode reads the section 'hermes_reasoning_effort_sources' (relative path -> text, or
+# null for a file that does not exist).
+REASONING_EFFORT_DECISION = "docs/decisions/261120-per-card-reasoning-effort.md"
+HERMES_MIDDLEWARE_SOURCE = "hermes_cli/middleware.py"
+HERMES_TURN_REQUEST_SOURCE = "agent/turn_api_request.py"
+HERMES_DISPATCH_SOURCE = "hermes_cli/kanban_db_dispatch.py"
+HERMES_ZAI_SOURCE = "plugins/model-providers/zai/__init__.py"
+HERMES_KANBAN_TOOL_SOURCES = ("tools/kanban_tools_schemas.py", "tools/kanban_tools.py")
+HERMES_REASONING_EFFORT_SOURCES = (HERMES_MIDDLEWARE_SOURCE, HERMES_TURN_REQUEST_SOURCE, HERMES_DISPATCH_SOURCE,
+                                   HERMES_ZAI_SOURCE, *HERMES_KANBAN_TOOL_SOURCES)
+
+
+def hermes_reasoning_effort_sources(source_root):
+    """Live observation: relative path -> file text, or None when the file cannot be read."""
+    observed = {}
+    for rel in HERMES_REASONING_EFFORT_SOURCES:
+        try:
+            observed[rel] = (Path(source_root) / rel).read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            observed[rel] = None
+    return observed
+
+
+def _subscript_store(tree, key, container=None):
+    """True when the tree assigns to <container>[key] (any container when None)."""
+    return any(isinstance(node, ast.Subscript) and isinstance(node.ctx, ast.Store)
+               and isinstance(node.slice, ast.Constant) and node.slice.value == key
+               and (container is None or (isinstance(node.value, ast.Name) and node.value.id == container))
+               for node in ast.walk(tree))
+
+
+def _module_constant(tree, name, value):
+    return any(isinstance(node, ast.Assign) and isinstance(node.value, ast.Constant) and node.value.value == value
+               and any(isinstance(target, ast.Name) and target.id == name for target in node.targets)
+               for node in tree.body)
+
+
+def _call_with_keywords(tree, function, keywords):
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        called = node.func.id if isinstance(node.func, ast.Name) else getattr(node.func, "attr", None)
+        if called == function and set(keywords) <= {kw.arg for kw in node.keywords}:
+            return True
+    return False
+
+
+def check_hermes_reasoning_effort_sources(errors, warnings, observed=_ABSENT_SECTION):
+    """FAIL when a Hermes behaviour that the per-card reasoning effort relies on no longer
+    holds; WARN when the Kanban tools mention reasoning_effort (a supported per-card option
+    may now exist)."""
+    if not isinstance(observed, dict) or any(rel not in observed for rel in HERMES_REASONING_EFFORT_SOURCES):
+        fail(errors, "incomplete fixture: missing required section 'hermes_reasoning_effort_sources'")
+        return
+    required = (
+        (HERMES_MIDDLEWARE_SOURCE, 'defines LLM_REQUEST_MIDDLEWARE = "llm_request"',
+         lambda tree: _module_constant(tree, "LLM_REQUEST_MIDDLEWARE", "llm_request")),
+        (HERMES_TURN_REQUEST_SOURCE, "calls apply_llm_request_middleware with the keyword arguments provider= and model=",
+         lambda tree: _call_with_keywords(tree, "apply_llm_request_middleware", ("provider", "model"))),
+        (HERMES_DISPATCH_SOURCE, "sets HERMES_KANBAN_TASK and HERMES_KANBAN_BOARD in the worker environment",
+         lambda tree: _subscript_store(tree, "HERMES_KANBAN_TASK") and _subscript_store(tree, "HERMES_KANBAN_BOARD")),
+        (HERMES_ZAI_SOURCE, 'sets top_level["reasoning_effort"]',
+         lambda tree: _subscript_store(tree, "reasoning_effort", "top_level")),
+    )
+    for rel, behaviour, holds in required:
+        text = observed[rel]
+        try:
+            ok = isinstance(text, str) and holds(ast.parse(text))
+        except (SyntaxError, ValueError):
+            ok = False
+        if not ok:
+            fail(errors, f"Hermes behaviour drift: {rel} no longer {behaviour}; the per-card reasoning effort "
+                         f"of plugins/jev depends on it (see {REASONING_EFFORT_DECISION})")
+    for rel in HERMES_KANBAN_TOOL_SOURCES:
+        text = observed[rel]
+        if isinstance(text, str) and "reasoning_effort" in text:
+            warnings.append(f"Hermes {rel} contains reasoning_effort: a supported per-card option now exists "
+                            f"and the design should be reviewed (see {REASONING_EFFORT_DECISION})")
+
+
 def check_live_glm_reviewers(errors, fleets, read):
     """Live checks of the five GLM reviewer profiles: toolsets review (the platform
     toolset list of the board's independent reviewer) and the skill sdlc-review installed
@@ -2611,7 +2694,7 @@ def main():
             return 2
         # Fail-closed fixture schema: a passing fixture must represent every required
         # observed field and every installed roster profile; omission is drift, not success.
-        for section in ("profile_models", "profile_providers", "profile_approval_modes", "plugins", "dispatch_profiles", "kanban", "skill_files", "profile_local_skill_overrides", "profile_soul_hashes", "repository_policy_hashes", "adapters", "terminal_notification_runtime", "terminal_retry_policy", "jev_peak_hold_agent", "glm_reviewer_skills", "ponytail_mode_env", "ponytail_install_metadata", "project_isolation", "project_repair_policy", "project_repair_cards", "profile_managed_settings", "profile_fallback_settings", "profile_auxiliary_settings"):
+        for section in ("profile_models", "profile_providers", "profile_approval_modes", "plugins", "dispatch_profiles", "kanban", "skill_files", "profile_local_skill_overrides", "profile_soul_hashes", "repository_policy_hashes", "adapters", "terminal_notification_runtime", "terminal_retry_policy", "jev_peak_hold_agent", "glm_reviewer_skills", "hermes_reasoning_effort_sources", "ponytail_mode_env", "ponytail_install_metadata", "project_isolation", "project_repair_policy", "project_repair_cards", "profile_managed_settings", "profile_fallback_settings", "profile_auxiliary_settings"):
             if section not in observed:
                 fail(errors, f"incomplete fixture: missing required section '{section}'")
         # None is a live/desired-only sentinel in these helpers, not a fixture
@@ -2672,6 +2755,8 @@ def main():
         check_terminal_retry_policy(errors, roster, observed)
         check_jev_peak_hold_agent(errors, observed.get("jev_peak_hold_agent", _ABSENT_SECTION))
         check_glm_reviewer_skills(errors, observed.get("glm_reviewer_skills", _ABSENT_SECTION))
+        check_hermes_reasoning_effort_sources(errors, warnings,
+                                              observed.get("hermes_reasoning_effort_sources", _ABSENT_SECTION))
         check_ponytail_mode(errors, ponytail_mode_profiles(roster),
                             observed.get("ponytail_mode_env", _ABSENT_SECTION))
         check_ponytail_install_metadata(errors, ponytail_mode_profiles(roster), snapshot["plugins"][PONYTAIL],
@@ -2749,6 +2834,8 @@ def main():
         check_live_terminal_notification_runtime(errors, snapshot["terminal_notification"]["producer_profiles"])
         check_jev_peak_hold_agent(errors, launchctl_observation(run, JEV_PEAK_HOLD_LABEL))
         check_live_glm_reviewers(errors, fleets, json_config)
+        check_hermes_reasoning_effort_sources(
+            errors, warnings, hermes_reasoning_effort_sources(snapshot["hermes_source"]["path"]))
         ponytail_profiles = ponytail_mode_profiles(roster)
         check_ponytail_mode(errors, ponytail_profiles,
                             {name: ponytail_mode_line_present(name) for name in ponytail_profiles})

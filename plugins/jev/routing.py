@@ -33,6 +33,9 @@
    commands can work and only for a card this call creates (see
    ``_creation_hold_blocker``).
 4. It writes one ``decisions`` record for every call.
+5. When the body has a line that starts with ``Reasoning effort`` and cannot be
+   used (``reasoning_effort.create_notice``), it adds the key ``jev_note`` with
+   a notice to the JSON result; the card is created unchanged.
 
 Any exception before ``next_call`` leaves the arguments unchanged.
 
@@ -64,11 +67,12 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence, Tuple
 
 try:  # loaded as the plugin package
-    from . import jev_log, peak_hold
+    from . import jev_log, peak_hold, reasoning_effort
     from .jev_client import JevError
 except ImportError:  # loaded directly by the tests
     import jev_log  # type: ignore[no-redef]
     import peak_hold  # type: ignore[no-redef]
+    import reasoning_effort  # type: ignore[no-redef]
     from jev_client import JevError  # type: ignore[no-redef]
 
 QUESTION_ID = "route"
@@ -514,6 +518,17 @@ def handle_create(args: Mapping[str, Any], next_call: Callable[..., Any], *, con
                 released, release_error = peak_hold.release_card(config, board, task_id, command)
                 error_class = error_class if released else f"{error_class}+{release_error}"
             peak_hold.log_hold(board, task_id, assignee, hold_until, ok, error_class)
+    except Exception:
+        pass
+    # A body line "Reasoning effort ..." that the worker's llm_request middleware
+    # cannot use (reasoning_effort.create_notice): a notice in the result, the card unchanged.
+    try:
+        notice = reasoning_effort.create_notice(args.get("body"), config)
+        parsed = json.loads(result) if notice is not None and isinstance(result, str) else result
+        if notice is not None and isinstance(parsed, dict):
+            with_note = dict(parsed)
+            with_note["jev_note"] = notice
+            result = json.dumps(with_note) if isinstance(result, str) else with_note
     except Exception:
         pass
     return result

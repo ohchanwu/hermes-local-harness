@@ -709,6 +709,8 @@ Without the key the plugin still loads: every routing decision is logged with `e
 | `tool_results.keep_threshold` | `0.6` | Minimum probability for keeping a chunk |
 | `tool_results.max_kept_ratio` | `0.9` | If the kept text is this share of the original or more, the result is unchanged |
 | `auxiliary_log.enabled` | `true` | Auxiliary call log on or off |
+| `reasoning_effort.enabled` | `true` | Reasoning effort from the card line on or off (see "Reasoning effort of one card") |
+| `reasoning_effort.allowed_levels` | `low`, `medium`, `high`, `xhigh`, `max` | Levels allowed in the card line |
 
 ## Routes and their criteria
 
@@ -841,6 +843,15 @@ The `transform_tool_result` hook calls `plugins/jev/tool_filter.py` (written by 
 Every `tool_results` record of a result that Jev answered for has `chunk_probabilities`: the probability of each chunk, as a list of numbers in chunk order (the first number is chunk 1). With these numbers the effect of another `keep_threshold` value can be computed from the log.
 
 Number of questions per request (checked on card `t_df87b851`): TypeSafe sets no limit on the number of questions in one request ("There is no limit on the number of questions in a request. What limits a request is its size", https://docs.typesafe.ai/primitives.md, section "How many questions you can ask"; the OpenAPI schema https://api.typesafe.ai/openapi.json gives `questions` a `minProperties` of 1 and no maximum). The limits are 64k tokens per request and 32k tokens per question, which counts the state and that question (https://docs.typesafe.ai/models.md, `jev-1.14.0`). Therefore no rule enlarges the chunks of a large result. Measured through `plugins/jev/jev_client.py` with synthetic output on 2026-11-13: 5 chunks (2,000 characters) 332 ms, 22 chunks 346 ms, 44 chunks 378 ms, 110 chunks (50,000 characters, 25,632 input tokens) 552 ms, and 300 questions about a 2,000-character state 462 ms; the time grows with the input tokens, not with the number of questions, and stays far below the 5-second timeout. A 100,000-character output was refused with HTTP status 400 with 220 chunks, with 52 chunks of the earlier size and with one question, so the limit is the size of the state, not the number of questions. With text like the synthetic test output (about one token for two characters), an output of more than about 60,000 characters exceeds the 32k tokens per question; Jev then returns HTTP status 400 and the result stays unchanged (`reason` `jev_error`, `error_class` `HTTPError`). `max_chars` (`100000`) is above that size; card `t_df87b851` did not change it.
+
+## Reasoning effort of one card
+
+Decision record: [`docs/decisions/261120-per-card-reasoning-effort.md`](../docs/decisions/261120-per-card-reasoning-effort.md).
+
+- Card line: one full body line `Reasoning effort EXACT <level>.` with one of `low`, `medium`, `high`, `xhigh`, `max` (`reasoning_effort.allowed_levels`). `kanban_create` adds a `jev_note` notice to its result when the body has more than one line that starts with `Reasoning effort`, a level that is not allowed, or a line that starts with `Reasoning effort` and does not have this form; the card is created unchanged.
+- Profiles: only the board's `implementation_workers`, `glm_workers` and `glm_max_workers` in a dispatcher-started session. The `llm_request` middleware of `jev` reads the card once per process with `hermes kanban --board <board> show <task> --json`; for provider `zai` (GLM 5.2 and GLM 5.3) it sets the top-level `reasoning_effort` (`xhigh` becomes `max`; nothing when thinking is disabled), and for provider `claude-subscription` it sets `extra_body["card_reasoning_effort"]`. Reviewers, orchestrators and every other profile are not changed.
+- Joint deployment: the `claude-subscription` provider refuses the key `card_reasoning_effort` until the provider change of card `t_db165633` is installed. Install this `jev` change and that provider change on the profiles at the same time; to turn the card line off, set `reasoning_effort.enabled` to `false` in the installed `config.json` (read on every call).
+- Fallback: when the card cannot be read or the request does not have the expected form, the request is sent unchanged and the worker runs at the reasoning effort of its profile. `reasoning_effort.jsonl` in the log directory gets one record per process and task: `event` `applied` (with `board`, `task_id`, `provider`, `level`), `card_read_failed` or `failed` (with `error_class`). `scripts/verify-state` check `check_hermes_reasoning_effort_sources` reports a Hermes change that breaks this.
 
 ## Logs and report
 

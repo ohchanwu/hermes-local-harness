@@ -20,6 +20,11 @@ Registered callbacks:
   refused with an error result, and ``kanban_block`` blocks the card with the
   hold reason (``glm_review.hold_action``, ``glm_review.handle_hold_block``).
   Every other tool passes through unchanged.
+- ``llm_request`` middleware: the reasoning effort of the card from its body
+  line ``Reasoning effort EXACT <level>.``, applied to each model request of a
+  board worker (``reasoning_effort.llm_request``; decision record
+  docs/decisions/261120-per-card-reasoning-effort.md). ``kanban_create`` adds a
+  notice to its result when the body has an unusable line of this kind.
 - ``transform_tool_result`` hook: calls ``tool_filter.transform`` (imported
   lazily); a missing module or any exception leaves the result unchanged.
 - ``post_auxiliary_call`` hook: one ``auxiliary`` log record per call.
@@ -36,7 +41,7 @@ import os
 from pathlib import Path
 from typing import Any, Dict
 
-from . import glm_review, jev_client, jev_log, routing
+from . import glm_review, jev_client, jev_log, reasoning_effort, routing
 
 CONFIG_PATH = Path(__file__).resolve().parent / "config.json"
 
@@ -179,7 +184,15 @@ def _post_auxiliary_call(**kwargs: Any) -> None:
         pass
 
 
+def _llm_request(**kwargs: Any) -> Any:
+    try:
+        return reasoning_effort.llm_request(config=load_config(), **kwargs)
+    except Exception:
+        return None
+
+
 def register(ctx: Any) -> None:
     ctx.register_middleware("tool_execution", _tool_execution)
+    ctx.register_middleware("llm_request", _llm_request)
     ctx.register_hook("transform_tool_result", _transform_tool_result)
     ctx.register_hook("post_auxiliary_call", _post_auxiliary_call)

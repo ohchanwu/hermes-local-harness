@@ -392,7 +392,8 @@ class PluginFrameTests(unittest.TestCase):
     def test_register_declares_middleware_and_hooks(self):
         ctx = _Ctx()
         self.plugin.register(ctx)
-        self.assertEqual([k for k, _ in ctx.middleware], ["tool_execution"])
+        # Card t_caf5dba0 added the llm_request middleware (per-card reasoning effort).
+        self.assertEqual([k for k, _ in ctx.middleware], ["tool_execution", "llm_request"])
         self.assertEqual(sorted(n for n, _ in ctx.hooks), ["post_auxiliary_call", "transform_tool_result"])
         manifest = (PLUGIN_DIR / "plugin.yaml").read_text(encoding="utf-8")
         self.assertIn("name: jev", manifest)

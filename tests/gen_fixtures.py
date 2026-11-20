@@ -208,6 +208,26 @@ clean["jev_peak_hold_agent"] = copy.deepcopy(desired["jev_peak_hold_agent"])
 GLM_REVIEWER_SKILL_INSTALLED = True
 clean["glm_reviewer_skills"] = {profile: GLM_REVIEWER_SKILL_INSTALLED
                                 for profile in roster["glm_reviewer_profile_settings"]["profiles"]}
+# Excerpts of the installed Hermes source (commit 9cf7960f) that the per-card reasoning
+# effort of plugins/jev depends on (card t_caf5dba0); verify-state parses them with ast.
+HERMES_REASONING_EFFORT_SOURCES = {
+    "hermes_cli/middleware.py": 'LLM_REQUEST_MIDDLEWARE = "llm_request"\n',
+    "agent/turn_api_request.py": (
+        "_llm_request_mw = apply_llm_request_middleware(\n"
+        "    api_kwargs, task_id=effective_task_id, model=agent.model, provider=agent.provider,\n"
+        ")\n"),
+    "hermes_cli/kanban_db_dispatch.py": (
+        'env["HERMES_KANBAN_TASK"] = task.id\n'
+        'env["HERMES_KANBAN_BOARD"] = _kb._normalize_board_slug(board) or _kb.get_current_board()\n'),
+    "plugins/model-providers/zai/__init__.py": (
+        "if is_5_2:\n"
+        "    effort = _glm_5_2_reasoning_effort(reasoning_config, model=model)\n"
+        "    if effort is not None:\n"
+        '        top_level["reasoning_effort"] = effort\n'),
+    "tools/kanban_tools_schemas.py": '"model": {"type": "string"},\n',
+    "tools/kanban_tools.py": "new_tid = kb.create_task(conn, model_override=model_override)\n",
+}
+clean["hermes_reasoning_effort_sources"] = copy.deepcopy(HERMES_REASONING_EFFORT_SOURCES)
 write("clean.yaml", clean)
 
 
@@ -278,6 +298,25 @@ def launch_agent_not_loaded(d):
 
 
 write("launch-agent-not-loaded.yaml", delta(launch_agent_not_loaded))
+
+
+def hermes_source(path, text):
+    """A fixture whose excerpt of one installed Hermes source file is replaced (card t_caf5dba0)."""
+    return delta(lambda d: d["hermes_reasoning_effort_sources"].__setitem__(path, text))
+
+
+# One fixture for each FAIL condition and one for the WARN case of the check of the Hermes
+# behaviour that the per-card reasoning effort depends on.
+write("hermes-llm-request-middleware-drift.yaml",
+      hermes_source("hermes_cli/middleware.py", 'LLM_REQUEST_MIDDLEWARE = "llm_call"\n'))
+write("hermes-turn-request-middleware-drift.yaml", hermes_source(
+    "agent/turn_api_request.py", "_llm_request_mw = apply_llm_request_middleware(api_kwargs, model=agent.model)\n"))
+write("hermes-dispatch-kanban-environment-drift.yaml", hermes_source(
+    "hermes_cli/kanban_db_dispatch.py", 'env["HERMES_KANBAN_TASK"] = task.id\n'))
+write("hermes-zai-reasoning-effort-drift.yaml", hermes_source(
+    "plugins/model-providers/zai/__init__.py", 'extra_body["reasoning_effort"] = effort\n'))
+write("hermes-kanban-tool-reasoning-effort.yaml", hermes_source(
+    "tools/kanban_tools_schemas.py", '"reasoning_effort": {"type": "string"},\n'))
 
 
 def jev_plugin_missing(d):

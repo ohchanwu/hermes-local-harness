@@ -11365,5 +11365,13 @@
       "revision": "7801d061243d7b753bad0e0b3c057cd250b11755",
       "source": "https://github.com/DietrichGebert/ponytail.git"
     }
+  },
+  "hermes_reasoning_effort_sources": {
+    "hermes_cli/middleware.py": "LLM_REQUEST_MIDDLEWARE = \"llm_request\"\n",
+    "agent/turn_api_request.py": "_llm_request_mw = apply_llm_request_middleware(\n    api_kwargs, task_id=effective_task_id, model=agent.model, provider=agent.provider,\n)\n",
+    "hermes_cli/kanban_db_dispatch.py": "env[\"HERMES_KANBAN_TASK\"] = task.id\nenv[\"HERMES_KANBAN_BOARD\"] = _kb._normalize_board_slug(board) or _kb.get_current_board()\n",
+    "plugins/model-providers/zai/__init__.py": "if is_5_2:\n    effort = _glm_5_2_reasoning_effort(reasoning_config, model=model)\n    if effort is not None:\n        top_level[\"reasoning_effort\"] = effort\n",
+    "tools/kanban_tools_schemas.py": "\"model\": {\"type\": \"string\"},\n",
+    "tools/kanban_tools.py": "new_tid = kb.create_task(conn, model_override=model_override)\n"
   }
 }

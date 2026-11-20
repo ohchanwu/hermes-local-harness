@@ -43,7 +43,9 @@ class CurrentStateSentences(unittest.TestCase):
     """The eight documents state claude-opus-5-5 as the current main model."""
 
     def test_readme_states_opus_for_every_role(self):
-        line = README.read_text().splitlines()[6]
+        # Card t_caf5dba0 put a section above this paragraph; the line is found by its start.
+        line = next(text for text in README.read_text().splitlines()
+                    if text.startswith("Every active profile currently runs"))
         self.assertIn("Since 2026-11-15 (owner change; `roster.yaml` follows from card `t_f03857d4`), "
                       "Opus 5.5 serves the orchestrators, the default home, the Advisor, the workers "
                       "and the reviewers", line)
