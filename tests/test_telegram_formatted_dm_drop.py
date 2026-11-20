@@ -11,20 +11,21 @@ What this file proves against the installed adapter (read-only import, real PTB 
     the handler exactly once with text equal to the plain delivery.  The reported drop does
     NOT reproduce in the adapter path for a well-formed ``message.text`` update, so these
     are ordinary regression assertions, not expected failures (see the evidence doc);
-(c) the only silent receipt-without-delivery path found: an admitted update that no core
-    handler serves is still marked completed by the group-99 ``TypeHandler`` observer
-    (update_admission.py:217-226 -> 267-268), so its receipt is written with no batch, no
-    turn and no log line.  ``test_unserved_update_is_not_silently_receipted`` asserts the
-    no-silent-loss invariant and is an ``expectedFailure`` until that path logs or refuses.
+(c) a text-less ``rich_message`` DM from the authorized user (content only in
+    ``rich_message.blocks``) reaches the handler exactly once with its flattened text
+    (fixed upstream in ceeeec8374fd and b3daabee04ca, issue #63485, in v0.23.3);
+(d) an admitted update that no core handler serves (a ``new_chat_title`` service message) is
+    not delivered and not receipted, and it logs exactly one INFO line with its update id and
+    field names only (fixed upstream in 4a2b984fd2ed, issue #141570; upstream tests added in
+    edb9736963cf).
+    Before v0.23.3 the group-99 ``TypeHandler`` observer completed such a claim, so the
+    receipt was written with no batch, no turn and no log line.
 
 Hermetic: temporary HERMES_HOME via tests/hermes_isolated_home.py (never ~/.hermes), the
 committed venv interpreter with ``-I -B`` (no byte-compile into the installed tree), a
 stubbed Bot API request object (only getMe is answered, offline), INET/INET6 sockets
 blocked in the child, no bot token, synthetic text only.  Skips (never passes) when the
 installed Hermes cannot be provided in an isolated home.
-
-``run_probe(iso, patched=...)`` is reused by tests/test_telegram_unserved_update_patch.py to
-run the same dispatch against a patched copy of the telegram package (card t_a9b14c3c).
 """
 
 from __future__ import annotations
@@ -54,9 +55,6 @@ _sm.socket = _NoInet
 import asyncio, json, logging, os, sys
 sys.path.insert(0, {root!r})
 import hermes_bootstrap  # noqa: F401
-if {patched!r}:  # a patched copy of plugins/platforms/telegram shadows the installed one
-    import plugins
-    plugins.__path__.insert(0, {patched!r})
 from unittest.mock import AsyncMock, patch
 from telegram import Update
 from telegram.request import BaseRequest
@@ -141,15 +139,23 @@ async def main(cases):
                 "error": error,
             }})
         await adapter.disconnect()
-    files = {{name: sys.modules[name].__file__ for name in (
-        "plugins.platforms.telegram.adapter", ADMISSION_LOGGER)}}
-    return {{"files": files, "cases": out}}
+    return out
 
 cases = json.loads(sys.argv[1])
 print({marker!r} + json.dumps(asyncio.run(main(cases))))
 '''
 
 PREFIX = "\U0001F600 intro \U0001F680\n"  # two non-BMP emoji before every entity
+
+# Text-less message whose content is only in rich_message blocks (Bot API field kept by PTB in
+# api_kwargs), and the text the installed rich_message_text flattens it to.
+RICH_MESSAGE = {"blocks": [
+    {"type": "paragraph", "text": ["\U0001F600 synthetic ", {"type": "bold", "text": "rich"}, " paragraph"]},
+    {"type": "list", "items": [
+        {"label": "-", "blocks": [{"type": "paragraph", "text": "first item"}]},
+        {"label": "-", "blocks": [{"type": "paragraph", "text": "second item"}]}]}]}
+RICH_TEXT = "\U0001F600 synthetic rich paragraph\n- first item\n- second item"
+UNSERVED_TITLE = "Synthetic title"
 
 
 def _u16(text: str) -> int:
@@ -183,8 +189,9 @@ def _cases() -> list[tuple[str, dict]]:
             if entities:
                 extra["entities"] = entities
             cases.append((f"{kind}{size}", extra))
-    # (c) an admitted message no core handler matches (TEXT, COMMAND, LOCATION, media).
-    cases.append(("unserved", {"dice": {"emoji": "\U0001F3B2", "value": 3}}))
+    cases.append(("rich", {"rich_message": RICH_MESSAGE}))
+    # An admitted message no core handler matches; the same shape as upstream's own test.
+    cases.append(("unserved", {"new_chat_title": UNSERVED_TITLE}))
     return cases
 
 
@@ -192,23 +199,19 @@ _RESULTS: dict[str, dict] | None = None
 _SKIP: str | None = None
 
 
-def run_probe(iso: hih.IsolatedHome, patched: str = "") -> dict:
-    """Run the real-PTB dispatch child in *iso*; *patched* is a plugins root to shadow with.
-
-    Returns ``{"files": {module: path}, "cases": {name: result}}``.
-    """
+def run_probe(iso: hih.IsolatedHome) -> dict:
+    """Run the real-PTB dispatch child in *iso*; returns ``{case name: result}``."""
     import subprocess
     script = iso.home / "telegram_formatted_dm_probe.py"
-    script.write_text(_CHILD.format(root=str(iso.checkout_root), marker=RESULT_MARKER,
-                                    patched=patched), encoding="utf-8")
+    script.write_text(_CHILD.format(root=str(iso.checkout_root), marker=RESULT_MARKER),
+                      encoding="utf-8")
     proc = subprocess.run(iso.child_command(script) + [json.dumps(_cases())], env=iso.env,
                           capture_output=True, text=True, timeout=240, check=False)
     lines = [ln for ln in proc.stdout.splitlines() if ln.startswith(RESULT_MARKER)]
     if proc.returncode != 0 or not lines:
         raise AssertionError(f"probe child failed rc={proc.returncode}\nstdout: {proc.stdout[-3000:]}\n"
                              f"stderr: {proc.stderr[-3000:]}")
-    payload = json.loads(lines[-1][len(RESULT_MARKER):])
-    return {"files": payload["files"], "cases": {r["name"]: r for r in payload["cases"]}}
+    return {r["name"]: r for r in json.loads(lines[-1][len(RESULT_MARKER):])}
 
 
 def _run_child() -> None:
@@ -217,7 +220,7 @@ def _run_child() -> None:
         return
     try:
         with hih.isolated_hermes_home() as iso:
-            _RESULTS = run_probe(iso)["cases"]
+            _RESULTS = run_probe(iso)
     except hih.IsolatedHomeError as exc:
         _SKIP = f"installed Hermes not available in an isolated home: {exc}"
 
@@ -268,28 +271,35 @@ class FormattedDmDelivery(_ProbeCase):
                     self.assertEqual(r["text"], plain["text"])
                     self.assertTrue(r["receipt"])
                     self.assertEqual((r["held"], r["pending"]), (0, 0))
+                    self.assertEqual(r["admission_logs"], [])
 
 
-class SilentReceiptMechanism(_ProbeCase):
-    """(c) the receipt-without-delivery path, demonstrated directly."""
+class TextlessRichMessageDelivery(_ProbeCase):
+    """(c) a text-less ``rich_message`` DM is delivered once with its flattened text."""
 
-    def test_unserved_update_receipted_without_delivery_or_log(self):
-        # Mechanism, current behaviour: no core handler ran, the group-99 observer returned
-        # (no gateway_platform_event hook), admitted_callback set claim.completed
-        # (update_admission.py:226) and _release_claim recorded the receipt (:267-268).
-        r = self.result("unserved")
-        self.assertEqual(r["deliveries"], 0)
+    def test_textless_rich_message_delivered_once_with_its_text(self):
+        r = self.result("rich")
+        self.assertEqual(r["deliveries"], 1)
+        self.assertEqual(r["text"], RICH_TEXT)
         self.assertTrue(r["receipt"])
-        self.assertEqual(r["info_or_higher_logs"], 0)
+        self.assertEqual((r["held"], r["pending"]), (0, 0))
+        self.assertEqual(r["admission_logs"], [])
 
-    @unittest.expectedFailure
-    def test_unserved_update_is_not_silently_receipted(self):
-        # Root-cause mechanism for silent loss: update_admission.py:226 marks the claim
-        # completed after the group-99 TypeHandler observer although no core handler served
-        # the update, so the receipt is written with no batch, turn or log.  Flips to an
-        # unexpected success once such an update is logged (INFO+) or not receipted.
+
+class UnservedUpdateNotReceipted(_ProbeCase):
+    """(d) an update no core handler serves: not delivered, not receipted, logged by names only."""
+
+    def test_unserved_update_not_receipted_and_logged_once_without_content(self):
         r = self.result("unserved")
-        self.assertTrue(r["deliveries"] == 1 or not r["receipt"] or r["info_or_higher_logs"] > 0)
+        update_id = len(_cases())  # the unserved update is the last case
+        self.assertEqual(r["deliveries"], 0)
+        self.assertFalse(r["receipt"], "an unserved update must stay unreceipted")
+        self.assertEqual(r["admission_logs"], [
+            f"[Telegram] Update {update_id} matched no core handler; not receipted "
+            "(fields: message(chat,date,from,message_id,new_chat_title), update_id)"])
+        # No value from the synthetic update appears: chat id, user id, name, title, date, message id.
+        for value in ("42", "88", "Human", UNSERVED_TITLE, "1800000000", str(500 + update_id)):
+            self.assertNotIn(value, r["admission_logs"][0])
 
 
 if __name__ == "__main__":
