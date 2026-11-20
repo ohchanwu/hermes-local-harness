@@ -60,8 +60,8 @@ VERSIONS = {"harness": ("0.6.7-harness.9", "0.6.7-harness.10"), "chapt": ("0.6.7
 # The current skill versions: card t_c7cc3830 raised each last number by one more step, card
 # t_a8884510 raised the jss version by one more step, card t_e14a6d6a raised each version by one
 # more step, and card t_d3bb0983 raised the chapt and jobcron versions by one more step.
-CURRENT_VERSIONS = {"harness": "0.6.7-harness.18", "chapt": "0.6.7-chapt.19",
-                    "jobcron": "0.6.9-jobcron.20", "jss": "0.6.7-jss.21", "anki": "0.6.10-anki.15"}
+CURRENT_VERSIONS = {"harness": "0.6.7-harness.19", "chapt": "0.6.7-chapt.20",
+                    "jobcron": "0.6.9-jobcron.21", "jss": "0.6.7-jss.22", "anki": "0.6.10-anki.16"}
 
 
 def soul(profile):

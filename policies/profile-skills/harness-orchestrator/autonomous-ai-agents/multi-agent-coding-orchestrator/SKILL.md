@@ -1,7 +1,7 @@
 ---
 name: multi-agent-coding-orchestrator
 description: "Use when orchestrating Harness repository work."
-version: 0.6.7-harness.18
+version: 0.6.7-harness.19
 author: chanbla11mit, Hermes Agent
 license: MIT
 platforms: [macos]
@@ -76,7 +76,7 @@ Set up a card without a setup-only hold:
 
 Never claim a card and `kanban_block` it as a setup hold. The worker's first action verifies `$HERMES_KANBAN_TASK`, worktree path, branch, and baseline, and it blocks only on a real mismatch.
 
-Do not plan a stop at which the worker blocks the card to hand it back to harness-orchestrator. Hermes counts every block of a card, including the kind `needs_input`: `BLOCK_RECURRENCE_LIMIT` is 2 (`/Users/chanbla11mit/.hermes/hermes-agent/hermes_cli/kanban_db.py`, line 114), and the function `_route_block` (lines 3397 to 3407 of the same file) moves the card to `triage`, with the event `block_loop_detected`, at the second block of the same kind after an unblock. When a step must wait for harness-orchestrator, split the work into two cards and link them.
+Do not plan a stop at which the worker blocks the card to hand it back to harness-orchestrator. Hermes counts every block of a card, including the kind `needs_input`: `BLOCK_RECURRENCE_LIMIT` is 2 (`/Users/chanbla11mit/.hermes/hermes-agent/hermes_cli/kanban_db.py`, line 115), and the function `_route_block` (lines 3230 to 3240 of the same file) moves the card to `triage`, with the event `block_loop_detected`, at the second block of the same kind after an unblock. When a step must wait for harness-orchestrator, split the work into two cards and link them.
 
 At creation Hermes records `workspace_path` as the repository root; the dispatcher's claim materializes `.worktrees/<ID>` (observed on `t_7d9c0343` events). A root value before claim is expected, not a mismatch; rely on the worker's start check.
 
@@ -237,7 +237,9 @@ Prefer fast-forward; otherwise merge or cherry-pick while preserving the reviewe
 - Keep verification proportional to the changed surfaces and named risks. Do not manufacture deadlines, aggregate credential-read ceilings, redundant review layers, or reusable automation when a bounded direct check answers the decision.
 - Authentication expiry blocks a fresh observation but does not erase previously recorded evidence. Revalidate only affected surfaces after a relevant change or immediately before a dependent authorized mutation.
 - Never modify the installed Hermes source. Use supported Hermes commands and repository-owned policy.
-- A `ready` or `review` card that the dispatcher skips with events `respawn_guarded` and reason `blocker_auth` still stores the failure text of an earlier run, which `kanban_request_review` does not clear. This is the step of the finding RESPAWN-GUARDED of the board check (`/Users/chanbla11mit/hermes-local-harness/deployment/orchestrator-board-check/cron-prompt.md`, line 13), which `harness-orchestrator` does not run. If no run of the card is running, the status is `review`, and the newest ended run has the outcome `review_requested`, run `hermes kanban --board harness assign <card id> none`, then `hermes kanban --board harness assign <card id> <the previous assignee>`, and confirm with `kanban_show(..., board: harness)` that the assignee is that profile again; a change of assignee sets `last_failure_error` to NULL and `consecutive_failures` to 0 (function `assign_task`, lines 1639 to 1644 of `/Users/chanbla11mit/.hermes/hermes-agent/hermes_cli/kanban_db.py`). In every other case report the card to the owner and change nothing.
+- A `ready` or `review` card that the dispatcher skips with events `respawn_guarded` and reason `blocker_auth` still stores the failure text of an earlier run, which `kanban_request_review` does not clear. This is the step of the finding RESPAWN-GUARDED of the board check (`/Users/chanbla11mit/hermes-local-harness/deployment/orchestrator-board-check/cron-prompt.md`, line 13), which `harness-orchestrator` does not run. If no run of the card is running, the status is `review`, and the newest ended run has the outcome `review_requested`, run `hermes kanban --board harness assign <card id> none`, then `hermes kanban --board harness assign <card id> <the previous assignee>`, and confirm with `kanban_show(..., board: harness)` that the assignee is that profile again; a change of assignee sets `last_failure_error` to NULL and `consecutive_failures` to 0 (function `assign_task`, lines 1469 to 1474 of `/Users/chanbla11mit/.hermes/hermes-agent/hermes_cli/kanban_db.py`). In every other case report the card to the owner and change nothing.
+
+The owner runs every Hermes update manually; no profile turns on automatic Hermes updates. A Hermes update is never held back because of a plugin or model provider of the harness repository. After an update, a plugin or provider that no longer works is repaired for the new Hermes release, or changed so that it keeps working or turns off only the one feature that needs the missing Hermes name and writes one Python `logging` record at level WARNING, as `/Users/chanbla11mit/hermes-local-harness/docs/decisions/261120-plugin-behaviour-across-hermes-updates.md` describes. Owner, Telegram direct message to `harness-orchestrator`, 2026-11-20 (verbatim): "We're doing the Hermes update, no question. It's just: if that causes a plugin break, then we repair the plugin according to a new update. Or, better yet, we rework the plugin so it doesn't break from changes with updates. We must never stop an update for a plugin. Update compatibility is a must for our harness, non-negotiable." Owner, 2026-11-20 (verbatim): "No, we don't want auto-updates though. Updates should still be manual."
 
 ## Completion Gate
 

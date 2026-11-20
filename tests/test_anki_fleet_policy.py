@@ -21,6 +21,7 @@ import unittest
 from unittest.mock import patch
 
 from incident_recovery_verify_fixture import LocalReads, ROOT, load_verifier, resolved_fixture
+from test_orchestrator_hermes_update_text import PARAGRAPH as HERMES_UPDATE_PARAGRAPH
 
 REPO = "/Users/chanbla11mit/projects/anki"
 ADDONS = "/Users/chanbla11mit/projects/anki-addons"
@@ -381,10 +382,12 @@ class RoleContracts(unittest.TestCase):
 
     def test_skill_version_scope_and_board_pinning(self):
         # Raised by the jev plugin policy change (t_71b4ef4a).
-        self.assertRegex(self.skill_raw, r"(?m)^version: 0\.6\.10-anki\.15$")  # raised by t_ac454595, t_46b5e63e, t_f4ce916d, t_c7cc3830, t_e14a6d6a, t_35874d04, t_cf518fd0 and t_18a2dc93
+        self.assertRegex(self.skill_raw, r"(?m)^version: 0\.6\.10-anki\.16$")  # raised by t_ac454595, t_46b5e63e, t_f4ce916d, t_c7cc3830, t_e14a6d6a, t_35874d04, t_cf518fd0 and t_18a2dc93
         history = "This caused the 2026-10-20 stalls of the JSS and Jobcron orchestrators."
         self.assertEqual(self.skill_raw.count(history), 1)
-        rest = self.skill_raw.replace(history, "")
+        # The paragraph on manual Hermes updates names `harness-orchestrator` as the recipient of the
+        # owner message (t_642b5ce9); it routes no work to the harness fleet.
+        rest = self.skill_raw.replace(history, "").replace(HERMES_UPDATE_PARAGRAPH, "")
         for foreign in ("jobcron-orchestrator", "jobcron-worker", "jobcron-reviewer", "chapt-",
                         "jss-orchestrator", "jss-worker", "jss-reviewer", "harness-orchestrator",
                         "harness-worker", "harness-reviewer", "board: harness", "board: jss-genr",
@@ -401,12 +404,15 @@ class RoleContracts(unittest.TestCase):
         # Card Setup step 5 names the owner's switch commands of the jev peak-hours hold with
         # the full path of the script (t_71b4ef4a); the owner runs them, the fleet does not.
         # Worker Selection names the decision record of the card line "Reasoning effort EXACT <level>."
-        # with its full path (t_12797c56).
+        # with its full path (t_12797c56). Operational Discipline names the decision record on plugin
+        # behaviour across Hermes updates with its full path (t_642b5ce9).
         self.assertEqual(harness_paths, {CHECKLIST_ABS,
                                          "/Users/chanbla11mit/hermes-local-harness/scripts/check-forced-skills",
                                          "/Users/chanbla11mit/hermes-local-harness/scripts/jev-peak-hold",
                                          "/Users/chanbla11mit/hermes-local-harness/docs/decisions/"
-                                         "261120-per-card-reasoning-effort.md"})
+                                         "261120-per-card-reasoning-effort.md",
+                                         "/Users/chanbla11mit/hermes-local-harness/docs/decisions/"
+                                         "261120-plugin-behaviour-across-hermes-updates.md"})
 
     def test_skill_card_types_collection_access_and_apply_rules(self):
         actions = ", ".join(f"`{action}`" for action in READ_ACTIONS)

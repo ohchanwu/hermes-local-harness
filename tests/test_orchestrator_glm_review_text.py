@@ -88,8 +88,8 @@ class OrchestratorGlmReviewText(unittest.TestCase):
                 self.assertEqual(ROUTE_NAMES_VERSIONS[prefix][0], version)
                 # Card t_40028345 raised the harness version by one more step.
                 self.assertEqual(re.findall(r"(?m)^version: (.+)$", (ROOT / skill(prefix)).read_text()),
-                                 [{"harness": "0.6.7-harness.18", "anki": "0.6.10-anki.15", "chapt": "0.6.7-chapt.19",
-                                   "jobcron": "0.6.9-jobcron.20", "jss": "0.6.7-jss.21"}[prefix]])
+                                 [{"harness": "0.6.7-harness.19", "anki": "0.6.10-anki.16", "chapt": "0.6.7-chapt.20",
+                                   "jobcron": "0.6.9-jobcron.21", "jss": "0.6.7-jss.22"}[prefix]])
 
     def test_names_both_reviewers_and_the_pass_reason(self):
         for prefix in PREFIXES:

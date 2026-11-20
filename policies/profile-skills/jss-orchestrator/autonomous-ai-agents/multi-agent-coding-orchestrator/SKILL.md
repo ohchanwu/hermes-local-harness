@@ -1,7 +1,7 @@
 ---
 name: multi-agent-coding-orchestrator
 description: "Use when orchestrating jss-genr repository and writing-round work."
-version: 0.6.7-jss.21
+version: 0.6.7-jss.22
 author: chanbla11mit, Hermes Agent
 license: MIT
 platforms: [macos]
@@ -274,6 +274,8 @@ Prefer fast-forward; otherwise merge or cherry-pick while preserving the reviewe
 - Preserve rejected commits, worktrees, and round files as evidence until the card is resolved.
 - Keep verification proportional to the changed surfaces and named risks. Do not manufacture deadlines, credential-read ceilings, redundant review layers, or reusable automation when a bounded direct check answers the decision.
 - Never modify the installed Hermes source. Use supported Hermes commands and repository-owned policy.
+
+The owner runs every Hermes update manually; no profile turns on automatic Hermes updates. A Hermes update is never held back because of a plugin or model provider of the harness repository. After an update, a plugin or provider that no longer works is repaired for the new Hermes release, or changed so that it keeps working or turns off only the one feature that needs the missing Hermes name and writes one Python `logging` record at level WARNING, as `/Users/chanbla11mit/hermes-local-harness/docs/decisions/261120-plugin-behaviour-across-hermes-updates.md` describes. Owner, Telegram direct message to `harness-orchestrator`, 2026-11-20 (verbatim): "We're doing the Hermes update, no question. It's just: if that causes a plugin break, then we repair the plugin according to a new update. Or, better yet, we rework the plugin so it doesn't break from changes with updates. We must never stop an update for a plugin. Update compatibility is a must for our harness, non-negotiable." Owner, 2026-11-20 (verbatim): "No, we don't want auto-updates though. Updates should still be manual."
 
 ## Completion Gate
 

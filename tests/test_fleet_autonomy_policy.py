@@ -16,6 +16,7 @@ from rule_text import assert_rule, raw_section
 from incident_recovery_verify_fixture import resolved_fixture
 from test_jev_policy_sources import HOLD_SCRIPT
 from test_reasoning_effort_skill_text import DECISION
+from test_orchestrator_hermes_update_text import PARAGRAPH as HERMES_UPDATE_PARAGRAPH
 
 ROOT = Path(__file__).resolve().parents[1]
 RELATIVE = "autonomous-ai-agents/multi-agent-coding-orchestrator/SKILL.md"
@@ -26,7 +27,7 @@ SKILLS = {
 # The jobcron version was raised by the owner-requested application-only production
 # deploy exception (t_b7455361).
 # Raised by the jev plugin policy change (t_b722c617).
-VERSIONS = {"jobcron": "0.6.9-jobcron.20", "cha-pt": "0.6.7-chapt.19"}  # raised by t_ac454595, t_46b5e63e, t_f4ce916d, t_c7cc3830, t_e14a6d6a, t_d3bb0983, t_35874d04, t_cf518fd0 and t_18a2dc93
+VERSIONS = {"jobcron": "0.6.9-jobcron.21", "cha-pt": "0.6.7-chapt.20"}  # raised by t_ac454595, t_46b5e63e, t_f4ce916d, t_c7cc3830, t_e14a6d6a, t_d3bb0983, t_35874d04, t_cf518fd0 and t_18a2dc93
 BASELINE_SKILL_LINES = {"jobcron": 429, "cha-pt": 434}
 # Live-only Jobcron rules reconciled verbatim from the installed
 # jobcron-orchestrator skill (0.6.5-jobcron.1) into the repository copy.
@@ -220,8 +221,11 @@ class FleetAutonomyPolicy(unittest.TestCase):
                 # (t_b722c617); that path routes no work to the harness board. The Card Setup
                 # paragraph on the card line "Reasoning effort EXACT <level>." names the full path
                 # of the decision record in the harness repository (t_12797c56); that path routes
-                # no work to the harness board either.
-                text = self.raw[board].replace(HOLD_SCRIPT, "").replace(DECISION, "")
+                # no work to the harness board either. The paragraph on manual Hermes updates names `harness-orchestrator` as the recipient of the
+                # owner message and the decision record in the harness repository (t_642b5ce9); it routes no
+                # work to the harness board.
+                text = (self.raw[board].replace(HOLD_SCRIPT, "").replace(DECISION, "")
+                        .replace(HERMES_UPDATE_PARAGRAPH, ""))
                 for forbidden in ("board: harness", "--board harness", "board `harness`",
                                   "harness-orchestrator", "harness-reviewer", "harness-worker",
                                   "hermes-local-harness"):

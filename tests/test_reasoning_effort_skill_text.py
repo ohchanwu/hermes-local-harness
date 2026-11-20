@@ -5,13 +5,16 @@ harness, jss) or of `## Card Setup` (chapt, jobcron), with the board name of eac
 edit command, and the version of each skill is raised by one.
 
 reverse_reasoning_effort_skill_text_edits() reverses these edits so that the tests of earlier
-cards, which recover the bytes of an earlier commit, can still do so. This module imports no
-other test module, so any test module can import it without a circular import.
+cards, which recover the bytes of an earlier commit, can still do so. It first reverses the edits
+of the later card t_642b5ce9. This module imports only test_orchestrator_hermes_update_text, which
+imports no other test module, so any test module can import it without a circular import.
 """
 import hashlib
 import pathlib
 import re
 import unittest
+
+from test_orchestrator_hermes_update_text import reverse_hermes_update_text_edits
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 DECISION = "/Users/chanbla11mit/hermes-local-harness/docs/decisions/261120-per-card-reasoning-effort.md"
@@ -59,6 +62,7 @@ def reverse_reasoning_effort_skill_text_edits(relative_path, text):
     with the text unchanged. Each replacement applies only when its new text is present, so a
     second call returns the same text.
     """
+    text = reverse_hermes_update_text_edits(relative_path, text)
     if isinstance(text, bytes):
         decoded = text.decode("utf-8")
         result = reverse_reasoning_effort_skill_text_edits(relative_path, decoded)
@@ -75,7 +79,9 @@ class ReasoningEffortSkillText(unittest.TestCase):
     def test_each_skill_has_the_paragraph_once_at_the_end_of_its_section(self):
         for prefix, (board, section, _old, version, _sha256) in SKILLS.items():
             with self.subTest(skill=prefix):
-                text = (ROOT / skill(prefix)).read_text(encoding="utf-8")
+                # Card t_642b5ce9 raised each version by one more step; its edits are reversed first.
+                text = reverse_hermes_update_text_edits(skill(prefix),
+                                                        (ROOT / skill(prefix)).read_text(encoding="utf-8"))
                 self.assertEqual(re.findall(r"(?m)^version: (.+)$", text), [version])
                 self.assertEqual(text.count(LINE), 1)
                 self.assertEqual(text.count(DECISION), 1)

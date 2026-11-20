@@ -34,7 +34,7 @@ class HarnessOrchestratorRecoveryRules(unittest.TestCase):
         cls.raw = SKILL.read_text()
 
     def test_version(self):
-        self.assertEqual(re.findall(r"(?m)^version: (.+)$", self.raw), ["0.6.7-harness.18"])
+        self.assertEqual(re.findall(r"(?m)^version: (.+)$", self.raw), ["0.6.7-harness.19"])
 
     def test_part1_respawn_guarded_recovery_in_operational_discipline(self):
         section = raw_section(self.raw, "Operational Discipline")
@@ -80,8 +80,9 @@ class HarnessOrchestratorRecoveryRules(unittest.TestCase):
             "`BLOCK_RECURRENCE_LIMIT` is 2",
             "`_route_block`",
             KANBAN_DB,
-            "line 114",
-            "lines 3397 to 3407",
+            # Card t_642b5ce9 changed the lines to those of the installed Hermes v0.23.3.
+            "line 115",
+            "lines 3230 to 3240",
             "split the work into two cards and link them",
         ):
             self.assertIn(marker, paragraph)
