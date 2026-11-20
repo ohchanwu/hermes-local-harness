@@ -13,6 +13,17 @@ test_glm_claude_fallback.reverse_glm_claude_fallback_edits calls it first, so ev
 recovers the bytes of an earlier commit reverses this card's edits before the edits of the earlier
 cards. This module imports only the standard library, so any test module can import it without a
 circular import.
+
+The Hermes line references in CARD_SETUP_PARAGRAPH and OPERATIONAL_DISCIPLINE_ITEM are the lines of
+`hermes_cli/kanban_db.py` in the Hermes that was installed when card t_40028345 ran (0.21.5+6751,
+commit 9cf7960f274ea2bdfe672d64d26389e9954dfeb6): line 114, lines 3397 to 3407 and lines 1639 to
+1644. These texts are the exact bytes that the card added, so they keep these lines. Card
+t_642b5ce9 changed the references in the skill to the lines of the installed Hermes v0.23.3
+(commit caafe5389ae585ef77387a962aee05b1bcf17029), where the referenced text is the same: line 115,
+lines 3230 to 3240 and lines 1469 to 1474. Its reversal,
+test_orchestrator_hermes_update_text.reverse_hermes_update_text_edits, runs first (through
+reverse_reasoning_effort_skill_text_edits) and restores the earlier lines before this card's texts
+are removed.
 """
 from test_ponytail_policy_text import reverse_ponytail_policy_text_edits
 from test_reasoning_effort_skill_text import reverse_reasoning_effort_skill_text_edits

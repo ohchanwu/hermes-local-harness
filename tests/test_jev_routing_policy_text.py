@@ -461,8 +461,8 @@ class RoutingPolicyText(unittest.TestCase):
                 # step, card t_e14a6d6a each version by one more step, and card t_d3bb0983 the chapt and
                 # jobcron versions by one more step; cards t_35874d04, t_cf518fd0 and t_18a2dc93 each version by one more
                 # step.
-                current = {"harness": "0.6.7-harness.18", "chapt": "0.6.7-chapt.19", "jobcron": "0.6.9-jobcron.20",
-                           "jss": "0.6.7-jss.21", "anki": "0.6.10-anki.15"}[prefix]
+                current = {"harness": "0.6.7-harness.19", "chapt": "0.6.7-chapt.20", "jobcron": "0.6.9-jobcron.21",
+                           "jss": "0.6.7-jss.22", "anki": "0.6.10-anki.16"}[prefix]
                 self.assertRegex(self.current[skill(prefix)], rf"(?m)^version: {re.escape(current)}$")
                 # Card t_c7cc3830 replaced the Part 5 rule text with the card split rule.
                 self.assertEqual(text.count(NEW_RULE), 1)

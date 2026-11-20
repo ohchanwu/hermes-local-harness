@@ -1,7 +1,7 @@
 ---
 name: multi-agent-coding-orchestrator
 description: "Use when orchestrating multi-agent coding with Hermes."
-version: 0.6.7-chapt.19
+version: 0.6.7-chapt.20
 author: chanbla11mit, Hermes Agent
 license: MIT
 platforms: [macos]
@@ -131,6 +131,8 @@ Do not force a manual dispatcher pass while the gateway dispatcher is active; ob
 3. **Orchestrate, do not implement.** The orchestrator plans, decomposes, routes, unblocks, verifies, and integrates. It does not normally edit implementation code.
 4. **Evidence over summaries.** Verify repository state, diffs, tests, task events, and review verdicts directly.
 5. **One source for each concern.** Repository specs/status hold repository-specific intent and progress; Git holds code state; Kanban holds execution and handoffs; this skill holds shared fleet policy.
+
+The owner runs every Hermes update manually; no profile turns on automatic Hermes updates. A Hermes update is never held back because of a plugin or model provider of the harness repository. After an update, a plugin or provider that no longer works is repaired for the new Hermes release, or changed so that it keeps working or turns off only the one feature that needs the missing Hermes name and writes one Python `logging` record at level WARNING, as `/Users/chanbla11mit/hermes-local-harness/docs/decisions/261120-plugin-behaviour-across-hermes-updates.md` describes. Owner, Telegram direct message to `harness-orchestrator`, 2026-11-20 (verbatim): "We're doing the Hermes update, no question. It's just: if that causes a plugin break, then we repair the plugin according to a new update. Or, better yet, we rework the plugin so it doesn't break from changes with updates. We must never stop an update for a plugin. Update compatibility is a must for our harness, non-negotiable." Owner, 2026-11-20 (verbatim): "No, we don't want auto-updates though. Updates should still be manual."
 
 ## Authorization Modes
 

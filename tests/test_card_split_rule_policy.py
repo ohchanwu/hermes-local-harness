@@ -40,8 +40,8 @@ VERSIONS = {"harness": "0.6.7-harness.11", "anki": "0.6.10-anki.9", "jss": "0.6.
 # The current skill versions: card t_a8884510 raised the jss version by one more step, card
 # t_e14a6d6a raised each version by one more step, and card t_d3bb0983 raised the chapt and
 # jobcron versions by one more step.
-CURRENT_VERSIONS = {"harness": "0.6.7-harness.18", "anki": "0.6.10-anki.15", "jss": "0.6.7-jss.21",
-                    "chapt": "0.6.7-chapt.19", "jobcron": "0.6.9-jobcron.20"}
+CURRENT_VERSIONS = {"harness": "0.6.7-harness.19", "anki": "0.6.10-anki.16", "jss": "0.6.7-jss.22",
+                    "chapt": "0.6.7-chapt.20", "jobcron": "0.6.9-jobcron.21"}
 
 NEW_RULE = (
     "By default, when the work for a card has several parts that each have their own acceptance check, "
