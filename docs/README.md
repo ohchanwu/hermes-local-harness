@@ -7,6 +7,7 @@ This index is the entry point for durable harness documentation tracked in Git. 
 After every Hermes upgrade, run `scripts/verify-state`; it reports FAIL when one of these Hermes behaviours no longer holds.
 
 - Per-card reasoning effort of the `jev` plugin: the documented `llm_request` plugin middleware, the `provider` and `model` keyword arguments that `agent/turn_api_request.py` passes to it, the Kanban variables `HERMES_KANBAN_TASK` and `HERMES_KANBAN_BOARD`, which `bind_worker_context` in `gateway/session_kanban.py` sets in the worker process (Hermes v0.23.3), and the top-level `reasoning_effort` of the `zai` provider. Decision record: [decisions/261120-per-card-reasoning-effort.md](decisions/261120-per-card-reasoning-effort.md). Verify-state check: `check_hermes_reasoning_effort_sources` (FAIL on drift; WARN when the Hermes Kanban tools contain `reasoning_effort`, which means a supported per-card option may exist). When it breaks, model requests are sent unchanged and workers run at the reasoning effort of their profile.
+- Hermes interfaces of the `claude-subscription` provider (P1 to P10 of [decisions/261120-plugin-behaviour-across-hermes-updates.md](decisions/261120-plugin-behaviour-across-hermes-updates.md), section 3.3; P11 and P12 are not covered): run `python3 tests/test_hermes_interfaces_claude_subscription.py` from the repository root; it prints one `PASS` or `FAIL` line per dependency ID and exits non-zero on any `FAIL`, also when the installed Hermes cannot be imported.
 
 ## Layout
 
