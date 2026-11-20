@@ -38,6 +38,17 @@ FIXTURE_RESULTS = {
     "glm-reviewer-dispatch-missing.yaml": (1, "GLM reviewer missing from dispatch_profiles: harness-reviewer-glm"),
     "glm-reviewer-model-drift.yaml": (1, "model drift harness-reviewer-glm: expected glm-5.3, actual claude-opus-5-5"),
     "launch-agent-not-loaded.yaml": (1, "LaunchAgent com.nous.hermes-jev-peak-hold is not loaded"),
+    # Card t_caf5dba0: the Hermes behaviour that the per-card reasoning effort of plugins/jev depends on.
+    "hermes-llm-request-middleware-drift.yaml": (
+        1, 'Hermes behaviour drift: hermes_cli/middleware.py no longer defines LLM_REQUEST_MIDDLEWARE = "llm_request"'),
+    "hermes-turn-request-middleware-drift.yaml": (
+        1, "Hermes behaviour drift: agent/turn_api_request.py no longer calls apply_llm_request_middleware"),
+    "hermes-dispatch-kanban-environment-drift.yaml": (
+        1, "Hermes behaviour drift: hermes_cli/kanban_db_dispatch.py no longer sets HERMES_KANBAN_TASK"),
+    "hermes-zai-reasoning-effort-drift.yaml": (
+        1, "Hermes behaviour drift: plugins/model-providers/zai/__init__.py no longer sets top_level"),
+    "hermes-kanban-tool-reasoning-effort.yaml": (
+        0, "WARN: Hermes tools/kanban_tools_schemas.py contains reasoning_effort"),
     "jev-plugin-missing.yaml": (1, "plugin drift harness-reviewer: required jev not enabled"),
     "behavior-changing-model-drift.yaml": (1, "model drift"),
     "active-extra.yaml": (1, "behavior-changing unexpected profile"),

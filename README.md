@@ -2,6 +2,10 @@
 
 Private desired state for the local Hermes harness. This repository is not live state: `~/.hermes` is applied configuration, Kanban is execution history, and project repositories retain project-specific rules.
 
+## Hermes behaviour the harness depends on (check after every Hermes upgrade)
+
+Some harness parts depend on Hermes behaviour that a Hermes upgrade can change. The list, with the decision record of each, is in [`docs/README.md`](docs/README.md#hermes-behaviour-the-harness-depends-on-check-after-every-hermes-upgrade). `scripts/verify-state` reports a broken dependency.
+
 ## Switching a profile's model (Claude, GPT, GLM)
 
 Every active profile currently runs on the [Claude subscription provider](plugins/model-providers/claude-subscription/README.md#rollout-status-2026-10-17-kst). Since 2026-11-15 (owner change; `roster.yaml` follows from card `t_f03857d4`), Opus 5.5 serves the orchestrators, the default home, the Advisor, the workers and the reviewers; the reasoning effort of each role is in [`procedures/switching-hermes-models.md`](procedures/switching-hermes-models.md#role-models-and-reasoning-effort). Under both Claude targets, the six light helper tasks run on Haiku 5.5 and the other ten helper tasks run on Opus 5.5 ([`procedures/haiku-helper-routing.md`](procedures/haiku-helper-routing.md)). To move any profile, use `scripts/switch-profile-model`. It sets the main model and all sixteen helper jobs in one step, after backing up the profile's `config.yaml`:

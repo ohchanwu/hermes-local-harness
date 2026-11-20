@@ -2,6 +2,12 @@
 
 This index is the entry point for durable harness documentation tracked in Git. Load this index instead of recursively reading the docs tree.
 
+## Hermes behaviour the harness depends on (check after every Hermes upgrade)
+
+After every Hermes upgrade, run `scripts/verify-state`; it reports FAIL when one of these Hermes behaviours no longer holds.
+
+- Per-card reasoning effort of the `jev` plugin: the documented `llm_request` plugin middleware, the `provider` and `model` keyword arguments that `agent/turn_api_request.py` passes to it, the dispatcher variables `HERMES_KANBAN_TASK` and `HERMES_KANBAN_BOARD`, and the top-level `reasoning_effort` of the `zai` provider. Decision record: [decisions/261120-per-card-reasoning-effort.md](decisions/261120-per-card-reasoning-effort.md). Verify-state check: `check_hermes_reasoning_effort_sources` (FAIL on drift; WARN when the Hermes Kanban tools contain `reasoning_effort`, which means a supported per-card option may exist). When it breaks, model requests are sent unchanged and workers run at the reasoning effort of their profile.
+
 ## Layout
 
 - `plans/` contains active implementation plans.
@@ -11,6 +17,7 @@ This index is the entry point for durable harness documentation tracked in Git. 
 
 ## Current entries
 
+- [Decision: reasoning effort of one Kanban card, set by the worker's `jev` plugin](decisions/261120-per-card-reasoning-effort.md) — body line `Reasoning effort EXACT <level>.`, applied by the `llm_request` middleware of `jev` for GLM and Claude workers; the Hermes behaviour it depends on and the verify-state check `check_hermes_reasoning_effort_sources`.
 - [Claude worker compression threshold, route very_hard, GLM workers first for hard cards, GLM reviewer before the Opus reviewer](specs/261114-claude-worker-compression-hard-route-and-glm-reviewer.md) — owner-approved specification (2026-11-14); the work is done by separate cards on board harness, and each live deployment is a separate card.
 - [Scheduled board check for each orchestrator](../procedures/orchestrator-board-check.md) — `scripts/orchestrator-board-check` with one settings file per orchestrator and the cron prompt in `deployment/orchestrator-board-check/`: findings NO-WAKE-SUBSCRIPTION, APPROVED-NOT-INTEGRATED, STALE-BLOCKED and STALE-REVIEW; live rollout is a separate card.
 - [Human deployment guide review](../skills/devops/human-deployment-guide-review/SKILL.md) — shared skill `human-deployment-guide-review` (version 1.0.0): six review steps for a guide that a person runs against production, with the rules of `human-deployment-guide-writing` as the rule list; declared for jobcron-reviewer and chapt-reviewer; live deployment is a separate card.

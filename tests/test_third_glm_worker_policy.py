@@ -384,6 +384,9 @@ class DesiredState(unittest.TestCase):
             entry["glm_max_workers"] = hard
             entry["easy_route_workers"] = easy
             entry["medium_route_workers"] = medium
+        # Card t_caf5dba0 (owner decision of 2026-11-20): the new section `reasoning_effort` of the
+        # per-card reasoning effort.
+        expected["reasoning_effort"] = {"enabled": True, "allowed_levels": ["low", "medium", "high", "xhigh", "max"]}
         self.assertEqual(config, expected)
 
     def test_roster_entries_of_the_third_glm_workers_equal_the_second(self):

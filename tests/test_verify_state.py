@@ -182,6 +182,47 @@ check("--fixture", str(FIXTURES / "dormant-extra.yaml"), text="WARN: dormant")
 check("--fixture", str(FIXTURES / "unexpected-plugin.yaml"), code=1, text="behavior-changing unexpected plugin")
 # disabled required plugin fails
 check("--fixture", str(FIXTURES / "missing-plugin.yaml"), code=1, text="plugin drift")
+# Hermes behaviour that the per-card reasoning effort of plugins/jev depends on (card
+# t_caf5dba0): each drift fixture fails with its message, the Kanban tool case only warns,
+# and the clean fixture (checked above) passes.
+DECISION = "docs/decisions/261120-per-card-reasoning-effort.md"
+for fixture, behaviour in (
+        ("hermes-llm-request-middleware-drift.yaml",
+         'hermes_cli/middleware.py no longer defines LLM_REQUEST_MIDDLEWARE = "llm_request"'),
+        ("hermes-turn-request-middleware-drift.yaml",
+         "agent/turn_api_request.py no longer calls apply_llm_request_middleware with the keyword arguments "
+         "provider= and model="),
+        ("hermes-dispatch-kanban-environment-drift.yaml",
+         "hermes_cli/kanban_db_dispatch.py no longer sets HERMES_KANBAN_TASK and HERMES_KANBAN_BOARD "
+         "in the worker environment"),
+        ("hermes-zai-reasoning-effort-drift.yaml",
+         'plugins/model-providers/zai/__init__.py no longer sets top_level["reasoning_effort"]')):
+    result = subprocess.run([str(VERIFY), "--fixture", str(FIXTURES / fixture)], text=True, capture_output=True)
+    fails = [line for line in result.stdout.splitlines() if line.startswith("FAIL:")]
+    assert result.returncode == 1, result.stdout
+    assert fails == [f"FAIL: Hermes behaviour drift: {behaviour}; the per-card reasoning effort of plugins/jev "
+                     f"depends on it (see {DECISION})"], result.stdout
+check("--fixture", str(FIXTURES / "hermes-kanban-tool-reasoning-effort.yaml"),
+      text="WARN: Hermes tools/kanban_tools_schemas.py contains reasoning_effort: a supported per-card option "
+           f"now exists and the design should be reviewed (see {DECISION})")
+clean_sources = json.loads((FIXTURES / "clean.yaml").read_text())["hermes_reasoning_effort_sources"]
+for changed, fail_count, warn_count in (
+        ({}, 0, 0),
+        ({"hermes_cli/middleware.py": None}, 1, 0),                         # file missing
+        ({"agent/turn_api_request.py": "apply_llm_request_middleware(\n"}, 1, 0),  # not Python
+        ({"hermes_cli/kanban_db_dispatch.py": 'env["HERMES_KANBAN_BOARD"] = b\n'}, 1, 0),
+        ({"tools/kanban_tools_schemas.py": None, "tools/kanban_tools.py": None}, 0, 0),
+        ({"tools/kanban_tools.py": "create_task(reasoning_effort=effort)\n"}, 0, 1)):
+    errors, warnings = [], []
+    with redirect_stdout(io.StringIO()):
+        verify_state.check_hermes_reasoning_effort_sources(errors, warnings, {**clean_sources, **changed})
+    assert (len(errors), len(warnings)) == (fail_count, warn_count), (changed, errors, warnings)
+    assert all(DECISION in message for message in errors + warnings), (errors, warnings)
+for incomplete in ({}, {"hermes_cli/middleware.py": clean_sources["hermes_cli/middleware.py"]}, None):
+    errors = []
+    with redirect_stdout(io.StringIO()):
+        verify_state.check_hermes_reasoning_effort_sources(errors, [], incomplete)
+    assert errors == ["incomplete fixture: missing required section 'hermes_reasoning_effort_sources'"], errors
 # command approval policy drift fails
 check("--fixture", str(FIXTURES / "approval-mode-drift.yaml"), code=1,
       text="approval mode drift jobcron-worker")
