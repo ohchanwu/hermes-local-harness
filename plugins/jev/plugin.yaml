@@ -6,3 +6,4 @@ provides_hooks:
   - post_auxiliary_call
 provides_middleware:
   - tool_execution
+  - llm_request

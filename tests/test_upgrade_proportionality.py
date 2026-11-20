@@ -44,7 +44,7 @@ FIXTURE_RESULTS = {
     "hermes-turn-request-middleware-drift.yaml": (
         1, "Hermes behaviour drift: agent/turn_api_request.py no longer calls apply_llm_request_middleware"),
     "hermes-dispatch-kanban-environment-drift.yaml": (
-        1, "Hermes behaviour drift: hermes_cli/kanban_db_dispatch.py no longer sets HERMES_KANBAN_TASK"),
+        1, "Hermes behaviour drift: gateway/session_kanban.py no longer sets HERMES_KANBAN_TASK"),
     "hermes-zai-reasoning-effort-drift.yaml": (
         1, "Hermes behaviour drift: plugins/model-providers/zai/__init__.py no longer sets top_level"),
     "hermes-kanban-tool-reasoning-effort.yaml": (
@@ -53,6 +53,7 @@ FIXTURE_RESULTS = {
     "behavior-changing-model-drift.yaml": (1, "model drift"),
     "active-extra.yaml": (1, "behavior-changing unexpected profile"),
     "unexpected-plugin.yaml": (1, "behavior-changing unexpected plugin"),
+    "unused-provider-plugin.yaml": (1, "behavior-changing unexpected plugin worker-flash-1: claude-subscription"),
     "missing-plugin.yaml": (1, "plugin drift"),
     "approval-mode-drift.yaml": (1, "approval mode drift jobcron-worker"),
     "compression-drift.yaml": (1, "managed setting drift advisor compression.threshold_tokens"),

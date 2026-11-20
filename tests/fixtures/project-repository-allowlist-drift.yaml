@@ -141,11 +141,13 @@
   },
   "plugins": {
     "default": {
-      "hermes-terminal-outcome-notification": "enabled      git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification"
+      "hermes-terminal-outcome-notification": "enabled      git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification",
+      "claude-subscription": "enabled      user     0.1.0    claude-subscription"
     },
     "advisor": {
       "ponytail": "enabled      git      5.3.3    ponytail",
-      "jev": "enabled      user     0.1.0    jev"
+      "jev": "enabled      user     0.1.0    jev",
+      "claude-subscription": "enabled      user     0.1.0    claude-subscription"
     },
     "reviewer-sol": {
       "hermes-terminal-outcome-notification": "enabled      git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification"
@@ -192,242 +194,297 @@
     "jobcron-orchestrator": {
       "hermes-terminal-outcome-notification": "disabled     git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification",
       "ponytail": "enabled      git      5.3.3    ponytail",
-      "jev": "enabled      user     0.1.0    jev"
+      "jev": "enabled      user     0.1.0    jev",
+      "claude-subscription": "enabled      user     0.1.0    claude-subscription"
     },
     "jobcron-worker": {
       "hermes-terminal-outcome-notification": "disabled     git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification",
       "ponytail": "enabled      git      5.3.3    ponytail",
-      "jev": "enabled      user     0.1.0    jev"
+      "jev": "enabled      user     0.1.0    jev",
+      "claude-subscription": "enabled      user     0.1.0    claude-subscription"
     },
     "jobcron-worker-2": {
       "hermes-terminal-outcome-notification": "disabled     git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification",
       "ponytail": "enabled      git      5.3.3    ponytail",
-      "jev": "enabled      user     0.1.0    jev"
+      "jev": "enabled      user     0.1.0    jev",
+      "claude-subscription": "enabled      user     0.1.0    claude-subscription"
     },
     "jobcron-reviewer": {
       "hermes-terminal-outcome-notification": "disabled     git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification",
       "ponytail": "enabled      git      5.3.3    ponytail",
-      "jev": "enabled      user     0.1.0    jev"
+      "jev": "enabled      user     0.1.0    jev",
+      "claude-subscription": "enabled      user     0.1.0    claude-subscription"
     },
     "chapt-orchestrator": {
       "hermes-terminal-outcome-notification": "disabled     git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification",
       "ponytail": "enabled      git      5.3.3    ponytail",
-      "jev": "enabled      user     0.1.0    jev"
+      "jev": "enabled      user     0.1.0    jev",
+      "claude-subscription": "enabled      user     0.1.0    claude-subscription"
     },
     "chapt-worker": {
       "hermes-terminal-outcome-notification": "disabled     git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification",
       "ponytail": "enabled      git      5.3.3    ponytail",
-      "jev": "enabled      user     0.1.0    jev"
+      "jev": "enabled      user     0.1.0    jev",
+      "claude-subscription": "enabled      user     0.1.0    claude-subscription"
     },
     "chapt-worker-2": {
       "hermes-terminal-outcome-notification": "disabled     git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification",
       "ponytail": "enabled      git      5.3.3    ponytail",
-      "jev": "enabled      user     0.1.0    jev"
+      "jev": "enabled      user     0.1.0    jev",
+      "claude-subscription": "enabled      user     0.1.0    claude-subscription"
     },
     "chapt-reviewer": {
       "hermes-terminal-outcome-notification": "disabled     git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification",
       "ponytail": "enabled      git      5.3.3    ponytail",
-      "jev": "enabled      user     0.1.0    jev"
+      "jev": "enabled      user     0.1.0    jev",
+      "claude-subscription": "enabled      user     0.1.0    claude-subscription"
     },
     "harness-orchestrator": {
       "hermes-terminal-outcome-notification": "disabled     git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification",
       "ponytail": "enabled      git      5.3.3    ponytail",
-      "jev": "enabled      user     0.1.0    jev"
+      "jev": "enabled      user     0.1.0    jev",
+      "claude-subscription": "enabled      user     0.1.0    claude-subscription"
     },
     "harness-worker": {
       "hermes-terminal-outcome-notification": "disabled     git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification",
       "ponytail": "enabled      git      5.3.3    ponytail",
-      "jev": "enabled      user     0.1.0    jev"
+      "jev": "enabled      user     0.1.0    jev",
+      "claude-subscription": "enabled      user     0.1.0    claude-subscription"
     },
     "harness-worker-2": {
       "hermes-terminal-outcome-notification": "disabled     git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification",
       "ponytail": "enabled      git      5.3.3    ponytail",
-      "jev": "enabled      user     0.1.0    jev"
+      "jev": "enabled      user     0.1.0    jev",
+      "claude-subscription": "enabled      user     0.1.0    claude-subscription"
     },
     "harness-reviewer": {
       "hermes-terminal-outcome-notification": "disabled     git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification",
       "ponytail": "enabled      git      5.3.3    ponytail",
-      "jev": "enabled      user     0.1.0    jev"
+      "jev": "enabled      user     0.1.0    jev",
+      "claude-subscription": "enabled      user     0.1.0    claude-subscription"
     },
     "jss-orchestrator": {
       "hermes-terminal-outcome-notification": "disabled     git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification",
       "ponytail": "enabled      git      5.3.3    ponytail",
-      "jev": "enabled      user     0.1.0    jev"
+      "jev": "enabled      user     0.1.0    jev",
+      "claude-subscription": "enabled      user     0.1.0    claude-subscription"
     },
     "jss-worker": {
       "hermes-terminal-outcome-notification": "disabled     git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification",
       "ponytail": "enabled      git      5.3.3    ponytail",
-      "jev": "enabled      user     0.1.0    jev"
+      "jev": "enabled      user     0.1.0    jev",
+      "claude-subscription": "enabled      user     0.1.0    claude-subscription"
     },
     "jss-worker-2": {
       "hermes-terminal-outcome-notification": "disabled     git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification",
       "ponytail": "enabled      git      5.3.3    ponytail",
-      "jev": "enabled      user     0.1.0    jev"
+      "jev": "enabled      user     0.1.0    jev",
+      "claude-subscription": "enabled      user     0.1.0    claude-subscription"
     },
     "jss-reviewer": {
       "hermes-terminal-outcome-notification": "disabled     git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification",
       "ponytail": "enabled      git      5.3.3    ponytail",
-      "jev": "enabled      user     0.1.0    jev"
+      "jev": "enabled      user     0.1.0    jev",
+      "claude-subscription": "enabled      user     0.1.0    claude-subscription"
     },
     "jobcron-worker-glm-easy-1": {
       "ponytail": "enabled      git      5.3.3    ponytail",
-      "jev": "enabled      user     0.1.0    jev"
+      "jev": "enabled      user     0.1.0    jev",
+      "claude-subscription": "enabled      user     0.1.0    claude-subscription"
     },
     "jobcron-worker-glm-easy-2": {
       "ponytail": "enabled      git      5.3.3    ponytail",
-      "jev": "enabled      user     0.1.0    jev"
+      "jev": "enabled      user     0.1.0    jev",
+      "claude-subscription": "enabled      user     0.1.0    claude-subscription"
     },
     "jobcron-worker-glm-medium-1": {
       "ponytail": "enabled      git      5.3.3    ponytail",
-      "jev": "enabled      user     0.1.0    jev"
+      "jev": "enabled      user     0.1.0    jev",
+      "claude-subscription": "enabled      user     0.1.0    claude-subscription"
     },
     "jobcron-worker-glm-medium-2": {
       "ponytail": "enabled      git      5.3.3    ponytail",
-      "jev": "enabled      user     0.1.0    jev"
+      "jev": "enabled      user     0.1.0    jev",
+      "claude-subscription": "enabled      user     0.1.0    claude-subscription"
     },
     "jobcron-worker-glm-hard-1": {
       "ponytail": "enabled      git      5.3.3    ponytail",
-      "jev": "enabled      user     0.1.0    jev"
+      "jev": "enabled      user     0.1.0    jev",
+      "claude-subscription": "enabled      user     0.1.0    claude-subscription"
     },
     "jobcron-worker-glm-hard-2": {
       "ponytail": "enabled      git      5.3.3    ponytail",
-      "jev": "enabled      user     0.1.0    jev"
+      "jev": "enabled      user     0.1.0    jev",
+      "claude-subscription": "enabled      user     0.1.0    claude-subscription"
     },
     "jobcron-reviewer-glm": {
       "ponytail": "enabled      git      5.3.3    ponytail",
-      "jev": "enabled      user     0.1.0    jev"
+      "jev": "enabled      user     0.1.0    jev",
+      "claude-subscription": "enabled      user     0.1.0    claude-subscription"
     },
     "chapt-worker-glm-easy-1": {
       "ponytail": "enabled      git      5.3.3    ponytail",
-      "jev": "enabled      user     0.1.0    jev"
+      "jev": "enabled      user     0.1.0    jev",
+      "claude-subscription": "enabled      user     0.1.0    claude-subscription"
     },
     "chapt-worker-glm-easy-2": {
       "ponytail": "enabled      git      5.3.3    ponytail",
-      "jev": "enabled      user     0.1.0    jev"
+      "jev": "enabled      user     0.1.0    jev",
+      "claude-subscription": "enabled      user     0.1.0    claude-subscription"
     },
     "chapt-worker-glm-medium-1": {
       "ponytail": "enabled      git      5.3.3    ponytail",
-      "jev": "enabled      user     0.1.0    jev"
+      "jev": "enabled      user     0.1.0    jev",
+      "claude-subscription": "enabled      user     0.1.0    claude-subscription"
     },
     "chapt-worker-glm-medium-2": {
       "ponytail": "enabled      git      5.3.3    ponytail",
-      "jev": "enabled      user     0.1.0    jev"
+      "jev": "enabled      user     0.1.0    jev",
+      "claude-subscription": "enabled      user     0.1.0    claude-subscription"
     },
     "chapt-worker-glm-hard-1": {
       "ponytail": "enabled      git      5.3.3    ponytail",
-      "jev": "enabled      user     0.1.0    jev"
+      "jev": "enabled      user     0.1.0    jev",
+      "claude-subscription": "enabled      user     0.1.0    claude-subscription"
     },
     "chapt-worker-glm-hard-2": {
       "ponytail": "enabled      git      5.3.3    ponytail",
-      "jev": "enabled      user     0.1.0    jev"
+      "jev": "enabled      user     0.1.0    jev",
+      "claude-subscription": "enabled      user     0.1.0    claude-subscription"
     },
     "chapt-reviewer-glm": {
       "ponytail": "enabled      git      5.3.3    ponytail",
-      "jev": "enabled      user     0.1.0    jev"
+      "jev": "enabled      user     0.1.0    jev",
+      "claude-subscription": "enabled      user     0.1.0    claude-subscription"
     },
     "harness-worker-glm-easy-1": {
       "ponytail": "enabled      git      5.3.3    ponytail",
-      "jev": "enabled      user     0.1.0    jev"
+      "jev": "enabled      user     0.1.0    jev",
+      "claude-subscription": "enabled      user     0.1.0    claude-subscription"
     },
     "harness-worker-glm-easy-2": {
       "ponytail": "enabled      git      5.3.3    ponytail",
-      "jev": "enabled      user     0.1.0    jev"
+      "jev": "enabled      user     0.1.0    jev",
+      "claude-subscription": "enabled      user     0.1.0    claude-subscription"
     },
     "harness-worker-glm-medium-1": {
       "ponytail": "enabled      git      5.3.3    ponytail",
-      "jev": "enabled      user     0.1.0    jev"
+      "jev": "enabled      user     0.1.0    jev",
+      "claude-subscription": "enabled      user     0.1.0    claude-subscription"
     },
     "harness-worker-glm-medium-2": {
       "ponytail": "enabled      git      5.3.3    ponytail",
-      "jev": "enabled      user     0.1.0    jev"
+      "jev": "enabled      user     0.1.0    jev",
+      "claude-subscription": "enabled      user     0.1.0    claude-subscription"
     },
     "harness-worker-glm-hard-1": {
       "ponytail": "enabled      git      5.3.3    ponytail",
-      "jev": "enabled      user     0.1.0    jev"
+      "jev": "enabled      user     0.1.0    jev",
+      "claude-subscription": "enabled      user     0.1.0    claude-subscription"
     },
     "harness-worker-glm-hard-2": {
       "ponytail": "enabled      git      5.3.3    ponytail",
-      "jev": "enabled      user     0.1.0    jev"
+      "jev": "enabled      user     0.1.0    jev",
+      "claude-subscription": "enabled      user     0.1.0    claude-subscription"
     },
     "harness-reviewer-glm": {
       "ponytail": "enabled      git      5.3.3    ponytail",
-      "jev": "enabled      user     0.1.0    jev"
+      "jev": "enabled      user     0.1.0    jev",
+      "claude-subscription": "enabled      user     0.1.0    claude-subscription"
     },
     "jss-worker-glm-easy-1": {
       "ponytail": "enabled      git      5.3.3    ponytail",
-      "jev": "enabled      user     0.1.0    jev"
+      "jev": "enabled      user     0.1.0    jev",
+      "claude-subscription": "enabled      user     0.1.0    claude-subscription"
     },
     "jss-worker-glm-easy-2": {
       "ponytail": "enabled      git      5.3.3    ponytail",
-      "jev": "enabled      user     0.1.0    jev"
+      "jev": "enabled      user     0.1.0    jev",
+      "claude-subscription": "enabled      user     0.1.0    claude-subscription"
     },
     "jss-worker-glm-medium-1": {
       "ponytail": "enabled      git      5.3.3    ponytail",
-      "jev": "enabled      user     0.1.0    jev"
+      "jev": "enabled      user     0.1.0    jev",
+      "claude-subscription": "enabled      user     0.1.0    claude-subscription"
     },
     "jss-worker-glm-medium-2": {
       "ponytail": "enabled      git      5.3.3    ponytail",
-      "jev": "enabled      user     0.1.0    jev"
+      "jev": "enabled      user     0.1.0    jev",
+      "claude-subscription": "enabled      user     0.1.0    claude-subscription"
     },
     "jss-worker-glm-hard-1": {
       "ponytail": "enabled      git      5.3.3    ponytail",
-      "jev": "enabled      user     0.1.0    jev"
+      "jev": "enabled      user     0.1.0    jev",
+      "claude-subscription": "enabled      user     0.1.0    claude-subscription"
     },
     "jss-worker-glm-hard-2": {
       "ponytail": "enabled      git      5.3.3    ponytail",
-      "jev": "enabled      user     0.1.0    jev"
+      "jev": "enabled      user     0.1.0    jev",
+      "claude-subscription": "enabled      user     0.1.0    claude-subscription"
     },
     "jss-reviewer-glm": {
       "ponytail": "enabled      git      5.3.3    ponytail",
-      "jev": "enabled      user     0.1.0    jev"
+      "jev": "enabled      user     0.1.0    jev",
+      "claude-subscription": "enabled      user     0.1.0    claude-subscription"
     },
     "anki-orchestrator": {
       "hermes-terminal-outcome-notification": "disabled     git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification",
       "ponytail": "enabled      git      5.3.3    ponytail",
-      "jev": "enabled      user     0.1.0    jev"
+      "jev": "enabled      user     0.1.0    jev",
+      "claude-subscription": "enabled      user     0.1.0    claude-subscription"
     },
     "anki-worker": {
       "hermes-terminal-outcome-notification": "disabled     git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification",
       "ponytail": "enabled      git      5.3.3    ponytail",
-      "jev": "enabled      user     0.1.0    jev"
+      "jev": "enabled      user     0.1.0    jev",
+      "claude-subscription": "enabled      user     0.1.0    claude-subscription"
     },
     "anki-worker-2": {
       "hermes-terminal-outcome-notification": "disabled     git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification",
       "ponytail": "enabled      git      5.3.3    ponytail",
-      "jev": "enabled      user     0.1.0    jev"
+      "jev": "enabled      user     0.1.0    jev",
+      "claude-subscription": "enabled      user     0.1.0    claude-subscription"
     },
     "anki-reviewer": {
       "hermes-terminal-outcome-notification": "disabled     git pinned@6ae2bf2d 0.2.0    hermes-terminal-outcome-notification",
       "ponytail": "enabled      git      5.3.3    ponytail",
-      "jev": "enabled      user     0.1.0    jev"
+      "jev": "enabled      user     0.1.0    jev",
+      "claude-subscription": "enabled      user     0.1.0    claude-subscription"
     },
     "anki-worker-glm-easy-1": {
       "ponytail": "enabled      git      5.3.3    ponytail",
-      "jev": "enabled      user     0.1.0    jev"
+      "jev": "enabled      user     0.1.0    jev",
+      "claude-subscription": "enabled      user     0.1.0    claude-subscription"
     },
     "anki-worker-glm-easy-2": {
       "ponytail": "enabled      git      5.3.3    ponytail",
-      "jev": "enabled      user     0.1.0    jev"
+      "jev": "enabled      user     0.1.0    jev",
+      "claude-subscription": "enabled      user     0.1.0    claude-subscription"
     },
     "anki-worker-glm-medium-1": {
       "ponytail": "enabled      git      5.3.3    ponytail",
-      "jev": "enabled      user     0.1.0    jev"
+      "jev": "enabled      user     0.1.0    jev",
+      "claude-subscription": "enabled      user     0.1.0    claude-subscription"
     },
     "anki-worker-glm-medium-2": {
       "ponytail": "enabled      git      5.3.3    ponytail",
-      "jev": "enabled      user     0.1.0    jev"
+      "jev": "enabled      user     0.1.0    jev",
+      "claude-subscription": "enabled      user     0.1.0    claude-subscription"
     },
     "anki-worker-glm-hard-1": {
       "ponytail": "enabled      git      5.3.3    ponytail",
-      "jev": "enabled      user     0.1.0    jev"
+      "jev": "enabled      user     0.1.0    jev",
+      "claude-subscription": "enabled      user     0.1.0    claude-subscription"
     },
     "anki-worker-glm-hard-2": {
       "ponytail": "enabled      git      5.3.3    ponytail",
-      "jev": "enabled      user     0.1.0    jev"
+      "jev": "enabled      user     0.1.0    jev",
+      "claude-subscription": "enabled      user     0.1.0    claude-subscription"
     },
     "anki-reviewer-glm": {
       "ponytail": "enabled      git      5.3.3    ponytail",
-      "jev": "enabled      user     0.1.0    jev"
+      "jev": "enabled      user     0.1.0    jev",
+      "claude-subscription": "enabled      user     0.1.0    claude-subscription"
     }
   },
   "dispatch_profiles": [
@@ -11370,7 +11427,7 @@
   "hermes_reasoning_effort_sources": {
     "hermes_cli/middleware.py": "LLM_REQUEST_MIDDLEWARE = \"llm_request\"\n",
     "agent/turn_api_request.py": "_llm_request_mw = apply_llm_request_middleware(\n    api_kwargs, task_id=effective_task_id, model=agent.model, provider=agent.provider,\n)\n",
-    "hermes_cli/kanban_db_dispatch.py": "env[\"HERMES_KANBAN_TASK\"] = task.id\nenv[\"HERMES_KANBAN_BOARD\"] = _kb._normalize_board_slug(board) or _kb.get_current_board()\n",
+    "gateway/session_kanban.py": "def bind_worker_context(frame):\n    import os\n    env = {'HERMES_KANBAN_TASK': context['task_id'], 'HERMES_KANBAN_BOARD': context['board']}\n    os.environ.update(env)\n",
     "plugins/model-providers/zai/__init__.py": "if is_5_2:\n    effort = _glm_5_2_reasoning_effort(reasoning_config, model=model)\n    if effort is not None:\n        top_level[\"reasoning_effort\"] = effort\n",
     "tools/kanban_tools_schemas.py": "\"model\": {\"type\": \"string\"},\n",
     "tools/kanban_tools.py": "new_tid = kb.create_task(conn, model_override=model_override)\n"

@@ -130,10 +130,19 @@ def pin_display_matches(pinned, line):
     return f"pinned@{pinned.get('pinned_display_commit', pinned['pinned_commit'])} {pinned['version']}" in str(line)
 
 
+def configured_providers(profile):
+    """Provider names that a roster profile uses as model.provider or in fallback_providers.
+    The other checks compare both roster fields with the live configuration of the profile."""
+    return {profile.get("provider"), *(entry.get("provider") for entry in profile.get("fallback_providers") or []
+                                       if isinstance(entry, dict))}
+
+
 def check_plugins(errors, warnings, profile, expected, observed_plugins, pinned_plugins=None,
-                  required_disabled=None):
+                  required_disabled=None, providers=()):
     """expected: required plugin names; observed_plugins: {name: status-or-line} or list of enabled names.
-    required_disabled: plugins that must be installed but disabled (None means no disabled expectation)."""
+    required_disabled: plugins that must be installed but disabled (None means no disabled expectation).
+    providers: provider names that the profile's configuration uses (configured_providers); an enabled
+    plugin with one of these names is the model-provider plugin of that provider and is expected."""
     if isinstance(observed_plugins, list):
         state = {n: "enabled" for n in observed_plugins}
     else:
@@ -157,6 +166,8 @@ def check_plugins(errors, warnings, profile, expected, observed_plugins, pinned_
     for name, status in sorted(state.items()):
         enabled = str(status).startswith("enabled")
         if name not in expected and name not in (required_disabled or []):
+            if enabled and name in providers:
+                continue  # the model-provider plugin that model.provider or fallback_providers names
             if enabled:
                 fail(errors, f"behavior-changing unexpected plugin {profile}: {name}")
             else:
@@ -2223,7 +2234,7 @@ def check_glm_reviewer_skills(errors, observed=_ABSENT_SECTION):
 REASONING_EFFORT_DECISION = "docs/decisions/261120-per-card-reasoning-effort.md"
 HERMES_MIDDLEWARE_SOURCE = "hermes_cli/middleware.py"
 HERMES_TURN_REQUEST_SOURCE = "agent/turn_api_request.py"
-HERMES_DISPATCH_SOURCE = "hermes_cli/kanban_db_dispatch.py"
+HERMES_DISPATCH_SOURCE = "gateway/session_kanban.py"
 HERMES_ZAI_SOURCE = "plugins/model-providers/zai/__init__.py"
 HERMES_KANBAN_TOOL_SOURCES = ("tools/kanban_tools_schemas.py", "tools/kanban_tools.py")
 HERMES_REASONING_EFFORT_SOURCES = (HERMES_MIDDLEWARE_SOURCE, HERMES_TURN_REQUEST_SOURCE, HERMES_DISPATCH_SOURCE,
@@ -2265,6 +2276,21 @@ def _call_with_keywords(tree, function, keywords):
     return False
 
 
+def _function_sets_environment(tree, function, keys):
+    """True when function <function> builds a dict literal with every key in keys and calls
+    os.environ.update (v0.23.3 gateway/session_kanban.py, bind_worker_context)."""
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == function:
+            inner = list(ast.walk(node))
+            dict_keys = {key.value for item in inner if isinstance(item, ast.Dict)
+                         for key in item.keys if isinstance(key, ast.Constant)}
+            updates = any(isinstance(item, ast.Call) and isinstance(item.func, ast.Attribute)
+                          and item.func.attr == "update" and ast.unparse(item.func.value) == "os.environ"
+                          for item in inner)
+            return set(keys) <= dict_keys and updates
+    return False
+
+
 def check_hermes_reasoning_effort_sources(errors, warnings, observed=_ABSENT_SECTION):
     """FAIL when a Hermes behaviour that the per-card reasoning effort relies on no longer
     holds; WARN when the Kanban tools mention reasoning_effort (a supported per-card option
@@ -2277,8 +2303,9 @@ def check_hermes_reasoning_effort_sources(errors, warnings, observed=_ABSENT_SEC
          lambda tree: _module_constant(tree, "LLM_REQUEST_MIDDLEWARE", "llm_request")),
         (HERMES_TURN_REQUEST_SOURCE, "calls apply_llm_request_middleware with the keyword arguments provider= and model=",
          lambda tree: _call_with_keywords(tree, "apply_llm_request_middleware", ("provider", "model"))),
-        (HERMES_DISPATCH_SOURCE, "sets HERMES_KANBAN_TASK and HERMES_KANBAN_BOARD in the worker environment",
-         lambda tree: _subscript_store(tree, "HERMES_KANBAN_TASK") and _subscript_store(tree, "HERMES_KANBAN_BOARD")),
+        (HERMES_DISPATCH_SOURCE, "sets HERMES_KANBAN_TASK and HERMES_KANBAN_BOARD in os.environ in bind_worker_context",
+         lambda tree: _function_sets_environment(tree, "bind_worker_context",
+                                                 ("HERMES_KANBAN_TASK", "HERMES_KANBAN_BOARD"))),
         (HERMES_ZAI_SOURCE, 'sets top_level["reasoning_effort"]',
          lambda tree: _subscript_store(tree, "reasoning_effort", "top_level")),
     )
@@ -2779,7 +2806,8 @@ def main():
                 fail(errors, f"behavior-changing unexpected profile: {name}")
             else:
                 check_plugins(errors, warnings, name, expected[name]["required_plugins"], observed_plugins,
-                              snapshot["plugins"], expected[name].get("installed_disabled_plugins"))
+                              snapshot["plugins"], expected[name].get("installed_disabled_plugins"),
+                              configured_providers(expected[name]))
         for name in observed.get("active_extras", []):
             fail(errors, f"behavior-changing unexpected profile: {name}")
         for name in observed.get("dormant_extras", []):
@@ -2827,7 +2855,7 @@ def main():
                         for message in full_pin_errors(name, snapshot["plugins"].get(PONYTAIL)):
                             fail(errors, message)
                     check_plugins(errors, warnings, name, profile["required_plugins"], state, snapshot["plugins"],
-                                  profile.get("installed_disabled_plugins"))
+                                  profile.get("installed_disabled_plugins"), configured_providers(profile))
         check_managed_setting_groups(errors, roster, fleets, expected, json_config)
         check_fallback_settings(errors, roster, json_config)
         check_auxiliary_models(errors, roster, json_config, allowed_models)

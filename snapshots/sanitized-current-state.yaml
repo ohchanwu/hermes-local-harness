@@ -662,7 +662,7 @@
   },
   "hermes_source": {
     "path": "/Users/chanbla11mit/.hermes/hermes-agent",
-    "commit": "9cf7960f274ea2bdfe672d64d26389e9954dfeb6",
+    "commit": "caafe5389ae585ef77387a962aee05b1bcf17029",
     "clean": true
   },
   "project_isolation": {
