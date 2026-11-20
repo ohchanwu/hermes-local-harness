@@ -29,7 +29,9 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import types
 import unittest.mock as mock
+from contextlib import closing
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -104,8 +106,11 @@ def observe(base, home):
     import yaml  # noqa: F401  (std-lib yaml is part of the Hermes venv)
     import hermes_constants
     import agent.shell_hooks as shell_hooks
-    import hermes_cli.kanban_db_dispatch as dispatch
     import model_tools
+    from gateway.session_kanban import build_kanban_policy
+    from gateway.session_policy import register_worker_hooks
+    from hermes_cli import kanban_db as kb
+    from hermes_cli.kanban_db_connect import connect as kanban_connect
     from hermes_cli.plugins import get_plugin_manager
 
     assert str(hermes_constants.get_hermes_home()) == str(home)
@@ -253,20 +258,51 @@ def observe(base, home):
              c2, f"result={json.dumps(result)[:300]}, the hook returns None (fail open) of agent/shell_hooks.py "
                  f"_evaluate_result lines 406 to 413 (fail_closed is False)")
 
-    # d. _worker_argv contains --accept-hooks.
-    task = dispatch._kb.Task(
-        id="t_observe", title="observation", body=None, assignee="harness-reviewer-glm",
-        status="ready", priority=0, created_by="observer", created_at=0,
-        started_at=None, completed_at=None,
-        workspace_kind="scratch", workspace_path=None, claim_lock=None, claim_expires=None,
-        tenant=None, skills=None, model_override=None, provider_override=None,
-        reasoning_effort=None)
-    argv = dispatch._worker_argv(task, "harness-reviewer-glm", str(home))
-    d1 = "--accept-hooks" in argv
-    observed("d1 _worker_argv of a dispatcher-started worker contains --accept-hooks",
-             d1, f"argv={argv}, flag at hermes_cli/kanban_db_dispatch.py line 2754, registered in the worker "
-                 f"process by hermes_cli/main.py _prepare_agent_startup lines 3012 to 3028 and 3088 to 3093 "
-                 f"(register_from_config(load_config(), accept_hooks=_accept_hooks))")
+    # d. The session setup of a dispatcher-started worker registers the hook.
+    # Since Hermes v0.23.3, _worker_argv (hermes_cli/kanban_db_dispatch.py lines 2639 to 2642)
+    # starts hermes_cli.kanban_worker_client, which sends kanban.run to the profile owner; the
+    # owner builds the session policy with gateway/session_kanban.py build_kanban_policy, and
+    # the managed worker registers the hooks with gateway/session_policy.py
+    # register_worker_hooks. Both real functions run here on a temporary board with no
+    # allowlist file, so the consent can only come from accept_hooks=True of the Kanban context.
+    shell_hooks.reset_for_tests()
+    drop_pre_tool_call_hooks()
+    allowlist_path.unlink(missing_ok=True)
+    board_db = kb.kanban_db_path(board="default")
+    if not board_db.resolve().is_relative_to(base.resolve()):
+        observed("d1 the temporary board is inside the temporary directory", False, f"board={board_db}")
+    else:
+        kb.init_db(board="default")
+        workspace = home / "workspace"
+        workspace.mkdir()
+        with closing(kanban_connect(board="default")) as conn:
+            # Assignee default: the temporary home is the default profile; a named profile
+            # needs a profile directory with an identity (hermes_constants.named_profile_is_live).
+            task_id = kb.create_task(conn, title="observation", assignee="default",
+                                     workspace_kind="dir", workspace_path=str(workspace))
+            task = kb.claim_task(conn, task_id)
+        # Stand-in for the profile owner's connection; build_kanban_policy lines 18 to 22 check these fields.
+        owner = types.SimpleNamespace(
+            native_owner=True, authority=types.SimpleNamespace(profile_id=str(home)),
+            actor=types.SimpleNamespace(profile_id=str(home), capabilities={"session:create"}))
+        params = {"board": "default", "task_id": task.id, "run_id": task.current_run_id,
+                  "claim_lock": task.claim_lock, "db": str(board_db)}
+        # A model in the config keeps build_kanban_policy from importing gateway.run (lines 58 to 60).
+        policy, _private = build_kanban_policy(
+            owner, params, {**cfg, "model": {"default": "glm-5.3", "provider": "zai"}})
+        kanban_accept = json.loads(policy.kanban_json).get("accept_hooks")
+        allowlist_absent = not allowlist_path.exists()
+        register_worker_hooks(policy)
+        result = call("kanban_complete", {"summary": "observation"})
+        d1 = (kanban_accept is True and allowlist_absent
+              and isinstance(result, dict) and "A GLM reviewer may not call" in result.get("error", ""))
+        observed("d1 the session setup of a dispatcher-started worker registers the hook without an allowlist "
+                 "entry, and kanban_complete is then blocked with the script's message",
+                 d1, f"kanban context accept_hooks={kanban_accept!r}, allowlist file absent before "
+                     f"registration={allowlist_absent}, result={json.dumps(result)[:300]}, "
+                     f"accept_hooks=True set by gateway/session_kanban.py build_kanban_policy line 65, read by "
+                     f"gateway/session_policy.py register_worker_hooks lines 851 to 856, called by "
+                     f"agent/managed_worker.py execute lines 424 to 426")
 
     # e. An exception inside _dispatch_pre_tool_call_hooks.
     with mock.patch("hermes_cli.plugins._dispatch_pre_tool_call_hooks",
