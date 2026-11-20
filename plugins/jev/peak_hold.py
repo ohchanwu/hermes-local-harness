@@ -38,6 +38,7 @@ Reads go through the documented commands ``hermes kanban --board <board> show
 from __future__ import annotations
 
 import json
+import logging
 import os
 import shlex
 import shutil
@@ -64,6 +65,33 @@ WORKER_SESSION_ENV_NAMES = ("HERMES_KANBAN_TASK", "HERMES_KANBAN_RUN_ID",
 DEFAULT_KANBAN_HOME = "/Users/chanbla11mit/.hermes"
 READ_ERROR_STATE_FILE_NAME = "read-error-state.json"
 READ_ERROR_LOG_INTERVAL_SECONDS = 3600
+
+
+# --- absent Hermes names ------------------------------------------------------
+
+_LOGGER = logging.getLogger("jev")
+# The Hermes names that this process has already reported with a WARNING record.
+WARNED_HERMES_NAMES: set = set()
+
+
+def warn_missing_hermes_name(name: str, feature: str) -> None:
+    """Write one Python ``logging`` record at level WARNING per process for
+    each absent Hermes name (decision record
+    ``docs/decisions/261120-plugin-behaviour-across-hermes-updates.md``,
+    change 2). ``name`` and ``feature`` are fixed texts of the plugin; the
+    record holds no card text, tool output, token or credential. Never raises.
+    """
+    try:
+        if name in WARNED_HERMES_NAMES:
+            return
+        WARNED_HERMES_NAMES.add(name)
+        _LOGGER.warning("jev: the Hermes name %s is absent; jev turns off %s", name, feature)
+    except Exception:
+        pass
+
+
+SOURCE_STATUS_NAME = "payload field source_status of the Kanban event blocked"
+SOURCE_STATUS_FEATURE = "the GLM review pass and the release of GLM review runs held in review"
 
 
 # --- window ---------------------------------------------------------------
@@ -413,7 +441,11 @@ def _held_reason(card: Mapping[str, Any], mark: str) -> Optional[str]:
     if card["task"].get("status") != "scheduled":
         return None
     event = newest_event(card, "scheduled")
-    reason = event_payload(event.get("payload")).get("reason") if event is not None else None
+    payload = event_payload(event.get("payload")) if event is not None else {}
+    if event is not None and "reason" not in payload:
+        warn_missing_hermes_name("payload field reason of the Kanban event scheduled",
+                                 "the recognition of cards that the peak-hours hold scheduled")
+    reason = payload.get("reason")
     return reason if carries_marker(reason, mark) else None
 
 
@@ -495,6 +527,8 @@ def _card_matches_pass(card: Optional[Mapping[str, Any]], glm_reviewer: str,
     reason = payload.get("reason")
     if not (isinstance(reason, str) and reason.startswith(GLM_REVIEW_PASS_PREFIX)):
         return False
+    if "source_status" not in payload:
+        warn_missing_hermes_name(SOURCE_STATUS_NAME, SOURCE_STATUS_FEATURE)
     if payload.get("source_status") != "review":
         return False
     return _run_profile(card, event.get("run_id")) == glm_reviewer
@@ -669,7 +703,11 @@ def _review_hold_reason(card: Optional[Mapping[str, Any]], glm_reviewer: str,
         return None
     payload = event_payload(event.get("payload"))
     reason = payload.get("reason")
-    if not carries_marker(reason, mark) or payload.get("source_status") != "review":
+    if not carries_marker(reason, mark):
+        return None
+    if "source_status" not in payload:
+        warn_missing_hermes_name(SOURCE_STATUS_NAME, SOURCE_STATUS_FEATURE)
+    if payload.get("source_status") != "review":
         return None
     return reason
 
@@ -828,6 +866,20 @@ def run_kanban(config: Mapping[str, Any], board: Optional[str], args: List[str],
     if completed.returncode != 0:
         return False, "CommandFailed"
     return True, None
+
+
+def kanban_option_absent(config: Mapping[str, Any], board: str, verb: str, option: str,
+                         command: Optional[str] = None) -> bool:
+    """True when ``<hermes> kanban --board <board> <verb> --help`` exits 0 and
+    its output does not name ``option``; False on every other outcome. The
+    help text holds no card text."""
+    try:
+        argv = hermes_argv(config, command) + ["kanban", "--board", board, verb, "--help"]
+        completed = subprocess.run(argv, stdin=subprocess.DEVNULL, capture_output=True, encoding="utf-8",
+                                   errors="replace", timeout=_command_timeout(config), check=False)
+    except Exception:
+        return False
+    return completed.returncode == 0 and option not in (completed.stdout or "")
 
 
 def hold_card(config: Mapping[str, Any], board: str, task_id: str, until: str,

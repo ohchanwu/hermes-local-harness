@@ -137,6 +137,23 @@ def _field_text(result, field):
     return text if isinstance(text, str) else None
 
 
+def _field_absent(result, tool_name):
+    """True when ``result`` is a JSON object without an error and without the
+    text field of ``tool_name`` (decision record
+    docs/decisions/261120-plugin-behaviour-across-hermes-updates.md, row J6)."""
+    try:
+        parsed = json.loads(result)
+    except (TypeError, ValueError):
+        return False
+    if not isinstance(parsed, dict) or parsed.get("error") or TEXT_FIELDS[tool_name] in parsed:
+        return False
+    # Hermes leaves matches_text out of a search_files result with fewer than
+    # five matches and writes it together with matches_format
+    # (tools/file_operations_common.py, SearchResult.to_dict), so for
+    # search_files only a result with matches_format shows that the field is absent.
+    return tool_name != "search_files" or "matches_format" in parsed
+
+
 def _encoded_literal(result, text):
     """Return (encoded, ensure_ascii) where ``encoded`` occurs exactly once in ``result``.
 
@@ -247,7 +264,7 @@ def _append_removal(parts, removed, saved_path):
     parts.append(prefix + REMOVAL_LINE.format(lines=lines, path=saved_path) + "\n")
 
 
-def _filter(*, tool_name, args, result, session_id, profile, settings, ask, log, cache_dir):
+def _filter(*, tool_name, args, result, session_id, profile, settings, ask, log, cache_dir, warn=None):
     if isinstance(settings, dict) and settings.get("enabled") is False:
         return None
     if tool_name in NEVER_FILTERED:
@@ -263,6 +280,9 @@ def _filter(*, tool_name, args, result, session_id, profile, settings, ask, log,
 
     text = _field_text(result, TEXT_FIELDS[tool_name])
     if text is None:
+        if callable(warn) and _field_absent(result, tool_name):
+            warn(f"result field {TEXT_FIELDS[tool_name]} of the Hermes tool {tool_name}",
+                 f"the shortening of {tool_name} results")
         _write_log(log, _record(profile, session_id, tool_name, action="skipped",
                                 reason="unrecognised_format"))
         return None
@@ -345,11 +365,16 @@ def _filter(*, tool_name, args, result, session_id, profile, settings, ask, log,
         return None
 
 
-def transform(*, tool_name, args, result, session_id, profile, settings, ask, log, cache_dir):
-    """Return the filtered result string, or None to leave the result unchanged."""
+def transform(*, tool_name, args, result, session_id, profile, settings, ask, log, cache_dir, warn=None):
+    """Return the filtered result string, or None to leave the result unchanged.
+
+    ``warn(name, feature)``, when given, is called for a result that is a JSON
+    object without an error and without the text field (``_field_absent``).
+    """
     try:
         return _filter(tool_name=tool_name, args=args, result=result, session_id=session_id,
-                       profile=profile, settings=settings, ask=ask, log=log, cache_dir=cache_dir)
+                       profile=profile, settings=settings, ask=ask, log=log, cache_dir=cache_dir,
+                       warn=warn)
     except Exception as exc:
         _write_log(log, _record(profile, session_id if isinstance(session_id, str) else None,
                                 tool_name if isinstance(tool_name, str) else None,

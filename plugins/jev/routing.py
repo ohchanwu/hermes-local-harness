@@ -77,8 +77,11 @@ except ImportError:  # loaded directly by the tests
 
 QUESTION_ID = "route"
 ASSIGNED_WORKER_LINE = re.compile(r"^(Assigned worker EXACT )([A-Za-z0-9][A-Za-z0-9_-]*)", re.MULTILINE)
-# Hermes task IDs are "t_" plus hexadecimal digits (hermes_cli/kanban_db.py _new_task_id).
-_HERMES_TASK_ID = re.compile(r"t_[0-9a-f]{4,32}")
+# A task ID: a letter or digit, then up to 63 letters, digits, "_" or "-". The
+# first character is not "-", so a task ID passed to ``hermes kanban`` cannot be
+# read as a command option (decision record
+# docs/decisions/261120-plugin-behaviour-across-hermes-updates.md, row J23).
+_HERMES_TASK_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]{0,63}")
 STATE_FILE_NAME = "routing-state.json"
 
 
@@ -264,6 +267,12 @@ def _create_result(result: Any) -> Tuple[Optional[str], Optional[str]]:
         return None, None
     if not isinstance(parsed, dict):
         return None, None
+    if not parsed.get("error") and parsed.get("ok") is not False:
+        for key in ("task_id", "status"):
+            if key not in parsed:
+                peak_hold.warn_missing_hermes_name(
+                    f"result field {key} of the Hermes tool kanban_create",
+                    "the task ID in the route record and the peak-hours hold at card creation")
     task_id = parsed.get("task_id")
     if not isinstance(task_id, str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", task_id):
         return None, None
@@ -297,7 +306,7 @@ def _configured_board(board: Any, config: Mapping[str, Any]) -> Optional[str]:
 
 
 def _arg_task_id(value: Any) -> Optional[str]:
-    """A task ID taken from tool arguments, only when it has the Hermes form ``t_<hex>``."""
+    """A task ID taken from tool arguments, only when it matches ``_HERMES_TASK_ID``."""
     return value if isinstance(value, str) and _HERMES_TASK_ID.fullmatch(value) else None
 
 
@@ -623,8 +632,12 @@ def _change_request_payloads(card: Optional[Mapping[str, Any]]) -> List[Dict[str
     (``show --json`` order); a payload that is not an object is an empty dict,
     and a missing card has no events."""
     events = (card or {}).get("events") or []
-    return [peak_hold.event_payload(event.get("payload")) for event in events
-            if isinstance(event, Mapping) and event.get("kind") == "changes_requested"]
+    payloads = [peak_hold.event_payload(event.get("payload")) for event in events
+                if isinstance(event, Mapping) and event.get("kind") == "changes_requested"]
+    if any("reviewer" not in payload for payload in payloads):
+        peak_hold.warn_missing_hermes_name("payload field reviewer of the Kanban event changes_requested",
+                                           "the count of change requests by reviewer")
+    return payloads
 
 
 def _card_change_request_reviewers(card: Optional[Mapping[str, Any]], opus_reviewer: str,
@@ -709,7 +722,7 @@ def handle_request_review(args: Mapping[str, Any], next_call: Callable[..., Any]
 
     In a GLM worker session, clear the card's model override first so that the
     reviewer run does not start with the GLM model and the ``zai`` provider.
-    Only a task ID of the Hermes form and a board in ``routing.boards`` are
+    Only a task ID that matches ``_HERMES_TASK_ID`` and a board in ``routing.boards`` are
     used and logged; other argument values are never written to a log.
 
     Then, in a GLM worker session with ``routing.enabled`` true, the reviewer
@@ -737,7 +750,7 @@ def handle_request_review(args: Mapping[str, Any], next_call: Callable[..., Any]
       with no ``reviewer`` argument Hermes uses the reviewer of the card's
       latest ``changes_requested`` event.
     - Missing data (no ``opus_reviewer`` or no ``glm_reviewers`` on the board,
-      a task ID that is not of the Hermes form, a board that is not in
+      a task ID that does not match ``_HERMES_TASK_ID``, a board that is not in
       ``routing.boards``, or a read error of the card): the arguments are
       unchanged, as at the baseline.
     - In every other session (Claude workers, reviewers, orchestrators) the
@@ -809,6 +822,7 @@ def handle_request_review(args: Mapping[str, Any], next_call: Callable[..., Any]
 # ``running`` when a dispatcher tick claimed it for the GLM worker before the
 # reassignment, ``scheduled`` when the peak-hours hold held it first.
 _ESCALATION_STATUSES = ("ready", "todo", "running", "scheduled")
+_RECLAIM_NAME = "option --reclaim of the command hermes kanban reassign"
 
 
 def change_request_limit(route: Mapping[str, Any], routing: Mapping[str, Any]) -> int:
@@ -1078,6 +1092,10 @@ def handle_request_changes(args: Mapping[str, Any], next_call: Callable[..., Any
             if ok:
                 ok, error_class = peak_hold.run_kanban(
                     config, board, ["reassign", task_id, new_assignee, "--reclaim"], command)
+                if (not ok and _RECLAIM_NAME not in peak_hold.WARNED_HERMES_NAMES
+                        and peak_hold.kanban_option_absent(config, board, "reassign", "--reclaim", command)):
+                    peak_hold.warn_missing_hermes_name(
+                        _RECLAIM_NAME, "the move of a GLM card to a Claude worker after change requests")
             record.update(applied=ok, error_class=error_class)
             if not ok:
                 record["new_assignee"] = assignee
